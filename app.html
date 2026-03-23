@@ -912,7 +912,6 @@ function setSingle(f) { sFile=f; const fs=document.getElementById('sfs'); fs.sty
 function clearSingle() { sFile=null; document.getElementById('sfi').value=''; document.getElementById('sfs').style.display='none'; document.getElementById('sdz').style.display='block'; }
 
 async function runSingle() {
-  if (!getKey()) { toggleSettings(); toast('Enter API key first','err'); return; }
   if (!sFile) { toast('Upload a PDF first','err'); return; }
   const btn=document.getElementById('sabtn');
   btn.disabled=true; btn.classList.add('loading');
@@ -1017,7 +1016,6 @@ function renderQueue(){
 function clearBatch(){bFiles=[];bSaved=0;bRunning=false;document.getElementById('bfi').value='';document.getElementById('bqueue').innerHTML='';document.getElementById('bresults').innerHTML='';document.getElementById('babtn').style.display='none';document.getElementById('bclrbtn').style.display='none';document.getElementById('bprogwrap').style.display='none';document.getElementById('bclrallwrap').style.display='none';window.scrollTo({top:0,behavior:'smooth'});toast('Batch cleared','ok');}
 
 async function runBatch(){
-  if(!getKey()){toggleSettings();toast('Enter API key','err');return;}
   if(!bFiles.length){toast('Upload PDFs first','err');return;}
   if(bRunning)return;
   bRunning=true;
