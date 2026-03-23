@@ -1282,6 +1282,29 @@ function highlightTierBreakdown(html) {
   );
 }
 
+async function logout() {
+  try {
+    await fetch('/api/logout', {method:'POST', credentials:'include', headers:{'Content-Type':'application/json','X-Session':getToken()}});
+  } catch(e){}
+  sessionStorage.removeItem('cif_token');
+  sessionStorage.removeItem('cif_user');
+  document.cookie = 'cif_token=; Path=/; Max-Age=0';
+  window.location.replace('/');
+}
+
+// Auto logout after 5 min inactivity
+(function(){
+  let t;
+  function reset(){
+    clearTimeout(t);
+    t=setTimeout(()=>{toast('Session expired — logging out...','err');setTimeout(logout,1500);},300000);
+  }
+  ['mousemove','mousedown','keypress','scroll','touchstart','click'].forEach(e=>{
+    document.addEventListener(e,reset,{passive:true});
+  });
+  reset();
+})();
+
 function toB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
 function fmtSz(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(1)+' MB';}
 function toast(msg,type=''){const t=document.getElementById('toastel');t.textContent=msg;t.className='toast '+(type||'')+' show';clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3200);}

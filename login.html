@@ -10,10 +10,9 @@
 body{background:linear-gradient(135deg,#0f4425 0%,#1a6b3c 50%,#0f4425 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:'Poppins',sans-serif;padding:1rem}
 .card{background:white;border-radius:24px;padding:48px 40px;width:100%;max-width:400px;box-shadow:0 32px 80px rgba(0,0,0,.25)}
 .logo{text-align:center;margin-bottom:32px}
-.logo img{height:44px;object-fit:contain}
+.logo img{height:34px;object-fit:contain}
 .logo-txt{font-size:22px;font-weight:800;color:#1a6b3c;display:none}
-.title{font-size:22px;font-weight:700;color:#0e1a12;text-align:center;margin-bottom:6px;letter-spacing:-.02em}
-.sub{font-size:14px;color:#6b7c72;text-align:center;margin-bottom:28px}
+
 .field{margin-bottom:18px}
 label{display:block;font-size:12px;font-weight:700;color:#2d4235;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
 input{width:100%;border:1.5px solid #ccd6ce;border-radius:10px;padding:13px 14px;font-size:15px;font-family:'Poppins',sans-serif;color:#0e1a12;transition:border-color .15s,box-shadow .15s}
@@ -31,12 +30,10 @@ input:focus{outline:none;border-color:#1a6b3c;box-shadow:0 0 0 3px rgba(26,107,6
 </head>
 <body>
 <div class="card">
-  <div class="logo">
+  <div class="logo" style="margin-bottom:28px">
     <img src="https://sp-ao.shortpixel.ai/client/to_webp,q_lossless,ret_img/https://cashinflash.com/wp-content/uploads/2025/08/logo_500px.png" alt="Cash in Flash" onerror="this.style.display='none';document.querySelector('.logo-txt').style.display='block'">
     <div class="logo-txt">Cash in Flash</div>
   </div>
-  <div class="title">Underwriting Portal</div>
-  <div class="sub">Sign in to access the dashboard</div>
   <div class="field">
     <label>Username</label>
     <input type="text" id="username" placeholder="Enter username" autocomplete="username">
