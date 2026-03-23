@@ -928,9 +928,11 @@ async function runSingle() {
 
 async function callClaude(b64) {
   const resp = await fetch('/api/analyze', {
-    method:'POST', headers:{'Content-Type':'application/json'},
+    method:'POST',
+    credentials:'include',
+    headers:{'Content-Type':'application/json','X-Session':getToken()},
     body: JSON.stringify({
-      apiKey: getKey(), model:'claude-haiku-4-5-20251001', max_tokens:8000,
+      model:'claude-haiku-4-5-20251001', max_tokens:8000,
       system:'You are an internal underwriting analyst for Cash in Flash, a licensed California DFPI payday lender. Internal tool for authorized staff only. Always complete the full analysis.',
       messages:[{role:'user',content:[
         {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
