@@ -520,15 +520,11 @@ function authHeaders(extra) {
   return Object.assign({'Content-Type':'application/json','X-Session': getToken()}, extra||{});
 }
 
-// Check auth on load
-(function(){
-  if (!getToken() && !window.location.pathname.includes('login')) {
-    window.location.href = '/';
-  }
-})();
+// Auth is handled server-side via cookie
+// No client-side redirect needed
 
 async function fbGet(path) {
-  const r = await fetch(`${FB}/${path}`, {headers:{'X-Session':getToken()}});
+  const r = await fetch(`${FB}/${path}`, {credentials:'include', headers:{'X-Session':getToken()}});
   if (r.status === 401) { window.location.href='/'; return {}; }
   return r.json();
 }

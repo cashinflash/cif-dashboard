@@ -102,10 +102,18 @@ class Handler(BaseHTTPRequestHandler):
             else: self.send_bytes(404, b'Not found')
             return
 
-        # App — requires session
+        # App — check token from cookie or query param
         if path in ('/app', '/app.html', '/dashboard'):
-            if not valid_session(self.get_session()):
-                # Redirect to login
+            # Get token from cookie
+            cookies = {}
+            cookie_header = self.headers.get('Cookie', '')
+            for c in cookie_header.split(';'):
+                c = c.strip()
+                if '=' in c:
+                    k, v = c.split('=', 1)
+                    cookies[k.strip()] = v.strip()
+            token = cookies.get('cif_token', '') or self.get_session()
+            if not valid_session(token):
                 self.send_response(302)
                 self.send_header('Location', '/')
                 self.end_headers()
@@ -117,7 +125,13 @@ class Handler(BaseHTTPRequestHandler):
 
         # Firebase proxy — requires session
         if path.startswith('/fb/'):
-            if not valid_session(self.get_session()):
+            cookies = {}
+            for c in self.headers.get('Cookie','').split(';'):
+                c=c.strip()
+                if '=' in c:
+                    k,v=c.split('=',1); cookies[k.strip()]=v.strip()
+            tok = cookies.get('cif_token','') or self.get_session()
+            if not valid_session(tok):
                 self.send_json(401, {'error':'Unauthorized'}); return
             fb_path = path[4:]
             try:
@@ -166,7 +180,14 @@ class Handler(BaseHTTPRequestHandler):
                 password = body.get('password','').strip()
                 if USERS.get(username) == password:
                     token = make_session(username)
-                    self.send_json(200, {'ok': True, 'token': token, 'user': username})
+                    resp_body = json.dumps({'ok': True, 'token': token, 'user': username}).encode()
+                    self.send_response(200)
+                    for k,v in CORS.items(): self.send_header(k,v)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_header('Content-Length', str(len(resp_body)))
+                    self.send_header('Set-Cookie', f'cif_token={token}; Path=/; SameSite=Lax; Max-Age=43200')
+                    self.end_headers()
+                    self.wfile.write(resp_body)
                 else:
                     self.send_json(401, {'ok': False, 'error': 'Invalid username or password'})
             except Exception as e:

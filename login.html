@@ -61,12 +61,18 @@ async function login() {
   if (!u || !p) { err.textContent='Please enter username and password'; err.classList.add('show'); return; }
   btn.disabled=true; btn.classList.add('loading'); err.classList.remove('show');
   try {
-    const r = await fetch('/api/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    const r = await fetch('/api/login', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      credentials:'include',
+      body:JSON.stringify({username:u,password:p})
+    });
     const d = await r.json();
     if (d.ok) {
-      sessionStorage.setItem('cif_token', d.token);
+      // Cookie is set by server — just navigate
       sessionStorage.setItem('cif_user', d.user);
-      window.location.href = '/app.html';
+      sessionStorage.setItem('cif_token', d.token);
+      window.location.replace('/app.html');
     } else {
       err.textContent = d.error || 'Invalid credentials';
       err.classList.add('show');
@@ -78,9 +84,6 @@ async function login() {
     btn.disabled=false; btn.classList.remove('loading');
   }
 }
-// If already logged in, redirect to app
-const tok = sessionStorage.getItem('cif_token');
-if (tok) window.location.href = '/app.html';
 </script>
 </body>
 </html>
