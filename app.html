@@ -1139,7 +1139,41 @@ function openModal(fbId){
   const a=apps.find(x=>x.firebaseId===fbId);if(!a)return;
   const ok=a.status==='Approved',dc=ok?'ok':a.status==='Declined'?'no':'';
   document.getElementById('mtitle').textContent=a.name||'Application';
-  document.getElementById('mbody').innerHTML=`<div class="mdh ${dc}"><div class="mdi">${ok?'✓':a.status==='Declined'?'✕':'⏳'}</div><div style="flex:1"><div class="mdn">${a.name||'—'}</div>${ok?`<div class="mda">${a.amount||''}</div>`:''} ${a.reason?`<div class="mdr" style="display:block!important">${a.reason}</div>`:''}</div><canvas id="mwh" width="86" height="86"></canvas></div><div class="mmeta"><div class="mmi"><div class="mml">Status</div><div class="mmv"><span class="pill pill-${a.status?.toLowerCase()}">${a.status}</span></div></div><div class="mmi"><div class="mml">Amount</div><div class="mmv">${ok?(a.amount||'—'):'N/A'}</div></div><div class="mmi"><div class="mml">Profile</div><div class="mmv">${a.profile||'—'}</div></div><div class="mmi"><div class="mml">Score</div><div class="mmv">${a.score||0}/100</div></div><div class="mmi" style="grid-column:span 2"><div class="mml">Document</div><div class="mmv" style="font-size:12px;word-break:break-all">${a.filename||'—'}</div></div></div><div class="msec">Full Underwriting Report</div><div class="mrhtml">${highlightTierBreakdown(a.report||'')}</div><div class="msec">Notes</div><textarea class="mnta" id="mnt${fbId}" placeholder="Add notes...">${a.notes||''}</textarea><button class="nsave" onclick="saveModalNotes('${fbId}')">Save Notes</button><div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;align-items:center">${a.status!=='Approved'?`<div style="display:flex;align-items:center;gap:6px;background:var(--green-light);border:1px solid var(--green-border);border-radius:9px;padding:6px 12px"><span style="font-size:13px;font-weight:600;color:var(--green)">$</span><input id="modal-approve-amt" type="text" placeholder="Amount" value="${a.amount&&a.amount!=='N/A'?a.amount.replace('$',''):''}" style="width:70px;border:none;background:transparent;font-size:14px;font-weight:700;color:var(--green);outline:none;font-family:var(--sans)"><button class="actbtn btn-ok" onclick="updStatusWithAmt('${fbId}','Approved')" style="padding:6px 14px">✓ Approve</button></div>`:''} ${a.status!=='Declined'?`<button class="actbtn btn-no" onclick="updStatus('${fbId}','Declined')">✕ Decline</button>`:''}<button class="actbtn btn-gh" onclick="copyModal('${fbId}')">⎘ Copy</button><button class="actbtn btn-gh" style="color:var(--red);border-color:var(--red-border)" onclick="delApp('${fbId}')">🗑 Delete</button></div>
+  document.getElementById('mbody').innerHTML=`
+<div class="mdh ${dc}">
+  <div class="mdi">${ok?'✓':a.status==='Declined'?'✕':'⏳'}</div>
+  <div style="flex:1">
+    <div class="mdn">${a.name||'—'}</div>
+    ${ok?`<div class="mda">${a.amount||''}</div>`:''}
+    ${a.reason?`<div class="mdr" style="display:block!important">${a.reason}</div>`:''}
+  </div>
+  <canvas id="mwh" width="86" height="86"></canvas>
+</div>
+<div class="mmeta">
+  <div class="mmi"><div class="mml">Status</div><div class="mmv"><span class="pill pill-${a.status?.toLowerCase()}">${a.status}</span></div></div>
+  <div class="mmi"><div class="mml">Amount</div><div class="mmv">${ok?(a.amount||'—'):'N/A'}</div></div>
+  <div class="mmi"><div class="mml">Score</div><div class="mmv">${a.score||0}/100</div></div>
+</div>
+<div style="display:flex;gap:8px;padding:14px 0;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap;align-items:center">
+  ${a.status!=='Approved'?`<div style="display:flex;align-items:center;gap:6px;background:var(--green-light);border:1px solid var(--green-border);border-radius:9px;padding:6px 12px"><span style="font-size:13px;font-weight:600;color:var(--green)">$</span><input id="modal-approve-amt" type="text" placeholder="Amount" value="${a.amount&&a.amount!=='N/A'?a.amount.replace('$',''):''}" style="width:70px;border:none;background:transparent;font-size:14px;font-weight:700;color:var(--green);outline:none;font-family:var(--sans)"><button class="actbtn btn-ok" onclick="updStatusWithAmt('${fbId}','Approved')" style="padding:6px 14px">✓ Approve</button></div>`:''}
+  ${a.status!=='Declined'?`<button class="actbtn btn-no" onclick="updStatus('${fbId}','Declined')">✕ Decline</button>`:''}
+  <button class="actbtn btn-gh" onclick="copyModal('${fbId}')">⎘ Copy</button>
+  <button class="actbtn btn-gh" style="color:var(--red);border-color:var(--red-border)" onclick="delApp('${fbId}')">🗑 Delete</button>
+</div>
+<div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:16px">
+  <button onclick="mTab('report','${fbId}',this)" id="mtab-report-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--green);border-bottom:2px solid var(--green);cursor:pointer;font-family:var(--sans)">📄 Report</button>
+  ${a.applicationData?`<button onclick="mTab('appdata','${fbId}',this)" id="mtab-appdata-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📋 Application</button>`:''}
+  ${(a.govIdB64||a.bankStatementB64||a.paystubB64)?`<button onclick="mTab('docs','${fbId}',this)" id="mtab-docs-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📁 Documents</button>`:''}
+</div>
+<div id="mpanel-report-${fbId}"><div class="mrhtml">${highlightTierBreakdown(stripFences(a.report||''))}</div></div>
+${a.applicationData?`<div id="mpanel-appdata-${fbId}" style="display:none">${buildAppDetails(a.applicationData)}</div>`:''}
+${(a.govIdB64||a.bankStatementB64||a.paystubB64)?`<div id="mpanel-docs-${fbId}" style="display:none">${buildDocsPanel(a)}</div>`:''}
+<div class="msec" style="margin-top:16px">Notes</div>
+<textarea class="mnta" id="mnt${fbId}" placeholder="Add notes...">${a.notes||''}</textarea>
+<div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+  <button class="nsave" onclick="saveModalNotes('${fbId}')">Save Notes</button>
+  <span style="font-size:11px;color:var(--muted)">Auto-saves as you type</span>
+</div>
 
 `;
   document.getElementById('ov').classList.add('open');
@@ -1296,6 +1330,11 @@ function drawWheel(id,score,size){
 // ════════════════════════════════════════
 // UTILS
 // ════════════════════════════════════════
+function stripFences(html) {
+  if (!html) return '';
+  return html.replace(/^```[a-z]*\n?/gim, '').replace(/```\s*$/gim, '').trim();
+}
+
 function highlightTierBreakdown(html) {
   // Wrap the tier breakdown block (Free Cash Flow through Final Decision) in a styled div
   return html.replace(
