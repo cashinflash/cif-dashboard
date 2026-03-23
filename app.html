@@ -532,6 +532,7 @@ async function fbGet(path) {
 async function fbPost(path, data) {
   const r = await fetch(`${FB}/${path}`, {
     method: 'POST',
+    credentials: 'include',
     headers: authHeaders(),
     body: JSON.stringify(data)
   });
@@ -542,6 +543,7 @@ async function fbPost(path, data) {
 async function fbPatch(path, data) {
   const r = await fetch(`${FB}/${path}`, {
     method: 'POST',
+    credentials: 'include',
     headers: authHeaders({'X-Method':'PATCH'}),
     body: JSON.stringify(data)
   });
@@ -552,6 +554,7 @@ async function fbPatch(path, data) {
 async function fbDelete(path) {
   await fetch(`${FB}/${path}`, {
     method: 'POST',
+    credentials: 'include',
     headers: authHeaders({'X-Method':'DELETE'}),
     body: '{}'
   });
@@ -598,37 +601,14 @@ window.onload = async () => {
 
 
 async function loadKey() {
-  try {
-    const r = await fetch('/api/key');
-    const d = await r.json();
-    if (d.key) {
-      window._apiKey = d.key;
-      document.getElementById('kstat').className = 'kstat ok';
-      document.getElementById('kstat').innerHTML = '<span>●</span><span>Key saved</span>';
-      const nudge = document.getElementById('nudge');
-      if (nudge) nudge.style.display = 'none';
-      const inp = document.getElementById('api-in');
-      if (inp) inp.value = d.key;
-    } else {
-      document.getElementById('nudge').style.display = 'flex';
-    }
-  } catch(e) { console.warn('Key load:', e); }
+  // API key is stored server-side — just update user label
+  const lbl = document.getElementById('user-label');
+  if (lbl) lbl.textContent = sessionStorage.getItem('cif_user') || 'User';
 }
 
-async function saveKey() {
-  const k = document.getElementById('api-in').value.trim();
-  if (!k.startsWith('sk-ant-')) { toast('Invalid key','err'); return; }
-  await fetch('/api/key', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k})});
-  window._apiKey = k;
-  document.getElementById('kstat').className = 'kstat ok';
-  document.getElementById('kstat').innerHTML = '<span>●</span><span>Key saved</span>';
-  document.getElementById('sp').classList.remove('open');
-  document.getElementById('nudge').style.display = 'none';
-  toast('API key saved ✓','ok');
-}
-
-function getKey() { return window._apiKey || ''; }
-function toggleSettings() { document.getElementById('sp').classList.toggle('open'); }
+async function saveKey() {}
+function getKey() { return 'server-side'; }
+function toggleSettings() {}
 
 function startDots() {
   const dots=['d1','d2','d3','d4','d5']; let i=0;
