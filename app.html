@@ -1209,7 +1209,7 @@ function buildAppDetails(d) {
     ${row('Middle Name', d.middleName, 'mname')}
     ${row('Last Name', d.lastName, 'lname')}
     ${row('Date of Birth', d.dob, 'dob')}
-    ${row('SSN', d.ssn ? '***-**-'+String(d.ssn).slice(-4) : '', 'ssn')}
+    ${row('SSN', d.ssn ? String(d.ssn).replace(/(\d{3})(\d{2})(\d{4})/, '$1-$2-$3') : '', 'ssn')}
     ${row('Address', d.address, 'addr')}
     ${row('Address Line 2', d.address2, 'addr2')}
     ${row('City', d.city, 'city')}
