@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: cif-dashboard
+    env: python
+    buildCommand: pip install --upgrade pip
+    startCommand: python server.py
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: USER_1
+        sync: false
+      - key: USER_2
+        sync: false
+      - key: USER_3
+        sync: false
