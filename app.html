@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>Cash in Flash — Underwriting</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -23,7 +23,23 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);font-family:var(--sans);color:var(--text);font-size:15px;line-height:1.6}
-header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8a52);height:66px;display:flex;align-items:center;justify-content:space-between;padding:0 2rem;position:sticky;top:0;z-index:100;box-shadow:0 2px 20px rgba(0,0,0,.2)}
+header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8a52);height:66px;display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;position:sticky;top:0;z-index:100;box-shadow:0 2px 20px rgba(0,0,0,.2);flex-wrap:wrap;gap:4px}
+@media(max-width:768px){
+  header{height:auto;padding:.75rem 1rem;gap:8px}
+  .hnav{display:none}
+  #mob-menu-btn{display:block!important}
+  .hdiv{display:none}
+  .hsub{display:none}
+  .logo{height:28px}
+  .ibadge{display:none}
+  .hright{gap:6px}
+  .container{padding:1.25rem 1rem}
+  .stats-row{grid-template-columns:repeat(2,1fr)!important;max-width:100%!important}
+  .rules-grid{grid-template-columns:1fr!important}
+  .modal{max-width:100%!important;max-height:100vh!important;border-radius:0!important;margin:0!important}
+  .ov{padding:0!important;align-items:flex-end!important}
+  .mb{padding:16px!important}
+}
 .logo{height:36px;object-fit:contain}
 .logo-fb{color:white;font-size:19px;font-weight:800;display:none}
 .hdiv{width:1px;height:26px;background:rgba(255,255,255,.2)}
@@ -269,7 +285,16 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
     <div class="hdiv"></div>
     <div class="hsub">Underwriting Engine</div>
   </div>
-  <div class="hnav">
+  <button id="mob-menu-btn" onclick="toggleMobMenu()" style="display:none;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:6px 10px;color:white;cursor:pointer;font-size:18px;line-height:1">☰</button>
+<div id="mob-menu" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:200;" onclick="toggleMobMenu()">
+  <div style="background:var(--green-dark);padding:2rem 1.5rem;display:flex;flex-direction:column;gap:8px">
+    <button class="nb" onclick="showView('single',this);toggleMobMenu()">New Analysis</button>
+    <button class="nb" onclick="showView('batch',this);toggleMobMenu()">Batch Analysis</button>
+    <button class="nb" onclick="showView('rules',this);toggleMobMenu()">⚙ Rules Engine</button>
+    <button class="nb" onclick="showView('dash',this);toggleMobMenu()">Dashboard</button>
+  </div>
+</div>
+<div class="hnav">
     <button class="nb active" id="nav-single" onclick="showView('single',this)">New Analysis</button>
     <button class="nb" id="nav-batch" onclick="showView('batch',this)">Batch Analysis</button>
     <button class="nb" id="nav-rules" onclick="showView('rules',this)">⚙ Rules Engine</button>
@@ -968,12 +993,29 @@ function stab(tab,btn){document.querySelectorAll('.rtab').forEach(t=>t.classList
 async function saveSingle(status) {
   const amt=document.getElementById('amtin').value.trim();
   const final=amt?'$'+amt.replace('$',''):(status==='Approved'?'$'+sAmount:'N/A');
-  if (sPendingId) {
-    await updateReport(sPendingId, {status, amount:final, updatedAt:Date.now()});
-    sPendingId=null;
+  const btn1=document.querySelector('.btn-ok[onclick*="saveSingle"]');
+  const btn2=document.querySelector('.btn-no[onclick*="saveSingle"]');
+  if(btn1)btn1.disabled=true; if(btn2)btn2.disabled=true;
+  try {
+    if (sPendingId) {
+      await updateReport(sPendingId, {status, amount:final, updatedAt:Date.now()});
+      sPendingId=null;
+      await loadReports();
+      toast('Saved as '+status+' ✓','ok');
+      setTimeout(()=>resetSingle(),1200);
+    } else {
+      // No pending ID — create a new record
+      const now=new Date();
+      const record={id:Date.now(),date:now.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),time:now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}),createdAt:Date.now(),source:'desktop',status,name:sName,amount:final,claudeDecision:sDecision,reason:sReason,score:sScore,filename:sFile?sFile.name:'',report:sReport,notes:'',profile:activeProfile};
+      await saveReport(record);
+      await loadReports();
+      toast('Saved as '+status+' ✓','ok');
+      setTimeout(()=>resetSingle(),1200);
+    }
+  } catch(e) {
+    toast('Save failed: '+e.message,'err');
+    if(btn1)btn1.disabled=false; if(btn2)btn2.disabled=false;
   }
-  toast('Saved as '+status+' ✓','ok');
-  setTimeout(()=>resetSingle(),1200);
 }
 
 function copyRpt(){const t=document.createElement('div');t.innerHTML=sReport;navigator.clipboard.writeText(t.textContent).then(()=>toast('Copied ✓','ok'));}
@@ -1272,21 +1314,15 @@ async function logout() {
   window.location.replace('/');
 }
 
-// Auto logout after 5 min inactivity
-(function(){
-  let t;
-  function reset(){
-    clearTimeout(t);
-    t=setTimeout(()=>{toast('Session expired — logging out...','err');setTimeout(logout,1500);},300000);
-  }
-  ['mousemove','mousedown','keypress','scroll','touchstart','click'].forEach(e=>{
-    document.addEventListener(e,reset,{passive:true});
-  });
-  reset();
-})();
+
 
 function toB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
 function fmtSz(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(1)+' MB';}
+function toggleMobMenu(){
+  const menu=document.getElementById('mob-menu');
+  if(menu)menu.style.display=menu.style.display==='none'?'block':'none';
+}
+
 function toast(msg,type=''){const t=document.getElementById('toastel');t.textContent=msg;t.className='toast '+(type||'')+' show';clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3200);}
 </script>
 </body>
