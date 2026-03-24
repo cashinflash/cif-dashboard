@@ -34,12 +34,43 @@ header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8
   .logo{height:28px}
   .ibadge{display:none}
   .hright{gap:6px}
-  .container{padding:1.25rem 1rem}
-  .stats-row{grid-template-columns:repeat(2,1fr)!important;max-width:100%!important}
+  .container{padding:1rem .75rem}
+  .stats-row{grid-template-columns:repeat(2,1fr)!important;max-width:100%!important;gap:10px!important}
+  .stat{padding:14px!important}
+  .sv{font-size:22px!important}
   .rules-grid{grid-template-columns:1fr!important}
-  .modal{max-width:100%!important;max-height:100vh!important;border-radius:0!important;margin:0!important}
+  /* Modal — full screen on mobile */
+  .modal{max-width:100%!important;max-height:100vh!important;border-radius:0!important;margin:0!important;width:100%!important}
   .ov{padding:0!important;align-items:flex-end!important}
-  .mb{padding:16px!important}
+  .mb{padding:14px!important}
+  /* Modal tabs scroll horizontally */
+  .mb > div[style*="border-bottom"]{overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;flex-wrap:nowrap!important}
+  /* Report text readable on small screens */
+  .mrhtml{font-size:13px!important;padding:14px!important}
+  .mrhtml h1{font-size:16px!important}
+  .mrhtml h2{font-size:12px!important}
+  /* Dashboard table — hide less important columns */
+  table th:nth-child(4),table td:nth-child(4),
+  table th:nth-child(5),table td:nth-child(5),
+  table th:nth-child(6),table td:nth-child(6){display:none}
+  /* Bigger tap targets for table rows */
+  table td{padding:12px 8px!important}
+  /* Action buttons wrap nicely */
+  .actbtn{padding:7px 12px!important;font-size:12px!important}
+  /* Page header on dashboard */
+  .phead{flex-direction:column;align-items:flex-start!important;gap:10px}
+  /* Search bar full width */
+  .sbar{flex-direction:column!important;gap:8px!important}
+  .sbar input{width:100%!important}
+  /* Filter pills wrap */
+  .frow{flex-wrap:wrap!important;gap:6px!important}
+}
+/* Surface Pro / tablet (769-1024px) */
+@media(min-width:769px) and (max-width:1024px){
+  .container{padding:1.5rem 1.25rem}
+  .stats-row{grid-template-columns:repeat(4,1fr)!important}
+  .modal{max-width:90%!important}
+  .mrhtml{font-size:14px!important}
 }
 .logo{height:36px;object-fit:contain}
 .logo-fb{color:white;font-size:19px;font-weight:800;display:none}
