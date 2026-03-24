@@ -196,6 +196,22 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error':str(e)})
             return
 
+        if path == '/api/rerun-plaid':
+            # Proxy rerun request to the apply backend
+            try:
+                body = json.loads(raw)
+                import urllib.request as ur
+                payload = json.dumps(body).encode()
+                req = ur.Request('https://cif-apply.onrender.com/rerun-plaid',
+                    data=payload, headers={'Content-Type':'application/json'}, method='POST')
+                try:
+                    with ur.urlopen(req, timeout=10) as r: r.read()
+                except: pass
+                self.send_json(200, {'ok': True})
+            except Exception as e:
+                self.send_json(500, {'error': str(e)})
+            return
+
         if path == '/api/analyze':
             try:
                 body = json.loads(raw)

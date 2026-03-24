@@ -289,17 +289,19 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
   <button id="mob-menu-btn" onclick="toggleMobMenu()" style="display:none;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:6px 10px;color:white;cursor:pointer;font-size:18px;line-height:1">☰</button>
 <div id="mob-menu" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:200;" onclick="toggleMobMenu()">
   <div style="background:var(--green-dark);padding:2rem 1.5rem;display:flex;flex-direction:column;gap:8px">
+    <button class="nb" onclick="showView('dash',this);toggleMobMenu()">Dashboard</button>
     <button class="nb" onclick="showView('single',this);toggleMobMenu()">New Analysis</button>
     <button class="nb" onclick="showView('batch',this);toggleMobMenu()">Batch Analysis</button>
     <button class="nb" onclick="showView('rules',this);toggleMobMenu()">⚙ Rules Engine</button>
-    <button class="nb" onclick="showView('dash',this);toggleMobMenu()">Dashboard</button>
+    <button class="nb" onclick="showView('plaid',this);toggleMobMenu()">🏦 Plaid Customers</button>
   </div>
 </div>
 <div class="hnav">
-    <button class="nb active" id="nav-single" onclick="showView('single',this)">New Analysis</button>
+    <button class="nb" id="nav-dash" onclick="showView('dash',this)">Dashboard</button>
+    <button class="nb" id="nav-single" onclick="showView('single',this)">New Analysis</button>
     <button class="nb" id="nav-batch" onclick="showView('batch',this)">Batch Analysis</button>
     <button class="nb" id="nav-rules" onclick="showView('rules',this)">⚙ Rules Engine</button>
-    <button class="nb" id="nav-dash" onclick="showView('dash',this)">Dashboard</button>
+    <button class="nb" id="nav-plaid" onclick="showView('plaid',this)">🏦 Plaid Customers</button>
   </div>
   <div class="hright">
     <div style="position:relative">
@@ -704,6 +706,7 @@ function updateSyncStatus(ok) {
 // VIEWS
 // ════════════════════════════════════════
 function showView(name, btn) {
+  if (name==='plaid') loadPlaidCustomers();
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
@@ -1342,6 +1345,134 @@ function highlightTierBreakdown(html) {
     /(<p[^>]*><b>Free Cash Flow:<\/b>[\s\S]*?<b>Compliance:<\/b>[^<]*<\/p>)/i,
     '<div class="tier-breakdown">$1</div>'
   );
+}
+
+// ══════════════════════════════════════════
+// PLAID CUSTOMERS
+// ══════════════════════════════════════════
+let allPlaidCustomers = [];
+
+async function loadPlaidCustomers() {
+  const list = document.getElementById('plaid-list');
+  if (!list) return;
+  list.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted)">Loading...</div>';
+  try {
+    const data = await fbGet('reports.json');
+    if (!data) { allPlaidCustomers = []; renderPlaidCustomers([]); return; }
+    // Find all unique customers who used Plaid
+    const seen = {};
+    allPlaidCustomers = [];
+    Object.entries(data).forEach(([id, r]) => {
+      if (!r || !r.applicationData) return;
+      const bankMethod = r.applicationData.bankMethod || r.bankMethod || '';
+      if (!bankMethod.toLowerCase().includes('plaid')) return;
+      const key = (r.applicationData.phone || '') + (r.applicationData.email || '');
+      if (!key) return;
+      if (!seen[key] || r.createdAt > seen[key].createdAt) {
+        seen[key] = {
+          firebaseId: id,
+          name: r.name || `${r.applicationData.firstName||''} ${r.applicationData.lastName||''}`.trim(),
+          phone: r.applicationData.phone || '',
+          email: r.applicationData.email || '',
+          date: r.date || '',
+          lastReport: r.date || '',
+          accessToken: r.plaidAccessToken || '',
+          assetToken: r.plaidAssetToken || '',
+          createdAt: r.createdAt || 0,
+          status: r.status || '',
+          amount: r.amount || '',
+        };
+      }
+    });
+    allPlaidCustomers = Object.values(seen).sort((a,b) => b.createdAt - a.createdAt);
+    renderPlaidCustomers(allPlaidCustomers);
+  } catch(e) {
+    list.innerHTML = `<div class="empty"><div class="empty-t">Error loading</div><div class="empty-s">${e.message}</div></div>`;
+  }
+}
+
+function filterPlaidCustomers(q) {
+  if (!q) { renderPlaidCustomers(allPlaidCustomers); return; }
+  const lq = q.toLowerCase();
+  renderPlaidCustomers(allPlaidCustomers.filter(c =>
+    (c.name||'').toLowerCase().includes(lq) ||
+    (c.phone||'').includes(lq) ||
+    (c.email||'').toLowerCase().includes(lq)
+  ));
+}
+
+function renderPlaidCustomers(list) {
+  const el = document.getElementById('plaid-list');
+  if (!el) return;
+  if (!list.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-ic">🏦</div><div class="empty-t">No Plaid customers found</div><div class="empty-s">Customers who connect their bank via Plaid will appear here</div></div>';
+    return;
+  }
+  el.innerHTML = `<table>
+    <thead><tr>
+      <th>Customer</th>
+      <th>Phone</th>
+      <th>Last Report</th>
+      <th>Status</th>
+      <th>Action</th>
+    </tr></thead>
+    <tbody>${list.map(c => `<tr>
+      <td><div class="nbig">${c.name||'—'}</div><div class="nsub">${c.email||''}</div></td>
+      <td style="font-size:13px">${c.phone||'—'}</td>
+      <td style="font-size:12px;color:var(--muted)">${c.lastReport||'—'}</td>
+      <td><span class="pill pill-${c.status?.toLowerCase()||'p'}">${c.status||'—'}</span></td>
+      <td>
+        <button onclick="openModal('${c.firebaseId}')" class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;margin-right:4px">View</button>
+        ${c.assetToken ? `<button onclick="rerunPlaidReport('${c.firebaseId}','${c.assetToken}','${c.name}')" class="actbtn btn-ok" style="font-size:11px;padding:5px 10px">↺ Re-run Report</button>` : `<span style="font-size:11px;color:var(--muted)">No token saved</span>`}
+      </td>
+    </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+async function rerunPlaidReport(fbId, assetToken, name) {
+  if (!confirm(`Re-run Plaid asset report for ${name}? This will create a new underwriting report.`)) return;
+  toast('Requesting new asset report...', '');
+  try {
+    // Create new Firebase record for the rerun
+    const orig = await fbGet(`reports/${fbId}.json`);
+    const now = new Date();
+    const newRecord = {
+      id: Date.now(),
+      date: now.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
+      time: now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}),
+      createdAt: Date.now(),
+      source: 'plaid-rerun',
+      status: 'Processing',
+      name: name,
+      amount: orig?.amount || 'N/A',
+      claudeDecision: '',
+      reason: '',
+      score: 0,
+      filename: 'Plaid Re-run Asset Report',
+      report: '',
+      notes: '',
+      profile: activeProfile,
+      processingComplete: false,
+      applicationData: orig?.applicationData || {},
+      plaidAssetToken: assetToken,
+    };
+    const newId = await saveReport(newRecord);
+    toast('Asset report requested — processing in background...', 'ok');
+    // Call backend to fetch new asset report
+    try {
+      await fetch('/api/rerun-plaid', {
+        method: 'POST',
+        credentials: 'include',
+        headers: authHeaders(),
+        body: JSON.stringify({assetToken, firebaseId: newId, formData: orig?.applicationData || {}})
+      });
+    } catch(e) {}
+    showView('dash', document.getElementById('nav-dash'));
+    setTimeout(loadReports, 2000);
+  } catch(e) {
+    toast('Error: ' + e.message, 'err');
+  }
 }
 
 async function logout() {
