@@ -1363,11 +1363,14 @@ async function loadPlaidCustomers() {
     const seen = {};
     allPlaidCustomers = [];
     Object.entries(data).forEach(([id, r]) => {
-      if (!r || !r.applicationData) return;
-      const bankMethod = r.applicationData.bankMethod || r.bankMethod || '';
-      if (!bankMethod.toLowerCase().includes('plaid')) return;
-      const key = (r.applicationData.phone || '') + (r.applicationData.email || '');
-      if (!key) return;
+      if (!r) return;
+      const bankMethod = (r.applicationData?.bankMethod || r.bankMethod || r.filename || '').toLowerCase();
+      const hasPlaidToken = !!(r.plaidAssetToken || r.plaidAccessToken);
+      const isPlaid = bankMethod.includes('plaid') || hasPlaidToken;
+      if (!isPlaid) return;
+      const phone = r.applicationData?.phone || '';
+      const email = r.applicationData?.email || '';
+      const key = phone + email || r.name || id;
       if (!seen[key] || r.createdAt > seen[key].createdAt) {
         seen[key] = {
           firebaseId: id,
@@ -1423,7 +1426,7 @@ function renderPlaidCustomers(list) {
       <td><span class="pill pill-${c.status?.toLowerCase()||'p'}">${c.status||'—'}</span></td>
       <td>
         <button onclick="openModal('${c.firebaseId}')" class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;margin-right:4px">View</button>
-        ${c.assetToken ? `<button onclick="rerunPlaidReport('${c.firebaseId}','${c.assetToken}','${c.name}')" class="actbtn btn-ok" style="font-size:11px;padding:5px 10px">↺ Re-run Report</button>` : `<span style="font-size:11px;color:var(--muted)">No token saved</span>`}
+        ${c.assetToken ? `<button onclick="rerunPlaidReport('${c.firebaseId}','${c.assetToken}','${c.name}')" class="actbtn btn-ok" style="font-size:11px;padding:5px 10px">↺ Re-run Report</button>` : `<button onclick="alert('This customer needs to reconnect via the application form to generate a new report.')" class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;opacity:.6">↺ Re-run Report</button>`}
       </td>
     </tr>`).join('')}
     </tbody>
