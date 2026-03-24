@@ -1184,11 +1184,11 @@ function openModal(fbId){
 <div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:16px">
   <button onclick="mTab('report','${fbId}',this)" id="mtab-report-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--green);border-bottom:2px solid var(--green);cursor:pointer;font-family:var(--sans)">📄 Report</button>
   ${a.applicationData?`<button onclick="mTab('appdata','${fbId}',this)" id="mtab-appdata-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📋 Application</button>`:''}
-  ${(a.govIdB64||a.bankStatementB64||a.paystubB64)?`<button onclick="mTab('docs','${fbId}',this)" id="mtab-docs-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📁 Documents</button>`:''}
+  ${(a.govIdB64||a.bankStatementB64||a.paystubB64||a.source==='web-apply'||a.source==='plaid-rerun')?`<button onclick="mTab('docs','${fbId}',this)" id="mtab-docs-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📁 Documents</button>`:''}
 </div>
 <div id="mpanel-report-${fbId}"><div class="mrhtml">${highlightTierBreakdown(stripFences(a.report||''))}</div></div>
 ${a.applicationData?`<div id="mpanel-appdata-${fbId}" style="display:none">${buildAppDetails(a.applicationData)}</div>`:''}
-${(a.govIdB64||a.bankStatementB64||a.paystubB64)?`<div id="mpanel-docs-${fbId}" style="display:none">${buildDocsPanel(a)}</div>`:''}
+${(a.govIdB64||a.bankStatementB64||a.paystubB64||a.source==='web-apply'||a.source==='plaid-rerun')?`<div id="mpanel-docs-${fbId}" style="display:none">${buildDocsPanel(a)}</div>`:''}
 <div class="msec" style="margin-top:16px">Notes</div>
 <textarea class="mnta" id="mnt${fbId}" placeholder="Add notes...">${a.notes||''}</textarea>
 <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
@@ -1293,7 +1293,11 @@ function buildDocsPanel(a) {
   html += docSection('Proof of Income / Pay Stubs', a.paystubB64, 'image/jpeg', '📑');
 
   if (!a.govIdB64 && !a.bankStatementB64 && !a.paystubB64) {
-    html += '<div style="text-align:center;padding:2rem;color:var(--muted)">No documents on file</div>';
+    html += `<div style="background:var(--pale);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;color:var(--muted)">
+      <div style="font-size:24px;margin-bottom:8px">📄</div>
+      <div style="font-weight:600;margin-bottom:6px;color:var(--text2)">Documents not stored</div>
+      <div style="font-size:13px">Files are processed securely and not retained to preserve storage. Bank verification: <strong>${a.applicationData?.bankMethod||a.bankMethod||'—'}</strong></div>
+    </div>`;
   }
 
   html += '</div>';
@@ -1396,7 +1400,7 @@ async function loadPlaidCustomers() {
           email: r.applicationData.email || '',
           date: r.date || '',
           lastReport: r.date || '',
-          accessToken: r.plaidAccessToken || '',
+          accessToken: r.plaidAccessToken || r.applicationData?.plaidAccessToken || '',
           assetToken: r.plaidAssetToken || '',
           createdAt: r.createdAt || 0,
           status: r.status || '',
