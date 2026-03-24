@@ -1179,6 +1179,7 @@ function openModal(fbId){
   ${a.status!=='Declined'?`<button class="actbtn btn-no" onclick="updStatus('${fbId}','Declined')">✕ Decline</button>`:''}
   <button class="actbtn btn-gh" onclick="copyModal('${fbId}')">⎘ Copy</button>
   <button class="actbtn btn-gh" style="color:var(--red);border-color:var(--red-border)" onclick="delApp('${fbId}')">🗑 Delete</button>
+  ${(a.status==='Error'||a.status==='Processing')&&a.plaidAccessToken ? `<button class="actbtn btn-ok" onclick="rerunFromModal('${fbId}')" style="background:var(--blue);border-color:var(--blue)">↺ Retry Plaid Report</button>` : ''}
 </div>
 <div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:16px">
   <button onclick="mTab('report','${fbId}',this)" id="mtab-report-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--green);border-bottom:2px solid var(--green);cursor:pointer;font-family:var(--sans)">📄 Report</button>
@@ -1447,6 +1448,13 @@ function renderPlaidCustomers(list) {
     </tr>`).join('')}
     </tbody>
   </table>`;
+}
+
+async function rerunFromModal(fbId) {
+  const a = apps.find(x => x.firebaseId === fbId);
+  if (!a) return;
+  closeModal();
+  await rerunPlaidReport(fbId, a.plaidAccessToken || '', a.name || 'Customer');
 }
 
 async function rerunPlaidReport(fbId, accessToken, name) {
