@@ -498,6 +498,22 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 </div>
 
 <!-- DASHBOARD -->
+<!-- PLAID CUSTOMERS VIEW -->
+<div id="view-plaid" class="view" style="display:none">
+  <div class="phead">
+    <div><div class="ptitle">🏦 Plaid Customers</div><div class="psub">Customers who connected via Plaid — rerun reports anytime</div></div>
+    <button class="actbtn btn-gh" onclick="loadPlaidCustomers()">↺ Refresh</button>
+  </div>
+  <div style="margin-bottom:16px">
+    <input type="text" id="plaid-search" placeholder="Search by name, phone or email..."
+      oninput="filterPlaidCustomers(this.value)"
+      style="width:100%;border:1.5px solid var(--border2);border-radius:10px;padding:10px 14px;font-size:14px;font-family:var(--sans)">
+  </div>
+  <div id="plaid-list">
+    <div class="empty"><div class="empty-ic">🏦</div><div class="empty-t">No Plaid customers yet</div><div class="empty-s">Customers who connect via Plaid will appear here</div></div>
+  </div>
+</div>
+
 <div id="view-dash" class="view">
   <div class="container">
     <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:12px">
