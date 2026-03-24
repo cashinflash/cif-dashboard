@@ -1442,18 +1442,17 @@ function renderPlaidCustomers(list) {
       <td><span class="pill pill-${c.status?.toLowerCase()||'p'}">${c.status||'—'}</span></td>
       <td>
         <button onclick="openModal('${c.firebaseId}')" class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;margin-right:4px">View</button>
-        ${c.assetToken ? `<button onclick="rerunPlaidReport('${c.firebaseId}','${c.assetToken}','${c.name}')" class="actbtn btn-ok" style="font-size:11px;padding:5px 10px">↺ Re-run Report</button>` : `<button onclick="alert('This customer needs to reconnect via the application form to generate a new report.')" class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;opacity:.6">↺ Re-run Report</button>`}
+        ${c.accessToken ? `<button onclick="rerunPlaidReport('${c.firebaseId}','${c.accessToken}','${c.name}')" class="actbtn btn-ok" style="font-size:11px;padding:5px 10px">↺ Re-run Report</button>` : `<button onclick="alert('This customer needs to reconnect via the application form to generate a new report.')" class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;opacity:.6">↺ Re-run Report</button>`}
       </td>
     </tr>`).join('')}
     </tbody>
   </table>`;
 }
 
-async function rerunPlaidReport(fbId, assetToken, name) {
-  if (!confirm(`Re-run Plaid asset report for ${name}? This will create a new underwriting report.`)) return;
-  toast('Requesting new asset report...', '');
+async function rerunPlaidReport(fbId, accessToken, name) {
+  if (!confirm(`Pull a fresh Plaid asset report for ${name}?\n\nThis will create a new underwriting report using their current bank data.`)) return;
+  toast('Pulling fresh Plaid asset report...', '');
   try {
-    // Create new Firebase record for the rerun
     const orig = await fbGet(`reports/${fbId}.json`);
     const now = new Date();
     const newRecord = {
@@ -1468,23 +1467,23 @@ async function rerunPlaidReport(fbId, assetToken, name) {
       claudeDecision: '',
       reason: '',
       score: 0,
-      filename: 'Plaid Re-run Asset Report',
+      filename: `Plaid Re-run — ${now.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`,
       report: '',
       notes: '',
       profile: activeProfile,
       processingComplete: false,
       applicationData: orig?.applicationData || {},
-      plaidAssetToken: assetToken,
+      plaidAccessToken: accessToken,
+      plaidAssetToken: '',
     };
     const newId = await saveReport(newRecord);
-    toast('Asset report requested — processing in background...', 'ok');
-    // Call backend to fetch new asset report
+    toast('Fresh asset report requested — underwriting in progress...', 'ok');
     try {
       await fetch('/api/rerun-plaid', {
         method: 'POST',
         credentials: 'include',
         headers: authHeaders(),
-        body: JSON.stringify({assetToken, firebaseId: newId, formData: orig?.applicationData || {}})
+        body: JSON.stringify({accessToken, firebaseId: newId, formData: orig?.applicationData || {}})
       });
     } catch(e) {}
     showView('dash', document.getElementById('nav-dash'));
