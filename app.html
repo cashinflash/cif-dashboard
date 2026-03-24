@@ -1183,12 +1183,12 @@ function openModal(fbId){
 </div>
 <div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:16px">
   <button onclick="mTab('report','${fbId}',this)" id="mtab-report-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--green);border-bottom:2px solid var(--green);cursor:pointer;font-family:var(--sans)">📄 Report</button>
-  ${a.applicationData?`<button onclick="mTab('appdata','${fbId}',this)" id="mtab-appdata-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📋 Application</button>`:''}
-  ${(a.govIdB64||a.bankStatementB64||a.paystubB64||a.source==='web-apply'||a.source==='plaid-rerun')?`<button onclick="mTab('docs','${fbId}',this)" id="mtab-docs-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📁 Documents</button>`:''}
+  <button onclick="mTab('appdata','${fbId}',this)" id="mtab-appdata-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📋 Application</button>
+  <button onclick="mTab('docs','${fbId}',this)" id="mtab-docs-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📁 Documents</button>
 </div>
 <div id="mpanel-report-${fbId}"><div class="mrhtml">${highlightTierBreakdown(stripFences(a.report||''))}</div></div>
-${a.applicationData?`<div id="mpanel-appdata-${fbId}" style="display:none">${buildAppDetails(a.applicationData)}</div>`:''}
-${(a.govIdB64||a.bankStatementB64||a.paystubB64||a.source==='web-apply'||a.source==='plaid-rerun')?`<div id="mpanel-docs-${fbId}" style="display:none">${buildDocsPanel(a)}</div>`:''}
+<div id="mpanel-appdata-${fbId}" style="display:none">${buildAppDetails(a.applicationData||{})}</div>
+<div id="mpanel-docs-${fbId}" style="display:none">${buildDocsPanel(a)}</div>
 <div class="msec" style="margin-top:16px">Notes</div>
 <textarea class="mnta" id="mnt${fbId}" placeholder="Add notes...">${a.notes||''}</textarea>
 <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
@@ -1212,7 +1212,7 @@ function mTab(tab, fbId, btn) {
 }
 
 function buildAppDetails(d) {
-  if (!d) return '<p style="color:var(--muted);padding:20px">No application data available.</p>';
+  if (!d || Object.keys(d).length === 0) return '<div style="text-align:center;padding:2rem;color:var(--muted)"><div style="font-size:28px;margin-bottom:8px">📋</div><div style="font-weight:600">No application data</div><div style="font-size:13px;margin-top:4px">This submission was not made through the online form</div></div>';
   const uid = Math.random().toString(36).slice(2,8);
   function row(label, value, id) {
     if (!value) return '';
