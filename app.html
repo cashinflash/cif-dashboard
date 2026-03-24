@@ -23,10 +23,10 @@
   --shadow-lg:0 12px 32px rgba(0,0,0,.1);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);font-family:var(--sans);color:var(--text);font-size:15px;line-height:1.6}
+body{background:var(--bg);font-family:var(--sans);color:var(--text);font-size:15px;line-height:1.6;overflow-x:hidden}
 header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8a52);height:66px;display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;position:sticky;top:0;z-index:100;box-shadow:0 2px 20px rgba(0,0,0,.2);flex-wrap:wrap;gap:4px}
 @media(max-width:768px){
-  header{height:auto;padding:.75rem 1rem;gap:8px}
+  header{height:auto;padding:.75rem 1rem;gap:8px;overflow:hidden}
   .hnav{display:none}
   #mob-menu-btn{display:block!important}
   .hdiv{display:none}
@@ -65,6 +65,8 @@ header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8
   /* Filter pills wrap */
   .frow{flex-wrap:wrap!important;gap:6px!important}
 }
+  /* Hide Plaid Customers from desktop nav on mobile - available in hamburger menu */
+  #nav-plaid{display:none!important}
 /* Surface Pro / tablet (769-1024px) */
 @media(min-width:769px) and (max-width:1024px){
   .container{padding:1.5rem 1.25rem}
@@ -669,6 +671,8 @@ window.onload = async () => {
   updateProfileBadge();
   startDots();
   setupDragDrop();
+  // Always land on Dashboard
+  showView('dash', document.getElementById('nav-dash'));
   loadReports();
   pollTimer = setInterval(loadReports, 8000);
 };
@@ -1482,7 +1486,26 @@ function renderPlaidCustomers(list) {
     el.innerHTML = '<div class="empty"><div class="empty-ic">🏦</div><div class="empty-t">No Plaid customers found</div><div class="empty-s">Customers who connect their bank via Plaid will appear here</div></div>';
     return;
   }
-  el.innerHTML = `<table>
+  const isMobile = window.innerWidth <= 768;
+  if (isMobile) {
+    el.innerHTML = list.map(c => `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div>
+            <div class="nbig">${c.name||'—'}</div>
+            <div class="nsub" style="font-size:12px">${c.phone||''}</div>
+            <div class="nsub" style="font-size:11px">${c.email||''}</div>
+          </div>
+          <span class="pill pill-${c.status?.toLowerCase()||'p'}">${c.status||'—'}</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Last report: ${c.lastReport||'—'}</div>
+        <div style="display:flex;gap:8px">
+          <button onclick="openModal('${c.firebaseId}')" class="actbtn btn-gh" style="flex:1;font-size:12px;text-align:center">View</button>
+          <button onclick="rerunPlaidReport('${c.firebaseId}','${c.accessToken}','${c.name}')" class="actbtn ${c.accessToken?'btn-ok':'btn-gh'}" style="flex:1;font-size:12px;text-align:center${c.accessToken?'':';opacity:.6'}">↺ Re-run</button>
+        </div>
+      </div>`).join('');
+  } else {
+    el.innerHTML = `<table>
     <thead><tr>
       <th>Customer</th>
       <th>Phone</th>
@@ -1502,6 +1525,7 @@ function renderPlaidCustomers(list) {
     </tr>`).join('')}
     </tbody>
   </table>`;
+  }
 }
 
 async function rerunFromModal(fbId) {
