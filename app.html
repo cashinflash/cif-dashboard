@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <link rel="icon" type="image/png" href="https://cashinflash.com/wp-content/uploads/2025/11/favicon-1.png">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>Cash in Flash — Underwriting</title>
+<title>Cash in Flash — Internal Portal</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -68,6 +68,8 @@ header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8
   /* Hide Plaid Customers from desktop nav on mobile - available in hamburger menu */
   #nav-plaid{display:none!important}
 /* Surface Pro / tablet (769-1024px) */
+/* Show Plaid Customers in desktop nav */
+@media(min-width:769px){#nav-plaid{display:inline-block!important}}
 @media(min-width:769px) and (max-width:1024px){
   .container{padding:1.5rem 1.25rem}
   .stats-row{grid-template-columns:repeat(4,1fr)!important}
