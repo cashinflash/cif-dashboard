@@ -1408,17 +1408,21 @@ async function deleteSelected() {
 // ════════════════════════════════════════
 function openModal(fbId){
   const a=apps.find(x=>x.firebaseId===fbId);if(!a)return;
-  const ok=a.status==='Approved',dc=ok?'ok':a.status==='Declined'?'no':'';
+  // Use claudeDecision for display if status is still being updated
+  const effectiveDecision = a.status==='Approved'||a.claudeDecision==='APPROVED' ? 'APPROVED' :
+                            a.status==='Declined'||a.claudeDecision==='DECLINED' ? 'DECLINED' : a.status||'PENDING';
+  const ok = effectiveDecision==='APPROVED';
+  const dc = ok?'ok':effectiveDecision==='DECLINED'?'no':a.status==='Processing'?'pending':'';
   document.getElementById('mtitle').textContent=a.formName||a.name||'Application';
   document.getElementById('mbody').innerHTML=`
 <div class="mdh ${dc||'pending'}">
   <div class="mdh-inner" style="flex:1">
     <div style="flex:1">
-      <div class="mdh-badge">${ok?'✓ Approved':a.status==='Declined'?'✕ Declined':'⏳ '+a.status}</div>
+      <div class="mdh-badge">${ok?'✓ Approved':effectiveDecision==='DECLINED'?'✕ Declined':a.status==='Processing'?'⏳ Processing...':'⏳ '+a.status}</div>
       <div class="mdn">${a.name||'—'}</div>
-      ${ok?`<div class="mda">${a.amount||''}</div><div style="font-size:13px;color:rgba(255,255,255,.75);margin-top:6px;font-style:italic">✓ Approved for disbursement</div>`:''}
-      ${!ok&&a.reason?`<div class="mdr"><span style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.8;display:block;margin-bottom:4px">📋 Decline Reason</span>${a.reason}</div>`:''}
-      ${!ok&&!a.reason&&a.status==='Pending'?`<div class="mdr" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2)"><span style="font-size:11px;opacity:.8">⏳ Underwriting in progress...</span></div>`:''}
+      ${ok?`<div class="mda">${a.amount||''}</div><div style="font-size:13px;color:rgba(255,255,255,.75);margin-top:6px;font-style:italic">✓ Approved for disbursement</div>`:(effectiveDecision==='DECLINED'&&!a.reason)?'':''}
+      ${(effectiveDecision==='DECLINED'||a.status==='Declined')&&a.reason?`<div class="mdr"><span style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.8;display:block;margin-bottom:4px">📋 Decline Reason</span>${a.reason}</div>`:''}
+      ${!a.reason&&(a.status==='Processing'||a.status==='Pending')&&effectiveDecision!=='DECLINED'&&effectiveDecision!=='APPROVED'?`<div class="mdr" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2)"><span style="font-size:11px;opacity:.8">⏳ Underwriting in progress...</span></div>`:''}
       ${a.nameMismatch?`<div style="background:rgba(255,193,7,.25);border:1px solid rgba(255,193,7,.5);border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:white"><b>⚠ Name Mismatch</b> — Form: <b>${a.formName||'—'}</b> · Document: <b>${a.documentName||'—'}</b></div>`:''}
     </div>
     <canvas id="mwh" width="90" height="90" style="flex-shrink:0;opacity:.9"></canvas>
@@ -1431,7 +1435,7 @@ function openModal(fbId){
   </div>
   <div class="mmi">
     <div class="mml">Loan Amount</div>
-    <div class="mmv" style="color:${ok?'var(--green)':'var(--muted)'};font-size:${ok?'20px':'16px'}">${ok?(a.amount||'—'):'N/A'}</div>
+    <div class="mmv" style="color:${ok?'var(--green)':'var(--muted)'};font-size:${ok?'20px':'16px'}">${ok?(a.amount||'—'):(effectiveDecision==='DECLINED'?'Declined':'N/A')}</div>
   </div>
   <div class="mmi">
     <div class="mml">AI Score</div>
