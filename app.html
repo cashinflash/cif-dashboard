@@ -350,16 +350,25 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 <div id="mob-menu" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:200;" onclick="toggleMobMenu()">
   <div style="background:var(--green-dark);padding:2rem 1.5rem;display:flex;flex-direction:column;gap:8px">
     <button class="nb" onclick="showView('dash',this);toggleMobMenu()">Dashboard</button>
-    <button class="nb" onclick="showView('single',this);toggleMobMenu()">New Analysis</button>
-    <button class="nb" onclick="showView('batch',this);toggleMobMenu()">Batch Analysis</button>
+    <button class="nb" onclick="showView('single',document.getElementById('nav-single'));toggleMobMenu()">📄 New Analysis</button>
+    <button class="nb" onclick="showView('batch',document.getElementById('nav-batch'));toggleMobMenu()">📋 Batch Analysis</button>
     <button class="nb" onclick="showView('rules',this);toggleMobMenu()">⚙ Rules Engine</button>
     <button class="nb" onclick="showView('plaid',this);toggleMobMenu()">🏦 Plaid Customers</button>
   </div>
 </div>
 <div class="hnav">
     <button class="nb" id="nav-dash" onclick="showView('dash',this)">Dashboard</button>
-    <button class="nb" id="nav-single" onclick="showView('single',this)">New Analysis</button>
-    <button class="nb" id="nav-batch" onclick="showView('batch',this)">Batch Analysis</button>
+    <div style="position:relative" id="analysis-dd-wrap">
+      <button class="nb" id="nav-analysis" onclick="toggleAnalysisDD()" style="display:flex;align-items:center;gap:6px">
+        Analysis <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div id="analysis-dd" style="display:none;position:absolute;top:calc(100% + 8px);left:0;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-lg);min-width:170px;overflow:hidden;z-index:300">
+        <div onclick="showView('single',document.getElementById('nav-analysis'));toggleAnalysisDD()" style="padding:11px 16px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:8px" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">📄 New Analysis</div>
+        <div onclick="showView('batch',document.getElementById('nav-analysis'));toggleAnalysisDD()" style="padding:11px 16px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:8px;border-top:1px solid var(--border)" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">📋 Batch Analysis</div>
+      </div>
+    </div>
+    <button class="nb" id="nav-single" style="display:none"></button>
+    <button class="nb" id="nav-batch" style="display:none"></button>
     <button class="nb" id="nav-rules" onclick="showView('rules',this)">⚙ Rules Engine</button>
     <button class="nb" id="nav-plaid" onclick="showView('plaid',this)">🏦 Plaid Customers</button>
   </div>
@@ -409,7 +418,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
   <div class="container">
 
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:1.5rem">
-      <div><div class="ptitle">New Underwriting Analysis</div><div class="psub" style="margin:0">Upload a PDF bank statement or Plaid asset report</div></div>
+      <div><div class="ptitle">New Analysis</div><div class="psub" style="margin:0">Upload a PDF bank statement or Plaid asset report</div></div>
       <div style="background:var(--green-light);border:1px solid var(--green-border);border-radius:10px;padding:8px 14px;font-size:12px;color:var(--green-dark)">Profile: <strong id="single-profile-name">Standard</strong></div>
     </div>
     <div class="card">
@@ -1005,7 +1014,7 @@ OUTPUT RULES: Only valid HTML, no html/head/body tags, no Markdown.
 Use h1 once, h2 per section, p per line item, ul/li for lists, hr between sections, b for bold, table for fintech apps.
 
 REPORT STRUCTURE:
-<h1>🔎 CASH IN FLASH – DFPI COMPLIANT UNDERWRITING REPORT</h1>
+<h1>CASH IN FLASH — UNDERWRITING ANALYSIS</h1>
 <h2>Applicant Summary</h2><hr/>
 <h2>1️⃣ Statement Verification</h2><hr/>
 <h2>2️⃣ Income Analysis (Verified Deposits Only)</h2><hr/>
@@ -1269,15 +1278,41 @@ function renderDash(){
     return;
   }
 
-  // Smart re-render — skip if data unchanged (prevents wheel flicker on poll)
-  const newKey=filtered.map(a=>a.firebaseId+'|'+a.status+'|'+(a.score||0)+'|'+(a.amount||'')).join('~');
-  if(c.dataset.renderKey===newKey && c.querySelector('table')){return;}
-  c.dataset.renderKey=newKey;
+  // Only full re-render when rows added/removed/reordered — not on status/score changes
+  const structureKey = filtered.map(a=>a.firebaseId).join('~');
+  const dataKey = filtered.map(a=>a.firebaseId+'|'+a.status+'|'+(a.score||0)+'|'+(a.amount||'')).join('~');
+
+  if(c.dataset.structureKey === structureKey && c.querySelector('table')) {
+    // Rows unchanged — just update individual cells in place (no flicker)
+    if(c.dataset.renderKey !== dataKey) {
+      c.dataset.renderKey = dataKey;
+      filtered.forEach(a => {
+        const wid = 'dw'+(a.firebaseId?.replace(/[^a-z0-9]/gi,'')||'');
+        const tr = document.querySelector(`tr[data-id="${a.firebaseId}"]`);
+        if (!tr) return;
+        // Update status pill
+        const statusCell = tr.querySelector('.pill');
+        if (statusCell) { statusCell.className=`pill pill-${a.status?.toLowerCase()||'p'}`; statusCell.textContent=a.status||'Pending'; }
+        // Update amount
+        const amtCell = tr.querySelector('.amt-cell');
+        if (amtCell) { const ok=a.status==='Approved'; amtCell.style.color=ok?'var(--green)':'var(--muted)'; amtCell.style.fontSize=ok?'15px':'13px'; amtCell.textContent=ok?(a.amount||'—'):'—'; }
+        // Redraw wheel only if score changed
+        if (tr.dataset.score !== String(a.score||0)) {
+          tr.dataset.score = String(a.score||0);
+          if(a.status==='Processing') drawProcessingWheel(wid,44);
+          else drawWheel(wid,a.score||0,44);
+        }
+      });
+    }
+    return;
+  }
+  c.dataset.structureKey = structureKey;
+  c.dataset.renderKey = dataKey;
 
   const rows=filtered.map(a=>{
     const wid='dw'+(a.firebaseId?.replace(/[^a-z0-9]/gi,'')||'');
     const ok=a.status==='Approved';
-    return `<tr oncontextmenu="showCtxMenu(event,'${a.firebaseId}')" style="cursor:pointer">
+    return `<tr data-id="${a.firebaseId}" data-score="${a.score||0}" oncontextmenu="showCtxMenu(event,'${a.firebaseId}')" style="cursor:pointer">
       <td onclick="event.stopPropagation()"><input type="checkbox" class="row-chk" data-id="${a.firebaseId}" onchange="updateSelCount()" style="cursor:pointer;width:15px;height:15px"></td>
       <td onclick="openModal('${a.firebaseId}')">
         <div class="nbig">${a.name||'—'}</div>
@@ -1286,7 +1321,7 @@ function renderDash(){
       <td onclick="openModal('${a.firebaseId}')" style="background:${scoreBg(a.score||0)};text-align:center;padding:8px">
         <canvas id="${wid}" width="44" height="44"></canvas>
       </td>
-      <td onclick="openModal('${a.firebaseId}')" class="abig" style="font-size:${ok?'15px':'13px'};color:${ok?'var(--green)':'var(--muted)'}">${ok?(a.amount||'—'):'—'}</td>
+      <td onclick="openModal('${a.firebaseId}')" class="amt-cell abig" style="font-size:${ok?'15px':'13px'};color:${ok?'var(--green)':'var(--muted)'}">${ok?(a.amount||'—'):'—'}</td>
       <td onclick="openModal('${a.firebaseId}')">${srcBadge(a.source)}</td>
       <td onclick="openModal('${a.firebaseId}')" style="color:var(--muted);font-size:12px">${a.date||''}<br><span style="font-size:11px;color:var(--muted2)">${a.time||''}</span></td>
       <td onclick="openModal('${a.firebaseId}')"><span class="pill pill-${a.status?.toLowerCase()||'p'}">${a.status||'Pending'}</span></td>
@@ -1342,7 +1377,7 @@ async function deleteSelected() {
 function openModal(fbId){
   const a=apps.find(x=>x.firebaseId===fbId);if(!a)return;
   const ok=a.status==='Approved',dc=ok?'ok':a.status==='Declined'?'no':'';
-  document.getElementById('mtitle').textContent=a.name||'Application';
+  document.getElementById('mtitle').textContent=a.formName||a.name||'Application';
   document.getElementById('mbody').innerHTML=`
 <div class="mdh ${dc||'pending'}">
   <div class="mdh-inner" style="flex:1">
@@ -1352,6 +1387,7 @@ function openModal(fbId){
       ${ok?`<div class="mda">${a.amount||''}</div><div style="font-size:13px;color:rgba(255,255,255,.75);margin-top:6px;font-style:italic">✓ Approved for disbursement</div>`:''}
       ${!ok&&a.reason?`<div class="mdr"><span style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.8;display:block;margin-bottom:4px">📋 Decline Reason</span>${a.reason}</div>`:''}
       ${!ok&&!a.reason&&a.status==='Pending'?`<div class="mdr" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2)"><span style="font-size:11px;opacity:.8">⏳ Underwriting in progress...</span></div>`:''}
+      ${a.nameMismatch?`<div style="background:rgba(255,193,7,.25);border:1px solid rgba(255,193,7,.5);border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:white"><b>⚠ Name Mismatch</b> — Form: <b>${a.formName||'—'}</b> · Document: <b>${a.documentName||'—'}</b></div>`:''}
     </div>
     <canvas id="mwh" width="90" height="90" style="flex-shrink:0;opacity:.9"></canvas>
   </div>
@@ -1369,7 +1405,16 @@ function openModal(fbId){
     <div class="mml">AI Score</div>
     <div class="mmv" style="color:${(a.score||0)>=60?'var(--green)':(a.score||0)>=40?'var(--gold-dark)':'var(--red)'}">${a.score||0}<span style="font-size:12px;font-weight:500;color:var(--muted)">/100</span></div>
   </div>
-  ${a.extractedSSN?`<div class="mmi" style="grid-column:span 3;flex-direction:row;align-items:center;justify-content:space-between"><div><div class="mml">SSN (from report)</div><div class="mmv" id="modal-ssn-${fbId}">${a.extractedSSN}</div></div><button onclick="copyField('modal-ssn-${fbId}')" style="background:var(--green-light);border:1px solid var(--green-border);border-radius:7px;padding:6px 14px;font-size:11px;font-weight:700;color:var(--green);cursor:pointer;font-family:var(--sans)">Copy SSN</button></div>`:''}
+  ${a.extractedSSN?`<div class="mmi" style="grid-column:span 3;flex-direction:row;align-items:center;justify-content:space-between">
+    <div><div class="mml">SSN</div>
+    <div class="mmv" id="modal-ssn-display-${fbId}">${a.extractedSSN.replace(/^(\d{3}-\d{2}-)(\d{4})$/,'XXX-XX-$2')}</div>
+    <div style="display:none" id="modal-ssn-full-${fbId}">${a.extractedSSN}</div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button onclick="toggleSSN('${fbId}','${a.extractedSSN}')" id="ssn-eye-${fbId}" style="background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:6px 10px;font-size:13px;cursor:pointer" title="Show/Hide SSN">👁</button>
+      <button onclick="copySSN('${a.extractedSSN}')" style="background:var(--green-light);border:1px solid var(--green-border);border-radius:7px;padding:6px 14px;font-size:11px;font-weight:700;color:var(--green);cursor:pointer;font-family:var(--sans)">Copy</button>
+    </div>
+  </div>`:''}
 </div>
 <div class="mact-bar">
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1">
@@ -1476,8 +1521,8 @@ function buildDocsPanel(a) {
       <div style="padding:12px 16px;background:var(--green-light);border-bottom:1px solid var(--green-border);display:flex;align-items:center;justify-content:space-between">
         <div style="font-size:13px;font-weight:700;color:var(--green-dark)">${icon} ${title}</div>
         <div style="display:flex;gap:6px">
-          <a href="${url}" target="_blank" style="background:var(--green);color:white;border:none;border-radius:7px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans);text-decoration:none">👁 View</a>
-          <a href="${url}" download style="background:white;color:var(--green);border:1px solid var(--green-border);border-radius:7px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans);text-decoration:none">⬇ Download</a>
+          <a href="${url}" target="_blank" rel="noopener" style="background:var(--green);color:white;border:none;border-radius:7px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans);text-decoration:none">👁 View</a>
+          <button onclick="downloadDoc('${url}','${title.replace(/'/g,'\'')}')" style="background:white;color:var(--green);border:1.5px solid var(--green-border);border-radius:7px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans)">⬇ Download</button>
         </div>
       </div>
       <div style="padding:14px 16px;text-align:center;color:var(--muted);font-size:13px">
@@ -1535,10 +1580,54 @@ function viewDoc(b64, mimeType) {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
+let ssnTimer = null;
+function toggleSSN(fbId, fullSSN) {
+  const display = document.getElementById('modal-ssn-display-'+fbId);
+  const btn = document.getElementById('ssn-eye-'+fbId);
+  if (!display) return;
+  const isHidden = display.textContent.includes('X');
+  if (isHidden) {
+    display.textContent = fullSSN;
+    btn.textContent = '🙈';
+    clearTimeout(ssnTimer);
+    ssnTimer = setTimeout(() => {
+      display.textContent = fullSSN.replace(/^(\d{3}-\d{2}-)(\d{4})$/, 'XXX-XX-$2');
+      btn.textContent = '👁';
+    }, 10000);
+  } else {
+    display.textContent = fullSSN.replace(/^(\d{3}-\d{2}-)(\d{4})$/, 'XXX-XX-$2');
+    btn.textContent = '👁';
+    clearTimeout(ssnTimer);
+  }
+}
+
+function copySSN(ssn) {
+  navigator.clipboard.writeText(ssn).then(() => toast('SSN copied ✓', 'ok'));
+}
+
 function copyField(id) {
   const el = document.getElementById(id);
   if (!el) return;
   navigator.clipboard.writeText(el.textContent.trim()).then(() => toast('Copied ✓','ok'));
+}
+
+async function downloadDoc(url, filename) {
+  try {
+    toast('Downloading...', '');
+    const resp = await fetch(url);
+    const blob = await resp.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename || 'document';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    toast('Downloaded ✓', 'ok');
+  } catch(e) {
+    // Fallback — open in new tab if fetch fails (CORS)
+    window.open(url, '_blank');
+  }
 }
 
 async function saveModalNotes(fbId){const ta=document.getElementById('mnt'+fbId);if(!ta)return;await updateReport(fbId,{notes:ta.value,updatedAt:Date.now()});toast('Notes saved ✓','ok');}
@@ -1932,6 +2021,15 @@ async function logout() {
 
 function toB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
 function fmtSz(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(1)+' MB';}
+function toggleAnalysisDD(){
+  const dd = document.getElementById('analysis-dd');
+  dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+}
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('analysis-dd-wrap');
+  if (wrap && !wrap.contains(e.target)) document.getElementById('analysis-dd').style.display = 'none';
+});
+
 function toggleMobMenu(){
   const menu=document.getElementById('mob-menu');
   if(menu)menu.style.display=menu.style.display==='none'?'block':'none';
