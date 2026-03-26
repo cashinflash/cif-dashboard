@@ -297,7 +297,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .mact-secondary:hover{background:var(--bg);border-color:var(--muted)}
 .msec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:8px}
 .msec::after{content:'';flex:1;height:1px;background:var(--border)}
-.mrhtml{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:24px 26px;max-height:65vh;overflow-y:auto;margin-bottom:16px;font-size:15px;line-height:1.9;color:var(--text2)}
+.mrhtml{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:24px 26px;max-height:none;overflow-y:visible;margin-bottom:16px;font-size:15px;line-height:1.9;color:var(--text2)}
 .mrhtml h1{font-size:19px;font-weight:700;color:var(--green-dark);margin-bottom:18px;padding-bottom:12px;border-bottom:2px solid var(--green-border)}
 .mrhtml h2{font-size:13px;font-weight:700;color:var(--green);margin:18px 0 10px;text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:5px}
 .mrhtml h2::after{content:'';flex:1;height:1px;background:var(--green-border);margin-left:5px}
@@ -1408,21 +1408,26 @@ async function deleteSelected() {
 // ════════════════════════════════════════
 function openModal(fbId){
   const a=apps.find(x=>x.firebaseId===fbId);if(!a)return;
-  // Use claudeDecision for display if status is still being updated
-  const effectiveDecision = a.status==='Approved'||a.claudeDecision==='APPROVED' ? 'APPROVED' :
-                            a.status==='Declined'||a.claudeDecision==='DECLINED' ? 'DECLINED' : a.status||'PENDING';
+  // Determine effective decision from all available signals
+  const cdec = (a.claudeDecision||'').toUpperCase();
+  const effectiveDecision = 
+    (a.status==='Approved' || cdec==='APPROVED') ? 'APPROVED' :
+    (a.status==='Declined' || cdec==='DECLINED') ? 'DECLINED' :
+    (a.status==='Processing' || !a.processingComplete) ? 'PROCESSING' : 'PENDING';
   const ok = effectiveDecision==='APPROVED';
-  const dc = ok?'ok':effectiveDecision==='DECLINED'?'no':a.status==='Processing'?'pending':'';
+  const isDeclined = effectiveDecision==='DECLINED';
+  const isProcessing = effectiveDecision==='PROCESSING' || (a.status==='Pending' && !a.processingComplete && !cdec);
+  const dc = ok?'ok':isDeclined?'no':isProcessing?'pending':'';
   document.getElementById('mtitle').textContent=a.formName||a.name||'Application';
   document.getElementById('mbody').innerHTML=`
 <div class="mdh ${dc||'pending'}">
   <div class="mdh-inner" style="flex:1">
     <div style="flex:1">
-      <div class="mdh-badge">${ok?'✓ Approved':effectiveDecision==='DECLINED'?'✕ Declined':a.status==='Processing'?'⏳ Processing...':'⏳ '+a.status}</div>
+      <div class="mdh-badge">${ok?'✓ Approved':isDeclined?'✕ Declined':isProcessing?'⏳ Processing...':'⏳ Pending Review'}</div>
       <div class="mdn">${a.name||'—'}</div>
       ${ok?`<div class="mda">${a.amount||''}</div><div style="font-size:13px;color:rgba(255,255,255,.75);margin-top:6px;font-style:italic">✓ Approved for disbursement</div>`:(effectiveDecision==='DECLINED'&&!a.reason)?'':''}
-      ${(effectiveDecision==='DECLINED'||a.status==='Declined')&&a.reason?`<div class="mdr"><span style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.8;display:block;margin-bottom:4px">📋 Decline Reason</span>${a.reason}</div>`:''}
-      ${!a.reason&&(a.status==='Processing'||a.status==='Pending')&&effectiveDecision!=='DECLINED'&&effectiveDecision!=='APPROVED'?`<div class="mdr" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2)"><span style="font-size:11px;opacity:.8">⏳ Underwriting in progress...</span></div>`:''}
+      ${(isDeclined||a.status==='Declined')&&a.reason?`<div class="mdr"><span style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.8;display:block;margin-bottom:4px">📋 Decline Reason</span>${a.reason}</div>`:''}
+      ${!a.reason&&isProcessing?`<div class="mdr" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2)"><span style="font-size:11px;opacity:.8">⏳ Underwriting in progress...</span></div>`:''}
       ${a.nameMismatch?`<div style="background:rgba(255,193,7,.25);border:1px solid rgba(255,193,7,.5);border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:white"><b>⚠ Name Mismatch</b> — Form: <b>${a.formName||'—'}</b> · Document: <b>${a.documentName||'—'}</b></div>`:''}
     </div>
     <canvas id="mwh" width="90" height="90" style="flex-shrink:0;opacity:.9"></canvas>
@@ -1435,7 +1440,7 @@ function openModal(fbId){
   </div>
   <div class="mmi">
     <div class="mml">Loan Amount</div>
-    <div class="mmv" style="color:${ok?'var(--green)':'var(--muted)'};font-size:${ok?'20px':'16px'}">${ok?(a.amount||'—'):(effectiveDecision==='DECLINED'?'Declined':'N/A')}</div>
+    <div class="mmv" style="color:${ok?'var(--green)':'var(--muted)'};font-size:${ok?'20px':'16px'}">${ok?(a.amount||'—'):(isDeclined?'Declined':'N/A')}</div>
   </div>
   <div class="mmi">
     <div class="mml">AI Score</div>
@@ -1456,7 +1461,7 @@ function openModal(fbId){
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1">
     ${a.status!=='Approved'?`<div style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,var(--green-dark),var(--green));border-radius:10px;padding:6px 8px 6px 14px"><span style="font-size:13px;font-weight:700;color:white">$</span><input id="modal-approve-amt" type="text" placeholder="255" value="${a.amount&&a.amount!=='N/A'?a.amount.replace('$',''):''}" style="width:60px;border:none;background:transparent;font-size:15px;font-weight:800;color:white;outline:none;font-family:var(--sans)"><button class="mact-primary" onclick="updStatusWithAmt('${fbId}','Approved')" style="background:rgba(255,255,255,.25);color:white;border:1px solid rgba(255,255,255,.3)">✓ Approve</button></div>`:'<span style="background:var(--green-light);color:var(--green);border:1px solid var(--green-border);border-radius:9px;padding:7px 16px;font-size:13px;font-weight:700">✓ Approved</span>'}
     ${a.status!=='Declined'?`<button class="mact-primary" onclick="updStatus('${fbId}','Declined')" style="background:var(--red);color:white">✕ Decline</button>`:'<span style="background:var(--red-light);color:var(--red);border:1px solid var(--red-border);border-radius:9px;padding:7px 16px;font-size:13px;font-weight:700">✕ Declined</span>'}
-    ${(a.claudeDecision==='DECLINED'||a.status==='Declined')?`<button class="mact-primary" onclick="openDenialModal('${fbId}')" style="background:#e8650a;color:white">📧 Denial Email</button>`:''}
+    ${(isDeclined||a.status==='Declined')?`<button class="mact-primary" onclick="openDenialModal('${fbId}')" style="background:#e8650a;color:white">📧 Denial Email</button>`:''}
     ${(a.status==='Error'||a.status==='Processing')&&a.plaidAccessToken?`<button class="mact-primary" onclick="rerunFromModal('${fbId}')" style="background:var(--blue);color:white">↺ Retry</button>`:''}
   </div>
   <div style="display:flex;gap:6px;margin-left:auto">
