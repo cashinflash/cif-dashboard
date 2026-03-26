@@ -859,7 +859,9 @@ function switchActive(n) {
   localStorage.setItem('cif_active_profile',n);
   updateProfileBadge();
   document.getElementById('profile-dd').classList.remove('open');
-  toast(`Switched to "${n}" ✓`,'ok');
+  // Push new active profile to Firebase
+  pushSettingsToFirebase(n, profiles[n] || DR);
+  toast(`Switched to "${n}" ✓`, 'ok');
 }
 
 function updateProfileBadge() {
@@ -923,7 +925,28 @@ async function loadPdfSetting() {
   } catch(e) {}
 }
 
-function saveRules() { profiles[editingProfile]=getRulesFromUI(); saveProfilesStore(); toast(`Rules saved for "${editingProfile}" ✓`,'ok'); }
+function saveRules() {
+  profiles[editingProfile] = getRulesFromUI();
+  saveProfilesStore();
+  // If editing the active profile, push to Firebase so cif-apply picks it up
+  if (editingProfile === activeProfile) {
+    pushSettingsToFirebase(editingProfile, profiles[editingProfile]);
+  }
+  toast(`Rules saved for "${editingProfile}" ✓`, 'ok');
+}
+
+async function pushSettingsToFirebase(profileName, rules) {
+  try {
+    await fbPatch('settings/underwriting.json', {
+      activeProfile: profileName,
+      rules: rules,
+      updatedAt: Date.now()
+    });
+    toast('Settings synced to underwriting engine ✓', 'ok');
+  } catch(e) {
+    console.warn('Settings sync failed:', e);
+  }
+}
 function resetProfileToDefaults() { if(!confirm(`Reset "${editingProfile}"?`))return; profiles[editingProfile]={...DR}; saveProfilesStore(); loadRulesUI(editingProfile); toast('Reset to defaults ✓','ok'); }
 
 // ════════════════════════════════════════
