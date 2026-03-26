@@ -261,16 +261,27 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .mcl{width:32px;height:32px;background:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:15px}
 .mcl:hover{background:var(--border)}
 .mb{padding:24px}
-.mdh{border-radius:12px;padding:18px 20px;margin-bottom:18px;display:flex;align-items:center;gap:14px}
-.mdh.ok{background:var(--green-light);border:1px solid var(--green-border)}
-.mdh.no{background:var(--red-light);border:1px solid var(--red-border)}
-.mdi{font-size:34px}.mdn{font-size:19px;font-weight:700;letter-spacing:-.02em}
-.mda{font-size:26px;font-weight:700;color:var(--green);margin-top:3px}
-.mdr{font-size:13px;color:var(--red);margin-top:5px;line-height:1.5}
-.mmeta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
-.mmi{display:flex;flex-direction:column;gap:3px}
-.mml{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
-.mmv{font-size:13px;font-weight:600;color:var(--text)}
+/* Modal hero */
+.mdh{border-radius:14px;overflow:hidden;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,.07)}
+.mdh.ok{background:linear-gradient(135deg,#0f4425,#1a6b3c)}
+.mdh.no{background:linear-gradient(135deg,#7a1a14,#c0392b)}
+.mdh.pending{background:linear-gradient(135deg,#7a6000,#b8860b)}
+.mdh-inner{padding:22px 24px;display:flex;align-items:center;gap:18px}
+.mdh-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;color:white;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}
+.mdn{font-size:22px;font-weight:800;color:white;letter-spacing:-.02em;margin-bottom:4px}
+.mda{font-size:32px;font-weight:800;color:rgba(255,255,255,.95);letter-spacing:-.02em}
+.mdr{background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 14px;margin-top:10px;font-size:13px;color:rgba(255,255,255,.9);line-height:1.6;font-weight:500}
+/* Stats cards */
+.mmeta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.mmi{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;transition:box-shadow .15s}
+.mmi:hover{box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.mml{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+.mmv{font-size:16px;font-weight:700;color:var(--text)}
+/* Action bar */
+.mact-bar{display:flex;gap:8px;padding:14px 0;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.mact-primary{padding:10px 20px;border-radius:10px;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.mact-secondary{padding:8px 14px;border-radius:9px;font-size:12px;font-weight:600;font-family:var(--sans);cursor:pointer;border:1.5px solid var(--border2);background:white;color:var(--text2);transition:all .15s;display:inline-flex;align-items:center;gap:5px}
+.mact-secondary:hover{background:var(--bg);border-color:var(--muted)}
 .msec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:8px}
 .msec::after{content:'';flex:1;height:1px;background:var(--border)}
 .mrhtml{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:24px 26px;max-height:65vh;overflow-y:auto;margin-bottom:16px;font-size:15px;line-height:1.9;color:var(--text2)}
@@ -1196,28 +1207,43 @@ function openModal(fbId){
   const ok=a.status==='Approved',dc=ok?'ok':a.status==='Declined'?'no':'';
   document.getElementById('mtitle').textContent=a.name||'Application';
   document.getElementById('mbody').innerHTML=`
-<div class="mdh ${dc}">
-  <div class="mdi">${ok?'✓':a.status==='Declined'?'✕':'⏳'}</div>
-  <div style="flex:1">
-    <div class="mdn">${a.name||'—'}</div>
-    ${ok?`<div class="mda">${a.amount||''}</div>`:''}
-    ${a.reason?`<div class="mdr" style="display:block!important">${a.reason}</div>`:''}
+<div class="mdh ${dc||'pending'}">
+  <div class="mdh-inner" style="flex:1">
+    <div style="flex:1">
+      <div class="mdh-badge">${ok?'✓ Approved':a.status==='Declined'?'✕ Declined':'⏳ '+a.status}</div>
+      <div class="mdn">${a.name||'—'}</div>
+      ${ok?`<div class="mda">${a.amount||''}</div>`:''}
+      ${a.reason?`<div class="mdr">${a.reason}</div>`:''}
+    </div>
+    <canvas id="mwh" width="90" height="90" style="flex-shrink:0;opacity:.9"></canvas>
   </div>
-  <canvas id="mwh" width="86" height="86"></canvas>
 </div>
 <div class="mmeta">
-  <div class="mmi"><div class="mml">Status</div><div class="mmv"><span class="pill pill-${a.status?.toLowerCase()}">${a.status}</span></div></div>
-  <div class="mmi"><div class="mml">Amount</div><div class="mmv">${ok?(a.amount||'—'):'N/A'}</div></div>
-  <div class="mmi"><div class="mml">Score</div><div class="mmv">${a.score||0}/100</div></div>
-  ${a.extractedSSN ? `<div class="mmi" style="grid-column:span 3"><div class="mml">SSN (from report)</div><div class="mmv" style="display:flex;align-items:center;gap:8px"><span id="modal-ssn-${fbId}">${a.extractedSSN}</span><button onclick="copyField('modal-ssn-${fbId}')" style="background:var(--green-light);border:1px solid var(--green-border);border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:var(--green);cursor:pointer;font-family:var(--sans)">Copy</button></div></div>` : ''}
+  <div class="mmi">
+    <div class="mml">Status</div>
+    <div class="mmv"><span class="pill pill-${a.status?.toLowerCase()||'p'}">${a.status||'Pending'}</span></div>
+  </div>
+  <div class="mmi">
+    <div class="mml">Loan Amount</div>
+    <div class="mmv" style="color:${ok?'var(--green)':'var(--muted)'};font-size:${ok?'20px':'16px'}">${ok?(a.amount||'—'):'N/A'}</div>
+  </div>
+  <div class="mmi">
+    <div class="mml">AI Score</div>
+    <div class="mmv" style="color:${(a.score||0)>=60?'var(--green)':(a.score||0)>=40?'var(--gold-dark)':'var(--red)'}">${a.score||0}<span style="font-size:12px;font-weight:500;color:var(--muted)">/100</span></div>
+  </div>
+  ${a.extractedSSN?`<div class="mmi" style="grid-column:span 3;flex-direction:row;align-items:center;justify-content:space-between"><div><div class="mml">SSN (from report)</div><div class="mmv" id="modal-ssn-${fbId}">${a.extractedSSN}</div></div><button onclick="copyField('modal-ssn-${fbId}')" style="background:var(--green-light);border:1px solid var(--green-border);border-radius:7px;padding:6px 14px;font-size:11px;font-weight:700;color:var(--green);cursor:pointer;font-family:var(--sans)">Copy SSN</button></div>`:''}
 </div>
-<div style="display:flex;gap:8px;padding:14px 0;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap;align-items:center">
-  ${a.status!=='Approved'?`<div style="display:flex;align-items:center;gap:6px;background:var(--green-light);border:1px solid var(--green-border);border-radius:9px;padding:6px 12px"><span style="font-size:13px;font-weight:600;color:var(--green)">$</span><input id="modal-approve-amt" type="text" placeholder="Amount" value="${a.amount&&a.amount!=='N/A'?a.amount.replace('$',''):''}" style="width:70px;border:none;background:transparent;font-size:14px;font-weight:700;color:var(--green);outline:none;font-family:var(--sans)"><button class="actbtn btn-ok" onclick="updStatusWithAmt('${fbId}','Approved')" style="padding:6px 14px">✓ Approve</button></div>`:''}
-  ${a.status!=='Declined'?`<button class="actbtn btn-no" onclick="updStatus('${fbId}','Declined')">✕ Decline</button>
-  ${(a.status==='Declined'||a.claudeDecision==='DECLINED')?`<button class="actbtn btn-gh" onclick="openDenialModal('${fbId}')" style="border-color:#e8650a;color:#e8650a">📧 Send Denial Email</button>`:''}`:''}
-  <button class="actbtn btn-gh" onclick="copyModal('${fbId}')">⎘ Copy</button>
-  <button class="actbtn btn-gh" style="color:var(--red);border-color:var(--red-border)" onclick="delApp('${fbId}')">🗑 Delete</button>
-  ${(a.status==='Error'||a.status==='Processing')&&a.plaidAccessToken ? `<button class="actbtn btn-ok" onclick="rerunFromModal('${fbId}')" style="background:var(--blue);border-color:var(--blue)">↺ Retry Plaid Report</button>` : ''}
+<div class="mact-bar">
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1">
+    ${a.status!=='Approved'?`<div style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,var(--green-dark),var(--green));border-radius:10px;padding:6px 8px 6px 14px"><span style="font-size:13px;font-weight:700;color:white">$</span><input id="modal-approve-amt" type="text" placeholder="255" value="${a.amount&&a.amount!=='N/A'?a.amount.replace('$',''):''}" style="width:60px;border:none;background:transparent;font-size:15px;font-weight:800;color:white;outline:none;font-family:var(--sans)"><button class="mact-primary" onclick="updStatusWithAmt('${fbId}','Approved')" style="background:rgba(255,255,255,.25);color:white;border:1px solid rgba(255,255,255,.3)">✓ Approve</button></div>`:'<span style="background:var(--green-light);color:var(--green);border:1px solid var(--green-border);border-radius:9px;padding:7px 16px;font-size:13px;font-weight:700">✓ Approved</span>'}
+    ${a.status!=='Declined'?`<button class="mact-primary" onclick="updStatus('${fbId}','Declined')" style="background:var(--red);color:white">✕ Decline</button>`:'<span style="background:var(--red-light);color:var(--red);border:1px solid var(--red-border);border-radius:9px;padding:7px 16px;font-size:13px;font-weight:700">✕ Declined</span>'}
+    ${(a.claudeDecision==='DECLINED'||a.status==='Declined')?`<button class="mact-primary" onclick="openDenialModal('${fbId}')" style="background:#e8650a;color:white">📧 Denial Email</button>`:''}
+    ${(a.status==='Error'||a.status==='Processing')&&a.plaidAccessToken?`<button class="mact-primary" onclick="rerunFromModal('${fbId}')" style="background:var(--blue);color:white">↺ Retry</button>`:''}
+  </div>
+  <div style="display:flex;gap:6px;margin-left:auto">
+    <button class="mact-secondary" onclick="copyModal('${fbId}')">⎘ Copy</button>
+    <button class="mact-secondary" onclick="delApp('${fbId}')" style="color:var(--red);border-color:var(--red-border)">🗑</button>
+  </div>
 </div>
 <div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:16px">
   <button onclick="mTab('report','${fbId}',this)" id="mtab-report-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--green);border-bottom:2px solid var(--green);cursor:pointer;font-family:var(--sans)">📄 Report</button>
@@ -1236,7 +1262,7 @@ function openModal(fbId){
 
 `;
   document.getElementById('ov').classList.add('open');
-  setTimeout(()=>drawWheel('mwh',a.score||0,86),80);
+  setTimeout(()=>drawWheel('mwh',a.score||0,90,true),80);
 }
 
 function mTab(tab, fbId, btn) {
@@ -1396,16 +1422,18 @@ function closeModalOut(e){if(e.target===document.getElementById('ov'))closeModal
 // ════════════════════════════════════════
 // SCORE WHEEL
 // ════════════════════════════════════════
-function drawWheel(id,score,size){
+function drawWheel(id,score,size,darkBg){
   const cv=document.getElementById(id);if(!cv)return;
   const ctx=cv.getContext('2d'),cx=size/2,cy=size/2,r=size/2-6,lw=size>80?9:size>60?7:5;
   ctx.clearRect(0,0,size,size);
-  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.strokeStyle='#e2e8e4';ctx.lineWidth=lw;ctx.stroke();
-  const col=score>=70?'#1a6b3c':score>=50?'#c9a84c':score>=30?'#d97706':'#c0392b';
+  const trackCol = darkBg ? 'rgba(255,255,255,.2)' : '#e2e8e4';
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.strokeStyle=trackCol;ctx.lineWidth=lw;ctx.stroke();
+  const col=score>=70?'#4ade80':score>=50?'#fbbf24':score>=30?'#fb923c':'#f87171';
+  const textCol = darkBg ? 'white' : (score>=70?'#1a6b3c':score>=50?'#c9a84c':score>=30?'#d97706':'#c0392b');
   ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+(Math.PI*2*score/100));ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.lineCap='round';ctx.stroke();
   const fs=size>80?20:size>60?14:11;
-  ctx.fillStyle=col;ctx.font=`bold ${fs}px Poppins,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
-  if(size>60){ctx.fillText(score,cx,cy-fs*.35);ctx.fillStyle='#8fa197';ctx.font=`500 ${Math.round(fs*.55)}px Poppins,sans-serif`;ctx.fillText('/100',cx,cy+fs*.7);}
+  ctx.fillStyle=textCol;ctx.font=`bold ${fs}px Poppins,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+  if(size>60){ctx.fillText(score,cx,cy-fs*.35);ctx.fillStyle=darkBg?'rgba(255,255,255,.6)':'#8fa197';ctx.font=`500 ${Math.round(fs*.55)}px Poppins,sans-serif`;ctx.fillText('/100',cx,cy+fs*.7);}
   else ctx.fillText(score,cx,cy);
 }
 
