@@ -223,13 +223,19 @@ header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8
 .rsb-text{font-size:13px;color:var(--text2);font-weight:500}
 .rsb-text span{font-weight:700;color:var(--green)}
 .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:1.5rem;max-width:700px}
-.sc{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px 22px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden;min-width:0}
-.sc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0}
-.sc.tot::before{background:linear-gradient(90deg,var(--border2),var(--muted2))}.sc.pen::before{background:linear-gradient(90deg,var(--gold),var(--gold-dark))}
-.sc.app::before{background:linear-gradient(90deg,var(--green-dark),var(--green))}.sc.dec::before{background:linear-gradient(90deg,#a93226,var(--red))}
-.slbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:10px}
-.snum{font-size:38px;font-weight:800;letter-spacing:-.03em;line-height:1}
-.snum.def{color:var(--text)}.snum.gld{color:var(--gold-dark)}.snum.grn{color:var(--green)}.snum.red{color:var(--red)}
+.sc{border-radius:16px;padding:20px 22px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden;min-width:0;transition:transform .15s,box-shadow .15s;cursor:default}
+.sc:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+.sc.tot{background:white;border:1.5px solid var(--border)}
+.sc.pen{background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1.5px solid #fde68a}
+.sc.app{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1.5px solid #bbf7d0}
+.sc.dec{background:linear-gradient(135deg,#fff5f5,#fee2e2);border:1.5px solid #fecaca}
+.sc::after{content:'';position:absolute;bottom:0;right:0;width:60px;height:60px;border-radius:50%;opacity:.08}
+.sc.tot::after{background:var(--text)}.sc.pen::after{background:var(--gold-dark)}
+.sc.app::after{background:var(--green)}.sc.dec::after{background:var(--red)}
+.slbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.snum{font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1;margin-bottom:4px}
+.snum.def{color:var(--text)}.snum.gld{color:#d97706}.snum.grn{color:var(--green)}.snum.red{color:var(--red)}
+.spct{font-size:11px;font-weight:600;color:var(--muted);margin-top:4px}
 .tcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-sm);margin-top:.5rem}
 .ttb{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--surface2)}
 .sbox{display:flex;align-items:center;gap:8px;border:1px solid var(--border2);border-radius:9px;padding:9px 14px;background:white;flex:1;max-width:320px}
@@ -329,7 +335,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
     <img class="logo" src="https://sp-ao.shortpixel.ai/client/to_webp,q_lossless,ret_img/https://cashinflash.com/wp-content/uploads/2025/08/white_logo_350.png" alt="" onerror="this.style.display='none';document.querySelector('.logo-fb').style.display='block'">
     <span class="logo-fb">Cash in Flash</span>
     <div class="hdiv"></div>
-    <div class="hsub">Underwriting Engine</div>
+    <div class="hsub">Internal Portal</div>
   </div>
   <button id="mob-menu-btn" onclick="toggleMobMenu()" style="display:none;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:6px 10px;color:white;cursor:pointer;font-size:18px;line-height:1">☰</button>
 <div id="mob-menu" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:200;" onclick="toggleMobMenu()">
@@ -570,10 +576,26 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
     </div>
     <div id="sync-status"></div>
     <div class="stats-row">
-      <div class="sc tot"><div class="slbl">Total</div><div class="snum def" id="st">0</div></div>
-      <div class="sc pen"><div class="slbl">Pending</div><div class="snum gld" id="sp2">0</div></div>
-      <div class="sc app"><div class="slbl">Approved</div><div class="snum grn" id="sa">0</div></div>
-      <div class="sc dec"><div class="slbl">Declined</div><div class="snum red" id="sd">0</div></div>
+      <div class="sc tot">
+        <div class="slbl">📋 Total</div>
+        <div class="snum def" id="st">0</div>
+        <div class="spct" id="st-sub">All applications</div>
+      </div>
+      <div class="sc pen">
+        <div class="slbl">⏳ Pending</div>
+        <div class="snum gld" id="sp2">0</div>
+        <div class="spct" id="sp-sub">Awaiting review</div>
+      </div>
+      <div class="sc app">
+        <div class="slbl">✓ Approved</div>
+        <div class="snum grn" id="sa">0</div>
+        <div class="spct" id="sa-sub">Approval rate</div>
+      </div>
+      <div class="sc dec">
+        <div class="slbl">✕ Declined</div>
+        <div class="snum red" id="sd">0</div>
+        <div class="spct" id="sd-sub">Decline rate</div>
+      </div>
     </div>
     <div class="tcard">
       <div class="ttb">
@@ -1158,16 +1180,77 @@ async function saveBatch(uid,status,name,score,filename){
 // ════════════════════════════════════════
 // DASHBOARD
 // ════════════════════════════════════════
+function srcBadge(src) {
+  const map = {
+    'loan-app':   ['#dbeafe','#1d4ed8','Loan App'],
+    'web-apply':  ['#f0fdf4','#15803d','Web Apply'],
+    'doc-upload': ['#fdf4ff','#7e22ce','Doc Upload'],
+    'mobile':     ['var(--gold-light)','var(--gold-dark)','Mobile'],
+    'plaid-rerun':['#eff6ff','#2563eb','Re-run'],
+  };
+  const [bg,col,lbl] = map[src] || ['var(--green-light)','var(--green-dark)','Desktop'];
+  return `<span style="font-size:11px;background:${bg};color:${col};padding:3px 10px;border-radius:20px;font-weight:700;letter-spacing:.02em">${lbl}</span>`;
+}
+
+function scoreBg(score) {
+  if (score >= 70) return 'rgba(26,107,60,.08)';
+  if (score >= 50) return 'rgba(201,168,76,.1)';
+  if (score >= 30) return 'rgba(217,119,6,.08)';
+  return 'rgba(192,57,43,.07)';
+}
+
 function renderDash(){
-  document.getElementById('st').textContent=apps.length;
-  document.getElementById('sp2').textContent=apps.filter(a=>a.status==='Pending').length;
-  document.getElementById('sa').textContent=apps.filter(a=>a.status==='Approved').length;
-  document.getElementById('sd').textContent=apps.filter(a=>a.status==='Declined').length;
+  const tot=apps.length;
+  const pend=apps.filter(a=>a.status==='Pending').length;
+  const appr=apps.filter(a=>a.status==='Approved').length;
+  const decl=apps.filter(a=>a.status==='Declined').length;
+  document.getElementById('st').textContent=tot;
+  document.getElementById('sp2').textContent=pend;
+  document.getElementById('sa').textContent=appr;
+  document.getElementById('sd').textContent=decl;
+  const reviewed=appr+decl;
+  document.getElementById('st-sub').textContent=tot===1?'1 application':tot+' applications';
+  document.getElementById('sp-sub').textContent=pend===0?'All reviewed':pend+' need review';
+  document.getElementById('sa-sub').textContent=reviewed>0?Math.round(appr/reviewed*100)+'% approval rate':'No decisions yet';
+  document.getElementById('sd-sub').textContent=reviewed>0?Math.round(decl/reviewed*100)+'% decline rate':'No decisions yet';
+
   const filtered=apps.filter(a=>(!srch||a.name?.toLowerCase().includes(srch.toLowerCase()))&&(!stFilter||a.status===stFilter));
   const c=document.getElementById('dtable');
-  if(!filtered.length){c.innerHTML=`<div class="empty"><div class="empty-ic">📋</div><div class="empty-t">${apps.length?'No results':'No applications yet'}</div><div class="empty-s">${apps.length?'Try a different filter.':'Run your first analysis to get started.'}</div>${!apps.length?'<button class="ecta" onclick="showView(\'single\',document.getElementById(\'nav-single\'))">+ New Analysis</button>':''}</div>`;return;}
-  c.innerHTML=`<table><thead><tr><th style="width:36px"><input type="checkbox" id="chk-all" onchange="toggleAllCheck(this)" style="cursor:pointer;width:15px;height:15px"></th><th>Applicant</th><th>Score</th><th>Amount</th><th>Source</th><th>Date</th><th>Status</th></tr></thead><tbody>${filtered.map(a=>`<tr><td onclick="event.stopPropagation()"><input type="checkbox" class="row-chk" data-id="${a.firebaseId}" onchange="updateSelCount()" style="cursor:pointer;width:15px;height:15px"></td><td onclick="openModal('${a.firebaseId}')" style="cursor:pointer"><div class="nbig">${a.name||'—'}</div><div class="nsub">${a.filename||''}</div></td><td onclick="openModal('${a.firebaseId}')"><canvas id="dw${a.firebaseId?.replace(/[^a-z0-9]/gi,'')}" width="42" height="42"></canvas></td><td onclick="openModal('${a.firebaseId}')" class="abig">${a.status==='Approved'?(a.amount||'—'):'—'}</td><td onclick="openModal('${a.firebaseId}')"><span style="font-size:11px;background:${a.source==='loan-app'?'var(--blue-light)':a.source==='web-apply'?'#f0fdf4':a.source==='doc-upload'?'#fdf4ff':a.source==='mobile'?'var(--gold-light)':'var(--green-light)'};color:${a.source==='loan-app'?'var(--blue)':a.source==='web-apply'?'#15803d':a.source==='doc-upload'?'#7e22ce':a.source==='mobile'?'var(--gold-dark)':'var(--green-dark)'};padding:2px 8px;border-radius:20px;font-weight:600">${a.source==='loan-app'?'Loan App':a.source==='web-apply'?'Web Apply':a.source==='doc-upload'?'Doc Upload':a.source==='mobile'?'Mobile':'Desktop'}</span></td><td onclick="openModal('${a.firebaseId}')" style="color:var(--muted);font-size:12px">${a.date||''}<br><span style="font-size:11px;color:var(--muted2)">${a.time||''}</span></td><td onclick="openModal('${a.firebaseId}')"><span class="pill pill-${a.status?.toLowerCase()||'p'}">${a.status||'Pending'}</span></td></tr>`).join('')}</tbody></table>`;
-  filtered.forEach(a=>setTimeout(()=>drawWheel('dw'+(a.firebaseId?.replace(/[^a-z0-9]/gi,'')||''),a.score||0,42),80));
+
+  if(!filtered.length){
+    c.innerHTML=`<div class="empty"><div class="empty-ic">📋</div><div class="empty-t">${apps.length?'No results':'No applications yet'}</div><div class="empty-s">${apps.length?'Try a different filter.':'Submit your first application to get started.'}</div>${!apps.length?'<button class="ecta" onclick="showView(\'single\',document.getElementById(\'nav-single\'))">+ New Analysis</button>':''}</div>`;
+    return;
+  }
+
+  // Smart re-render — skip if data unchanged (prevents wheel flicker on poll)
+  const newKey=filtered.map(a=>a.firebaseId+'|'+a.status+'|'+(a.score||0)+'|'+(a.amount||'')).join('~');
+  if(c.dataset.renderKey===newKey && c.querySelector('table')){return;}
+  c.dataset.renderKey=newKey;
+
+  const rows=filtered.map(a=>{
+    const wid='dw'+(a.firebaseId?.replace(/[^a-z0-9]/gi,'')||'');
+    const ok=a.status==='Approved';
+    return `<tr oncontextmenu="showCtxMenu(event,'${a.firebaseId}')" style="cursor:pointer">
+      <td onclick="event.stopPropagation()"><input type="checkbox" class="row-chk" data-id="${a.firebaseId}" onchange="updateSelCount()" style="cursor:pointer;width:15px;height:15px"></td>
+      <td onclick="openModal('${a.firebaseId}')">
+        <div class="nbig">${a.name||'—'}</div>
+        <div class="nsub">${a.filename||''}</div>
+      </td>
+      <td onclick="openModal('${a.firebaseId}')" style="background:${scoreBg(a.score||0)};text-align:center;padding:8px">
+        <canvas id="${wid}" width="44" height="44"></canvas>
+      </td>
+      <td onclick="openModal('${a.firebaseId}')" class="abig" style="font-size:${ok?'15px':'13px'};color:${ok?'var(--green)':'var(--muted)'}">${ok?(a.amount||'—'):'—'}</td>
+      <td onclick="openModal('${a.firebaseId}')">${srcBadge(a.source)}</td>
+      <td onclick="openModal('${a.firebaseId}')" style="color:var(--muted);font-size:12px">${a.date||''}<br><span style="font-size:11px;color:var(--muted2)">${a.time||''}</span></td>
+      <td onclick="openModal('${a.firebaseId}')"><span class="pill pill-${a.status?.toLowerCase()||'p'}">${a.status||'Pending'}</span></td>
+    </tr>`;
+  }).join('');
+
+  c.innerHTML=`<table><thead><tr>
+    <th style="width:36px"><input type="checkbox" id="chk-all" onchange="toggleAllCheck(this)" style="cursor:pointer;width:15px;height:15px"></th>
+    <th>Applicant</th><th>Score</th><th>Amount</th><th>Source</th><th>Date</th><th>Status</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+  filtered.forEach(a=>setTimeout(()=>drawWheel('dw'+(a.firebaseId?.replace(/[^a-z0-9]/gi,'')||''),a.score||0,44),80));
 }
 
 function filterDash(v){srch=v;renderDash();}
@@ -1611,6 +1694,39 @@ async function rerunPlaidReport(fbId, accessToken, name) {
 }
 
 
+
+// ══ RIGHT-CLICK CONTEXT MENU ══
+let ctxFbId = null;
+
+function showCtxMenu(e, fbId) {
+  e.preventDefault();
+  ctxFbId = fbId;
+  const a = apps.find(x => x.firebaseId === fbId);
+  const menu = document.getElementById('ctx-menu');
+  document.getElementById('ctx-name').textContent = a?.name || 'Application';
+  menu.style.display = 'block';
+  // Position near cursor
+  const x = Math.min(e.clientX, window.innerWidth - 200);
+  const y = Math.min(e.clientY, window.innerHeight - 220);
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+}
+
+async function ctxAction(action) {
+  const menu = document.getElementById('ctx-menu');
+  menu.style.display = 'none';
+  if (!ctxFbId) return;
+  if (action === 'open') { openModal(ctxFbId); }
+  else if (action === 'approve') { await updStatus(ctxFbId, 'Approved'); }
+  else if (action === 'decline') { await updStatus(ctxFbId, 'Declined'); }
+  else if (action === 'denial') { openDenialModal(ctxFbId); }
+  else if (action === 'delete') { await delApp(ctxFbId); }
+  ctxFbId = null;
+}
+
+document.addEventListener('click', () => { document.getElementById('ctx-menu').style.display = 'none'; });
+document.addEventListener('scroll', () => { document.getElementById('ctx-menu').style.display = 'none'; });
+
 // ══ DENIAL EMAIL ══
 const DENIAL_REASONS = [
   "Insufficient income to support a cash advance loan",
@@ -1772,6 +1888,17 @@ function toast(msg,type=''){const t=document.getElementById('toastel');t.textCon
       </div>
     </div>
   </div>
+</div>
+
+<!-- Right-click context menu -->
+<div id="ctx-menu" style="display:none;position:fixed;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-lg);z-index:600;min-width:180px;overflow:hidden;animation:fadeUp .15s ease">
+  <div id="ctx-name" style="padding:10px 14px;font-size:12px;font-weight:700;color:var(--muted);border-bottom:1px solid var(--border);text-overflow:ellipsis;overflow:hidden;white-space:nowrap"></div>
+  <div onclick="ctxAction('open')" style="padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--text)" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">📄 Open Report</div>
+  <div onclick="ctxAction('approve')" style="padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--green)" onmouseover="this.style.background='var(--green-light)'" onmouseout="this.style.background=''">✓ Quick Approve</div>
+  <div onclick="ctxAction('decline')" style="padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--red)" onmouseover="this.style.background='var(--red-light)'" onmouseout="this.style.background=''">✕ Quick Decline</div>
+  <div style="border-top:1px solid var(--border)"></div>
+  <div onclick="ctxAction('denial')" style="padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;color:#e8650a" onmouseover="this.style.background='#fff7f0'" onmouseout="this.style.background=''">📧 Send Denial Email</div>
+  <div onclick="ctxAction('delete')" style="padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--red)" onmouseover="this.style.background='var(--red-light)'" onmouseout="this.style.background=''">🗑 Delete</div>
 </div>
 </body>
 </html>
