@@ -1410,24 +1410,28 @@ function openModal(fbId){
   const a=apps.find(x=>x.firebaseId===fbId);if(!a)return;
   // Determine effective decision from all available signals
   const cdec = (a.claudeDecision||'').toUpperCase();
+  // Use status field as primary truth — it's set by server after processing
   const effectiveDecision = 
     (a.status==='Approved' || cdec==='APPROVED') ? 'APPROVED' :
     (a.status==='Declined' || cdec==='DECLINED') ? 'DECLINED' :
-    (a.status==='Processing' || !a.processingComplete) ? 'PROCESSING' : 'PENDING';
+    (a.status==='Processing') ? 'PROCESSING' :
+    (a.processingComplete && a.status==='Pending') ? 'PENDING_REVIEW' : 'PROCESSING';
   const ok = effectiveDecision==='APPROVED';
   const isDeclined = effectiveDecision==='DECLINED';
-  const isProcessing = effectiveDecision==='PROCESSING' || (a.status==='Pending' && !a.processingComplete && !cdec);
+  const isProcessing = effectiveDecision==='PROCESSING';
+  const isPendingReview = effectiveDecision==='PENDING_REVIEW';
   const dc = ok?'ok':isDeclined?'no':isProcessing?'pending':'';
   document.getElementById('mtitle').textContent=a.formName||a.name||'Application';
   document.getElementById('mbody').innerHTML=`
 <div class="mdh ${dc||'pending'}">
   <div class="mdh-inner" style="flex:1">
     <div style="flex:1">
-      <div class="mdh-badge">${ok?'✓ Approved':isDeclined?'✕ Declined':isProcessing?'⏳ Processing...':'⏳ Pending Review'}</div>
+      <div class="mdh-badge">${ok?'✓ Approved':isDeclined?'✕ Declined':isProcessing?'⏳ Processing...':isPendingReview?'📋 Pending Review':'⏳ '+a.status}</div>
       <div class="mdn">${a.name||'—'}</div>
       ${ok?`<div class="mda">${a.amount||''}</div><div style="font-size:13px;color:rgba(255,255,255,.75);margin-top:6px;font-style:italic">✓ Approved for disbursement</div>`:(effectiveDecision==='DECLINED'&&!a.reason)?'':''}
       ${(isDeclined||a.status==='Declined')&&a.reason?`<div class="mdr"><span style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.8;display:block;margin-bottom:4px">📋 Decline Reason</span>${a.reason}</div>`:''}
-      ${!a.reason&&isProcessing?`<div class="mdr" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2)"><span style="font-size:11px;opacity:.8">⏳ Underwriting in progress...</span></div>`:''}
+      ${(!a.reason&&isProcessing)?`<div class="mdr" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2)"><span style="font-size:11px;opacity:.8">⏳ Underwriting in progress...</span></div>`:''}
+      ${(isPendingReview&&!a.reason)?`<div class="mdr" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2)"><span style="font-size:11px;opacity:.8">⏳ Underwriting in progress...</span></div>`:''}
       ${a.nameMismatch?`<div style="background:rgba(255,193,7,.25);border:1px solid rgba(255,193,7,.5);border-radius:8px;padding:8px 12px;margin-top:8px;font-size:12px;color:white"><b>⚠ Name Mismatch</b> — Form: <b>${a.formName||'—'}</b> · Document: <b>${a.documentName||'—'}</b></div>`:''}
     </div>
     <canvas id="mwh" width="90" height="90" style="flex-shrink:0;opacity:.9"></canvas>
