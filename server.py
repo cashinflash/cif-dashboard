@@ -196,6 +196,19 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error':str(e)})
             return
 
+        if path == '/api/send-denial':
+            try:
+                import urllib.request as ur
+                payload = raw
+                req = ur.Request('https://cif-apply.onrender.com/api/send-denial',
+                    data=payload, headers={'Content-Type':'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=30) as r:
+                    result = r.read()
+                self.send_json(200, json.loads(result))
+            except Exception as e:
+                self.send_json(500, {'error': str(e)})
+            return
+
         if path == '/api/rerun-plaid':
             try:
                 body = json.loads(raw)

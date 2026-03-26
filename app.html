@@ -1209,10 +1209,12 @@ function openModal(fbId){
   <div class="mmi"><div class="mml">Status</div><div class="mmv"><span class="pill pill-${a.status?.toLowerCase()}">${a.status}</span></div></div>
   <div class="mmi"><div class="mml">Amount</div><div class="mmv">${ok?(a.amount||'—'):'N/A'}</div></div>
   <div class="mmi"><div class="mml">Score</div><div class="mmv">${a.score||0}/100</div></div>
+  ${a.extractedSSN ? `<div class="mmi" style="grid-column:span 3"><div class="mml">SSN (from report)</div><div class="mmv" style="display:flex;align-items:center;gap:8px"><span id="modal-ssn-${fbId}">${a.extractedSSN}</span><button onclick="copyField('modal-ssn-${fbId}')" style="background:var(--green-light);border:1px solid var(--green-border);border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:var(--green);cursor:pointer;font-family:var(--sans)">Copy</button></div></div>` : ''}
 </div>
 <div style="display:flex;gap:8px;padding:14px 0;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap;align-items:center">
   ${a.status!=='Approved'?`<div style="display:flex;align-items:center;gap:6px;background:var(--green-light);border:1px solid var(--green-border);border-radius:9px;padding:6px 12px"><span style="font-size:13px;font-weight:600;color:var(--green)">$</span><input id="modal-approve-amt" type="text" placeholder="Amount" value="${a.amount&&a.amount!=='N/A'?a.amount.replace('$',''):''}" style="width:70px;border:none;background:transparent;font-size:14px;font-weight:700;color:var(--green);outline:none;font-family:var(--sans)"><button class="actbtn btn-ok" onclick="updStatusWithAmt('${fbId}','Approved')" style="padding:6px 14px">✓ Approve</button></div>`:''}
-  ${a.status!=='Declined'?`<button class="actbtn btn-no" onclick="updStatus('${fbId}','Declined')">✕ Decline</button>`:''}
+  ${a.status!=='Declined'?`<button class="actbtn btn-no" onclick="updStatus('${fbId}','Declined')">✕ Decline</button>
+  ${(a.status==='Declined'||a.claudeDecision==='DECLINED')?`<button class="actbtn btn-gh" onclick="openDenialModal('${fbId}')" style="border-color:#e8650a;color:#e8650a">📧 Send Denial Email</button>`:''}`:''}
   <button class="actbtn btn-gh" onclick="copyModal('${fbId}')">⎘ Copy</button>
   <button class="actbtn btn-gh" style="color:var(--red);border-color:var(--red-border)" onclick="delApp('${fbId}')">🗑 Delete</button>
   ${(a.status==='Error'||a.status==='Processing')&&a.plaidAccessToken ? `<button class="actbtn btn-ok" onclick="rerunFromModal('${fbId}')" style="background:var(--blue);border-color:var(--blue)">↺ Retry Plaid Report</button>` : ''}
@@ -1580,6 +1582,123 @@ async function rerunPlaidReport(fbId, accessToken, name) {
   }
 }
 
+
+// ══ DENIAL EMAIL ══
+const DENIAL_REASONS = [
+  "Insufficient income to support a cash advance loan",
+  "No verified income in statement period",
+  "Excessive payday/advance activity",
+  "Excessive NSF/returned items",
+  "Chronic negative balance",
+  "Low average daily balance",
+  "Account closed",
+  "Fraud indication",
+  "Identity mismatch",
+  "Bank statement outside acceptable window",
+  "Excessive speculative activity",
+  "Inability to demonstrate repayment without hardship",
+  "Incomplete or unreadable bank statement"
+];
+
+const DENIAL_KEYWORD_MAP = [
+  { keywords: ['income','pay','gross','salary','employment','wages'], reasons: [0,1] },
+  { keywords: ['nsf','returned','insufficient fund','bounced'], reasons: [3] },
+  { keywords: ['negative','below zero','overdraft'], reasons: [4] },
+  { keywords: ['balance','low','average daily'], reasons: [5] },
+  { keywords: ['closed','account close'], reasons: [6] },
+  { keywords: ['fraud','suspicious','unusual'], reasons: [7] },
+  { keywords: ['identity','mismatch','name','id'], reasons: [8] },
+  { keywords: ['fintech','advance','dave','brigit','earnin','payday','cash advance'], reasons: [2] },
+  { keywords: ['speculative','gambling','crypto','betting'], reasons: [10] },
+  { keywords: ['repayment','hardship','afford','cash flow','fcf'], reasons: [11] },
+  { keywords: ['statement','window','30 day','period','outside'], reasons: [9,12] },
+];
+
+let denialFbId = null;
+let denialEmail = '';
+let denialName = '';
+
+function openDenialModal(fbId) {
+  const a = apps.find(x => x.firebaseId === fbId);
+  if (!a) return;
+  denialFbId = fbId;
+  denialEmail = a.applicationData?.email || '';
+  denialName = a.name || '';
+
+  document.getElementById('denial-to-label').textContent = 'To: ' + (denialEmail || 'No email on file');
+  document.getElementById('denial-email-display').textContent = denialEmail || 'No email address found';
+
+  // Auto-select reasons based on Claude decline reason
+  const declineReason = (a.reason || '').toLowerCase();
+  const autoSelected = new Set();
+  DENIAL_KEYWORD_MAP.forEach(({keywords, reasons}) => {
+    if (keywords.some(k => declineReason.includes(k))) {
+      reasons.forEach(r => autoSelected.add(r));
+    }
+  });
+  // If nothing matched, default to reason 0 (insufficient income) as fallback
+  if (autoSelected.size === 0) autoSelected.add(0);
+
+  // Render checkboxes
+  const container = document.getElementById('denial-reasons');
+  container.innerHTML = DENIAL_REASONS.map((r, i) => `
+    <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:10px 12px;border:1px solid ${autoSelected.has(i)?'var(--green-border)':'var(--border)'};border-radius:9px;background:${autoSelected.has(i)?'var(--green-light)':'white'};transition:all .15s" id="denial-row-${i}">
+      <input type="checkbox" id="denial-chk-${i}" ${autoSelected.has(i)?'checked':''} onchange="updateDenialRow(${i})"
+        style="width:16px;height:16px;margin-top:2px;accent-color:var(--green);cursor:pointer;flex-shrink:0">
+      <span style="font-size:13px;color:var(--text2);line-height:1.5">${r}</span>
+    </label>`).join('');
+
+  document.getElementById('denial-ov').style.display = 'flex';
+}
+
+function updateDenialRow(i) {
+  const chk = document.getElementById('denial-chk-'+i);
+  const row = document.getElementById('denial-row-'+i);
+  if (chk.checked) {
+    row.style.borderColor = 'var(--green-border)';
+    row.style.background = 'var(--green-light)';
+  } else {
+    row.style.borderColor = 'var(--border)';
+    row.style.background = 'white';
+  }
+}
+
+function closeDenialModal() {
+  document.getElementById('denial-ov').style.display = 'none';
+  denialFbId = null;
+}
+
+async function sendDenialEmail() {
+  if (!denialEmail) { toast('No email address on file for this customer', 'err'); return; }
+  const selectedReasons = DENIAL_REASONS.filter((_, i) => document.getElementById('denial-chk-'+i)?.checked);
+  if (selectedReasons.length === 0) { toast('Please select at least one denial reason', 'err'); return; }
+
+  const btn = document.getElementById('denial-send-btn');
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+
+  try {
+    const resp = await fetch('/api/send-denial', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {...authHeaders(), 'Content-Type':'application/json'},
+      body: JSON.stringify({email: denialEmail, name: denialName, reasons: selectedReasons})
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      toast('Denial email sent to ' + denialEmail + ' ✓', 'ok');
+      closeDenialModal();
+    } else {
+      toast('Error: ' + (data.error||'Unknown error'), 'err');
+    }
+  } catch(e) {
+    toast('Failed to send: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send Denial Email';
+  }
+}
+
 async function logout() {
   try {
     await fetch('/api/logout', {method:'POST', credentials:'include', headers:{'Content-Type':'application/json','X-Session':getToken()}});
@@ -1601,5 +1720,30 @@ function toggleMobMenu(){
 
 function toast(msg,type=''){const t=document.getElementById('toastel');t.textContent=msg;t.className='toast '+(type||'')+' show';clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3200);}
 </script>
+
+<!-- ══ DENIAL EMAIL MODAL ══ -->
+<div id="denial-ov" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:white;border-radius:18px;width:100%;max-width:580px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:white;z-index:1">
+      <div>
+        <div style="font-size:17px;font-weight:700;color:var(--text)">📧 Send Denial Email</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px" id="denial-to-label"></div>
+      </div>
+      <button onclick="closeDenialModal()" style="width:32px;height:32px;background:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:15px;color:var(--muted)">✕</button>
+    </div>
+    <div style="padding:20px 24px">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Select the denial reasons to include. Auto-selected based on Claude's decision — uncheck any that don't apply.</p>
+      <div id="denial-reasons" style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px"></div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:20px">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Sending to</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text)" id="denial-email-display"></div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button onclick="closeDenialModal()" class="actbtn btn-gh" style="flex:1">Cancel</button>
+        <button onclick="sendDenialEmail()" class="actbtn btn-ok" style="flex:2;background:#e8650a;border-color:#e8650a" id="denial-send-btn">📧 Send Denial Email</button>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
