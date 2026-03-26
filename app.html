@@ -1325,11 +1325,14 @@ function renderDash(){
         // Update amount
         const amtCell = tr.querySelector('.amt-cell');
         if (amtCell) { const ok=a.status==='Approved'; amtCell.style.color=ok?'var(--green)':'var(--muted)'; amtCell.style.fontSize=ok?'15px':'13px'; amtCell.textContent=ok?(a.amount||'—'):'—'; }
-        // Redraw wheel only if score changed
-        if (tr.dataset.score !== String(a.score||0)) {
+        // Redraw wheel if score changed OR if status changed away from Processing
+        const wasProcessing = tr.dataset.status === 'Processing';
+        const nowProcessing = a.status === 'Processing';
+        tr.dataset.status = a.status || '';
+        if (tr.dataset.score !== String(a.score||0) || (wasProcessing && !nowProcessing)) {
           tr.dataset.score = String(a.score||0);
           if(a.status==='Processing') drawProcessingWheel(wid,44);
-          else drawWheel(wid,a.score||0,44);
+          else { const cv=document.getElementById(wid); if(cv) cv.classList.remove('wheel-processing'); drawWheel(wid,a.score||0,44); }
         }
       });
     }
