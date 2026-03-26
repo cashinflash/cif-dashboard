@@ -1349,8 +1349,9 @@ function openModal(fbId){
     <div style="flex:1">
       <div class="mdh-badge">${ok?'✓ Approved':a.status==='Declined'?'✕ Declined':'⏳ '+a.status}</div>
       <div class="mdn">${a.name||'—'}</div>
-      ${ok?`<div class="mda">${a.amount||''}</div>`:''}
-      ${a.reason?`<div class="mdr">${a.reason}</div>`:''}
+      ${ok?`<div class="mda">${a.amount||''}</div><div style="font-size:13px;color:rgba(255,255,255,.75);margin-top:6px;font-style:italic">✓ Approved for disbursement</div>`:''}
+      ${!ok&&a.reason?`<div class="mdr"><span style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.8;display:block;margin-bottom:4px">📋 Decline Reason</span>${a.reason}</div>`:''}
+      ${!ok&&!a.reason&&a.status==='Pending'?`<div class="mdr" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2)"><span style="font-size:11px;opacity:.8">⏳ Underwriting in progress...</span></div>`:''}
     </div>
     <canvas id="mwh" width="90" height="90" style="flex-shrink:0;opacity:.9"></canvas>
   </div>
