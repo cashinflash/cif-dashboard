@@ -327,6 +327,8 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--blue);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes wheelSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.wheel-processing{animation:wheelSpin 1.2s linear infinite;transform-origin:50% 50%;}
 </style>
 </head>
 <body>
@@ -1250,7 +1252,14 @@ function renderDash(){
     <th style="width:36px"><input type="checkbox" id="chk-all" onchange="toggleAllCheck(this)" style="cursor:pointer;width:15px;height:15px"></th>
     <th>Applicant</th><th>Score</th><th>Amount</th><th>Source</th><th>Date</th><th>Status</th>
   </tr></thead><tbody>${rows}</tbody></table>`;
-  filtered.forEach(a=>setTimeout(()=>drawWheel('dw'+(a.firebaseId?.replace(/[^a-z0-9]/gi,'')||''),a.score||0,44),80));
+  filtered.forEach(a=>setTimeout(()=>{
+    const wid='dw'+(a.firebaseId?.replace(/[^a-z0-9]/gi,'')||'');
+    if(a.status==='Processing'||a.status==='Error'&&!a.score){
+      drawProcessingWheel(wid,44);
+    } else {
+      drawWheel(wid,a.score||0,44);
+    }
+  },80));
 }
 
 function filterDash(v){srch=v;renderDash();}
@@ -1505,6 +1514,26 @@ function closeModalOut(e){if(e.target===document.getElementById('ov'))closeModal
 // ════════════════════════════════════════
 // SCORE WHEEL
 // ════════════════════════════════════════
+function drawProcessingWheel(id, size) {
+  const cv = document.getElementById(id);
+  if (!cv) return;
+  cv.classList.add('wheel-processing');
+  const ctx = cv.getContext('2d'), cx = size/2, cy = size/2, r = size/2-6, lw = size>80?9:size>60?7:5;
+  // Draw static track
+  ctx.clearRect(0,0,size,size);
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+  ctx.strokeStyle = 'rgba(200,210,205,.4)'; ctx.lineWidth = lw; ctx.stroke();
+  // Draw spinning arc (about 1/3 of circle)
+  ctx.beginPath(); ctx.arc(cx,cy,r,-Math.PI/2, Math.PI/6);
+  ctx.strokeStyle = '#1a6b3c'; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.stroke();
+  // Draw dots in center
+  const fs = size>80?11:8;
+  ctx.fillStyle = '#6b9e7e';
+  ctx.font = `bold ${fs}px sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('...', cx, cy);
+}
+
 function drawWheel(id,score,size,darkBg){
   const cv=document.getElementById(id);if(!cv)return;
   const ctx=cv.getContext('2d'),cx=size/2,cy=size/2,r=size/2-6,lw=size>80?9:size>60?7:5;
