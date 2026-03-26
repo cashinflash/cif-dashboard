@@ -551,6 +551,34 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
         <div class="rule-row"><div class="rule-label">Drop 1 tier at<small>% of income on gambling/crypto</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-spec-drop-r" min="1" max="100" value="35" oninput="syncR('r-spec-drop','r-spec-drop-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-spec-drop" value="35" oninput="syncR('r-spec-drop-r','r-spec-drop',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
         <div class="rule-row"><div class="rule-label">Cap at $100 at<small>% that caps approval</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-spec-cap-r" min="1" max="100" value="50" oninput="syncR('r-spec-cap','r-spec-cap-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-spec-cap" value="50" oninput="syncR('r-spec-cap-r','r-spec-cap',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
       </div></div>
+
+      <!-- ATM WITHDRAWAL TREATMENT -->
+      <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#fff3e0">🏧</div><div><div class="rs-hdr-title">ATM Withdrawal Treatment</div><div class="rs-hdr-sub">How to count large ATM cash withdrawals in FCF calculation</div></div></div>
+      <div class="rs-body" style="display:grid;grid-template-columns:1fr 1fr;gap:0 32px">
+        <div class="rule-row" style="align-items:center">
+          <div class="rule-label">Large ATM threshold<small>Withdrawals above this amount are treated specially</small></div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:14px;font-weight:700;color:var(--muted)">$</span>
+            <input class="rule-input" type="number" id="r-atm-threshold" value="200" style="width:90px">
+          </div>
+        </div>
+        <div class="rule-row" style="align-items:center">
+          <div class="rule-label">Count large ATM withdrawals as expenses at<small>0% = ignore ATM | 50% = half counts | 100% = fully counts</small></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="range" class="rule-range" id="r-atm-pct-r" min="0" max="100" value="50" oninput="syncR('r-atm-pct','r-atm-pct-r')">
+            <div style="display:flex;align-items:center;gap:2px">
+              <input class="rule-input" type="number" id="r-atm-pct" value="50" oninput="syncR('r-atm-pct-r','r-atm-pct',true)">
+              <span style="font-size:12px;color:var(--muted);font-weight:600">%</span>
+            </div>
+          </div>
+        </div>
+        <div style="grid-column:1/-1;background:var(--bg);border-radius:10px;padding:12px 16px;margin-top:4px;font-size:12px;color:var(--muted);line-height:1.7">
+          <b style="color:var(--text2)">Examples:</b> &nbsp;
+          <span style="margin-right:16px"><b>0%</b> = ATM withdrawals ignored (most lenient — best FCF)</span>
+          <span style="margin-right:16px"><b>50%</b> = Half counted as expense (balanced — recommended)</span>
+          <span><b>100%</b> = Fully counted as expense (strictest — worst FCF)</span>
+        </div>
+      </div></div>
       <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">🚫</div><div><div class="rs-hdr-title">Auto-Decline Conditions</div></div><span class="rs-hdr-sub">Toggle each on or off</span></div>
       <div class="rs-body" style="display:grid;grid-template-columns:1fr 1fr;gap:0 32px">
         <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:8px 0 6px;display:grid;grid-template-columns:1fr 160px;gap:12px"><span>Condition</span><span style="text-align:center">Action</span></div>
@@ -695,7 +723,7 @@ async function fbDelete(path) {
 // ════════════════════════════════════════
 const DR = {loanMin:100,loanMax:255,t1Fcf:200,t2Fcf:375,t3Fcf:500,t4Fcf:640,
   nsfDrop:2,nsfCap:4,nsfDecline:5,ftDrop:5,ftCap:7,ftDecline:9,ftAbs:11,
-  negCap:7,negDecline:10,specDrop:35,specCap:50,
+  negCap:7,negDecline:10,specDrop:35,specCap:50,atmThreshold:200,atmPct:50,
   adNoIncome:'decline',adClosed:'decline',adFraud:'decline',adFcf:'decline',
   adAvgBal:'decline',adJobLoss:'decline',adBankruptcy:'decline',adStale:'decline'};
 
@@ -909,6 +937,7 @@ function loadRulesUI(n) {
   set('r-neg-dec',r.negDecline); set('r-neg-dec-r',r.negDecline);
   set('r-spec-drop',r.specDrop); set('r-spec-drop-r',r.specDrop);
   set('r-spec-cap',r.specCap); set('r-spec-cap-r',r.specCap);
+  set('r-atm-threshold',r.atmThreshold??200); set('r-atm-pct',r.atmPct??50); set('r-atm-pct-r',r.atmPct??50);
   // Set ad-sel dropdowns — handle legacy boolean values
   function setAd(id, val) {
     const el = document.getElementById(id);
@@ -929,7 +958,7 @@ function getRulesFromUI() {
   const c = id => document.getElementById(id).checked;
   return {loanMin:n('r-loan-min'),loanMax:n('r-loan-max'),t1Fcf:n('r-t1-fcf'),t2Fcf:n('r-t2-fcf'),t3Fcf:n('r-t3-fcf'),t4Fcf:n('r-t4-fcf'),
     nsfDrop:n('r-nsf-drop'),nsfCap:n('r-nsf-cap'),nsfDecline:n('r-nsf-decline'),ftDrop:n('r-ft-drop'),ftCap:n('r-ft-cap'),ftDecline:n('r-ft-decline'),ftAbs:n('r-ft-abs'),
-    negCap:n('r-neg-cap'),negDecline:n('r-neg-dec'),specDrop:n('r-spec-drop'),specCap:n('r-spec-cap'),
+    negCap:n('r-neg-cap'),negDecline:n('r-neg-dec'),specDrop:n('r-spec-drop'),specCap:n('r-spec-cap'),atmThreshold:n('r-atm-threshold'),atmPct:n('r-atm-pct'),
     adNoIncome:document.getElementById('ad-no-income')?.value||'decline',
     adClosed:document.getElementById('ad-closed')?.value||'decline',
     adFraud:document.getElementById('ad-fraud')?.value||'decline',
@@ -1433,7 +1462,21 @@ function openModal(fbId){
   <button onclick="mTab('appdata','${fbId}',this)" id="mtab-appdata-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📋 Application</button>
   <button onclick="mTab('docs','${fbId}',this)" id="mtab-docs-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📁 Documents</button>
 </div>
-<div id="mpanel-report-${fbId}"><div class="mrhtml">${highlightTierBreakdown(stripFences(a.report||''))}</div></div>
+<div id="mpanel-report-${fbId}"><div class="mrhtml">${
+  a.status==='Processing' || (!a.report && !a.processingComplete) ?
+  `<div style="text-align:center;padding:3rem 2rem">
+    <div style="width:48px;height:48px;border:4px solid var(--green-light);border-top-color:var(--green);border-radius:50%;animation:spin .9s linear infinite;margin:0 auto 20px"></div>
+    <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">Underwriting in Progress</div>
+    <div style="font-size:13px;color:var(--muted)">Claude is analyzing the bank statement.<br>This typically takes 1–3 minutes. Page updates automatically.</div>
+  </div>` :
+  a.status==='Error' ?
+  `<div style="text-align:center;padding:3rem 2rem;color:var(--red)">
+    <div style="font-size:32px;margin-bottom:12px">⚠️</div>
+    <div style="font-size:15px;font-weight:700;margin-bottom:8px">Processing Error</div>
+    <div style="font-size:13px;color:var(--muted)">${a.error||'An error occurred during analysis.'}</div>
+  </div>` :
+  highlightTierBreakdown(stripFences(a.report||''))
+}</div></div>
 <div id="mpanel-appdata-${fbId}" style="display:none">${buildAppDetails(a.applicationData||{})}</div>
 <div id="mpanel-docs-${fbId}" style="display:none">${buildDocsPanel(a)}</div>
 <div class="msec" style="margin-top:16px">Notes</div>
@@ -1689,7 +1732,19 @@ function drawWheel(id,score,size,darkBg){
 // ════════════════════════════════════════
 function stripFences(html) {
   if (!html) return '';
-  return html.replace(/^```[a-z]*\n?/gim, '').replace(/```\s*$/gim, '').trim();
+  // Remove code fences
+  html = html.replace(/^```[a-z]*\n?/gim, '').replace(/```\s*$/gim, '').trim();
+  // Convert markdown headings to HTML (safety net if Claude outputs markdown)
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  // Convert markdown bold to HTML
+  html = html.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  // Convert markdown horizontal rules
+  html = html.replace(/^---+$/gm, '<hr>');
+  // Convert markdown bullet points
+  html = html.replace(/^\* (.+)$/gm, '<li>$1</li>');
+  return html;
 }
 
 function highlightTierBreakdown(html) {
