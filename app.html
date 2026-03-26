@@ -206,6 +206,13 @@ header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8
 .rule-input:focus{outline:none;border-color:var(--green);background:white}
 .rule-range{-webkit-appearance:none;width:100px;height:4px;border-radius:2px;background:var(--border2);outline:none;cursor:pointer}
 .rule-range::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--green);cursor:pointer}
+.ad-sel{border:1.5px solid var(--border2);border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600;background:white;color:var(--text);font-family:var(--sans);cursor:pointer;min-width:140px}
+.ad-sel:focus{outline:none;border-color:var(--green)}
+.ad-sel option[value="decline"]{color:var(--red);font-weight:700}
+.ad-sel option[value="drop"]{color:var(--gold-dark);font-weight:600}
+.ad-sel option[value="cap"]{color:#b45309;font-weight:600}
+.ad-sel option[value="flag"]{color:var(--blue);font-weight:600}
+.ad-sel option[value="off"]{color:var(--muted)}
 .tog{position:relative;width:40px;height:22px;flex-shrink:0}
 .tog input{opacity:0;width:0;height:0;position:absolute}
 .tog-slider{position:absolute;inset:0;background:var(--border2);border-radius:11px;cursor:pointer;transition:background .2s}
@@ -537,14 +544,15 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
       </div></div>
       <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">🚫</div><div><div class="rs-hdr-title">Auto-Decline Conditions</div></div><span class="rs-hdr-sub">Toggle each on or off</span></div>
       <div class="rs-body" style="display:grid;grid-template-columns:1fr 1fr;gap:0 32px">
-        <div class="rule-row"><div class="rule-label">No verified income in statement period</div><label class="tog"><input type="checkbox" id="ad-no-income" checked><span class="tog-slider"></span></label></div>
-        <div class="rule-row"><div class="rule-label">Account is closed or restricted</div><label class="tog"><input type="checkbox" id="ad-closed" checked><span class="tog-slider"></span></label></div>
-        <div class="rule-row"><div class="rule-label">Fraud indicators detected</div><label class="tog"><input type="checkbox" id="ad-fraud" checked><span class="tog-slider"></span></label></div>
-        <div class="rule-row"><div class="rule-label">FCF below minimum tier threshold</div><label class="tog"><input type="checkbox" id="ad-fcf" checked><span class="tog-slider"></span></label></div>
-        <div class="rule-row"><div class="rule-label">Average daily balance below $0</div><label class="tog"><input type="checkbox" id="ad-avg-bal" checked><span class="tog-slider"></span></label></div>
-        <div class="rule-row"><div class="rule-label">Recent job loss indicated</div><label class="tog"><input type="checkbox" id="ad-job-loss" checked><span class="tog-slider"></span></label></div>
-        <div class="rule-row"><div class="rule-label">Bankruptcy filing in progress</div><label class="tog"><input type="checkbox" id="ad-bankruptcy" checked><span class="tog-slider"></span></label></div>
-        <div class="rule-row"><div class="rule-label">Statement older than 30 days</div><label class="tog"><input type="checkbox" id="ad-stale" checked><span class="tog-slider"></span></label></div>
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:8px 0 6px;display:grid;grid-template-columns:1fr 160px;gap:12px"><span>Condition</span><span style="text-align:center">Action</span></div>
+        <div class="rule-row" style="align-items:center"><div class="rule-label">No verified income in statement period<small>Payroll, benefits, or consistent gig deposits</small></div><select class="ad-sel" id="ad-no-income" style="width:155px"><option value="decline">Hard Decline</option><option value="drop">Drop 1 Tier</option><option value="cap">Cap at $100</option><option value="flag">Flag Only</option><option value="off">Ignore</option></select></div>
+        <div class="rule-row" style="align-items:center"><div class="rule-label">Account is closed or restricted<small>Bank confirmed account closure</small></div><select class="ad-sel" id="ad-closed"><option value="decline">Hard Decline</option><option value="drop">Drop 1 Tier</option><option value="cap">Cap at $100</option><option value="flag">Flag Only</option><option value="off">Ignore</option></select></div>
+        <div class="rule-row" style="align-items:center"><div class="rule-label">Fraud indicators detected<small>Suspicious transaction patterns</small></div><select class="ad-sel" id="ad-fraud"><option value="decline">Hard Decline</option><option value="drop">Drop 1 Tier</option><option value="cap">Cap at $100</option><option value="flag">Flag Only</option><option value="off">Ignore</option></select></div>
+        <div class="rule-row" style="align-items:center"><div class="rule-label">FCF below minimum tier threshold<small>Free cash flow too low for any loan tier</small></div><select class="ad-sel" id="ad-fcf"><option value="decline">Hard Decline</option><option value="drop">Drop 1 Tier</option><option value="cap">Cap at $100</option><option value="flag">Flag Only</option><option value="off">Ignore</option></select></div>
+        <div class="rule-row" style="align-items:center"><div class="rule-label">Average daily balance below $0<small>Chronic negative balance pattern</small></div><select class="ad-sel" id="ad-avg-bal"><option value="decline">Hard Decline</option><option value="drop">Drop 1 Tier</option><option value="cap">Cap at $100</option><option value="flag">Flag Only</option><option value="off">Ignore</option></select></div>
+        <div class="rule-row" style="align-items:center"><div class="rule-label">Recent job loss indicated<small>Employment termination in statement period</small></div><select class="ad-sel" id="ad-job-loss"><option value="decline">Hard Decline</option><option value="drop">Drop 1 Tier</option><option value="cap">Cap at $100</option><option value="flag">Flag Only</option><option value="off">Ignore</option></select></div>
+        <div class="rule-row" style="align-items:center"><div class="rule-label">Bankruptcy filing in progress<small>Active bankruptcy proceeding</small></div><select class="ad-sel" id="ad-bankruptcy"><option value="decline">Hard Decline</option><option value="drop">Drop 1 Tier</option><option value="cap">Cap at $100</option><option value="flag">Flag Only</option><option value="off">Ignore</option></select></div>
+        <div class="rule-row" style="align-items:center"><div class="rule-label">Statement older than 30 days<small>Bank statement outside acceptable window</small></div><select class="ad-sel" id="ad-stale"><option value="decline">Hard Decline</option><option value="drop">Drop 1 Tier</option><option value="cap">Cap at $100</option><option value="flag">Flag Only</option><option value="off">Ignore</option></select></div>
       </div></div>
     </div>
   </div>
@@ -679,8 +687,8 @@ async function fbDelete(path) {
 const DR = {loanMin:100,loanMax:255,t1Fcf:200,t2Fcf:375,t3Fcf:500,t4Fcf:640,
   nsfDrop:2,nsfCap:4,nsfDecline:5,ftDrop:5,ftCap:7,ftDecline:9,ftAbs:11,
   negCap:7,negDecline:10,specDrop:35,specCap:50,
-  adNoIncome:true,adClosed:true,adFraud:true,adFcf:true,
-  adAvgBal:true,adJobLoss:true,adBankruptcy:true,adStale:true};
+  adNoIncome:'decline',adClosed:'decline',adFraud:'decline',adFcf:'decline',
+  adAvgBal:'decline',adJobLoss:'decline',adBankruptcy:'decline',adStale:'decline'};
 
 // ════════════════════════════════════════
 // STATE
@@ -892,9 +900,17 @@ function loadRulesUI(n) {
   set('r-neg-dec',r.negDecline); set('r-neg-dec-r',r.negDecline);
   set('r-spec-drop',r.specDrop); set('r-spec-drop-r',r.specDrop);
   set('r-spec-cap',r.specCap); set('r-spec-cap-r',r.specCap);
-  chk('ad-no-income',r.adNoIncome); chk('ad-closed',r.adClosed); chk('ad-fraud',r.adFraud);
-  chk('ad-fcf',r.adFcf); chk('ad-avg-bal',r.adAvgBal); chk('ad-job-loss',r.adJobLoss);
-  chk('ad-bankruptcy',r.adBankruptcy); chk('ad-stale',r.adStale);
+  // Set ad-sel dropdowns — handle legacy boolean values
+  function setAd(id, val) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (val === true || val === 'true') el.value = 'decline';
+    else if (val === false || val === 'false') el.value = 'off';
+    else el.value = val || 'decline';
+  }
+  setAd('ad-no-income',r.adNoIncome); setAd('ad-closed',r.adClosed); setAd('ad-fraud',r.adFraud);
+  setAd('ad-fcf',r.adFcf); setAd('ad-avg-bal',r.adAvgBal); setAd('ad-job-loss',r.adJobLoss);
+  setAd('ad-bankruptcy',r.adBankruptcy); setAd('ad-stale',r.adStale);
 }
 
 function syncR(t,s,rev=false) { const se=document.getElementById(s),te=document.getElementById(t); if(se&&te)te.value=se.value; }
@@ -905,8 +921,14 @@ function getRulesFromUI() {
   return {loanMin:n('r-loan-min'),loanMax:n('r-loan-max'),t1Fcf:n('r-t1-fcf'),t2Fcf:n('r-t2-fcf'),t3Fcf:n('r-t3-fcf'),t4Fcf:n('r-t4-fcf'),
     nsfDrop:n('r-nsf-drop'),nsfCap:n('r-nsf-cap'),nsfDecline:n('r-nsf-decline'),ftDrop:n('r-ft-drop'),ftCap:n('r-ft-cap'),ftDecline:n('r-ft-decline'),ftAbs:n('r-ft-abs'),
     negCap:n('r-neg-cap'),negDecline:n('r-neg-dec'),specDrop:n('r-spec-drop'),specCap:n('r-spec-cap'),
-    adNoIncome:c('ad-no-income'),adClosed:c('ad-closed'),adFraud:c('ad-fraud'),adFcf:c('ad-fcf'),
-    adAvgBal:c('ad-avg-bal'),adJobLoss:c('ad-job-loss'),adBankruptcy:c('ad-bankruptcy'),adStale:c('ad-stale')};
+    adNoIncome:document.getElementById('ad-no-income')?.value||'decline',
+    adClosed:document.getElementById('ad-closed')?.value||'decline',
+    adFraud:document.getElementById('ad-fraud')?.value||'decline',
+    adFcf:document.getElementById('ad-fcf')?.value||'decline',
+    adAvgBal:document.getElementById('ad-avg-bal')?.value||'decline',
+    adJobLoss:document.getElementById('ad-job-loss')?.value||'decline',
+    adBankruptcy:document.getElementById('ad-bankruptcy')?.value||'decline',
+    adStale:document.getElementById('ad-stale')?.value||'decline'};
 }
 
 async function savePdfSetting(allowed) {
