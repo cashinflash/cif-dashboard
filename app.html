@@ -1428,7 +1428,9 @@ function openModal(fbId){
     <div style="flex:1">
       <div class="mdh-badge">${ok?'✓ Approved':isDeclined?'✕ Declined':isProcessing?'⏳ Processing...':isPendingReview?'📋 Pending Review':'⏳ '+a.status}</div>
       <div class="mdn">${a.name||'—'}</div>
-      ${ok?`<div class="mda">${a.amount||''}</div><div style="font-size:13px;color:rgba(255,255,255,.75);margin-top:6px;font-style:italic">✓ Approved for disbursement</div>`:(effectiveDecision==='DECLINED'&&!a.reason)?'':''}
+      ${ok?`<div class="mda">${a.amount||''}</div>
+        ${a.approvalReason?`<div class="mdr" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.25)"><span style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.9;display:block;margin-bottom:4px">✓ Approval Reason</span>${a.approvalReason}</div>`:`<div style="font-size:13px;color:rgba(255,255,255,.75);margin-top:6px;font-style:italic">✓ Approved for disbursement</div>`}
+      `:(effectiveDecision==='DECLINED'&&!a.reason)?'':''}
       ${(isDeclined||a.status==='Declined')&&a.reason?`<div class="mdr"><span style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.8;display:block;margin-bottom:4px">📋 Decline Reason</span>${a.reason}</div>`:''}
       ${(!a.reason&&isProcessing)?`<div class="mdr" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2)"><span style="font-size:11px;opacity:.8">⏳ Underwriting in progress...</span></div>`:''}
       ${(isPendingReview&&!a.reason)?`<div class="mdr" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2)"><span style="font-size:11px;opacity:.8">⏳ Underwriting in progress...</span></div>`:''}
@@ -1518,7 +1520,10 @@ function mTab(tab, fbId, btn) {
 }
 
 function buildAppDetails(d) {
-  if (!d || Object.keys(d).length === 0) return '<div style="text-align:center;padding:2rem;color:var(--muted)"><div style="font-size:28px;margin-bottom:8px">📋</div><div style="font-weight:600">No application data</div><div style="font-size:13px;margin-top:4px">This submission was not made through the online form</div></div>';
+  if (!d) return '<div style="text-align:center;padding:2rem;color:var(--muted)"><div style="font-size:28px;margin-bottom:8px">📋</div><div style="font-weight:600">No application data</div><div style="font-size:13px;margin-top:4px">This submission was not made through the online form</div></div>';
+  // Check if all meaningful fields are empty
+  const hasData = d.firstName||d.lastName||d.phone||d.email||d.ssn||d.address;
+  if (!hasData) return '<div style="text-align:center;padding:2rem;color:var(--muted)"><div style="font-size:28px;margin-bottom:8px">📋</div><div style="font-weight:600">Application data unavailable</div><div style="font-size:13px;margin-top:4px">This submission may have been processed before form data capture was enabled. Ask the customer to reapply.</div></div>';
   const uid = Math.random().toString(36).slice(2,8);
   function row(label, value, id) {
     if (!value) return '';
