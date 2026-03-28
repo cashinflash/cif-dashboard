@@ -1074,7 +1074,8 @@ document.addEventListener('click', e => {
 function loadRulesUI(n) {
   const r = profiles[n]||DR;
   const set = (id,v) => { const el=document.getElementById(id); if(el) el.value=v; };
-  const chk = (id,v) => { const el=document.getElementById(id); if(el) el.checked=v; };
+  const setChk = (id,v) => { const el=document.getElementById(id); if(el) el.checked=!!v; };
+  const setSel = (id,v) => { const el=document.getElementById(id); if(el) el.value=v||''; };
   set('r-loan-min',r.loanMin); set('r-loan-max',r.loanMax);
   set('r-t1-fcf',r.t1Fcf); set('r-t2-fcf',r.t2Fcf); set('r-t3-fcf',r.t3Fcf); set('r-t4-fcf',r.t4Fcf);
   set('r-nsf-drop',r.nsfDrop); set('r-nsf-cap',r.nsfCap); set('r-nsf-decline',r.nsfDecline);
@@ -1120,8 +1121,10 @@ function loadRulesUI(n) {
 function syncR(t,s,rev=false) { const se=document.getElementById(s),te=document.getElementById(t); if(se&&te)te.value=se.value; }
 
 function getRulesFromUI() {
-  const n = id => +document.getElementById(id).value;
-  const c = id => document.getElementById(id).checked;
+  const n = id => { const el=document.getElementById(id); return el ? +el.value||0 : 0; };
+  const c = id => { const el=document.getElementById(id); return el ? el.checked : false; };
+  const chk = c;
+  const sel = id => { const el=document.getElementById(id); return el ? el.value : ''; };
   return {loanMin:n('r-loan-min'),loanMax:n('r-loan-max'),t1Fcf:n('r-t1-fcf'),t2Fcf:n('r-t2-fcf'),t3Fcf:n('r-t3-fcf'),t4Fcf:n('r-t4-fcf'),
     nsfDrop:n('r-nsf-drop'),nsfCap:n('r-nsf-cap'),nsfDecline:n('r-nsf-decline'),ftDrop:n('r-ft-drop'),ftCap:n('r-ft-cap'),ftDecline:n('r-ft-decline'),ftAbs:n('r-ft-abs'),
     negCap:n('r-neg-cap'),negDecline:n('r-neg-dec'),specDrop:n('r-spec-drop'),specCap:n('r-spec-cap'),atmThreshold:n('r-atm-threshold'),atmPct:n('r-atm-pct'),
@@ -1134,14 +1137,14 @@ function getRulesFromUI() {
     require2Checks:chk('r-require-2-checks'),incomeVariance:n('r-income-variance'),
     ftDep:n('r-ft-dep'),ftDepCap:n('r-ft-dep-cap'),
     adSingleCheck:sel('ad-single-check'),adLowBalance:sel('ad-low-balance'),
-    adNoIncome:document.getElementById('ad-no-income')?.value||'decline',
-    adClosed:document.getElementById('ad-closed')?.value||'decline',
-    adFraud:document.getElementById('ad-fraud')?.value||'decline',
-    adFcf:document.getElementById('ad-fcf')?.value||'decline',
-    adAvgBal:document.getElementById('ad-avg-bal')?.value||'decline',
-    adJobLoss:document.getElementById('ad-job-loss')?.value||'decline',
-    adBankruptcy:document.getElementById('ad-bankruptcy')?.value||'decline',
-    adStale:document.getElementById('ad-stale')?.value||'decline'};
+    adNoIncome:sel('ad-no-income')||'decline',
+    adClosed:sel('ad-closed')||'decline',
+    adFraud:sel('ad-fraud')||'decline',
+    adFcf:sel('ad-fcf')||'decline',
+    adAvgBal:sel('ad-avg-bal')||'decline',
+    adJobLoss:sel('ad-job-loss')||'decline',
+    adBankruptcy:sel('ad-bankruptcy')||'decline',
+    adStale:sel('ad-stale')||'decline'};
 }
 
 async function savePdfSetting(allowed) {
