@@ -657,11 +657,11 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
           <div class="rule-row"><div class="rule-label">Auto-decline at<small>NSFs that trigger decline</small></div><input class="rule-input" type="number" id="r-nsf-decline" value="5" min="1"></div>
         </div></div>
 
-        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--amber-light)">📱</div><div><div class="rs-hdr-title">Fintech / Payday App Usage</div><div class="rs-hdr-sub">Dave, Brigit, Earnin, Empower, Albert, Cleo, etc.</div></div></div><div class="rs-body">
-          <div class="rule-row"><div class="rule-label">Drop 1 tier at<small>App interactions before tier drop</small></div><input class="rule-input" type="number" id="r-ft-drop" value="5" min="1"></div>
-          <div class="rule-row"><div class="rule-label">Cap at $100 at<small>App interactions before capping</small></div><input class="rule-input" type="number" id="r-ft-cap" value="7" min="1"></div>
-          <div class="rule-row"><div class="rule-label">Decline at<small>App interactions before decline</small></div><input class="rule-input" type="number" id="r-ft-decline" value="9" min="1"></div>
-          <div class="rule-row"><div class="rule-label">Absolute decline at<small>Never approve regardless of FCF</small></div><input class="rule-input" type="number" id="r-ft-abs" value="11" min="1"></div>
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--amber-light)">📱</div><div><div class="rs-hdr-title">Fintech / Payday App Usage</div><div class="rs-hdr-sub">Counted by UNIQUE apps, not total interactions — Dave used 10× still = 1 app</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">Drop 1 tier at<small>Unique apps (e.g. 3 = using Dave + Earnin + Cleo)</small></div><input class="rule-input" type="number" id="r-ft-drop" value="5" min="1"></div>
+          <div class="rule-row"><div class="rule-label">Cap at $100 at<small>Unique apps before capping</small></div><input class="rule-input" type="number" id="r-ft-cap" value="7" min="1"></div>
+          <div class="rule-row"><div class="rule-label">Decline at<small>Unique apps before decline</small></div><input class="rule-input" type="number" id="r-ft-decline" value="9" min="1"></div>
+          <div class="rule-row"><div class="rule-label">Absolute decline at<small>Unique apps — no exceptions ever</small></div><input class="rule-input" type="number" id="r-ft-abs" value="11" min="1"></div>
         </div></div>
 
         <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">📉</div><div><div class="rs-hdr-title">Negative Balance Days</div><div class="rs-hdr-sub">Days ending balance was below $0</div></div></div><div class="rs-body">
