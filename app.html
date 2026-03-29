@@ -163,10 +163,12 @@ header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8
 .rhtml p{margin-bottom:9px;font-size:14.5px}.rhtml p b{color:var(--text);font-weight:600}
 .rhtml ul{margin:8px 0 12px 20px}.rhtml ul li{margin-bottom:7px;font-size:14.5px}
 .rhtml hr{border:none;border-top:1px solid var(--border);margin:18px 0}
-.rhtml table{width:100%;border-collapse:collapse;margin:12px 0 16px;font-size:14px}
-.rhtml table th{background:var(--green-light);color:var(--green-dark);font-weight:700;padding:10px 14px;border:1px solid var(--green-border);font-size:13px;text-transform:uppercase}
-.rhtml table td{padding:10px 14px;border:1px solid var(--border);font-size:14px}
+.rhtml table{width:100%;border-collapse:collapse;margin:12px 0 16px;font-size:13px;table-layout:fixed}
+.rhtml table th{background:var(--green-light);color:var(--green-dark);font-weight:700;padding:8px 12px;border:1px solid var(--green-border);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.rhtml table td{padding:8px 12px;border:1px solid var(--border);font-size:13px;word-wrap:break-word;vertical-align:top}
 .rhtml table tr:nth-child(even) td{background:var(--surface2)}
+.rhtml table th:first-child,.rhtml table td:first-child{width:110px}
+.rhtml table th:last-child,.rhtml table td:last-child{width:130px}
 .npanel{padding:20px 24px}
 .nlbl{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px}
 .nta{width:100%;min-height:140px;border:1px solid var(--border2);border-radius:10px;padding:13px;font-size:14px;font-family:var(--sans);color:var(--text);background:var(--bg);resize:vertical;line-height:1.6}
@@ -304,6 +306,10 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .mrhtml h1{font-size:19px;font-weight:700;color:var(--green-dark);margin-bottom:18px;padding-bottom:12px;border-bottom:2px solid var(--green-border)}
 .mrhtml h2{font-size:13px;font-weight:700;color:var(--green);margin:18px 0 10px;text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:5px}
 .mrhtml h2::after{content:'';flex:1;height:1px;background:var(--green-border);margin-left:5px}
+.mrhtml table{width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:13px;table-layout:fixed}
+.mrhtml table th{background:var(--green-light);color:var(--green-dark);font-weight:700;padding:7px 10px;border:1px solid var(--green-border);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.mrhtml table td{padding:7px 10px;border:1px solid var(--border);font-size:12px;word-wrap:break-word;vertical-align:top}
+.mrhtml table tr:nth-child(even) td{background:var(--surface)}
 .mrhtml .tier-breakdown{background:linear-gradient(135deg,rgba(26,107,60,.06),rgba(26,107,60,.02));border:2px solid var(--green-border);border-radius:10px;padding:14px 16px;margin:8px 0 14px}
 .mrhtml .tier-breakdown p{margin-bottom:5px;font-size:13.5px}
 .mrhtml .tier-breakdown p:last-child{margin-bottom:0;font-weight:700;color:var(--green);font-size:14px;border-top:1px solid var(--green-border);padding-top:7px;margin-top:7px}
