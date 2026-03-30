@@ -1456,6 +1456,7 @@ function srcBadge(src) {
     'doc-upload': ['#fdf4ff','#7e22ce','Doc Upload'],
     'mobile':     ['var(--gold-light)','var(--gold-dark)','Mobile'],
     'plaid-rerun':['#eff6ff','#2563eb','Re-run'],
+    'lead':       ['#fef3c7','#92400e','⭐ Lead'],
   };
   const [bg,col,lbl] = map[src] || ['var(--green-light)','var(--green-dark)','Desktop'];
   return `<span style="font-size:11px;background:${bg};color:${col};padding:3px 10px;border-radius:20px;font-weight:700;letter-spacing:.02em">${lbl}</span>`;
