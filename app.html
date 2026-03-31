@@ -171,7 +171,7 @@ header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8
 .rhtml table th:last-child,.rhtml table td:last-child{width:130px}
 .npanel{padding:20px 24px}
 .nlbl{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px}
-.nta{width:100%;min-height:140px;border:1px solid var(--border2);border-radius:10px;padding:13px;font-size:14px;font-family:var(--sans);color:var(--text);background:var(--bg);resize:vertical;line-height:1.6}
+.nta{width:100%;min-height:200px;border:1.5px solid var(--border2);border-radius:10px;padding:14px;font-size:14px;font-family:var(--sans);color:var(--text);background:var(--bg);resize:vertical;line-height:1.7}
 .nta:focus{outline:none;border-color:var(--green);background:white}
 .nsave{margin-top:10px;padding:9px 20px;background:var(--green);color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans)}
 .ract{padding:15px 20px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--surface2)}
@@ -225,7 +225,7 @@ header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8
 .tog input:checked+.tog-slider{background:var(--green)}
 .tog input:checked+.tog-slider::before{transform:translateX(18px)}
 .profiles-bar{display:flex;gap:10px;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap}
-.profile-chip{padding:8px 16px;border-radius:20px;border:1.5px solid var(--border2);background:white;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);color:var(--muted);transition:all .15s;display:flex;align-items:center;gap:6px}
+.profile-chip{padding:8px 16px;border-radius:20px;border:1.5px solid var(--border2);background:var(--surface2);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);color:var(--text2);transition:all .15s;display:flex;align-items:center;gap:6px}
 .profile-chip:hover{border-color:var(--green-border);color:var(--green-dark)}
 .profile-chip.active{background:var(--green);border-color:var(--green);color:white}
 .new-profile-row{display:flex;gap:8px;align-items:center;margin-top:12px}
@@ -241,9 +241,7 @@ header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8
 .sc.pen{background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1.5px solid #fde68a}
 .sc.app{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1.5px solid #bbf7d0}
 .sc.dec{background:linear-gradient(135deg,#fff5f5,#fee2e2);border:1.5px solid #fecaca}
-.sc::after{content:'';position:absolute;bottom:0;right:0;width:60px;height:60px;border-radius:50%;opacity:.08}
-.sc.tot::after{background:var(--text)}.sc.pen::after{background:var(--gold-dark)}
-.sc.app::after{background:var(--green)}.sc.dec::after{background:var(--red)}
+/* stat donuts rendered via canvas */
 .slbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px}
 .snum{font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1;margin-bottom:4px}
 .snum.def{color:var(--text)}.snum.gld{color:#d97706}.snum.grn{color:var(--green)}.snum.red{color:var(--red)}
@@ -273,7 +271,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .ecta{background:var(--green);color:white;border:none;border-radius:10px;padding:11px 24px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans)}
 .ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:1.5rem}
 .ov.open{display:flex}
-.modal{background:var(--surface);border-radius:18px;width:100%;max-width:1100px;max-height:95vh;overflow-y:auto;animation:fadeUp .25s ease;box-shadow:var(--shadow-lg)}
+.modal{background:var(--surface);border-radius:18px;width:100%;max-width:1100px;min-width:min(85vw,1100px);max-height:95vh;overflow-y:auto;animation:fadeUp .25s ease;box-shadow:var(--shadow-lg)}
 .mh{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1}
 .mt{font-size:18px;font-weight:700;letter-spacing:-.02em}
 .mcl{width:32px;height:32px;background:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:15px}
@@ -339,8 +337,8 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .nudge:hover{background:#fff8e1}
 .nt{font-size:13px;font-weight:600;color:#7a5c00}
 .ns{font-size:12px;color:#a07820;margin-top:2px}
-.sync-bar{background:var(--blue-light);border:1px solid var(--blue-border);border-radius:12px;padding:12px 18px;margin-bottom:1.5rem;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--blue)}
-.sync-dot{width:8px;height:8px;border-radius:50%;background:var(--blue);animation:pulse 2s infinite}
+.sync-bar{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-bottom:1rem;padding:4px 2px}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;flex-shrink:0}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @keyframes wheelSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
@@ -530,7 +528,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
           <span style="font-size:12px;font-weight:600;color:var(--gold-dark)">Allow PDF uploads on apply form</span>
           <label class="tog"><input type="checkbox" id="allow-pdf-toggle" onchange="savePdfSetting(this.checked)" checked><span class="tog-slider"></span></label>
         </div>
-        <button class="actbtn btn-gh" onclick="resetProfileToDefaults()">↺ Reset to Defaults</button>
+        <button class="actbtn" onclick="resetProfileToDefaults()" style="background:#fff5f5;color:#c0392b;border:1.5px solid #f5b8b0;font-family:var(--sans)" title="Reset this profile to factory defaults">↺ Reset to Defaults</button>
         <button class="actbtn btn-ok" onclick="saveRules()">💾 Save Rules</button>
       </div>
     </div>
@@ -769,23 +767,31 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
     <div class="stats-row">
       <div class="sc tot">
         <div class="slbl">📋 Total</div>
-        <div class="snum def" id="st">0</div>
-        <div class="spct" id="st-sub">All applications</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1"><div class="snum def" id="st">0</div><div class="spct" id="st-sub">All applications</div></div>
+          <canvas id="sc-tot-c" width="56" height="56" style="flex-shrink:0;opacity:.8"></canvas>
+        </div>
       </div>
       <div class="sc pen">
         <div class="slbl">⏳ Pending</div>
-        <div class="snum gld" id="sp2">0</div>
-        <div class="spct" id="sp-sub">Awaiting review</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1"><div class="snum gld" id="sp2">0</div><div class="spct" id="sp-sub">Awaiting review</div></div>
+          <canvas id="sc-pen-c" width="56" height="56" style="flex-shrink:0;opacity:.85"></canvas>
+        </div>
       </div>
       <div class="sc app">
         <div class="slbl">✓ Approved</div>
-        <div class="snum grn" id="sa">0</div>
-        <div class="spct" id="sa-sub">Approval rate</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1"><div class="snum grn" id="sa">0</div><div class="spct" id="sa-sub">Approval rate</div></div>
+          <canvas id="sc-app-c" width="56" height="56" style="flex-shrink:0;opacity:.85"></canvas>
+        </div>
       </div>
       <div class="sc dec">
         <div class="slbl">✕ Declined</div>
-        <div class="snum red" id="sd">0</div>
-        <div class="spct" id="sd-sub">Decline rate</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1"><div class="snum red" id="sd">0</div><div class="spct" id="sd-sub">Decline rate</div></div>
+          <canvas id="sc-dec-c" width="56" height="56" style="flex-shrink:0;opacity:.85"></canvas>
+        </div>
       </div>
     </div>
     <div class="tcard">
@@ -978,7 +984,7 @@ function updateSyncStatus(ok) {
   const el = document.getElementById('sync-status');
   if (!el) return;
   if (ok && apps.length > 0) {
-    el.innerHTML = `<div class="sync-bar"><div class="sync-dot"></div>Connected to Firebase — ${apps.length} report${apps.length!==1?'s':''} synced across all devices</div>`;
+    el.innerHTML = `<div class="sync-bar"><div class="sync-dot"></div>Firebase connected — ${apps.length} report${apps.length!==1?'s':''}</div>`;
   } else if (ok) {
     el.innerHTML = '';
   } else {
@@ -1469,6 +1475,27 @@ function scoreBg(score) {
   return 'rgba(192,57,43,.07)';
 }
 
+
+// ════════════════════════════════════════
+// STAT CARD DONUTS
+// ════════════════════════════════════════
+function drawStatDonut(id,pct,color,track){
+  const cv=document.getElementById(id);if(!cv)return;
+  const ctx=cv.getContext('2d'),s=56,cx=28,cy=28,r=21,lw=6;
+  ctx.clearRect(0,0,s,s);
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.strokeStyle=track||'rgba(0,0,0,.09)';ctx.lineWidth=lw;ctx.stroke();
+  if(pct>0){ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+(Math.PI*2*Math.min(pct,1)));ctx.strokeStyle=color;ctx.lineWidth=lw;ctx.lineCap='round';ctx.stroke();}
+  ctx.fillStyle=color;ctx.font='700 11px Poppins,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(Math.round(pct*100)+'%',cx,cy);
+}
+function drawStatDonuts(tot,pend,appr,decl){
+  const rev=appr+decl;
+  drawStatDonut('sc-tot-c',rev/Math.max(tot,1),'#4b7c5e','rgba(0,0,0,.07)');
+  drawStatDonut('sc-pen-c',tot>0?pend/tot:0,'#d97706','rgba(217,119,6,.15)');
+  drawStatDonut('sc-app-c',rev>0?appr/rev:0,'#1a6b3c','rgba(26,107,60,.12)');
+  drawStatDonut('sc-dec-c',rev>0?decl/rev:0,'#c0392b','rgba(192,57,43,.1)');
+}
+
 function renderDash(){
   const tot=apps.length;
   const pend=apps.filter(a=>a.status==='Pending').length;
@@ -1650,7 +1677,7 @@ function openModal(fbId){
 </div>
 <div class="mact-bar">
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1">
-    ${a.status!=='Approved'?`<div style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,var(--green-dark),var(--green));border-radius:10px;padding:6px 8px 6px 14px"><span style="font-size:13px;font-weight:700;color:white">$</span><input id="modal-approve-amt" type="text" placeholder="255" value="${a.amount&&a.amount!=='N/A'?a.amount.replace('$',''):''}" style="width:60px;border:none;background:transparent;font-size:15px;font-weight:800;color:white;outline:none;font-family:var(--sans)"><button class="mact-primary" onclick="updStatusWithAmt('${fbId}','Approved')" style="background:rgba(255,255,255,.25);color:white;border:1px solid rgba(255,255,255,.3)">✓ Approve</button></div>`:'<span style="background:var(--green-light);color:var(--green);border:1px solid var(--green-border);border-radius:9px;padding:7px 16px;font-size:13px;font-weight:700">✓ Approved</span>'}
+    ${a.status!=='Approved'?`<div style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,var(--green-dark),var(--green));border-radius:10px;padding:6px 8px 6px 14px"><span style="font-size:13px;font-weight:700;color:white">$</span><input id="modal-approve-amt" type="text" placeholder="255" value="${a.amount&&a.amount!=='N/A'?a.amount.replace('$',''):''}" style="width:60px;border:none;background:transparent;font-size:15px;font-weight:800;color:white;outline:none;font-family:var(--sans)" oninput="const b=document.getElementById('approve-btn-${fbId}');if(b)b.textContent='✓ Approve $'+this.value"><button class="mact-primary" onclick="updStatusWithAmt('${fbId}','Approved')" style="background:rgba(255,255,255,.25);color:white;border:1px solid rgba(255,255,255,.3)" id="approve-btn-${fbId}">✓ Approve${a.amount&&a.amount!=='N/A'?' '+a.amount:''}</button></div>`:'<span style="background:var(--green-light);color:var(--green);border:1px solid var(--green-border);border-radius:9px;padding:7px 16px;font-size:13px;font-weight:700">✓ Approved</span>'}
     ${a.status!=='Declined'?`<button class="mact-primary" onclick="updStatus('${fbId}','Declined')" style="background:var(--red);color:white">✕ Decline</button>`:'<span style="background:var(--red-light);color:var(--red);border:1px solid var(--red-border);border-radius:9px;padding:7px 16px;font-size:13px;font-weight:700">✕ Declined</span>'}
     ${(isDeclined||a.status==='Declined')?`<button class="mact-primary" onclick="openDenialModal('${fbId}')" style="background:#e8650a;color:white">📧 Denial Email</button>`:''}
     ${(a.status==='Error'||a.status==='Processing')&&a.plaidAccessToken?`<button class="mact-primary" onclick="rerunFromModal('${fbId}')" style="background:var(--blue);color:white">↺ Retry</button>`:''}
@@ -1683,7 +1710,7 @@ function openModal(fbId){
 <div id="mpanel-appdata-${fbId}" style="display:none">${buildAppDetails(a.applicationData||{})}</div>
 <div id="mpanel-docs-${fbId}" style="display:none">${buildDocsPanel(a)}</div>
 <div class="msec" style="margin-top:16px">Notes</div>
-<textarea class="mnta" id="mnt${fbId}" placeholder="Add notes...">${a.notes||''}</textarea>
+<textarea style="width:100%;min-height:120px;border:1.5px solid var(--border2);border-radius:10px;padding:13px;font-size:13.5px;font-family:var(--sans);color:var(--text);background:var(--bg);resize:vertical;line-height:1.7;margin-top:4px" id="mnt${fbId}" placeholder="Add underwriter notes — observations, conditions, follow-up items...">${a.notes||''}</textarea>
 <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
   <button class="nsave" onclick="saveModalNotes('${fbId}')">Save Notes</button>
   <span style="font-size:11px;color:var(--muted)">Auto-saves as you type</span>
@@ -1927,10 +1954,17 @@ function drawWheel(id,score,size,darkBg){
   const col=score>=70?'#4ade80':score>=50?'#fbbf24':score>=30?'#fb923c':'#f87171';
   const textCol = darkBg ? 'white' : (score>=70?'#1a6b3c':score>=50?'#c9a84c':score>=30?'#d97706':'#c0392b');
   ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+(Math.PI*2*score/100));ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.lineCap='round';ctx.stroke();
-  const fs=size>80?20:size>60?14:11;
-  ctx.fillStyle=textCol;ctx.font=`bold ${fs}px Poppins,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
-  if(size>60){ctx.fillText(score,cx,cy-fs*.35);ctx.fillStyle=darkBg?'rgba(255,255,255,.6)':'#8fa197';ctx.font=`500 ${Math.round(fs*.55)}px Poppins,sans-serif`;ctx.fillText('/100',cx,cy+fs*.7);}
-  else ctx.fillText(score,cx,cy);
+  if(size>60){
+    const bigFs=size>80?26:16;
+    ctx.fillStyle=textCol;ctx.font=`800 ${bigFs}px Poppins,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(score,cx,cy);
+    ctx.fillStyle=darkBg?'rgba(255,255,255,.5)':'#8fa197';
+    ctx.font=`600 ${Math.round(bigFs*.42)}px Poppins,sans-serif`;
+    ctx.fillText('/100',cx,cy+bigFs*.98);
+  } else {
+    ctx.fillStyle=textCol;ctx.font=`bold 11px Poppins,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(score,cx,cy);
+  }
 }
 
 // ════════════════════════════════════════
