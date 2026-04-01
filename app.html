@@ -1741,11 +1741,10 @@ function openModal(fbId){
     </div>
     <canvas id="mwh" width="90" height="90" style="flex-shrink:0;opacity:.9"></canvas>
   </div>
-</div>
-<div class="mdh-stats">
-  <div class="mdh-stat"><div class="mdh-stat-label">Status</div><div class="mdh-stat-value">${a.status||'Pending'}</div></div>
-  <div class="mdh-stat"><div class="mdh-stat-label">Loan</div><div class="mdh-stat-value">${ok?(a.amount||'—'):(isDeclined?'Declined':'—')}</div></div>
-  <div class="mdh-stat"><div class="mdh-stat-label">Score</div><div class="mdh-stat-value">${a.score||0}<span style="font-size:10px;opacity:.6">/100</span></div></div>
+<div style="display:flex;background:rgba(0,0,0,.2);border-top:1px solid rgba(255,255,255,.1)">
+  <div style="flex:1;text-align:center;padding:10px 8px;border-right:1px solid rgba(255,255,255,.1)"><div style="font-size:9px;opacity:.6;text-transform:uppercase;letter-spacing:.08em;color:white">Status</div><div style="font-size:14px;font-weight:700;color:white;margin-top:2px">${a.status||'Pending'}</div></div>
+  <div style="flex:1;text-align:center;padding:10px 8px;border-right:1px solid rgba(255,255,255,.1)"><div style="font-size:9px;opacity:.6;text-transform:uppercase;letter-spacing:.08em;color:white">Loan</div><div style="font-size:15px;font-weight:800;color:white;margin-top:2px">${ok?(a.amount||'—'):(isDeclined?'Declined':'—')}</div></div>
+  <div style="flex:1;text-align:center;padding:10px 8px"><div style="font-size:9px;opacity:.6;text-transform:uppercase;letter-spacing:.08em;color:white">Score</div><div style="font-size:15px;font-weight:800;color:white;margin-top:2px">${a.score||0}<span style="font-size:10px;opacity:.6">/100</span></div></div>
 </div>
 </div>
 ${a.extractedSSN?`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:12px">
