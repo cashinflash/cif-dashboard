@@ -596,6 +596,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
           <div class="rule-row"><div class="rule-label">Restaurants / dining<small>Restaurants, fast food, food delivery</small></div><label class="tog"><input type="checkbox" id="r-exp-restaurants" checked><span class="tog-slider"></span></label></div>
           <div class="rule-row"><div class="rule-label">Transportation<small>Public transit, Uber/Lyft rides, parking</small></div><label class="tog"><input type="checkbox" id="r-exp-transportation" checked><span class="tog-slider"></span></label></div>
           <div class="rule-row"><div class="rule-label">Medical / healthcare<small>Pharmacy, doctor, hospital, dental</small></div><label class="tog"><input type="checkbox" id="r-exp-medical" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"><div class="rule-label">Other/unknown expenses — count if ≥<small>Uncategorized debits above this amount are counted as expenses (0 = exclude all)</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-exp-other-threshold" value="50" style="width:90px"></div></div>
         </div></div>
 
         <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">❌</div><div><div class="rs-hdr-title">Always Exclude from Expenses</div><div class="rs-hdr-sub">Mirrors the income exclusion rules</div></div></div><div class="rs-body">
@@ -879,7 +880,7 @@ const DR = {loanMin:100,loanMax:255,t1Fcf:200,t2Fcf:375,t3Fcf:500,t4Fcf:640,
   negCap:7,negDecline:10,specDrop:35,specCap:50,atmThreshold:200,atmPct:50,
   expenseFloorOn:true,expenseFloor:800,
   incPayroll:true,incGovt:true,incPension:true,incGig:true,incSupport:false,
-  expRent:true,expUtilities:true,expPhone:true,expInsurance:true,expLoans:true,expGrocery:true,expGas:true,expSubscriptions:true,expChildcare:false,expRestaurants:true,expTransportation:true,expMedical:true,
+  expRent:true,expUtilities:true,expPhone:true,expInsurance:true,expLoans:true,expGrocery:true,expGas:true,expSubscriptions:true,expChildcare:false,expRestaurants:true,expTransportation:true,expMedical:true,expOtherThreshold:50,
   velocityOn:true,velocityDrop:90,velocityCap:98,
   endBalOn:true,endBalFlag:25,endBalDrop:5,
   require2Checks:false,incomeVariance:25,
@@ -1114,6 +1115,7 @@ function loadRulesUI(n) {
   setChk('r-exp-childcare',r.expChildcare??false);
   setChk('r-exp-restaurants',r.expRestaurants??true); setChk('r-exp-transportation',r.expTransportation??true);
   setChk('r-exp-medical',r.expMedical??true);
+  set('r-exp-other-threshold',r.expOtherThreshold??50);
   // Behavioral
   setChk('r-velocity-on',r.velocityOn??true); set('r-velocity-drop',r.velocityDrop??90); set('r-velocity-drop-r',r.velocityDrop??90);
   set('r-velocity-cap',r.velocityCap??98); set('r-velocity-cap-r',r.velocityCap??98);
@@ -1148,7 +1150,7 @@ function getRulesFromUI() {
     expenseFloorOn:chk('r-expense-floor-on'),expenseFloor:n('r-expense-floor'),
     incPayroll:chk('r-inc-payroll'),incGovt:chk('r-inc-govt'),incPension:chk('r-inc-pension'),incGig:chk('r-inc-gig'),incSupport:chk('r-inc-support'),
     expRent:chk('r-exp-rent'),expUtilities:chk('r-exp-utilities'),expPhone:chk('r-exp-phone'),expInsurance:chk('r-exp-insurance'),
-    expLoans:chk('r-exp-loans'),expGrocery:chk('r-exp-grocery'),expGas:chk('r-exp-gas'),expSubscriptions:chk('r-exp-subscriptions'),expChildcare:chk('r-exp-childcare'),expRestaurants:chk('r-exp-restaurants'),expTransportation:chk('r-exp-transportation'),expMedical:chk('r-exp-medical'),
+    expLoans:chk('r-exp-loans'),expGrocery:chk('r-exp-grocery'),expGas:chk('r-exp-gas'),expSubscriptions:chk('r-exp-subscriptions'),expChildcare:chk('r-exp-childcare'),expRestaurants:chk('r-exp-restaurants'),expTransportation:chk('r-exp-transportation'),expMedical:chk('r-exp-medical'),expOtherThreshold:n('r-exp-other-threshold'),
     velocityOn:chk('r-velocity-on'),velocityDrop:n('r-velocity-drop'),velocityCap:n('r-velocity-cap'),
     endBalOn:chk('r-endbal-on'),endBalFlag:n('r-endbal-flag'),endBalDrop:n('r-endbal-drop'),
     require2Checks:chk('r-require-2-checks'),incomeVariance:n('r-income-variance'),
