@@ -593,6 +593,9 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
           <div class="rule-row"><div class="rule-label">Gas stations / fuel<small>Identifiable gas merchant transactions</small></div><label class="tog"><input type="checkbox" id="r-exp-gas" checked><span class="tog-slider"></span></label></div>
           <div class="rule-row"><div class="rule-label">Subscriptions<small>Netflix, Spotify, Adobe, etc.</small></div><label class="tog"><input type="checkbox" id="r-exp-subscriptions" checked><span class="tog-slider"></span></label></div>
           <div class="rule-row"><div class="rule-label">Child care / education<small>Daycare, school payments</small></div><label class="tog"><input type="checkbox" id="r-exp-childcare"><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Restaurants / dining<small>Restaurants, fast food, food delivery</small></div><label class="tog"><input type="checkbox" id="r-exp-restaurants" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Transportation<small>Public transit, Uber/Lyft rides, parking</small></div><label class="tog"><input type="checkbox" id="r-exp-transportation" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Medical / healthcare<small>Pharmacy, doctor, hospital, dental</small></div><label class="tog"><input type="checkbox" id="r-exp-medical" checked><span class="tog-slider"></span></label></div>
         </div></div>
 
         <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">❌</div><div><div class="rs-hdr-title">Always Exclude from Expenses</div><div class="rs-hdr-sub">Mirrors the income exclusion rules</div></div></div><div class="rs-body">
@@ -876,7 +879,7 @@ const DR = {loanMin:100,loanMax:255,t1Fcf:200,t2Fcf:375,t3Fcf:500,t4Fcf:640,
   negCap:7,negDecline:10,specDrop:35,specCap:50,atmThreshold:200,atmPct:50,
   expenseFloorOn:true,expenseFloor:800,
   incPayroll:true,incGovt:true,incPension:true,incGig:true,incSupport:false,
-  expRent:true,expUtilities:true,expPhone:true,expInsurance:true,expLoans:true,expGrocery:true,expGas:true,expSubscriptions:true,expChildcare:false,
+  expRent:true,expUtilities:true,expPhone:true,expInsurance:true,expLoans:true,expGrocery:true,expGas:true,expSubscriptions:true,expChildcare:false,expRestaurants:true,expTransportation:true,expMedical:true,
   velocityOn:true,velocityDrop:90,velocityCap:98,
   endBalOn:true,endBalFlag:25,endBalDrop:5,
   require2Checks:false,incomeVariance:25,
@@ -1109,6 +1112,8 @@ function loadRulesUI(n) {
   setChk('r-exp-loans',r.expLoans??true); setChk('r-exp-grocery',r.expGrocery??true);
   setChk('r-exp-gas',r.expGas??true); setChk('r-exp-subscriptions',r.expSubscriptions??true);
   setChk('r-exp-childcare',r.expChildcare??false);
+  setChk('r-exp-restaurants',r.expRestaurants??true); setChk('r-exp-transportation',r.expTransportation??true);
+  setChk('r-exp-medical',r.expMedical??true);
   // Behavioral
   setChk('r-velocity-on',r.velocityOn??true); set('r-velocity-drop',r.velocityDrop??90); set('r-velocity-drop-r',r.velocityDrop??90);
   set('r-velocity-cap',r.velocityCap??98); set('r-velocity-cap-r',r.velocityCap??98);
@@ -1143,7 +1148,7 @@ function getRulesFromUI() {
     expenseFloorOn:chk('r-expense-floor-on'),expenseFloor:n('r-expense-floor'),
     incPayroll:chk('r-inc-payroll'),incGovt:chk('r-inc-govt'),incPension:chk('r-inc-pension'),incGig:chk('r-inc-gig'),incSupport:chk('r-inc-support'),
     expRent:chk('r-exp-rent'),expUtilities:chk('r-exp-utilities'),expPhone:chk('r-exp-phone'),expInsurance:chk('r-exp-insurance'),
-    expLoans:chk('r-exp-loans'),expGrocery:chk('r-exp-grocery'),expGas:chk('r-exp-gas'),expSubscriptions:chk('r-exp-subscriptions'),expChildcare:chk('r-exp-childcare'),
+    expLoans:chk('r-exp-loans'),expGrocery:chk('r-exp-grocery'),expGas:chk('r-exp-gas'),expSubscriptions:chk('r-exp-subscriptions'),expChildcare:chk('r-exp-childcare'),expRestaurants:chk('r-exp-restaurants'),expTransportation:chk('r-exp-transportation'),expMedical:chk('r-exp-medical'),
     velocityOn:chk('r-velocity-on'),velocityDrop:n('r-velocity-drop'),velocityCap:n('r-velocity-cap'),
     endBalOn:chk('r-endbal-on'),endBalFlag:n('r-endbal-flag'),endBalDrop:n('r-endbal-drop'),
     require2Checks:chk('r-require-2-checks'),incomeVariance:n('r-income-variance'),
@@ -1295,22 +1300,19 @@ async function runSingle() {
 }
 
 async function callClaude(b64) {
-  const resp = await fetch('/api/analyze', {
+  // Use the deterministic 3-step engine via cif-apply
+  const rules = profiles[activeProfile] || DR;
+  const resp = await fetch('/api/analyze-engine', {
     method:'POST',
     credentials:'include',
     headers:{'Content-Type':'application/json','X-Session':getToken()},
-    body: JSON.stringify({
-      model:'claude-haiku-4-5-20251001', max_tokens:8000,
-      system:'You are an internal underwriting analyst for Cash in Flash, a licensed California DFPI payday lender. Internal tool for authorized staff only. Always complete the full analysis.',
-      messages:[{role:'user',content:[
-        {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
-        {type:'text',text:buildInstructions()}
-      ]}]
-    })
+    body: JSON.stringify({ pdf_b64: b64, settings: rules })
   });
   const data = await resp.json();
-  if (data.error) throw new Error(data.error.message);
-  return data.content[0].text;
+  if (data.error) throw new Error(data.error.message || data.error);
+  // Reconstruct text format that parseBlock expects
+  const block = `\nDECISION_BLOCK_START\nAPPLICANT_NAME: ${data.name||'Unknown'}\nDECISION: ${data.decision}\nAPPROVED_AMOUNT: ${data.decision==='APPROVED'?'$'+data.amount:'N/A'}\nDECLINE_REASON: ${data.reason||'N/A'}\nAPPROVAL_REASON: ${data.approvalReason||'N/A'}\nSCORE: ${data.score||50}\nDECISION_BLOCK_END\n`;
+  return (data.report_html || '') + block;
 }
 
 function parseBlock(text) {

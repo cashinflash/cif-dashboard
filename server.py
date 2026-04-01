@@ -229,6 +229,22 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        if path == '/api/analyze-engine':
+            try:
+                body = json.loads(raw)
+                payload = json.dumps(body).encode()
+                print(f'[ANALYZE-ENGINE PROXY] Forwarding to cif-apply...', flush=True)
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/analyze-engine',
+                    data=payload, headers={'Content-Type':'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=300) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except Exception as e:
+                print(f'[ANALYZE-ENGINE ERROR] {e}', flush=True)
+                self.send_json(500, {'error':{'message':str(e)}})
+            return
+
         if path == '/api/analyze':
             try:
                 body = json.loads(raw)
