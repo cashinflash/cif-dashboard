@@ -1285,34 +1285,66 @@ function handleSingle(input) { const f=input.files[0]; if(f) setSingle(f); }
 function setSingle(f) { sFile=f; const fs=document.getElementById('sfs'); fs.style.display='flex'; document.getElementById('sfn').textContent=f.name; document.getElementById('sfz').textContent=fmtSz(f.size); document.getElementById('sdz').style.display='none'; }
 function clearSingle() { sFile=null; document.getElementById('sfi').value=''; document.getElementById('sfs').style.display='none'; document.getElementById('sdz').style.display='block'; }
 
+function setStep(n) {
+  for(let i=1;i<=5;i++){const d=document.getElementById('d'+i);if(d){d.className='dot'+(i<n?' done':'')+(i===n?' active':'');}}
+}
+
 async function runSingle() {
   if (!sFile) { toast('Upload a PDF first','err'); return; }
   const btn=document.getElementById('sabtn');
   btn.disabled=true; btn.classList.add('loading');
+  setStep(1);
   document.getElementById('proc').classList.add('show');
   document.getElementById('sresult').style.display='none';
   try {
     const b64 = await toB64(sFile);
     const res = await callClaude(b64);
-    await parseSingle(res);
+    await parseSingle(res, b64);
   } catch(e) { toast('Error: '+e.message,'err'); }
-  finally { btn.disabled=false; btn.classList.remove('loading'); document.getElementById('proc').classList.remove('show'); }
+  finally { btn.disabled=false; btn.classList.remove('loading'); document.getElementById('proc').classList.remove('show'); setStep(0); }
 }
 
 async function callClaude(b64) {
   // Use the deterministic 3-step engine via cif-apply
   const rules = profiles[activeProfile] || DR;
-  const resp = await fetch('/api/analyze-engine', {
-    method:'POST',
-    credentials:'include',
-    headers:{'Content-Type':'application/json','X-Session':getToken()},
-    body: JSON.stringify({ pdf_b64: b64, settings: rules })
-  });
-  const data = await resp.json();
-  if (data.error) throw new Error(data.error.message || data.error);
-  // Reconstruct text format that parseBlock expects
-  const block = `\nDECISION_BLOCK_START\nAPPLICANT_NAME: ${data.name||'Unknown'}\nDECISION: ${data.decision}\nAPPROVED_AMOUNT: ${data.decision==='APPROVED'?'$'+data.amount:'N/A'}\nDECLINE_REASON: ${data.reason||'N/A'}\nAPPROVAL_REASON: ${data.approvalReason||'N/A'}\nSCORE: ${data.score||50}\nDECISION_BLOCK_END\n`;
-  return (data.report_html || '') + block;
+  setStep(1);
+  const controller = new AbortController();
+  const timeout = setTimeout(()=>controller.abort(), 300000); // 5 min timeout
+  // Animate steps on a timer (estimate: extract ~30s, engine ~2s, narrative ~30s)
+  const stepTimers = [
+    setTimeout(()=>setStep(2), 8000),
+    setTimeout(()=>setStep(3), 25000),
+    setTimeout(()=>setStep(4), 35000),
+    setTimeout(()=>setStep(5), 55000)
+  ];
+  try {
+    const resp = await fetch('/api/analyze-engine', {
+      method:'POST',
+      credentials:'include',
+      signal: controller.signal,
+      headers:{'Content-Type':'application/json','X-Session':getToken()},
+      body: JSON.stringify({ pdf_b64: b64, settings: rules })
+    });
+    clearTimeout(timeout);
+    stepTimers.forEach(t=>clearTimeout(t));
+    setStep(5);
+    if (!resp.ok) {
+      const err = await resp.json().catch(()=>({}));
+      throw new Error(err.error?.message || err.error || `Server error ${resp.status}`);
+    }
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error.message || data.error);
+    // Reconstruct text format that parseBlock expects
+    const block = `\nDECISION_BLOCK_START\nAPPLICANT_NAME: ${data.name||'Unknown'}\nDECISION: ${data.decision}\nAPPROVED_AMOUNT: ${data.decision==='APPROVED'?'$'+data.amount:'N/A'}\nDECLINE_REASON: ${data.reason||'N/A'}\nAPPROVAL_REASON: ${data.approvalReason||'N/A'}\nSCORE: ${data.score||50}\nDECISION_BLOCK_END\n`;
+    // Attach extracted info for Application tab
+    callClaude._lastExtracted = data.extracted_info || null;
+    return (data.report_html || '') + block;
+  } catch(e) {
+    clearTimeout(timeout);
+    stepTimers.forEach(t=>clearTimeout(t));
+    if (e.name === 'AbortError') throw new Error('Analysis timed out after 5 minutes. Please try again.');
+    throw e;
+  }
 }
 
 function parseBlock(text) {
@@ -1330,7 +1362,7 @@ function parseBlock(text) {
   return {name,decision,amount:amount==='N/A'?'':amount.replace('$','').trim(),reason:reason==='N/A'?'':reason,score,report:text.replace(/DECISION_BLOCK_START[\s\S]*?DECISION_BLOCK_END\n?/,'').trim()};
 }
 
-async function parseSingle(text) {
+async function parseSingle(text, b64) {
   const d = parseBlock(text);
   sReport=d.report; sName=d.name; sDecision=d.decision; sAmount=d.amount; sReason=d.reason; sScore=d.score;
   const ok = d.decision==='APPROVED';
@@ -1350,7 +1382,21 @@ async function parseSingle(text) {
 
   // Auto-save to Firebase as Pending immediately
   const now=new Date();
+  const ext = callClaude._lastExtracted || {};
+  const appData = ext.account_holder_name ? {
+    firstName: (ext.account_holder_name||'').split(' ')[0]||'',
+    lastName: (ext.account_holder_name||'').split(' ').slice(1).join(' ')||'',
+    bankName: ext.bank_name||'',
+    statementStart: ext.statement_start||'',
+    statementEnd: ext.statement_end||'',
+    beginningBalance: ext.beginning_balance||'',
+    endingBalance: ext.ending_balance||'',
+    avgDailyBalance: ext.avg_daily_balance||'',
+    source: 'desktop'
+  } : undefined;
   const record={id:Date.now(),date:now.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),time:now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}),createdAt:Date.now(),source:'desktop',status:'Pending',name:d.name,amount:d.amount?'$'+d.amount:'N/A',claudeDecision:d.decision,reason:d.reason,score:d.score,filename:sFile?sFile.name:'',report:d.report,notes:'',profile:activeProfile};
+  if(appData) record.applicationData = appData;
+  if(b64) record.bankStatementB64 = b64;
   sPendingId = await saveReport(record);
 }
 
@@ -1736,7 +1782,7 @@ function mTab(tab, fbId, btn) {
 function buildAppDetails(d) {
   if (!d) return '<div style="text-align:center;padding:2rem;color:var(--muted)"><div style="font-size:28px;margin-bottom:8px">📋</div><div style="font-weight:600">No application data</div><div style="font-size:13px;margin-top:4px">This submission was not made through the online form</div></div>';
   // Check if all meaningful fields are empty
-  const hasData = d.firstName||d.lastName||d.phone||d.email||d.ssn||d.address;
+  const hasData = d.firstName||d.lastName||d.phone||d.email||d.ssn||d.address||d.bankName||d.statementStart;
   if (!hasData) return '<div style="text-align:center;padding:2rem;color:var(--muted)"><div style="font-size:28px;margin-bottom:8px">📋</div><div style="font-weight:600">Application data unavailable</div><div style="font-size:13px;margin-top:4px">This submission may have been processed before form data capture was enabled. Ask the customer to reapply.</div></div>';
   const uid = Math.random().toString(36).slice(2,8);
   function row(label, value, id) {
@@ -1778,6 +1824,11 @@ function buildAppDetails(d) {
     ${row('Routing Number', d.routingNumber, 'routing')}
     ${row('Account Number', d.accountNumber, 'acctnum')}
     ${row('Bank Name', d.bankName, 'bankname')}
+    ${row('Statement Start', d.statementStart, 'ststart')}
+    ${row('Statement End', d.statementEnd, 'stend')}
+    ${row('Beginning Balance', d.beginningBalance!=null&&d.beginningBalance!=='' ? '$'+Number(d.beginningBalance).toLocaleString(undefined,{minimumFractionDigits:2}) : '', 'begbal')}
+    ${row('Ending Balance', d.endingBalance!=null&&d.endingBalance!=='' ? '$'+Number(d.endingBalance).toLocaleString(undefined,{minimumFractionDigits:2}) : '', 'endbal')}
+    ${row('Avg Daily Balance', d.avgDailyBalance!=null&&d.avgDailyBalance!=='' ? '$'+Number(d.avgDailyBalance).toLocaleString(undefined,{minimumFractionDigits:2}) : '', 'avgbal')}
     ${sec('Financial Information')}
     ${row('Housing Status', d.housingStatus, 'housing')}
     ${row('Bankruptcy', d.bankruptcy, 'bk')}
