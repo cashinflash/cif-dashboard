@@ -294,7 +294,17 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .mml{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
 .mmv{font-size:16px;font-weight:700;color:var(--text)}
 /* Action bar */
-.mact-bar{display:flex;gap:8px;padding:14px 0;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.mact-bar{display:flex;gap:8px;padding:14px 0;flex-wrap:wrap;align-items:center}
+.msticky{position:sticky;top:57px;background:var(--surface);z-index:2;margin:0 -24px;padding:0 24px;border-bottom:1px solid var(--border)}
+.msummary{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:12px 0}
+.msummary-item{text-align:center;padding:8px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:8px}
+.msummary-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.msummary-value{font-size:14px;font-weight:800;color:var(--text);margin-top:2px}
+.mdh-stats{display:flex;gap:0;background:rgba(0,0,0,.15);border-top:1px solid rgba(255,255,255,.1)}
+.mdh-stat{flex:1;text-align:center;padding:10px 8px;border-right:1px solid rgba(255,255,255,.1)}
+.mdh-stat:last-child{border-right:none}
+.mdh-stat-label{font-size:9px;opacity:.6;text-transform:uppercase;letter-spacing:.08em;color:white}
+.mdh-stat-value{font-size:15px;font-weight:800;color:white;margin-top:2px}
 .mact-primary{padding:10px 20px;border-radius:10px;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
 .mact-secondary{padding:8px 14px;border-radius:9px;font-size:12px;font-weight:600;font-family:var(--sans);cursor:pointer;border:1.5px solid var(--border2);background:white;color:var(--text2);transition:all .15s;display:inline-flex;align-items:center;gap:5px}
 .mact-secondary:hover{background:var(--bg);border-color:var(--muted)}
@@ -302,8 +312,10 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .msec::after{content:'';flex:1;height:1px;background:var(--border)}
 .mrhtml{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:24px 26px;max-height:none;overflow-y:visible;margin-bottom:16px;font-size:15px;line-height:1.9;color:var(--text2)}
 .mrhtml h1{font-size:19px;font-weight:700;color:var(--green-dark);margin-bottom:18px;padding-bottom:12px;border-bottom:2px solid var(--green-border)}
-.mrhtml h2{font-size:13px;font-weight:700;color:var(--green);margin:18px 0 10px;text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:5px}
-.mrhtml h2::after{content:'';flex:1;height:1px;background:var(--green-border);margin-left:5px}
+.mrhtml .report-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px}
+.mrhtml .report-card h2{margin-top:0}
+.mrhtml h2{font-size:13px;font-weight:700;color:var(--green);margin:18px 0 10px;text-transform:uppercase;letter-spacing:.05em;background:var(--green-light);padding:8px 12px;border-radius:6px;border-left:3px solid var(--green)}
+.mrhtml hr{display:none}
 .mrhtml table{width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:13px;table-layout:fixed}
 .mrhtml table th{background:var(--green-light);color:var(--green-dark);font-weight:700;padding:7px 10px;border:1px solid var(--green-border);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
 .mrhtml table td{padding:7px 10px;border:1px solid var(--border);font-size:12px;word-wrap:break-word;vertical-align:top}
@@ -1362,6 +1374,11 @@ async function callClaude(b64) {
     const block = `\nDECISION_BLOCK_START\nAPPLICANT_NAME: ${data.name||'Unknown'}\nDECISION: ${data.decision}\nAPPROVED_AMOUNT: ${data.decision==='APPROVED'?'$'+data.amount:'N/A'}\nDECLINE_REASON: ${data.reason||'N/A'}\nAPPROVAL_REASON: ${data.approvalReason||'N/A'}\nSCORE: ${data.score||50}\nDECISION_BLOCK_END\n`;
     // Attach extracted info for Application tab
     callClaude._lastExtracted = data.extracted_info || null;
+    callClaude._lastMetrics = {
+      fcf: data.fcf, monthlyIncome: data.monthly_income,
+      monthlyExpenses: data.monthly_expenses, fintechCount: data.fintech_count,
+      nsfCount: data.nsf_count
+    };
     return (data.report_html || '') + block;
   } catch(e) {
     clearTimeout(timeout);
@@ -1421,6 +1438,8 @@ async function parseSingle(text, b64) {
   const record={id:Date.now(),date:now.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),time:now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}),createdAt:Date.now(),source:'desktop',status:'Pending',name:d.name,amount:d.amount?'$'+d.amount:'N/A',claudeDecision:d.decision,reason:d.reason,score:d.score,filename:sFile?sFile.name:'',report:d.report,notes:'',profile:activeProfile};
   if(appData) record.applicationData = appData;
   if(b64) record.bankStatementB64 = b64;
+  const metrics = callClaude._lastMetrics || {};
+  if(metrics.fcf!=null) { record.fcf=metrics.fcf; record.monthlyIncome=metrics.monthlyIncome; record.monthlyExpenses=metrics.monthlyExpenses; record.fintechCount=metrics.fintechCount; record.nsfCount=metrics.nsfCount; }
   sPendingId = await saveReport(record);
 }
 
@@ -1723,30 +1742,19 @@ function openModal(fbId){
     <canvas id="mwh" width="90" height="90" style="flex-shrink:0;opacity:.9"></canvas>
   </div>
 </div>
-<div class="mmeta">
-  <div class="mmi">
-    <div class="mml">Status</div>
-    <div class="mmv"><span class="pill pill-${a.status?.toLowerCase()||'p'}">${a.status||'Pending'}</span></div>
-  </div>
-  <div class="mmi">
-    <div class="mml">Loan Amount</div>
-    <div class="mmv" style="color:${ok?'var(--green)':'var(--muted)'};font-size:${ok?'20px':'16px'}">${ok?(a.amount||'—'):(isDeclined?'Declined':'N/A')}</div>
-  </div>
-  <div class="mmi">
-    <div class="mml">AI Score</div>
-    <div class="mmv" style="color:${(a.score||0)>=60?'var(--green)':(a.score||0)>=40?'var(--gold-dark)':'var(--red)'}">${a.score||0}<span style="font-size:12px;font-weight:500;color:var(--muted)">/100</span></div>
-  </div>
-  ${a.extractedSSN?`<div class="mmi" style="grid-column:span 3;flex-direction:row;align-items:center;justify-content:space-between">
-    <div><div class="mml">SSN</div>
-    <div class="mmv" id="modal-ssn-display-${fbId}">${a.extractedSSN.replace(/^(\d{3}-\d{2}-)(\d{4})$/,'XXX-XX-$2')}</div>
-    <div style="display:none" id="modal-ssn-full-${fbId}">${a.extractedSSN}</div>
-    </div>
-    <div style="display:flex;gap:6px;align-items:center">
-      <button onclick="toggleSSN('${fbId}','${a.extractedSSN}')" id="ssn-eye-${fbId}" style="background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:6px 10px;font-size:13px;cursor:pointer" title="Show/Hide SSN">👁</button>
-      <button onclick="copySSN('${a.extractedSSN}')" style="background:var(--green-light);border:1px solid var(--green-border);border-radius:7px;padding:6px 14px;font-size:11px;font-weight:700;color:var(--green);cursor:pointer;font-family:var(--sans)">Copy</button>
-    </div>
-  </div>`:''}
+<div class="mdh-stats">
+  <div class="mdh-stat"><div class="mdh-stat-label">Status</div><div class="mdh-stat-value">${a.status||'Pending'}</div></div>
+  <div class="mdh-stat"><div class="mdh-stat-label">Loan</div><div class="mdh-stat-value">${ok?(a.amount||'—'):(isDeclined?'Declined':'—')}</div></div>
+  <div class="mdh-stat"><div class="mdh-stat-label">Score</div><div class="mdh-stat-value">${a.score||0}<span style="font-size:10px;opacity:.6">/100</span></div></div>
 </div>
+</div>
+${a.extractedSSN?`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:12px">
+  <div><span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">SSN</span>
+  <span style="font-size:14px;font-weight:700;margin-left:8px" id="modal-ssn-display-${fbId}">${a.extractedSSN.replace(/^(\d{3}-\d{2}-)(\d{4})$/,'XXX-XX-$2')}</span>
+  <span style="display:none" id="modal-ssn-full-${fbId}">${a.extractedSSN}</span></div>
+  <div style="display:flex;gap:6px"><button onclick="toggleSSN('${fbId}','${a.extractedSSN}')" id="ssn-eye-${fbId}" style="background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:5px 8px;font-size:12px;cursor:pointer">👁</button><button onclick="copySSN('${a.extractedSSN}')" style="background:var(--green-light);border:1px solid var(--green-border);border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--green);cursor:pointer;font-family:var(--sans)">Copy</button></div>
+</div>`:''}
+<div class="msticky">
 <div class="mact-bar">
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1">
     ${a.status!=='Approved'?`<div style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,var(--green-dark),var(--green));border-radius:10px;padding:6px 8px 6px 14px"><span style="font-size:13px;font-weight:700;color:white">$</span><input id="modal-approve-amt" type="text" placeholder="255" value="${a.amount&&a.amount!=='N/A'?a.amount.replace('$',''):''}" style="width:60px;border:none;background:transparent;font-size:15px;font-weight:800;color:white;outline:none;font-family:var(--sans)" oninput="const b=document.getElementById('approve-btn-${fbId}');if(b)b.textContent='✓ Approve $'+this.value"><button class="mact-primary" onclick="updStatusWithAmt('${fbId}','Approved')" style="background:rgba(255,255,255,.25);color:white;border:1px solid rgba(255,255,255,.3)" id="approve-btn-${fbId}">✓ Approve${a.amount&&a.amount!=='N/A'?' '+a.amount:''}</button></div>`:'<span style="background:var(--green-light);color:var(--green);border:1px solid var(--green-border);border-radius:9px;padding:7px 16px;font-size:13px;font-weight:700">✓ Approved</span>'}
@@ -1759,11 +1767,20 @@ function openModal(fbId){
     <button class="mact-secondary" onclick="delApp('${fbId}')" style="color:var(--red);border-color:var(--red-border)">🗑</button>
   </div>
 </div>
-<div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:16px">
+<div style="display:flex;border-bottom:1px solid var(--border)">
   <button onclick="mTab('report','${fbId}',this)" id="mtab-report-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--green);border-bottom:2px solid var(--green);cursor:pointer;font-family:var(--sans)">📄 Report</button>
   <button onclick="mTab('appdata','${fbId}',this)" id="mtab-appdata-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📋 Application</button>
   <button onclick="mTab('docs','${fbId}',this)" id="mtab-docs-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📁 Documents</button>
+  <button onclick="mTab('notes','${fbId}',this)" id="mtab-notes-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📝 Notes</button>
 </div>
+</div>
+${(a.fcf!=null||a.monthlyIncome!=null)?`<div class="msummary">
+  <div class="msummary-item"><div class="msummary-label">Income</div><div class="msummary-value" style="color:var(--green)">$${Math.round(a.monthlyIncome||0).toLocaleString()}</div></div>
+  <div class="msummary-item"><div class="msummary-label">Expenses</div><div class="msummary-value" style="color:var(--red)">$${Math.round(a.monthlyExpenses||0).toLocaleString()}</div></div>
+  <div class="msummary-item"><div class="msummary-label">FCF</div><div class="msummary-value" style="color:${(a.fcf||0)>=0?'var(--green)':'var(--red)'}">$${Math.round(a.fcf||0).toLocaleString()}</div></div>
+  <div class="msummary-item"><div class="msummary-label">Fintech</div><div class="msummary-value">${a.fintechCount||0}</div></div>
+  <div class="msummary-item"><div class="msummary-label">NSFs</div><div class="msummary-value">${a.nsfCount||0}</div></div>
+</div>`:''}
 <div id="mpanel-report-${fbId}"><div class="mrhtml">${
   a.status==='Processing' || (!a.report && !a.processingComplete) ?
   `<div style="text-align:center;padding:3rem 2rem">
@@ -1781,11 +1798,14 @@ function openModal(fbId){
 }</div></div>
 <div id="mpanel-appdata-${fbId}" style="display:none">${buildAppDetails(a.applicationData||{})}</div>
 <div id="mpanel-docs-${fbId}" style="display:none">${buildDocsPanel(a)}</div>
-<div class="msec" style="margin-top:16px">Notes</div>
-<textarea style="width:100%;min-height:120px;border:1.5px solid var(--border2);border-radius:10px;padding:13px;font-size:13.5px;font-family:var(--sans);color:var(--text);background:var(--bg);resize:vertical;line-height:1.7;margin-top:4px" id="mnt${fbId}" placeholder="Add underwriter notes — observations, conditions, follow-up items...">${a.notes||''}</textarea>
-<div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-  <button class="nsave" onclick="saveModalNotes('${fbId}')">Save Notes</button>
-  <span style="font-size:11px;color:var(--muted)">Auto-saves as you type</span>
+<div id="mpanel-notes-${fbId}" style="display:none">
+  <div style="padding:8px 0">
+    <textarea style="width:100%;min-height:160px;border:1.5px solid var(--border2);border-radius:10px;padding:13px;font-size:13.5px;font-family:var(--sans);color:var(--text);background:var(--bg);resize:vertical;line-height:1.7" id="mnt${fbId}" placeholder="Add underwriter notes — observations, conditions, follow-up items...">${a.notes||''}</textarea>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+      <button class="nsave" onclick="saveModalNotes('${fbId}')">Save Notes</button>
+      <span style="font-size:11px;color:var(--muted)">Auto-saves as you type</span>
+    </div>
+  </div>
 </div>
 
 `;
@@ -1794,7 +1814,7 @@ function openModal(fbId){
 }
 
 function mTab(tab, fbId, btn) {
-  const panels = ['report','appdata','docs'];
+  const panels = ['report','appdata','docs','notes'];
   panels.forEach(p => {
     const el = document.getElementById('mpanel-'+p+'-'+fbId);
     const b = document.getElementById('mtab-'+p+'-'+fbId);
@@ -1878,9 +1898,10 @@ function buildDocsPanel(a) {
           <button onclick="downloadDoc('${url}','${title.replace(/'/g,'\'')}')" style="background:white;color:var(--green);border:1.5px solid var(--green-border);border-radius:7px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans)">⬇ Download</button>
         </div>
       </div>
-      <div style="padding:14px 16px;text-align:center;color:var(--muted);font-size:13px">
-        <div style="font-size:24px;margin-bottom:6px">${isPdf ? '📄' : '🪪'}</div>
-        <div style="font-weight:600;color:var(--text2)">${isPdf ? 'Click View to open PDF' : 'Click View to see image'}</div>
+      <div style="padding:14px 16px;text-align:center">
+        ${isPdf
+          ? '<iframe src="'+url+'" style="width:100%;height:350px;border:none;border-radius:8px;background:var(--bg)" loading="lazy"></iframe>'
+          : '<img src="'+url+'" style="max-width:100%;max-height:280px;object-fit:contain;border-radius:8px;background:var(--bg)" loading="lazy" onerror="this.outerHTML=\'<div style=padding:20px;color:var(--muted)>Preview unavailable — click View</div>\'" />'}
       </div>
     </div>`;
   }
@@ -1895,8 +1916,10 @@ function buildDocsPanel(a) {
         <div style="font-size:13px;font-weight:700;color:var(--green-dark)">${icon} ${title}</div>
         <button onclick="viewDoc('${b64}','${mimeType}')" style="background:var(--green);color:white;border:none;border-radius:7px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans)">👁 View</button>
       </div>
-      <div style="padding:14px;text-align:center;font-size:13px;color:var(--muted)">
-        <div style="font-size:24px;margin-bottom:6px">📄</div>Click View to open
+      <div style="padding:14px;text-align:center">
+        ${isImage
+          ? '<img src="'+dataUrl+'" style="max-width:100%;max-height:280px;object-fit:contain;border-radius:8px;background:var(--bg)" loading="lazy" />'
+          : '<iframe src="'+dataUrl+'" style="width:100%;height:350px;border:none;border-radius:8px;background:var(--bg)" loading="lazy"></iframe>'}
       </div>
     </div>`;
   }
