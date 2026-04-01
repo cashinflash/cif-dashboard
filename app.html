@@ -557,13 +557,17 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
           <div class="rule-row"><div class="rule-label">Count child support / alimony<small>Court-ordered support payments</small></div><label class="tog"><input type="checkbox" id="r-inc-support"><span class="tog-slider"></span></label></div>
         </div></div>
 
-        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">🚫</div><div><div class="rs-hdr-title">Always Exclude from Income</div><div class="rs-hdr-sub">These are never counted as income regardless of amount</div></div></div><div class="rs-body">
+        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--gold-light)">💸</div><div><div class="rs-hdr-title">P2P & Transfer Handling</div><div class="rs-hdr-sub">Configure how Zelle, Venmo, CashApp deposits and outflows are treated</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">P2P Received (Zelle/Venmo/CashApp income)<small>Exclude: never count. Recurring: count repeat senders at %. All: count all at %.</small></div><select class="rule-select" id="r-p2p-received-mode"><option value="exclude">Exclude All</option><option value="recurring">Count Recurring at %</option><option value="all">Count All at %</option></select></div>
+          <div class="rule-row"><div class="rule-label">P2P Received counting %<small>What % of P2P deposits to count (e.g., 50% = half value)</small></div><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-p2p-received-pct" value="50" style="width:70px"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div>
+          <div class="rule-row"><div class="rule-label">P2P Sent (Zelle/Venmo/CashApp outflows)<small>Exclude: don't count. Recurring: count repeat recipients as expenses.</small></div><select class="rule-select" id="r-p2p-sent-mode"><option value="exclude">Exclude All</option><option value="recurring">Count Recurring as Expenses</option></select></div>
+        </div></div>
+
+        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">🚫</div><div><div class="rs-hdr-title">Always Exclude from Income</div><div class="rs-hdr-sub">These are never counted as income regardless of settings</div></div></div><div class="rs-body">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 32px">
-            <div class="rule-row"><div class="rule-label">Zelle / Venmo / P2P transfers<small>Always excluded — unverified source</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
             <div class="rule-row"><div class="rule-label">Internal account transfers<small>Moving money between own accounts</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
             <div class="rule-row"><div class="rule-label">Fintech / payday app advances<small>Dave, Brigit, Earnin, etc.</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
             <div class="rule-row"><div class="rule-label">Loan proceeds<small>Proceeds from other loans</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
-            <div class="rule-row"><div class="rule-label">Gambling / crypto proceeds<small>Casino, Coinbase, etc.</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
             <div class="rule-row"><div class="rule-label">Refunds / credits<small>Merchant refunds</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
           </div>
         </div></div>
@@ -596,7 +600,10 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
           <div class="rule-row"><div class="rule-label">Restaurants / dining<small>Restaurants, fast food, food delivery</small></div><label class="tog"><input type="checkbox" id="r-exp-restaurants" checked><span class="tog-slider"></span></label></div>
           <div class="rule-row"><div class="rule-label">Transportation<small>Public transit, Uber/Lyft rides, parking</small></div><label class="tog"><input type="checkbox" id="r-exp-transportation" checked><span class="tog-slider"></span></label></div>
           <div class="rule-row"><div class="rule-label">Medical / healthcare<small>Pharmacy, doctor, hospital, dental</small></div><label class="tog"><input type="checkbox" id="r-exp-medical" checked><span class="tog-slider"></span></label></div>
-          <div class="rule-row" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"><div class="rule-label">Other/unknown expenses — count if ≥<small>Uncategorized debits above this amount are counted as expenses (0 = exclude all)</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-exp-other-threshold" value="50" style="width:90px"></div></div>
+          <div class="rule-row"><div class="rule-label">Speculative / gambling<small>Casino, DraftKings, crypto, lottery</small></div><label class="tog"><input type="checkbox" id="r-exp-speculative" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"><div class="rule-label">Other/unknown expenses — count if ≥<small>Uncategorized debits above this amount counted (0 = exclude all)</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-exp-other-threshold" value="50" style="width:90px"></div></div>
+          <div class="rule-row"><div class="rule-label">Subscription cap per merchant<small>Max charges per merchant per statement (0 = unlimited)</small></div><input class="rule-input" type="number" id="r-sub-cap" value="2" style="width:70px"></div>
+          <div class="rule-row"><div class="rule-label">Detect bounced/returned payments<small>Match returned check credits against debits to avoid double-counting</small></div><label class="tog"><input type="checkbox" id="r-bounced-detection" checked><span class="tog-slider"></span></label></div>
         </div></div>
 
         <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">❌</div><div><div class="rs-hdr-title">Always Exclude from Expenses</div><div class="rs-hdr-sub">Mirrors the income exclusion rules</div></div></div><div class="rs-body">
@@ -622,10 +629,10 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
         </div></div>
 
         <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--gold-light)">📊</div><div><div class="rs-hdr-title">FCF Tier Thresholds</div><div class="rs-hdr-sub">Minimum monthly FCF required for each tier</div></div></div><div class="rs-body">
-          <div class="rule-row"><div class="rule-label">Tier 1 — $100 loan<small>Min monthly FCF required</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-t1-fcf" value="200"></div></div>
-          <div class="rule-row"><div class="rule-label">Tier 2 — $150 loan<small>Min monthly FCF required</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-t2-fcf" value="375"></div></div>
-          <div class="rule-row"><div class="rule-label">Tier 3 — $200 loan<small>Min monthly FCF required</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-t3-fcf" value="500"></div></div>
-          <div class="rule-row"><div class="rule-label">Tier 4 — $255 loan<small>Min monthly FCF required</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-t4-fcf" value="640"></div></div>
+          <div class="rule-row"><div class="rule-label">Tier 1<small>Loan amount & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan $</span><input class="rule-input" type="number" id="r-t1-amount" value="100" style="width:70px"><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t1-fcf" value="200" style="width:70px"></div></div>
+          <div class="rule-row"><div class="rule-label">Tier 2<small>Loan amount & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan $</span><input class="rule-input" type="number" id="r-t2-amount" value="150" style="width:70px"><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t2-fcf" value="375" style="width:70px"></div></div>
+          <div class="rule-row"><div class="rule-label">Tier 3<small>Loan amount & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan $</span><input class="rule-input" type="number" id="r-t3-amount" value="200" style="width:70px"><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t3-fcf" value="500" style="width:70px"></div></div>
+          <div class="rule-row"><div class="rule-label">Tier 4<small>Uses Max Loan & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan = Max</span><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t4-fcf" value="640" style="width:70px"></div></div>
         </div></div>
 
         <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#e3f2fd">🧮</div><div><div class="rs-hdr-title">FCF Formula Preview</div><div class="rs-hdr-sub">Based on your current settings</div></div></div><div class="rs-body">
@@ -878,7 +885,10 @@ async function fbDelete(path) {
 // ════════════════════════════════════════
 const DR = {loanMin:100,loanMax:255,t1Fcf:200,t2Fcf:375,t3Fcf:500,t4Fcf:640,
   nsfDrop:2,nsfCap:4,nsfDecline:5,ftDrop:5,ftCap:7,ftDecline:9,ftAbs:11,
+  t1Amount:100,t2Amount:150,t3Amount:200,
   negCap:7,negDecline:10,specDrop:35,specCap:50,atmThreshold:200,atmPct:30,atmCountAll:true,
+  p2pReceivedMode:'exclude',p2pReceivedPct:50,p2pSentMode:'exclude',
+  subCapPerMerchant:2,bouncedDetection:true,expSpeculative:true,staleDays:30,
   expenseFloorOn:true,expenseFloor:800,
   incPayroll:true,incGovt:true,incPension:true,incGig:true,incSupport:false,
   expRent:true,expUtilities:true,expPhone:true,expInsurance:true,expLoans:true,expGrocery:true,expGas:true,expSubscriptions:true,expChildcare:true,expRestaurants:true,expTransportation:true,expMedical:true,expOtherThreshold:50,atmCountAll:true,
@@ -1095,6 +1105,7 @@ function loadRulesUI(n) {
   const setSel = (id,v) => { const el=document.getElementById(id); if(el) el.value=v||''; };
   set('r-loan-min',r.loanMin); set('r-loan-max',r.loanMax);
   set('r-t1-fcf',r.t1Fcf); set('r-t2-fcf',r.t2Fcf); set('r-t3-fcf',r.t3Fcf); set('r-t4-fcf',r.t4Fcf);
+  set('r-t1-amount',r.t1Amount??100); set('r-t2-amount',r.t2Amount??150); set('r-t3-amount',r.t3Amount??200);
   set('r-nsf-drop',r.nsfDrop); set('r-nsf-cap',r.nsfCap); set('r-nsf-decline',r.nsfDecline);
   set('r-ft-drop',r.ftDrop); set('r-ft-cap',r.ftCap); set('r-ft-decline',r.ftDecline); set('r-ft-abs',r.ftAbs);
   set('r-neg-cap',r.negCap); set('r-neg-cap-r',r.negCap);
@@ -1103,6 +1114,13 @@ function loadRulesUI(n) {
   set('r-spec-cap',r.specCap); set('r-spec-cap-r',r.specCap);
   set('r-atm-threshold',r.atmThreshold??200); set('r-atm-pct',r.atmPct??30); set('r-atm-pct-r',r.atmPct??30);
   setChk('r-atm-count-all',r.atmCountAll??true);
+  // P2P, subscription, bounced, speculative
+  const p2pRSel = document.getElementById('r-p2p-received-mode'); if(p2pRSel) p2pRSel.value = r.p2pReceivedMode||'exclude';
+  set('r-p2p-received-pct',r.p2pReceivedPct??50);
+  const p2pSSel = document.getElementById('r-p2p-sent-mode'); if(p2pSSel) p2pSSel.value = r.p2pSentMode||'exclude';
+  set('r-sub-cap',r.subCapPerMerchant??2);
+  setChk('r-bounced-detection',r.bouncedDetection??true);
+  setChk('r-exp-speculative',r.expSpeculative??true);
   // Expense floor
   setChk('r-expense-floor-on',r.expenseFloorOn??true); set('r-expense-floor',r.expenseFloor??800);
   // Income toggles
@@ -1146,13 +1164,15 @@ function getRulesFromUI() {
   const c = id => { const el=document.getElementById(id); return el ? el.checked : false; };
   const chk = c;
   const sel = id => { const el=document.getElementById(id); return el ? el.value : ''; };
-  return {loanMin:n('r-loan-min'),loanMax:n('r-loan-max'),t1Fcf:n('r-t1-fcf'),t2Fcf:n('r-t2-fcf'),t3Fcf:n('r-t3-fcf'),t4Fcf:n('r-t4-fcf'),
+  return {loanMin:n('r-loan-min'),loanMax:n('r-loan-max'),t1Fcf:n('r-t1-fcf'),t2Fcf:n('r-t2-fcf'),t3Fcf:n('r-t3-fcf'),t4Fcf:n('r-t4-fcf'),t1Amount:n('r-t1-amount'),t2Amount:n('r-t2-amount'),t3Amount:n('r-t3-amount'),
     nsfDrop:n('r-nsf-drop'),nsfCap:n('r-nsf-cap'),nsfDecline:n('r-nsf-decline'),ftDrop:n('r-ft-drop'),ftCap:n('r-ft-cap'),ftDecline:n('r-ft-decline'),ftAbs:n('r-ft-abs'),
     negCap:n('r-neg-cap'),negDecline:n('r-neg-dec'),specDrop:n('r-spec-drop'),specCap:n('r-spec-cap'),atmThreshold:n('r-atm-threshold'),atmPct:n('r-atm-pct'),atmCountAll:chk('r-atm-count-all'),
     expenseFloorOn:chk('r-expense-floor-on'),expenseFloor:n('r-expense-floor'),
     incPayroll:chk('r-inc-payroll'),incGovt:chk('r-inc-govt'),incPension:chk('r-inc-pension'),incGig:chk('r-inc-gig'),incSupport:chk('r-inc-support'),
     expRent:chk('r-exp-rent'),expUtilities:chk('r-exp-utilities'),expPhone:chk('r-exp-phone'),expInsurance:chk('r-exp-insurance'),
-    expLoans:chk('r-exp-loans'),expGrocery:chk('r-exp-grocery'),expGas:chk('r-exp-gas'),expSubscriptions:chk('r-exp-subscriptions'),expChildcare:chk('r-exp-childcare'),expRestaurants:chk('r-exp-restaurants'),expTransportation:chk('r-exp-transportation'),expMedical:chk('r-exp-medical'),expOtherThreshold:n('r-exp-other-threshold'),
+    expLoans:chk('r-exp-loans'),expGrocery:chk('r-exp-grocery'),expGas:chk('r-exp-gas'),expSubscriptions:chk('r-exp-subscriptions'),expChildcare:chk('r-exp-childcare'),expRestaurants:chk('r-exp-restaurants'),expTransportation:chk('r-exp-transportation'),expMedical:chk('r-exp-medical'),expSpeculative:chk('r-exp-speculative'),expOtherThreshold:n('r-exp-other-threshold'),
+    subCapPerMerchant:n('r-sub-cap'),bouncedDetection:chk('r-bounced-detection'),
+    p2pReceivedMode:sel('r-p2p-received-mode'),p2pReceivedPct:n('r-p2p-received-pct'),p2pSentMode:sel('r-p2p-sent-mode'),
     velocityOn:chk('r-velocity-on'),velocityDrop:n('r-velocity-drop'),velocityCap:n('r-velocity-cap'),
     endBalOn:chk('r-endbal-on'),endBalFlag:n('r-endbal-flag'),endBalDrop:n('r-endbal-drop'),
     require2Checks:chk('r-require-2-checks'),incomeVariance:n('r-income-variance'),
