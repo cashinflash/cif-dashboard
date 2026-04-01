@@ -604,8 +604,9 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
           <div class="rule-row"><div class="rule-label">Internal transfers (own accounts)<small>Moving money between own accounts</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
           <div class="rule-row"><div class="rule-label">Fintech / payday app repayments<small>Repaying Dave, Brigit, etc. — flagged separately</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
           <div class="rule-row"><div class="rule-label">Gambling / crypto outflows<small>Flagged as speculative risk instead</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
-          <div class="rule-row" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)"><div class="rule-label">ATM withdrawals — threshold<small>Withdrawals below this are ignored (pocket money)</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-atm-threshold" value="200" style="width:90px"></div></div>
-          <div class="rule-row"><div class="rule-label">Count large ATM withdrawals at<small>0% = ignore | 50% = half as cash expenses | 100% = fully count</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-atm-pct-r" min="0" max="100" value="50" oninput="syncR('r-atm-pct','r-atm-pct-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-atm-pct" value="50" oninput="syncR('r-atm-pct-r','r-atm-pct',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
+          <div class="rule-row" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)"><div class="rule-label">Count ALL ATM withdrawals<small>When on: counts all ATM at the % below. When off: only counts above threshold.</small></div><label class="tog"><input type="checkbox" id="r-atm-count-all" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">ATM threshold (if not counting all)<small>Only used when "Count all" is off — withdrawals below this are ignored</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-atm-threshold" value="200" style="width:90px"></div></div>
+          <div class="rule-row"><div class="rule-label">ATM counting percentage<small>What % of ATM withdrawals count as cash expenses (default 30%)</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-atm-pct-r" min="0" max="100" value="30" oninput="syncR('r-atm-pct','r-atm-pct-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-atm-pct" value="30" oninput="syncR('r-atm-pct-r','r-atm-pct',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
         </div></div>
       </div>
     </div>
@@ -877,10 +878,10 @@ async function fbDelete(path) {
 // ════════════════════════════════════════
 const DR = {loanMin:100,loanMax:255,t1Fcf:200,t2Fcf:375,t3Fcf:500,t4Fcf:640,
   nsfDrop:2,nsfCap:4,nsfDecline:5,ftDrop:5,ftCap:7,ftDecline:9,ftAbs:11,
-  negCap:7,negDecline:10,specDrop:35,specCap:50,atmThreshold:200,atmPct:50,
+  negCap:7,negDecline:10,specDrop:35,specCap:50,atmThreshold:200,atmPct:30,atmCountAll:true,
   expenseFloorOn:true,expenseFloor:800,
   incPayroll:true,incGovt:true,incPension:true,incGig:true,incSupport:false,
-  expRent:true,expUtilities:true,expPhone:true,expInsurance:true,expLoans:true,expGrocery:true,expGas:true,expSubscriptions:true,expChildcare:false,expRestaurants:true,expTransportation:true,expMedical:true,expOtherThreshold:50,
+  expRent:true,expUtilities:true,expPhone:true,expInsurance:true,expLoans:true,expGrocery:true,expGas:true,expSubscriptions:true,expChildcare:true,expRestaurants:true,expTransportation:true,expMedical:true,expOtherThreshold:50,atmCountAll:true,
   velocityOn:true,velocityDrop:90,velocityCap:98,
   endBalOn:true,endBalFlag:25,endBalDrop:5,
   require2Checks:false,incomeVariance:25,
@@ -1100,7 +1101,8 @@ function loadRulesUI(n) {
   set('r-neg-dec',r.negDecline); set('r-neg-dec-r',r.negDecline);
   set('r-spec-drop',r.specDrop); set('r-spec-drop-r',r.specDrop);
   set('r-spec-cap',r.specCap); set('r-spec-cap-r',r.specCap);
-  set('r-atm-threshold',r.atmThreshold??200); set('r-atm-pct',r.atmPct??50); set('r-atm-pct-r',r.atmPct??50);
+  set('r-atm-threshold',r.atmThreshold??200); set('r-atm-pct',r.atmPct??30); set('r-atm-pct-r',r.atmPct??30);
+  setChk('r-atm-count-all',r.atmCountAll??true);
   // Expense floor
   setChk('r-expense-floor-on',r.expenseFloorOn??true); set('r-expense-floor',r.expenseFloor??800);
   // Income toggles
@@ -1146,7 +1148,7 @@ function getRulesFromUI() {
   const sel = id => { const el=document.getElementById(id); return el ? el.value : ''; };
   return {loanMin:n('r-loan-min'),loanMax:n('r-loan-max'),t1Fcf:n('r-t1-fcf'),t2Fcf:n('r-t2-fcf'),t3Fcf:n('r-t3-fcf'),t4Fcf:n('r-t4-fcf'),
     nsfDrop:n('r-nsf-drop'),nsfCap:n('r-nsf-cap'),nsfDecline:n('r-nsf-decline'),ftDrop:n('r-ft-drop'),ftCap:n('r-ft-cap'),ftDecline:n('r-ft-decline'),ftAbs:n('r-ft-abs'),
-    negCap:n('r-neg-cap'),negDecline:n('r-neg-dec'),specDrop:n('r-spec-drop'),specCap:n('r-spec-cap'),atmThreshold:n('r-atm-threshold'),atmPct:n('r-atm-pct'),
+    negCap:n('r-neg-cap'),negDecline:n('r-neg-dec'),specDrop:n('r-spec-drop'),specCap:n('r-spec-cap'),atmThreshold:n('r-atm-threshold'),atmPct:n('r-atm-pct'),atmCountAll:chk('r-atm-count-all'),
     expenseFloorOn:chk('r-expense-floor-on'),expenseFloor:n('r-expense-floor'),
     incPayroll:chk('r-inc-payroll'),incGovt:chk('r-inc-govt'),incPension:chk('r-inc-pension'),incGig:chk('r-inc-gig'),incSupport:chk('r-inc-support'),
     expRent:chk('r-exp-rent'),expUtilities:chk('r-exp-utilities'),expPhone:chk('r-exp-phone'),expInsurance:chk('r-exp-insurance'),
