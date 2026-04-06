@@ -597,6 +597,8 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
           <div style="background:var(--gold-light);border:1px solid var(--gold-border);border-radius:10px;padding:12px 16px;margin-top:8px;font-size:12px;color:var(--gold-dark);line-height:1.7">
             <b>Example:</b> If a customer has $0 verified card expenses but you set the floor to $800, the engine uses $800 as their expense base. This prevents the FCF paradox where someone looks great on paper but is clearly financially stressed.
           </div>
+          <div class="rule-row" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)"><div class="rule-label">Fintech Fee %<small>What % of fintech loan repayments to count as expense (fee portion). 15% = only the fee matters for FCF.</small></div><div style="display:flex;align-items:center;gap:4px"><input class="rule-input" type="number" id="r-fintech-fee-pct" min="0" max="100" step="5" value="15" style="width:70px"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div>
+          <div class="rule-row"><div class="rule-label">Money Order Threshold<small>Retail store purchases above this amount classified as money orders, not groceries.</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-money-order-threshold" min="100" max="1000" step="50" value="200" style="width:90px"></div></div>
         </div></div>
 
         <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--green-light)">✅</div><div><div class="rs-hdr-title">Count as Expenses</div><div class="rs-hdr-sub">These categories are verified expenses</div></div></div><div class="rs-body">
@@ -682,24 +684,29 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
         <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">⚠️</div><div><div class="rs-hdr-title">NSF / Returned Items</div><div class="rs-hdr-sub">Non-sufficient fund fees and returned payments</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Drop 1 tier at<small>NSFs trigger a tier reduction</small></div><input class="rule-input" type="number" id="r-nsf-drop" value="2" min="1"></div>
           <div class="rule-row"><div class="rule-label">Cap at $100 at<small>NSFs that cap the approval</small></div><input class="rule-input" type="number" id="r-nsf-cap" value="4" min="1"></div>
-          <div class="rule-row"><div class="rule-label">Auto-decline at<small>NSFs that trigger decline</small></div><input class="rule-input" type="number" id="r-nsf-decline" value="5" min="1"></div>
+          <div class="rule-row"><div class="rule-label">Drop 2 tiers / cap at<small>NSFs — v2: drops tiers instead of declining</small></div><input class="rule-input" type="number" id="r-nsf-decline" value="5" min="1"></div>
         </div></div>
 
         <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--amber-light)">📱</div><div><div class="rs-hdr-title">Fintech / Payday App Usage</div><div class="rs-hdr-sub">Counted by UNIQUE apps, not total interactions — Dave used 10× still = 1 app</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Drop 1 tier at<small>Unique apps (e.g. 3 = using Dave + Earnin + Cleo)</small></div><input class="rule-input" type="number" id="r-ft-drop" value="5" min="1"></div>
           <div class="rule-row"><div class="rule-label">Cap at $100 at<small>Unique apps before capping</small></div><input class="rule-input" type="number" id="r-ft-cap" value="7" min="1"></div>
-          <div class="rule-row"><div class="rule-label">Decline at<small>Unique apps before decline</small></div><input class="rule-input" type="number" id="r-ft-decline" value="9" min="1"></div>
-          <div class="rule-row"><div class="rule-label">Absolute decline at<small>Unique apps — no exceptions ever</small></div><input class="rule-input" type="number" id="r-ft-abs" value="11" min="1"></div>
+          <div class="rule-row"><div class="rule-label">Drop 2 tiers / cap at<small>Unique apps — v2: drops tiers instead of declining</small></div><input class="rule-input" type="number" id="r-ft-decline" value="9" min="1"></div>
+          <div class="rule-row"><div class="rule-label">Hard cap at $100 at<small>Unique apps — v2: hard caps instead of absolute decline</small></div><input class="rule-input" type="number" id="r-ft-abs" value="11" min="1"></div>
         </div></div>
 
         <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">📉</div><div><div class="rs-hdr-title">Negative Balance Days</div><div class="rs-hdr-sub">Days ending balance was below $0</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Cap at $100 at<small>Days negative before capping</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-neg-cap-r" min="1" max="20" value="7" oninput="syncR('r-neg-cap','r-neg-cap-r')"><input class="rule-input" type="number" id="r-neg-cap" value="7" oninput="syncR('r-neg-cap-r','r-neg-cap',true)"></div></div>
-          <div class="rule-row"><div class="rule-label">Auto-decline at<small>Days negative that trigger decline</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-neg-dec-r" min="1" max="30" value="10" oninput="syncR('r-neg-dec','r-neg-dec-r')"><input class="rule-input" type="number" id="r-neg-dec" value="10" oninput="syncR('r-neg-dec-r','r-neg-dec',true)"></div></div>
+          <div class="rule-row"><div class="rule-label">Drop 2 tiers / cap at<small>Days negative — v2: drops tiers instead of declining</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-neg-dec-r" min="1" max="30" value="10" oninput="syncR('r-neg-dec','r-neg-dec-r')"><input class="rule-input" type="number" id="r-neg-dec" value="10" oninput="syncR('r-neg-dec-r','r-neg-dec',true)"></div></div>
         </div></div>
 
         <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--amber-light)">🎰</div><div><div class="rs-hdr-title">Speculative Activity</div><div class="rs-hdr-sub">Gambling, crypto, and high-risk spending as % of income</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Drop 1 tier at<small>% of income on gambling/crypto</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-spec-drop-r" min="1" max="100" value="35" oninput="syncR('r-spec-drop','r-spec-drop-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-spec-drop" value="35" oninput="syncR('r-spec-drop-r','r-spec-drop',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
           <div class="rule-row"><div class="rule-label">Cap at $100 at<small>% that caps the approval</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-spec-cap-r" min="1" max="100" value="50" oninput="syncR('r-spec-cap','r-spec-cap-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-spec-cap" value="50" oninput="syncR('r-spec-cap-r','r-spec-cap',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
+        </div></div>
+
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#e3f2fd">📊</div><div><div class="rs-hdr-title">Debt-to-Income Ratio</div><div class="rs-hdr-sub">DTI = (loan payments + fintech repayments + BNPL + recurring P2P) / monthly income. Higher DTI = more debt burden.</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">Drop 1 Tier at DTI<small>Drop one loan tier when DTI exceeds this %</small></div><div style="display:flex;align-items:center;gap:4px"><input class="rule-input" type="number" id="r-dti-drop" min="20" max="80" step="5" value="45" style="width:70px"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div>
+          <div class="rule-row"><div class="rule-label">Drop 2 Tiers at DTI<small>Drop two loan tiers when DTI exceeds this %</small></div><div style="display:flex;align-items:center;gap:4px"><input class="rule-input" type="number" id="r-dti-drop2" min="30" max="90" step="5" value="60" style="width:70px"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div>
         </div></div>
       </div>
     </div>
@@ -895,13 +902,14 @@ async function fbDelete(path) {
 // ════════════════════════════════════════
 // DEFAULT RULES
 // ════════════════════════════════════════
-const DR = {loanMin:100,loanMax:255,t1Fcf:200,t2Fcf:375,t3Fcf:500,t4Fcf:640,
+const DR = {loanMin:100,loanMax:255,t1Fcf:150,t2Fcf:300,t3Fcf:425,t4Fcf:550,
   nsfDrop:2,nsfCap:4,nsfDecline:5,ftDrop:5,ftCap:7,ftDecline:9,ftAbs:11,
   t1Amount:100,t2Amount:150,t3Amount:200,
   negCap:7,negDecline:10,specDrop:35,specCap:50,atmThreshold:200,atmPct:30,atmCountAll:true,
-  p2pReceivedMode:'exclude',p2pReceivedPct:50,p2pSentMode:'exclude',
+  p2pReceivedMode:'exclude',p2pReceivedPct:50,p2pSentMode:'recurring',
   subCapPerMerchant:2,bouncedDetection:true,expSpeculative:true,staleDays:30,
-  expenseFloorOn:true,expenseFloor:800,
+  expenseFloorOn:true,expenseFloor:500,
+  fintechFeePct:15,moneyOrderThreshold:200,dtiDrop:45,dtiDrop2:60,
   incPayroll:true,incGovt:true,incPension:true,incGig:true,incSupport:false,
   expRent:true,expUtilities:true,expPhone:true,expInsurance:true,expLoans:true,expGrocery:true,expGas:true,expSubscriptions:true,expChildcare:true,expRestaurants:true,expTransportation:true,expMedical:true,expOtherThreshold:50,atmCountAll:true,
   velocityOn:true,velocityDrop:90,velocityCap:98,
@@ -1135,6 +1143,11 @@ function loadRulesUI(n) {
   setChk('r-exp-speculative',r.expSpeculative??true);
   // Expense floor
   setChk('r-expense-floor-on',r.expenseFloorOn??true); set('r-expense-floor',r.expenseFloor??800);
+  // v2 expense settings
+  if(document.getElementById('r-fintech-fee-pct')) document.getElementById('r-fintech-fee-pct').value = r.fintechFeePct ?? 15;
+  if(document.getElementById('r-money-order-threshold')) document.getElementById('r-money-order-threshold').value = r.moneyOrderThreshold ?? 200;
+  if(document.getElementById('r-dti-drop')) document.getElementById('r-dti-drop').value = r.dtiDrop ?? 45;
+  if(document.getElementById('r-dti-drop2')) document.getElementById('r-dti-drop2').value = r.dtiDrop2 ?? 60;
   // Income toggles
   setChk('r-inc-payroll',r.incPayroll??true); setChk('r-inc-govt',r.incGovt??true);
   setChk('r-inc-pension',r.incPension??true); setChk('r-inc-gig',r.incGig??true);
@@ -1180,6 +1193,8 @@ function getRulesFromUI() {
     nsfDrop:n('r-nsf-drop'),nsfCap:n('r-nsf-cap'),nsfDecline:n('r-nsf-decline'),ftDrop:n('r-ft-drop'),ftCap:n('r-ft-cap'),ftDecline:n('r-ft-decline'),ftAbs:n('r-ft-abs'),
     negCap:n('r-neg-cap'),negDecline:n('r-neg-dec'),specDrop:n('r-spec-drop'),specCap:n('r-spec-cap'),atmThreshold:n('r-atm-threshold'),atmPct:n('r-atm-pct'),atmCountAll:chk('r-atm-count-all'),
     expenseFloorOn:chk('r-expense-floor-on'),expenseFloor:n('r-expense-floor'),
+    fintechFeePct:parseInt(document.getElementById('r-fintech-fee-pct')?.value||'15'),moneyOrderThreshold:parseInt(document.getElementById('r-money-order-threshold')?.value||'200'),
+    dtiDrop:parseInt(document.getElementById('r-dti-drop')?.value||'45'),dtiDrop2:parseInt(document.getElementById('r-dti-drop2')?.value||'60'),
     incPayroll:chk('r-inc-payroll'),incGovt:chk('r-inc-govt'),incPension:chk('r-inc-pension'),incGig:chk('r-inc-gig'),incSupport:chk('r-inc-support'),
     expRent:chk('r-exp-rent'),expUtilities:chk('r-exp-utilities'),expPhone:chk('r-exp-phone'),expInsurance:chk('r-exp-insurance'),
     expLoans:chk('r-exp-loans'),expGrocery:chk('r-exp-grocery'),expGas:chk('r-exp-gas'),expSubscriptions:chk('r-exp-subscriptions'),expChildcare:chk('r-exp-childcare'),expRestaurants:chk('r-exp-restaurants'),expTransportation:chk('r-exp-transportation'),expMedical:chk('r-exp-medical'),expSpeculative:chk('r-exp-speculative'),expOtherThreshold:n('r-exp-other-threshold'),
