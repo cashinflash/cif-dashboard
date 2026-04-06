@@ -593,7 +593,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
       <div class="rules-grid">
         <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#e8f5e9">🏠</div><div><div class="rs-hdr-title">Minimum Living Expense Floor</div><div class="rs-hdr-sub">Applied when verified card expenses are below this amount — prevents unrealistically high FCF</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Enable minimum expense floor<small>If ON, uses floor when actual expenses are lower. If OFF, uses $0 when no expenses found.</small></div><label class="tog"><input type="checkbox" id="r-expense-floor-on" checked><span class="tog-slider"></span></label></div>
-          <div class="rule-row"><div class="rule-label">Minimum monthly expense floor<small>Recommended: $800–$1,200 for California single adult</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-expense-floor" value="800" min="0" max="3000"></div></div>
+          <div class="rule-row"><div class="rule-label">Minimum monthly expense floor<small>Recommended: $800–$1,200 for California single adult</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-expense-floor" value="500" min="0" max="3000"></div></div>
           <div style="background:var(--gold-light);border:1px solid var(--gold-border);border-radius:10px;padding:12px 16px;margin-top:8px;font-size:12px;color:var(--gold-dark);line-height:1.7">
             <b>Example:</b> If a customer has $0 verified card expenses but you set the floor to $800, the engine uses $800 as their expense base. This prevents the FCF paradox where someone looks great on paper but is clearly financially stressed.
           </div>
@@ -643,10 +643,10 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
         </div></div>
 
         <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--gold-light)">📊</div><div><div class="rs-hdr-title">FCF Tier Thresholds</div><div class="rs-hdr-sub">Minimum monthly FCF required for each tier</div></div></div><div class="rs-body">
-          <div class="rule-row"><div class="rule-label">Tier 1<small>Loan amount & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan $</span><input class="rule-input" type="number" id="r-t1-amount" value="100" style="width:70px"><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t1-fcf" value="200" style="width:70px"></div></div>
-          <div class="rule-row"><div class="rule-label">Tier 2<small>Loan amount & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan $</span><input class="rule-input" type="number" id="r-t2-amount" value="150" style="width:70px"><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t2-fcf" value="375" style="width:70px"></div></div>
-          <div class="rule-row"><div class="rule-label">Tier 3<small>Loan amount & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan $</span><input class="rule-input" type="number" id="r-t3-amount" value="200" style="width:70px"><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t3-fcf" value="500" style="width:70px"></div></div>
-          <div class="rule-row"><div class="rule-label">Tier 4<small>Uses Max Loan & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan = Max</span><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t4-fcf" value="640" style="width:70px"></div></div>
+          <div class="rule-row"><div class="rule-label">Tier 1<small>Loan amount & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan $</span><input class="rule-input" type="number" id="r-t1-amount" value="100" style="width:70px"><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t1-fcf" value="150" style="width:70px"></div></div>
+          <div class="rule-row"><div class="rule-label">Tier 2<small>Loan amount & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan $</span><input class="rule-input" type="number" id="r-t2-amount" value="150" style="width:70px"><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t2-fcf" value="300" style="width:70px"></div></div>
+          <div class="rule-row"><div class="rule-label">Tier 3<small>Loan amount & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan $</span><input class="rule-input" type="number" id="r-t3-amount" value="200" style="width:70px"><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t3-fcf" value="425" style="width:70px"></div></div>
+          <div class="rule-row"><div class="rule-label">Tier 4<small>Uses Max Loan & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan = Max</span><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t4-fcf" value="550" style="width:70px"></div></div>
         </div></div>
 
         <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#e3f2fd">🧮</div><div><div class="rs-hdr-title">FCF Formula Preview</div><div class="rs-hdr-sub">Based on your current settings</div></div></div><div class="rs-body">
@@ -654,22 +654,22 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
             <div style="background:var(--green-light);border:1px solid var(--green-border);border-radius:10px;padding:14px;text-align:center">
               <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;margin-bottom:6px">Tier 1</div>
               <div style="font-size:22px;font-weight:800;color:var(--green-dark)">$100</div>
-              <div style="font-size:12px;color:var(--muted);margin-top:4px">FCF ≥ $<span id="prev-t1">200</span>/mo</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px">FCF ≥ $<span id="prev-t1">150</span>/mo</div>
             </div>
             <div style="background:var(--gold-light);border:1px solid var(--gold-border);border-radius:10px;padding:14px;text-align:center">
               <div style="font-size:11px;font-weight:700;color:var(--gold-dark);text-transform:uppercase;margin-bottom:6px">Tier 2</div>
               <div style="font-size:22px;font-weight:800;color:var(--gold-dark)">$150</div>
-              <div style="font-size:12px;color:var(--muted);margin-top:4px">FCF ≥ $<span id="prev-t2">375</span>/mo</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px">FCF ≥ $<span id="prev-t2">300</span>/mo</div>
             </div>
             <div style="background:#fff3e0;border:1px solid #ffe0b2;border-radius:10px;padding:14px;text-align:center">
               <div style="font-size:11px;font-weight:700;color:#e65100;text-transform:uppercase;margin-bottom:6px">Tier 3</div>
               <div style="font-size:22px;font-weight:800;color:#e65100">$200</div>
-              <div style="font-size:12px;color:var(--muted);margin-top:4px">FCF ≥ $<span id="prev-t3">500</span>/mo</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px">FCF ≥ $<span id="prev-t3">425</span>/mo</div>
             </div>
             <div style="background:var(--green-light);border:2px solid var(--green);border-radius:10px;padding:14px;text-align:center">
               <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;margin-bottom:6px">Tier 4 ⭐</div>
               <div style="font-size:22px;font-weight:800;color:var(--green-dark)">$255</div>
-              <div style="font-size:12px;color:var(--muted);margin-top:4px">FCF ≥ $<span id="prev-t4">640</span>/mo</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px">FCF ≥ $<span id="prev-t4">550</span>/mo</div>
             </div>
           </div>
         </div></div>
@@ -1137,12 +1137,12 @@ function loadRulesUI(n) {
   // P2P, subscription, bounced, speculative
   const p2pRSel = document.getElementById('r-p2p-received-mode'); if(p2pRSel) p2pRSel.value = r.p2pReceivedMode||'exclude';
   set('r-p2p-received-pct',r.p2pReceivedPct??50);
-  const p2pSSel = document.getElementById('r-p2p-sent-mode'); if(p2pSSel) p2pSSel.value = r.p2pSentMode||'exclude';
+  const p2pSSel = document.getElementById('r-p2p-sent-mode'); if(p2pSSel) p2pSSel.value = r.p2pSentMode||'recurring';
   set('r-sub-cap',r.subCapPerMerchant??2);
   setChk('r-bounced-detection',r.bouncedDetection??true);
   setChk('r-exp-speculative',r.expSpeculative??true);
   // Expense floor
-  setChk('r-expense-floor-on',r.expenseFloorOn??true); set('r-expense-floor',r.expenseFloor??800);
+  setChk('r-expense-floor-on',r.expenseFloorOn??true); set('r-expense-floor',r.expenseFloor??500);
   // v2 expense settings
   if(document.getElementById('r-fintech-fee-pct')) document.getElementById('r-fintech-fee-pct').value = r.fintechFeePct ?? 15;
   if(document.getElementById('r-money-order-threshold')) document.getElementById('r-money-order-threshold').value = r.moneyOrderThreshold ?? 200;
