@@ -1489,6 +1489,67 @@ async function saveSingle(status) {
 }
 
 function copyRpt(){const t=document.createElement('div');t.innerHTML=sReport;navigator.clipboard.writeText(t.textContent).then(()=>toast('Copied ✓','ok'));}
+
+// ── Recalculate decision with transaction overrides ──
+window.recalculateDecision = async function(firebaseId) {
+  const overrides = window.__txnOverrides || {};
+  const changes = Object.keys(overrides);
+  if (!changes.length) { toast('No changes to recalculate','warn'); return; }
+
+  // Find the firebase ID — either passed directly or from the currently open modal/report
+  const fbId = firebaseId || sPendingId || (window._currentModalFbId || '');
+  if (!fbId) { toast('No application ID found — save application first','warn'); return; }
+
+  const btn = document.getElementById('recalc-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Recalculating...'; }
+
+  try {
+    // Build transaction_overrides array from the changes map
+    const txnOverrides = changes.map(idx => ({
+      index: parseInt(idx),
+      category: overrides[idx].category || undefined,
+      counted: overrides[idx].counted !== undefined ? overrides[idx].counted : undefined,
+    }));
+
+    const resp = await fetch('/api/rerun-engine', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {'Content-Type':'application/json', 'X-Session': getToken()},
+      body: JSON.stringify({ firebase_id: fbId, overrides: { transaction_overrides: txnOverrides } })
+    });
+    if (!resp.ok) throw new Error('Rerun failed: ' + resp.status);
+    const data = await resp.json();
+
+    // Update the report display
+    const newHtml = data.report_html || '';
+    const reportEl = document.getElementById('srhtml');
+    if (reportEl && newHtml) reportEl.innerHTML = highlightTierBreakdown(newHtml);
+    // Also update modal report if open
+    const modalEl = document.getElementById('mpanel-report-' + fbId);
+    if (modalEl && newHtml) modalEl.innerHTML = '<div class="mrhtml">' + highlightTierBreakdown(newHtml) + '</div>';
+
+    // Update hero/badge
+    const ok = data.decision === 'APPROVED';
+    const dhero = document.getElementById('dhero');
+    if (dhero) dhero.className = 'dhero ' + (ok ? 'approved' : 'declined');
+    const badge = document.getElementById('dbadge');
+    if (badge) { badge.className = 'dbadge ' + (ok ? 'approved' : 'declined'); badge.textContent = ok ? '✓ Approved' : '✕ Declined'; }
+    const amtIn = document.getElementById('amtin');
+    if (amtIn && ok) amtIn.value = data.amount;
+
+    // Clear overrides
+    window.__txnOverrides = {};
+    toast('Decision recalculated — ' + data.decision + (ok ? ' $' + data.amount : ''), ok ? 'ok' : 'warn');
+
+    // Refresh the app list to pick up updated Firebase data
+    setTimeout(() => loadReports(), 1000);
+  } catch (e) {
+    console.error('Recalculate error:', e);
+    toast('Recalculation failed: ' + e.message, 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Recalculate Decision'; }
+  }
+};
 function resetSingle(){clearSingle();document.getElementById('sresult').style.display='none';sReport='';sName='';sDecision='';sAmount='';sReason='';sScore=0;sPendingId=null;window.scrollTo({top:0,behavior:'smooth'});}
 
 // ════════════════════════════════════════
