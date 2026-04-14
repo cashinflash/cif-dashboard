@@ -67,6 +67,17 @@ CORS = {
     'Access-Control-Allow-Headers': 'Content-Type,X-Method,X-Session',
 }
 
+# Whitelist of static files that can be served from repo root
+STATIC_FILES = {
+    'styles.css': 'text/css',
+    'script-1-auth.js': 'application/javascript',
+    'script-2-ui.js': 'application/javascript',
+    'script-3-ocr.js': 'application/javascript',
+    'script-4a-dash.js': 'application/javascript',
+    'script-4b-dash.js': 'application/javascript',
+    'script-5-misc.js': 'application/javascript',
+}
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
 
@@ -86,6 +97,15 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(data)))
         if extra_headers:
             for k,v in extra_headers.items(): self.send_header(k,v)
+        self.end_headers()
+        self.wfile.write(data)
+
+    def send_static(self, code, data, content_type):
+        self.send_response(code)
+        for k,v in CORS.items(): self.send_header(k,v)
+        self.send_header('Content-Type', content_type + '; charset=utf-8')
+        self.send_header('Content-Length', str(len(data)))
+        self.send_header('Cache-Control', 'no-cache')
         self.end_headers()
         self.wfile.write(data)
 
@@ -115,6 +135,21 @@ class Handler(BaseHTTPRequestHandler):
                 return
             data = read_file(os.path.join(DIR, 'app.html'))
             self.send_html(200, data or b'App not found')
+            return
+
+        # Serve whitelisted static files (CSS, JS) — requires valid session
+        stripped_path = path.lstrip('/')
+        if stripped_path in STATIC_FILES:
+            if not valid_session(token):
+                self.send_response(302)
+                self.send_header('Location', '/')
+                self.end_headers()
+                return
+            data = read_file(os.path.join(DIR, stripped_path))
+            if data is None:
+                self.send_json(404, {'error':'not found'})
+                return
+            self.send_static(200, data, STATIC_FILES[stripped_path])
             return
 
         if path.startswith('/fb/'):
