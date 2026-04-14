@@ -1,0 +1,115 @@
+<div id="view-rules" class="view">
+  <div class="container">
+    <div class="ptitle">⚙ Rules Engine</div>
+    <div class="psub">Full control over every underwriting variable. Changes apply to all future analyses immediately.</div>
+
+    <!-- PROFILE BAR -->
+    <div class="card">
+      <div class="card-hdr"><span style="font-size:16px">📋</span><span class="card-hdr-title">Risk Profiles</span><span class="card-hdr-sub">Select a profile to edit</span></div>
+      <div class="card-body">
+        <div class="profiles-bar" id="profiles-bar"></div>
+        <div class="new-profile-row"><input class="new-profile-input" type="text" id="new-profile-name" placeholder="New profile name..."><button class="actbtn btn-blue" onclick="addProfile()">+ Add Profile</button></div>
+      </div>
+    </div>
+
+    <!-- SAVE BAR -->
+    <div class="rules-save-bar">
+      <div class="rsb-text">Editing: <span id="editing-profile-name">Standard</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px;background:var(--gold-light);border:1px solid var(--gold-border);border-radius:9px;padding:7px 14px">
+          <span style="font-size:12px;font-weight:600;color:var(--gold-dark)">Allow PDF uploads on apply form</span>
+          <label class="tog"><input type="checkbox" id="allow-pdf-toggle" onchange="savePdfSetting(this.checked)" checked><span class="tog-slider"></span></label>
+        </div>
+        <button class="actbtn" onclick="resetProfileToDefaults()" style="background:#fff5f5;color:#c0392b;border:1.5px solid #f5b8b0;font-family:var(--sans)" title="Reset this profile to factory defaults">↺ Reset to Defaults</button>
+        <button class="actbtn btn-ok" onclick="saveRules()">💾 Save Rules</button>
+      </div>
+    </div>
+
+    <!-- SECTION TABS -->
+    <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+      <button class="re-tab active" id="retab-income" onclick="showReTab('income')">💵 Income</button>
+      <button class="re-tab" id="retab-expense" onclick="showReTab('expense')">💸 Expenses</button>
+      <button class="re-tab" id="retab-fcf" onclick="showReTab('fcf')">📊 FCF & Tiers</button>
+      <button class="re-tab" id="retab-risk" onclick="showReTab('risk')">⚠️ Risk Adjustments</button>
+      <button class="re-tab" id="retab-behavior" onclick="showReTab('behavior')">📈 Behavioral</button>
+      <button class="re-tab" id="retab-decline" onclick="showReTab('decline')">🚫 Auto-Decline</button>
+    </div>
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- TAB: INCOME -->
+    <!-- ══════════════════════════════════════ -->
+    <div id="retab-content-income" class="re-tab-content">
+      <div class="rules-grid">
+        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--green-light)">💵</div><div><div class="rs-hdr-title">Income Verification Rules</div><div class="rs-hdr-sub">What qualifies as verified income</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">Minimum verified paychecks required<small>Require at least this many payroll deposits in statement. 1 = lenient, 2 = recommended</small></div><input class="rule-input" type="number" id="r-min-paychecks" value="1" min="1" max="5"></div>
+          <div class="rule-row"><div class="rule-label">Count payroll/direct deposit<small>ACH payroll from employers</small></div><label class="tog"><input type="checkbox" id="r-inc-payroll" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Count government benefits<small>SSA, SSI, disability, unemployment, EDD</small></div><label class="tog"><input type="checkbox" id="r-inc-govt" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Count pension/annuity income<small>Retirement payments</small></div><label class="tog"><input type="checkbox" id="r-inc-pension" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Count consistent gig income<small>DoorDash, Uber, Lyft, Instacart — only if recurring</small></div><label class="tog"><input type="checkbox" id="r-inc-gig" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Count child support / alimony<small>Court-ordered support payments</small></div><label class="tog"><input type="checkbox" id="r-inc-support"><span class="tog-slider"></span></label></div>
+        </div></div>
+
+        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--gold-light)">💸</div><div><div class="rs-hdr-title">P2P & Transfer Handling</div><div class="rs-hdr-sub">Configure how Zelle, Venmo, CashApp deposits and outflows are treated</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">P2P Received (Zelle/Venmo/CashApp income)<small>Exclude: never count. Recurring: count repeat senders at %. All: count all at %.</small></div><select class="rule-select" id="r-p2p-received-mode"><option value="exclude">Exclude All</option><option value="recurring">Count Recurring at %</option><option value="all">Count All at %</option></select></div>
+          <div class="rule-row"><div class="rule-label">P2P Received counting %<small>What % of P2P deposits to count (e.g., 50% = half value)</small></div><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-p2p-received-pct" value="50" style="width:70px"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div>
+          <div class="rule-row"><div class="rule-label">P2P Sent (Zelle/Venmo/CashApp outflows)<small>Exclude: don't count. Recurring: count repeat recipients as expenses.</small></div><select class="rule-select" id="r-p2p-sent-mode"><option value="exclude">Exclude All</option><option value="recurring">Count Recurring as Expenses</option></select></div>
+        </div></div>
+
+        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">🚫</div><div><div class="rs-hdr-title">Always Exclude from Income</div><div class="rs-hdr-sub">These are never counted as income regardless of settings</div></div></div><div class="rs-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 32px">
+            <div class="rule-row"><div class="rule-label">Internal account transfers<small>Moving money between own accounts</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
+            <div class="rule-row"><div class="rule-label">Fintech / payday app advances<small>Dave, Brigit, Earnin, etc.</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
+            <div class="rule-row"><div class="rule-label">Loan proceeds<small>Proceeds from other loans</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
+            <div class="rule-row"><div class="rule-label">Refunds / credits<small>Merchant refunds</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- TAB: EXPENSES -->
+    <!-- ══════════════════════════════════════ -->
+    <div id="retab-content-expense" class="re-tab-content" style="display:none">
+      <div class="rules-grid">
+        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#e8f5e9">🏠</div><div><div class="rs-hdr-title">Minimum Living Expense Floor</div><div class="rs-hdr-sub">Applied when verified card expenses are below this amount — prevents unrealistically high FCF</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">Enable minimum expense floor<small>If ON, uses floor when actual expenses are lower. If OFF, uses $0 when no expenses found.</small></div><label class="tog"><input type="checkbox" id="r-expense-floor-on" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Minimum monthly expense floor<small>Recommended: $800–$1,200 for California single adult</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-expense-floor" value="500" min="0" max="3000"></div></div>
+          <div style="background:var(--gold-light);border:1px solid var(--gold-border);border-radius:10px;padding:12px 16px;margin-top:8px;font-size:12px;color:var(--gold-dark);line-height:1.7">
+            <b>Example:</b> If a customer has $0 verified card expenses but you set the floor to $800, the engine uses $800 as their expense base. This prevents the FCF paradox where someone looks great on paper but is clearly financially stressed.
+          </div>
+          <div class="rule-row" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)"><div class="rule-label">Fintech Fee %<small>What % of fintech loan repayments to count as expense (fee portion). 15% = only the fee matters for FCF.</small></div><div style="display:flex;align-items:center;gap:4px"><input class="rule-input" type="number" id="r-fintech-fee-pct" min="0" max="100" step="5" value="15" style="width:70px"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div>
+          <div class="rule-row"><div class="rule-label">Money Order Threshold<small>Retail store purchases above this amount classified as money orders, not groceries.</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-money-order-threshold" min="100" max="1000" step="50" value="200" style="width:90px"></div></div>
+        </div></div>
+
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--green-light)">✅</div><div><div class="rs-hdr-title">Count as Expenses</div><div class="rs-hdr-sub">These categories are verified expenses</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">Rent / mortgage payments<small>ACH housing payments</small></div><label class="tog"><input type="checkbox" id="r-exp-rent" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Utility bills<small>Electric, gas, water, internet</small></div><label class="tog"><input type="checkbox" id="r-exp-utilities" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Phone / telecom<small>T-Mobile, Verizon, prepaid, etc.</small></div><label class="tog"><input type="checkbox" id="r-exp-phone" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Insurance payments<small>Auto, health, renters insurance</small></div><label class="tog"><input type="checkbox" id="r-exp-insurance" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Loan / credit card payments<small>Minimum payments on existing debt</small></div><label class="tog"><input type="checkbox" id="r-exp-loans" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Groceries / food (card)<small>Supermarkets, food stores</small></div><label class="tog"><input type="checkbox" id="r-exp-grocery" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Gas stations / fuel<small>Identifiable gas merchant transactions</small></div><label class="tog"><input type="checkbox" id="r-exp-gas" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Subscriptions<small>Netflix, Spotify, Adobe, etc.</small></div><label class="tog"><input type="checkbox" id="r-exp-subscriptions" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Child care / education<small>Daycare, school payments</small></div><label class="tog"><input type="checkbox" id="r-exp-childcare"><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Restaurants / dining<small>Restaurants, fast food, food delivery</small></div><label class="tog"><input type="checkbox" id="r-exp-restaurants" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Transportation<small>Public transit, Uber/Lyft rides, parking</small></div><label class="tog"><input type="checkbox" id="r-exp-transportation" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Medical / healthcare<small>Pharmacy, doctor, hospital, dental</small></div><label class="tog"><input type="checkbox" id="r-exp-medical" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Speculative / gambling<small>Casino, DraftKings, crypto, lottery</small></div><label class="tog"><input type="checkbox" id="r-exp-speculative" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"><div class="rule-label">Other/unknown expenses — count if ≥<small>Uncategorized debits above this amount counted (0 = exclude all)</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-exp-other-threshold" value="50" style="width:90px"></div></div>
+          <div class="rule-row"><div class="rule-label">Subscription cap per merchant<small>Max charges per merchant per statement (0 = unlimited)</small></div><input class="rule-input" type="number" id="r-sub-cap" value="2" style="width:70px"></div>
+          <div class="rule-row"><div class="rule-label">Detect bounced/returned payments<small>Match returned check credits against debits to avoid double-counting</small></div><label class="tog"><input type="checkbox" id="r-bounced-detection" checked><span class="tog-slider"></span></label></div>
+        </div></div>
+
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">❌</div><div><div class="rs-hdr-title">Always Exclude from Expenses</div><div class="rs-hdr-sub">Mirrors the income exclusion rules</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">Zelle / Venmo / P2P outflows<small>Same logic as income — P2P is excluded both ways</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
+          <div class="rule-row"><div class="rule-label">Internal transfers (own accounts)<small>Moving money between own accounts</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
+          <div class="rule-row"><div class="rule-label">Fintech / payday app repayments<small>Repaying Dave, Brigit, etc. — flagged separately</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
+          <div class="rule-row"><div class="rule-label">Gambling / crypto outflows<small>Flagged as speculative risk instead</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
+          <div class="rule-row" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)"><div class="rule-label">Count ALL ATM withdrawals<small>When on: counts all ATM at the % below. When off: only counts above threshold.</small></div><label class="tog"><input type="checkbox" id="r-atm-count-all" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">ATM threshold (if not counting all)<small>Only used when "Count all" is off — withdrawals below this are ignored</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-atm-threshold" value="200" style="width:90px"></div></div>
+          <div class="rule-row"><div class="rule-label">ATM counting percentage<small>What % of ATM withdrawals count as cash expenses (default 30%)</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-atm-pct-r" min="0" max="100" value="30" oninput="syncR('r-atm-pct','r-atm-pct-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-atm-pct" value="30" oninput="syncR('r-atm-pct-r','r-atm-pct',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════ -->
