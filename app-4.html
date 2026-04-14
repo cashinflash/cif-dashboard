@@ -1,0 +1,95 @@
+    <!-- ══════════════════════════════════════ -->
+    <div id="retab-content-decline" class="re-tab-content" style="display:none">
+      <div class="rules-grid">
+        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">🚫</div><div><div class="rs-hdr-title">Auto-Decline Conditions</div><div class="rs-hdr-sub">Set the action for each condition</div></div></div>
+        <div class="rs-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 32px">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:8px 0 6px;display:grid;grid-template-columns:1fr 160px;gap:12px"><span>Condition</span><span style="text-align:center">Action</span></div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:8px 0 6px;display:grid;grid-template-columns:1fr 160px;gap:12px"><span>Condition</span><span style="text-align:center">Action</span></div>
+            <div class="rule-row" style="align-items:center"><div class="rule-label">No verified income found<small>Zero payroll, benefits, or gig deposits</small></div><select class="ad-sel" id="ad-no-income" style="width:155px"><option value="decline">Hard Decline</option><option value="drop">Drop 1 Tier</option><option value="cap">Cap at $100</option><option value="flag">Flag Only</option><option value="off">Ignore</option></select></div>
+            <div class="rule-row" style="align-items:center"><div class="rule-label">Account is closed or restricted<small>Bank confirmed closure</small></div><select class="ad-sel" id="ad-closed" style="width:155px"><option value="decline">Hard Decline</option><option value="drop">Drop 1 Tier</option><option value="cap">Cap at $100</option><option value="flag">Flag Only</option><option value="off">Ignore</option></select></div>
+            <div class="rule-row" style="align-items:center"><div class="rule-label">Fraud indicators detected<small>Suspicious round-trip patterns</small></div><select class="ad-sel" id="ad-fraud" style="width:155px"><option value="decline">Hard Decline</option><option value="drop">Drop 1 Tier</option><option value="cap">Cap at $100</option><option value="flag">Flag Only</option><option value="off">Ignore</option></select></div>
+            <div class="rule-row" style="align-items:center"><div class="rule-label">FCF below minimum threshold<small>Below Tier 1 FCF requirement</small></div><select class="ad-sel" id="ad-fcf" style="width:155px"><option value="decline">Hard Decline</option><option value="drop">Drop 1 Tier</option><option value="cap">Cap at $100</option><option value="flag">Flag Only</option><option value="off">Ignore</option></select></div>
+            <div class="rule-row" style="align-items:center"><div class="rule-label">Average daily balance below $0<small>Chronic negative balance</small></div><select class="ad-sel" id="ad-avg-bal" style="width:155px"><option value="decline">Hard Decline</option><option value="drop">Drop 1 Tier</option><option value="cap">Cap at $100</option><option value="flag">Flag Only</option><option value="off">Ignore</option></select></div>
+            <div class="rule-row" style="align-items:center"><div class="rule-label">Recent job loss indicated<small>Employment termination in period</small></div><select class="ad-sel" id="ad-job-loss" style="width:155px"><option value="decline">Hard Decline</option><option value="drop">Drop 1 Tier</option><option value="cap">Cap at $100</option><option value="flag">Flag Only</option><option value="off">Ignore</option></select></div>
+            <div class="rule-row" style="align-items:center"><div class="rule-label">Bankruptcy filing in progress<small>Active bankruptcy proceeding</small></div><select class="ad-sel" id="ad-bankruptcy" style="width:155px"><option value="decline">Hard Decline</option><option value="drop">Drop 1 Tier</option><option value="cap">Cap at $100</option><option value="flag">Flag Only</option><option value="off">Ignore</option></select></div>
+            <div class="rule-row" style="align-items:center"><div class="rule-label">Statement older than 30 days<small>Outside acceptable window</small></div><select class="ad-sel" id="ad-stale" style="width:155px"><option value="decline">Hard Decline</option><option value="drop">Drop 1 Tier</option><option value="cap">Cap at $100</option><option value="flag">Flag Only</option><option value="off">Ignore</option></select></div>
+            <div class="rule-row" style="align-items:center"><div class="rule-label">Single paycheck only in 30 days<small>Only one deposit — pattern unconfirmed</small></div><select class="ad-sel" id="ad-single-check" style="width:155px"><option value="flag">Flag Only</option><option value="drop">Drop 1 Tier</option><option value="cap">Cap at $100</option><option value="decline">Hard Decline</option><option value="off">Ignore</option></select></div>
+            <div class="rule-row" style="align-items:center"><div class="rule-label">Ending balance near zero<small>Below your ending balance flag threshold</small></div><select class="ad-sel" id="ad-low-balance" style="width:155px"><option value="flag">Flag Only</option><option value="drop">Drop 1 Tier</option><option value="cap">Cap at $100</option><option value="decline">Hard Decline</option><option value="off">Ignore</option></select></div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<!-- PLAID CUSTOMERS VIEW -->
+<div id="view-plaid" class="view">
+  <div class="phead">
+    <div><div class="ptitle">🏦 Plaid Customers</div><div class="psub">Customers who connected via Plaid — rerun reports anytime</div></div>
+    <button class="actbtn btn-gh" onclick="loadPlaidCustomers()">↺ Refresh</button>
+  </div>
+  <div style="margin-bottom:16px">
+    <input type="text" id="plaid-search" placeholder="Search by name, phone or email..."
+      oninput="filterPlaidCustomers(this.value)"
+      style="width:100%;border:1.5px solid var(--border2);border-radius:10px;padding:10px 14px;font-size:14px;font-family:var(--sans)">
+  </div>
+  <div id="plaid-list">
+    <div class="empty"><div class="empty-ic">🏦</div><div class="empty-t">No Plaid customers yet</div><div class="empty-s">Customers who connect via Plaid will appear here</div></div>
+  </div>
+</div>
+
+<div id="view-dash" class="view">
+  <div class="container">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:12px">
+      <div><div class="ptitle">Applications Dashboard</div><div class="psub" style="margin-bottom:0">All decisions — synced across all devices</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="actbtn btn-gh" onclick="loadReports()">↺ Refresh</button>
+        <button class="actbtn btn-ok" onclick="showView('single',document.getElementById('nav-single'))" style="margin:0">+ New Analysis</button>
+      </div>
+    </div>
+    <div id="sync-status"></div>
+    <div class="stats-row">
+      <div class="sc tot">
+        <div class="slbl">📋 Total</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1"><div class="snum def" id="st">0</div><div class="spct" id="st-sub">All applications</div></div>
+          <canvas id="sc-tot-c" width="56" height="56" style="flex-shrink:0;opacity:.8"></canvas>
+        </div>
+      </div>
+      <div class="sc pen">
+        <div class="slbl">⏳ Pending</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1"><div class="snum gld" id="sp2">0</div><div class="spct" id="sp-sub">Awaiting review</div></div>
+          <canvas id="sc-pen-c" width="56" height="56" style="flex-shrink:0;opacity:.85"></canvas>
+        </div>
+      </div>
+      <div class="sc app">
+        <div class="slbl">✓ Approved</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1"><div class="snum grn" id="sa">0</div><div class="spct" id="sa-sub">Approval rate</div></div>
+          <canvas id="sc-app-c" width="56" height="56" style="flex-shrink:0;opacity:.85"></canvas>
+        </div>
+      </div>
+      <div class="sc dec">
+        <div class="slbl">✕ Declined</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1"><div class="snum red" id="sd">0</div><div class="spct" id="sd-sub">Decline rate</div></div>
+          <canvas id="sc-dec-c" width="56" height="56" style="flex-shrink:0;opacity:.85"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="tcard">
+      <div class="ttb">
+        <div class="sbox"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7c72" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" placeholder="Search applicants..." oninput="filterDash(this.value)"></div>
+        <select class="fsel" onchange="filterStatus(this.value)"><option value="">All statuses</option><option value="Approved">Approved</option><option value="Declined">Declined</option><option value="Pending">Pending</option></select>
+        <button id="del-selected-btn" class="actbtn btn-gh" onclick="deleteSelected()" style="display:none;color:var(--red);border-color:var(--red-border)">🗑 Delete Selected (<span id="sel-count">0</span>)</button>
+      </div>
+      <div id="dtable"></div>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="ov" onclick="closeModalOut(event)">
