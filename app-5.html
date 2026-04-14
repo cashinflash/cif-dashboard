@@ -1,0 +1,52 @@
+  <div class="modal">
+    <div class="mh"><div class="mt" id="mtitle">Detail</div><button class="mcl" onclick="closeModal()">✕</button></div>
+    <div class="mb" id="mbody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toastel"></div>
+
+<script src="/script-1-auth.js"></script>
+<script src="/script-2-ui.js"></script>
+<script src="/script-3-ocr.js"></script>
+<script src="/script-4a-dash.js"></script>
+<script src="/script-4b-dash.js"></script>
+<script src="/script-5-misc.js"></script>
+
+<!-- ══ DENIAL EMAIL MODAL ══ -->
+<div id="denial-ov" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:white;border-radius:18px;width:100%;max-width:580px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:white;z-index:1">
+      <div>
+        <div style="font-size:17px;font-weight:700;color:var(--text)">📧 Send Denial Email</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px" id="denial-to-label"></div>
+      </div>
+      <button onclick="closeDenialModal()" style="width:32px;height:32px;background:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:15px;color:var(--muted)">✕</button>
+    </div>
+    <div style="padding:20px 24px">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Select the denial reasons to include. Auto-selected based on Claude's decision — uncheck any that don't apply.</p>
+      <div id="denial-reasons" style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px"></div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:20px">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Sending to</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text)" id="denial-email-display"></div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button onclick="closeDenialModal()" class="actbtn btn-gh" style="flex:1">Cancel</button>
+        <button onclick="sendDenialEmail()" class="actbtn btn-ok" style="flex:2;background:#e8650a;border-color:#e8650a" id="denial-send-btn">📧 Send Denial Email</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Right-click context menu -->
+<div id="ctx-menu" style="display:none;position:fixed;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-lg);z-index:600;min-width:180px;overflow:hidden;animation:fadeUp .15s ease">
+  <div id="ctx-name" style="padding:10px 14px;font-size:12px;font-weight:700;color:var(--muted);border-bottom:1px solid var(--border);text-overflow:ellipsis;overflow:hidden;white-space:nowrap"></div>
+  <div onclick="ctxAction('open')" style="padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--text)" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">📄 Open Report</div>
+  <div onclick="ctxAction('approve')" style="padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--green)" onmouseover="this.style.background='var(--green-light)'" onmouseout="this.style.background=''">✓ Quick Approve</div>
+  <div onclick="ctxAction('decline')" style="padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--red)" onmouseover="this.style.background='var(--red-light)'" onmouseout="this.style.background=''">✕ Quick Decline</div>
+  <div style="border-top:1px solid var(--border)"></div>
+  <div onclick="ctxAction('denial')" style="padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;color:#e8650a" onmouseover="this.style.background='#fff7f0'" onmouseout="this.style.background=''">📧 Send Denial Email</div>
+  <div onclick="ctxAction('delete')" style="padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--red)" onmouseover="this.style.background='var(--red-light)'" onmouseout="this.style.background=''">🗑 Delete</div>
+</div>
+</body>
+</html>
