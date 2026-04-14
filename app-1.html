@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" href="https://cashinflash.com/wp-content/uploads/2025/11/favicon-1.png">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Cash in Flash — Internal Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles-1.css">
+<link rel="stylesheet" href="/styles-2.css">
+</head>
+<body>
+<header>
+  <div style="display:flex;align-items:center;gap:14px">
+    <img class="logo" src="https://sp-ao.shortpixel.ai/client/to_webp,q_lossless,ret_img/https://cashinflash.com/wp-content/uploads/2025/08/white_logo_350.png" alt="" onerror="this.style.display='none';document.querySelector('.logo-fb').style.display='block'">
+    <span class="logo-fb">Cash in Flash</span>
+    <div class="hdiv"></div>
+    <div class="hsub">Internal Portal</div>
+  </div>
+  <button id="mob-menu-btn" onclick="toggleMobMenu()" style="display:none;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:6px 10px;color:white;cursor:pointer;font-size:18px;line-height:1">☰</button>
+<div id="mob-menu" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:200;" onclick="toggleMobMenu()">
+  <div style="background:var(--green-dark);padding:2rem 1.5rem;display:flex;flex-direction:column;gap:8px">
+    <button class="nb" onclick="showView('dash',this);toggleMobMenu()">Dashboard</button>
+    <button class="nb" onclick="showView('single',document.getElementById('nav-single'));toggleMobMenu()">📄 New Analysis</button>
+    <button class="nb" onclick="showView('batch',document.getElementById('nav-batch'));toggleMobMenu()">📋 Batch Analysis</button>
+    <button class="nb" onclick="showView('rules',this);toggleMobMenu()">⚙ Rules Engine</button>
+    <button class="nb" onclick="showView('plaid',this);toggleMobMenu()">🏦 Plaid Customers</button>
+  </div>
+</div>
+<div class="hnav">
+    <button class="nb" id="nav-dash" onclick="showView('dash',this)">Dashboard</button>
+    <div style="position:relative" id="analysis-dd-wrap">
+      <button class="nb" id="nav-analysis" onclick="toggleAnalysisDD()" style="display:flex;align-items:center;gap:6px">
+        Analysis <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div id="analysis-dd" style="display:none;position:absolute;top:calc(100% + 8px);left:0;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-lg);min-width:170px;overflow:hidden;z-index:300">
+        <div onclick="showView('single',document.getElementById('nav-analysis'));toggleAnalysisDD()" style="padding:11px 16px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:8px" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">📄 New Analysis</div>
+        <div onclick="showView('batch',document.getElementById('nav-analysis'));toggleAnalysisDD()" style="padding:11px 16px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:8px;border-top:1px solid var(--border)" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">📋 Batch Analysis</div>
+      </div>
+    </div>
+    <button class="nb" id="nav-single" style="display:none"></button>
+    <button class="nb" id="nav-batch" style="display:none"></button>
+    <button class="nb" id="nav-rules" onclick="showView('rules',this)">⚙ Rules Engine</button>
+    <button class="nb" id="nav-plaid" onclick="showView('plaid',this)">🏦 Plaid Customers</button>
+  </div>
+  <div class="hright">
+    <div style="position:relative">
+      <button class="profile-btn" id="profile-btn" onclick="toggleProfileDD()">
+        <span id="active-profile-label">Standard</span>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="profile-dd" id="profile-dd">
+        <div class="profile-dd-hdr">Switch Active Profile</div>
+        <div id="profile-dd-list"></div>
+      </div>
+    </div>
+    <div class="ibadge">Internal Only</div>
+    <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:9px;padding:5px 12px">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span id="user-label" style="font-size:12px;font-weight:600;color:rgba(255,255,255,.85)"></span>
+    </div>
+    <button class="sbtn" onclick="logout()" title="Sign Out" style="background:rgba(255,255,255,.12)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    </button>
+  </div>
+</header>
+
+
+
+<div class="proc" id="proc">
+  <div class="pcard">
+    <img class="plogo" src="https://sp-ao.shortpixel.ai/client/to_webp,q_lossless,ret_img/https://cashinflash.com/wp-content/uploads/2025/08/logo_500px.png" alt="" onerror="this.style.display='none';document.querySelector('.plogofb').style.display='block'">
+    <div class="plogofb">Cash in Flash</div>
+    <div class="pring"></div>
+    <div class="ptit">Analyzing Document</div>
+    <div class="psub2">Claude is reviewing the bank statement...</div>
+    <div class="psteps">
+      <div class="pst"><div class="dot active" id="d1"></div>Reading document</div>
+      <div class="pst"><div class="dot" id="d2"></div>Verifying income</div>
+      <div class="pst"><div class="dot" id="d3"></div>Calculating FCF</div>
+      <div class="pst"><div class="dot" id="d4"></div>Applying configured rules</div>
+      <div class="pst"><div class="dot" id="d5"></div>Final decision</div>
+    </div>
+  </div>
+</div>
+
+<!-- SINGLE -->
+<div id="view-single" class="view active">
+  <div class="container">
+
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:1.5rem">
+      <div><div class="ptitle">New Analysis</div><div class="psub" style="margin:0">Upload a PDF bank statement or Plaid asset report</div></div>
+      <div style="background:var(--green-light);border:1px solid var(--green-border);border-radius:10px;padding:8px 14px;font-size:12px;color:var(--green-dark)">Profile: <strong id="single-profile-name">Standard</strong></div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="card-hdr-title">Upload Financial Document</span><span class="card-hdr-sub">PDF only</span></div>
+      <div class="card-body">
+        <div class="dz" id="sdz">
+          <input type="file" id="sfi" accept=".pdf" onchange="handleSingle(this)">
+          <div class="dz-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1a6b3c" stroke-width="1.6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+          <div class="dz-title">Drop PDF here or click to browse</div>
+          <div class="dz-sub">Bank statements and Plaid asset reports</div>
+        </div>
+        <div id="sfs" style="display:none;margin-top:14px;padding:11px 16px;background:white;border:1px solid var(--green-border);border-radius:10px;align-items:center;gap:10px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a6b3c" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <span id="sfn" style="font-size:13px;font-weight:600;flex:1"></span>
+          <span id="sfz" style="font-size:11px;color:var(--muted)"></span>
+          <button onclick="clearSingle()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;padding:3px">✕</button>
+        </div>
+      </div>
+    </div>
+    <button class="abtn" id="sabtn" onclick="runSingle()">Run Underwriting Analysis →</button>
+    <div id="sresult" style="display:none" class="result-wrap">
+      <div class="result-card">
+        <div class="dhero" id="dhero">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0">
+            <canvas id="swh" width="108" height="108"></canvas>
+            <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Score</span>
+          </div>
+          <div style="flex:1">
+            <div class="dname" id="dname">—</div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px"><div class="dbadge" id="dbadge">—</div></div>
+            <div class="amt-row"><span class="amt-prefix" id="amtpfx">$</span><input class="amt-in" id="amtin" type="text" placeholder="0"><div><div class="amt-lbl" id="amtlbl">Approved amount — edit if needed</div></div></div>
+            <div class="reason-box" id="rbox" style="display:none"></div>
+          </div>
+        </div>
+        <div class="rtabs">
+          <button class="rtab active" onclick="stab('report',this)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Full Report</button>
+          <button class="rtab" onclick="stab('notes',this)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Notes</button>
+        </div>
+        <div class="tpanel active" id="tp-report"><div class="rhtml" id="srhtml"></div></div>
+        <div class="tpanel" id="tp-notes"><div class="npanel"><div class="nlbl">Underwriter Notes</div><textarea class="nta" id="snotes" placeholder="Add your notes..."></textarea><button class="nsave" onclick="toast('Notes saved ✓','ok')">Save Notes</button></div></div>
+        <div class="ract">
+          <button class="actbtn btn-ok" onclick="saveSingle('Approved')">✓ Approve &amp; Save</button>
+          <button class="actbtn btn-no" onclick="saveSingle('Declined')">✕ Decline &amp; Save</button>
+          <button class="actbtn btn-gh" onclick="copyRpt()">⎘ Copy Report</button>
+          <button class="actbtn btn-gh" style="margin-left:auto" onclick="resetSingle()">+ New Analysis</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BATCH -->
+<div id="view-batch" class="view">
+  <div class="container">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:1.5rem">
+      <div><div class="ptitle">Batch Analysis</div><div class="psub" style="margin:0">Upload up to 10 PDFs — analyzed one by one</div></div>
+      <div style="background:var(--green-light);border:1px solid var(--green-border);border-radius:10px;padding:8px 14px;font-size:12px;color:var(--green-dark)">Profile: <strong id="batch-profile-name">Standard</strong></div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="card-hdr-title">Upload Multiple PDFs</span><span class="card-hdr-sub">Hold Ctrl to select multiple · Max 10</span></div>
+      <div class="card-body">
+        <div class="dz" id="bdz"><input type="file" id="bfi" accept=".pdf" multiple onchange="handleBatch(this)">
+          <div class="dz-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1a6b3c" stroke-width="1.6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+          <div class="dz-title">Drop up to 10 PDFs here or click to browse</div>
+          <div class="dz-sub">Hold Ctrl to select multiple files at once</div>
+        </div>
+        <div id="bqueue"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <button class="abtn" id="babtn" onclick="runBatch()" style="display:none;flex:1">Run Batch Analysis →</button>
+      <button id="bclrbtn" onclick="clearBatch()" style="display:none;padding:16px 20px;border-radius:12px;border:1.5px solid var(--border2);background:white;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);white-space:nowrap">✕ Clear</button>
+    </div>
+    <div id="bprogwrap" style="display:none;margin-top:16px"><div class="bctr" id="bctr">0 of 0</div><div class="bprog"><div class="bpbar" id="bpbar"></div></div></div>
+    <div id="bresults"></div>
+    <div id="bclrallwrap" style="display:none;margin-top:16px;text-align:center"><button onclick="clearBatch()" style="padding:12px 32px;border-radius:10px;border:1.5px solid var(--border2);background:white;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans)">✕ Clear Batch &amp; Start New</button></div>
+  </div>
+</div>
+
+<!-- RULES ENGINE -->
