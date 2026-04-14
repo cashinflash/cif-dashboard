@@ -1,0 +1,109 @@
+    <!-- TAB: FCF & TIERS -->
+    <!-- ══════════════════════════════════════ -->
+    <div id="retab-content-fcf" class="re-tab-content" style="display:none">
+      <div class="rules-grid">
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--green-light)">💰</div><div><div class="rs-hdr-title">Loan Limits</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">Minimum loan amount<small>Lowest approvable amount</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-loan-min" value="100" min="50" max="255"></div></div>
+          <div class="rule-row"><div class="rule-label">Maximum loan amount<small>Highest approvable amount</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-loan-max" value="255" min="100" max="255"></div></div>
+        </div></div>
+
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--gold-light)">📊</div><div><div class="rs-hdr-title">FCF Tier Thresholds</div><div class="rs-hdr-sub">Minimum monthly FCF required for each tier</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">Tier 1<small>Loan amount & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan $</span><input class="rule-input" type="number" id="r-t1-amount" value="100" style="width:70px"><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t1-fcf" value="150" style="width:70px"></div></div>
+          <div class="rule-row"><div class="rule-label">Tier 2<small>Loan amount & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan $</span><input class="rule-input" type="number" id="r-t2-amount" value="150" style="width:70px"><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t2-fcf" value="300" style="width:70px"></div></div>
+          <div class="rule-row"><div class="rule-label">Tier 3<small>Loan amount & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan $</span><input class="rule-input" type="number" id="r-t3-amount" value="200" style="width:70px"><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t3-fcf" value="425" style="width:70px"></div></div>
+          <div class="rule-row"><div class="rule-label">Tier 4<small>Uses Max Loan & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan = Max</span><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t4-fcf" value="550" style="width:70px"></div></div>
+        </div></div>
+
+        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#e3f2fd">🧮</div><div><div class="rs-hdr-title">FCF Formula Preview</div><div class="rs-hdr-sub">Based on your current settings</div></div></div><div class="rs-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+            <div style="background:var(--green-light);border:1px solid var(--green-border);border-radius:10px;padding:14px;text-align:center">
+              <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;margin-bottom:6px">Tier 1</div>
+              <div style="font-size:22px;font-weight:800;color:var(--green-dark)">$100</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px">FCF ≥ $<span id="prev-t1">150</span>/mo</div>
+            </div>
+            <div style="background:var(--gold-light);border:1px solid var(--gold-border);border-radius:10px;padding:14px;text-align:center">
+              <div style="font-size:11px;font-weight:700;color:var(--gold-dark);text-transform:uppercase;margin-bottom:6px">Tier 2</div>
+              <div style="font-size:22px;font-weight:800;color:var(--gold-dark)">$150</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px">FCF ≥ $<span id="prev-t2">300</span>/mo</div>
+            </div>
+            <div style="background:#fff3e0;border:1px solid #ffe0b2;border-radius:10px;padding:14px;text-align:center">
+              <div style="font-size:11px;font-weight:700;color:#e65100;text-transform:uppercase;margin-bottom:6px">Tier 3</div>
+              <div style="font-size:22px;font-weight:800;color:#e65100">$200</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px">FCF ≥ $<span id="prev-t3">425</span>/mo</div>
+            </div>
+            <div style="background:var(--green-light);border:2px solid var(--green);border-radius:10px;padding:14px;text-align:center">
+              <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;margin-bottom:6px">Tier 4 ⭐</div>
+              <div style="font-size:22px;font-weight:800;color:var(--green-dark)">$255</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px">FCF ≥ $<span id="prev-t4">550</span>/mo</div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- TAB: RISK ADJUSTMENTS -->
+    <!-- ══════════════════════════════════════ -->
+    <div id="retab-content-risk" class="re-tab-content" style="display:none">
+      <div class="rules-grid">
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">⚠️</div><div><div class="rs-hdr-title">NSF / Returned Items</div><div class="rs-hdr-sub">Non-sufficient fund fees and returned payments</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">Drop 1 tier at<small>NSFs trigger a tier reduction</small></div><input class="rule-input" type="number" id="r-nsf-drop" value="2" min="1"></div>
+          <div class="rule-row"><div class="rule-label">Cap at $100 at<small>NSFs that cap the approval</small></div><input class="rule-input" type="number" id="r-nsf-cap" value="4" min="1"></div>
+          <div class="rule-row"><div class="rule-label">Drop 2 tiers / cap at<small>NSFs — v2: drops tiers instead of declining</small></div><input class="rule-input" type="number" id="r-nsf-decline" value="5" min="1"></div>
+        </div></div>
+
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--amber-light)">📱</div><div><div class="rs-hdr-title">Fintech / Payday App Usage</div><div class="rs-hdr-sub">Counted by UNIQUE apps, not total interactions — Dave used 10× still = 1 app</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">Drop 1 tier at<small>Unique apps (e.g. 3 = using Dave + Earnin + Cleo)</small></div><input class="rule-input" type="number" id="r-ft-drop" value="5" min="1"></div>
+          <div class="rule-row"><div class="rule-label">Cap at $100 at<small>Unique apps before capping</small></div><input class="rule-input" type="number" id="r-ft-cap" value="7" min="1"></div>
+          <div class="rule-row"><div class="rule-label">Drop 2 tiers / cap at<small>Unique apps — v2: drops tiers instead of declining</small></div><input class="rule-input" type="number" id="r-ft-decline" value="9" min="1"></div>
+          <div class="rule-row"><div class="rule-label">Hard cap at $100 at<small>Unique apps — v2: hard caps instead of absolute decline</small></div><input class="rule-input" type="number" id="r-ft-abs" value="11" min="1"></div>
+        </div></div>
+
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">📉</div><div><div class="rs-hdr-title">Negative Balance Days</div><div class="rs-hdr-sub">Days ending balance was below $0</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">Cap at $100 at<small>Days negative before capping</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-neg-cap-r" min="1" max="20" value="7" oninput="syncR('r-neg-cap','r-neg-cap-r')"><input class="rule-input" type="number" id="r-neg-cap" value="7" oninput="syncR('r-neg-cap-r','r-neg-cap',true)"></div></div>
+          <div class="rule-row"><div class="rule-label">Drop 2 tiers / cap at<small>Days negative — v2: drops tiers instead of declining</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-neg-dec-r" min="1" max="30" value="10" oninput="syncR('r-neg-dec','r-neg-dec-r')"><input class="rule-input" type="number" id="r-neg-dec" value="10" oninput="syncR('r-neg-dec-r','r-neg-dec',true)"></div></div>
+        </div></div>
+
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--amber-light)">🎰</div><div><div class="rs-hdr-title">Speculative Activity</div><div class="rs-hdr-sub">Gambling, crypto, and high-risk spending as % of income</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">Drop 1 tier at<small>% of income on gambling/crypto</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-spec-drop-r" min="1" max="100" value="35" oninput="syncR('r-spec-drop','r-spec-drop-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-spec-drop" value="35" oninput="syncR('r-spec-drop-r','r-spec-drop',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
+          <div class="rule-row"><div class="rule-label">Cap at $100 at<small>% that caps the approval</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-spec-cap-r" min="1" max="100" value="50" oninput="syncR('r-spec-cap','r-spec-cap-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-spec-cap" value="50" oninput="syncR('r-spec-cap-r','r-spec-cap',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
+        </div></div>
+
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#e3f2fd">📊</div><div><div class="rs-hdr-title">Debt-to-Income Ratio</div><div class="rs-hdr-sub">DTI = (loan payments + fintech repayments + BNPL + recurring P2P) / monthly income. Higher DTI = more debt burden.</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">Drop 1 Tier at DTI<small>Drop one loan tier when DTI exceeds this %</small></div><div style="display:flex;align-items:center;gap:4px"><input class="rule-input" type="number" id="r-dti-drop" min="20" max="80" step="5" value="45" style="width:70px"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div>
+          <div class="rule-row"><div class="rule-label">Drop 2 Tiers at DTI<small>Drop two loan tiers when DTI exceeds this %</small></div><div style="display:flex;align-items:center;gap:4px"><input class="rule-input" type="number" id="r-dti-drop2" min="30" max="90" step="5" value="60" style="width:70px"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- TAB: BEHAVIORAL -->
+    <!-- ══════════════════════════════════════ -->
+    <div id="retab-content-behavior" class="re-tab-content" style="display:none">
+      <div class="rules-grid">
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#f3e5f5">🔄</div><div><div class="rs-hdr-title">Account Velocity</div><div class="rs-hdr-sub">High velocity = money flowing through but not staying (sign of financial stress)</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">Enable velocity check<small>Flags accounts where outflows are close to inflows</small></div><label class="tog"><input type="checkbox" id="r-velocity-on" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Drop 1 tier at velocity<small>Outflows ÷ Inflows ratio — 90% = spending 90 cents of every dollar received</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-velocity-drop-r" min="50" max="100" value="90" oninput="syncR('r-velocity-drop','r-velocity-drop-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-velocity-drop" value="90" oninput="syncR('r-velocity-drop-r','r-velocity-drop',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
+          <div class="rule-row"><div class="rule-label">Cap at $100 at velocity<small>Ratio that caps at $100</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-velocity-cap-r" min="50" max="100" value="98" oninput="syncR('r-velocity-cap','r-velocity-cap-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-velocity-cap" value="98" oninput="syncR('r-velocity-cap-r','r-velocity-cap',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
+        </div></div>
+
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#fce4ec">💰</div><div><div class="rs-hdr-title">Ending Balance Health</div><div class="rs-hdr-sub">Low ending balances indicate paycheck-to-paycheck living</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">Enable ending balance check<small>Flags customers who always end near $0</small></div><label class="tog"><input type="checkbox" id="r-endbal-on" checked><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Flag if ending balance below<small>Balance at end of statement period</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-endbal-flag" value="25" min="0"></div></div>
+          <div class="rule-row"><div class="rule-label">Drop 1 tier if ending balance below<small>Very low ending balance triggers tier drop</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-endbal-drop" value="5" min="0"></div></div>
+        </div></div>
+
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#e8f5e9">📅</div><div><div class="rs-hdr-title">Income Consistency</div><div class="rs-hdr-sub">Recurring vs one-time income signals</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">Require at least 2 paychecks in 30-day window<small>Single paycheck = unconfirmed employment pattern</small></div><label class="tog"><input type="checkbox" id="r-require-2-checks"><span class="tog-slider"></span></label></div>
+          <div class="rule-row"><div class="rule-label">Flag income variance above<small>If pay amounts vary by more than this % between checks</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-income-variance-r" min="5" max="50" value="25" oninput="syncR('r-income-variance','r-income-variance-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-income-variance" value="25" oninput="syncR('r-income-variance-r','r-income-variance',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
+        </div></div>
+
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#fff9c4">⚡</div><div><div class="rs-hdr-title">Fintech Dependency Score</div><div class="rs-hdr-sub">Measures reliance on cash advances as % of income</div></div></div><div class="rs-body">
+          <div class="rule-row"><div class="rule-label">Flag if fintech advances exceed % of income<small>Advances ÷ Verified income — high % = dependency</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-ft-dep-r" min="5" max="100" value="30" oninput="syncR('r-ft-dep','r-ft-dep-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-ft-dep" value="30" oninput="syncR('r-ft-dep-r','r-ft-dep',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
+          <div class="rule-row"><div class="rule-label">Cap at $100 if fintech advances exceed % of income</div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-ft-dep-cap-r" min="10" max="100" value="60" oninput="syncR('r-ft-dep-cap','r-ft-dep-cap-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-ft-dep-cap" value="60" oninput="syncR('r-ft-dep-cap-r','r-ft-dep-cap',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- TAB: AUTO-DECLINE -->
