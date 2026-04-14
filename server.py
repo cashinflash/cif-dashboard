@@ -69,7 +69,8 @@ CORS = {
 
 # Whitelist of static files that can be served from repo root
 STATIC_FILES = {
-    'styles.css': 'text/css',
+    'styles-1.css': 'text/css',
+    'styles-2.css': 'text/css',
     'script-1-auth.js': 'application/javascript',
     'script-2-ui.js': 'application/javascript',
     'script-3-ocr.js': 'application/javascript',
@@ -77,6 +78,19 @@ STATIC_FILES = {
     'script-4b-dash.js': 'application/javascript',
     'script-5-misc.js': 'application/javascript',
 }
+
+# Parts of app.html that are concatenated at request time
+APP_PARTS = ['app-1.html', 'app-2.html', 'app-3.html', 'app-4.html', 'app-5.html']
+
+def read_app_html():
+    """Concatenate all app-N.html parts into a single HTML response."""
+    parts = []
+    for name in APP_PARTS:
+        data = read_file(os.path.join(DIR, name))
+        if data is None:
+            return None
+        parts.append(data)
+    return b''.join(parts)
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
@@ -133,7 +147,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header('Location', '/')
                 self.end_headers()
                 return
-            data = read_file(os.path.join(DIR, 'app.html'))
+            data = read_app_html()
             self.send_html(200, data or b'App not found')
             return
 
