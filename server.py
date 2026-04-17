@@ -245,6 +245,30 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error':{'message':str(e)}})
             return
 
+        if path == '/api/rerun-v2':
+            try:
+                body = json.loads(raw)
+                payload = json.dumps(body).encode()
+                print(f'[RERUN-V2 PROXY] Forwarding to cif-apply...', flush=True)
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/rerun-v2',
+                    data=payload, headers={'Content-Type':'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=60) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                # Forward upstream error so dashboard shows the real reason
+                try:
+                    err_body = json.loads(e.read().decode())
+                except Exception:
+                    err_body = {'error': str(e)}
+                print(f'[RERUN-V2 UPSTREAM HTTP ERROR] {e.code}: {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[RERUN-V2 ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         if path == '/api/analyze-engine':
             try:
                 body = json.loads(raw)

@@ -1664,8 +1664,41 @@ function drawStatDonuts(tot,pend,appr,decl){
 }
 
 // ════════════════════════════════════════
-// DATE GROUPING
+// DATE GROUPING (collapsible)
 // ════════════════════════════════════════
+// Per-day open/closed state. Today is open by default; user toggles persist
+// for the page session.
+const dayGroupOpen = new Map();
+
+function toggleDayGroup(key) {
+  const header = document.querySelector(`tr.day-group-header[data-day-group="${key}"]`);
+  if (!header) return;
+  const wasOpen = header.dataset.open === '1';
+  const newOpen = !wasOpen;
+  dayGroupOpen.set(key, newOpen);
+  header.dataset.open = newOpen ? '1' : '0';
+  header.style.background = newOpen ? '#eef5ee' : '#f6f8f7';
+  const chev = header.querySelector('.chev');
+  if (chev) chev.textContent = newOpen ? '▼' : '▶';
+  // Show/hide all data rows in this group
+  document.querySelectorAll(`tr[data-day-group="${key}"]:not(.day-group-header)`).forEach(r => {
+    r.style.display = newOpen ? '' : 'none';
+  });
+  // Redraw score wheels for newly visible rows
+  if (newOpen) {
+    document.querySelectorAll(`tr[data-day-group="${key}"]:not(.day-group-header)`).forEach(r => {
+      const id = r.getAttribute('data-id');
+      const a = apps.find(x => x.firebaseId === id);
+      if (!a) return;
+      const wid = 'dw'+(a.firebaseId?.replace(/[^a-z0-9]/gi,'')||'');
+      setTimeout(() => {
+        if (a.status === 'Processing') drawProcessingWheel(wid, 44);
+        else drawWheel(wid, a.score || 0, 44);
+      }, 30);
+    });
+  }
+}
+
 function groupAppsByDay(list) {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -1711,15 +1744,32 @@ function renderDash(){
   const pend=apps.filter(a=>a.status==='Pending').length;
   const appr=apps.filter(a=>a.status==='Approved').length;
   const decl=apps.filter(a=>a.status==='Declined').length;
-  document.getElementById('st').textContent=tot;
-  document.getElementById('sp2').textContent=pend;
-  document.getElementById('sa').textContent=appr;
-  document.getElementById('sd').textContent=decl;
-  const reviewed=appr+decl;
-  document.getElementById('st-sub').textContent=tot===1?'1 application':tot+' applications';
-  document.getElementById('sp-sub').textContent=pend===0?'All reviewed':pend+' need review';
-  document.getElementById('sa-sub').textContent=reviewed>0?Math.round(appr/reviewed*100)+'% approval rate':'No decisions yet';
-  document.getElementById('sd-sub').textContent=reviewed>0?Math.round(decl/reviewed*100)+'% decline rate':'No decisions yet';
+
+  // ── Today's stats (primary numbers in the cards) ──
+  const _now = new Date();
+  const todayKey = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate()).toISOString().slice(0,10);
+  const todayApps = apps.filter(a => {
+    const ts = a.createdAt || 0;
+    return ts ? new Date(ts).toISOString().slice(0,10) === todayKey : false;
+  });
+  const totToday = todayApps.length;
+  const pendToday = todayApps.filter(a=>a.status==='Pending').length;
+  const apprToday = todayApps.filter(a=>a.status==='Approved').length;
+  const declToday = todayApps.filter(a=>a.status==='Declined').length;
+
+  document.getElementById('st').textContent=totToday;
+  document.getElementById('sp2').textContent=pendToday;
+  document.getElementById('sa').textContent=apprToday;
+  document.getElementById('sd').textContent=declToday;
+  const reviewedToday=apprToday+declToday;
+  document.getElementById('st-sub').textContent=`Today · ${tot.toLocaleString()} all-time`;
+  document.getElementById('sp-sub').textContent=`Today · ${pend.toLocaleString()} all-time pending`;
+  document.getElementById('sa-sub').textContent=reviewedToday>0
+    ? `${Math.round(apprToday/reviewedToday*100)}% today · ${appr.toLocaleString()} all-time`
+    : `${appr.toLocaleString()} approved all-time`;
+  document.getElementById('sd-sub').textContent=reviewedToday>0
+    ? `${Math.round(declToday/reviewedToday*100)}% today · ${decl.toLocaleString()} all-time`
+    : `${decl.toLocaleString()} declined all-time`;
 
   const filtered=apps.filter(a=>(!srch||a.name?.toLowerCase().includes(srch.toLowerCase()))&&(!stFilter||a.status===stFilter));
   const c=document.getElementById('dtable');
@@ -1764,17 +1814,29 @@ function renderDash(){
   c.dataset.renderKey = dataKey;
 
   // Group by day for readability. Uses createdAt when present, otherwise
-  // falls back to the stored `date` field. Header rows are decorative;
-  // actual data rows still use data-id so in-place updates work.
+  // falls back to the stored `date` field. Today expanded by default;
+  // other days collapsed (click header to expand).
   const groups = groupAppsByDay(filtered);
 
   const rows = groups.map(group => {
-    const header = `<tr class="day-group-header"><td colspan="7" style="background:#f6f8f7;padding:8px 16px;font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:1px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)">${group.label} <span style="color:var(--muted2);font-weight:500;margin-left:8px">${group.items.length} application${group.items.length===1?'':'s'}</span></td></tr>`;
+    // Default: Today expanded; honor user toggle via dayGroupOpen Map.
+    const stateKey = group.key;
+    const userPref = dayGroupOpen.get(stateKey);
+    const isOpen = userPref !== undefined ? userPref : (group.label === 'Today');
+    const chevron = isOpen ? '▼' : '▶';
+    const headerBg = isOpen ? '#eef5ee' : '#f6f8f7';
+    const header = `<tr class="day-group-header" data-day-group="${stateKey}" data-open="${isOpen?'1':'0'}" onclick="toggleDayGroup('${stateKey}')" style="cursor:pointer">
+      <td colspan="7" style="background:${headerBg};padding:10px 16px;font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:1px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);user-select:none">
+        <span class="chev" style="display:inline-block;width:12px;color:var(--green);font-size:9px;margin-right:6px">${chevron}</span>${group.label}
+        <span style="color:var(--muted2);font-weight:500;margin-left:8px">${group.items.length} application${group.items.length===1?'':'s'}</span>
+      </td>
+    </tr>`;
+    const rowDisplay = isOpen ? '' : 'none';
     const body = group.items.map(a=>{
       const wid='dw'+(a.firebaseId?.replace(/[^a-z0-9]/gi,'')||'');
       const ok=a.status==='Approved';
       const v2Badge = a.v2Decision ? ` <span title="v2: ${a.v2Decision} $${a.v2TierAmount||0}" style="background:${a.v2Decision==='APPROVE'?'#eef9f1':'#fff4f0'};color:${a.v2Decision==='APPROVE'?'#1a6b3c':'#c0392b'};padding:1px 5px;border-radius:8px;font-size:9px;font-weight:700;margin-left:4px">v2</span>` : '';
-      return `<tr data-id="${a.firebaseId}" data-score="${a.score||0}" oncontextmenu="showCtxMenu(event,'${a.firebaseId}')" style="cursor:pointer">
+      return `<tr data-id="${a.firebaseId}" data-day-group="${stateKey}" data-score="${a.score||0}" oncontextmenu="showCtxMenu(event,'${a.firebaseId}')" style="cursor:pointer;display:${rowDisplay}">
         <td onclick="event.stopPropagation()"><input type="checkbox" class="row-chk" data-id="${a.firebaseId}" onchange="updateSelCount()" style="cursor:pointer;width:15px;height:15px"></td>
         <td onclick="openModal('${a.firebaseId}')">
           <div class="nbig">${a.name||'—'}${v2Badge}</div>
