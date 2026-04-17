@@ -402,6 +402,9 @@ table tbody tr:hover td{background:#f5f9f6}
     <symbol id="icn-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></symbol>
     <symbol id="icn-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></symbol>
     <symbol id="icn-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="icn-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="icn-key" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></symbol>
+    <symbol id="icn-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
   </defs>
 </svg>
 
@@ -422,6 +425,7 @@ table tbody tr:hover td{background:#f5f9f6}
     <button class="nb" onclick="showView('batch',document.getElementById('nav-batch'));toggleMobMenu()"><svg class="icn"><use href="#icn-layers"/></svg>Batch Analysis</button>
     <button class="nb" onclick="showView('rules',this);toggleMobMenu()"><svg class="icn"><use href="#icn-sliders"/></svg>Rules Engine</button>
     <button class="nb" onclick="showView('plaid',this);toggleMobMenu()"><svg class="icn"><use href="#icn-bank"/></svg>Plaid Customers</button>
+    <button class="nb admin-only" onclick="showView('users',this);toggleMobMenu()" style="display:none"><svg class="icn"><use href="#icn-users"/></svg>Users</button>
   </div>
 </div>
 <div class="hnav">
@@ -441,6 +445,7 @@ table tbody tr:hover td{background:#f5f9f6}
     <button class="nb" id="nav-batch" style="display:none"></button>
     <button class="nb" id="nav-rules" onclick="showView('rules',this)"><svg class="icn"><use href="#icn-sliders"/></svg>Rules Engine</button>
     <button class="nb" id="nav-plaid" onclick="showView('plaid',this)"><svg class="icn"><use href="#icn-bank"/></svg>Plaid Customers</button>
+    <button class="nb admin-only" id="nav-users" onclick="showView('users',this)" style="display:none"><svg class="icn"><use href="#icn-users"/></svg>Users</button>
   </div>
   <div class="hright">
     <div style="position:relative">
@@ -458,6 +463,9 @@ table tbody tr:hover td{background:#f5f9f6}
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       <span id="user-label" style="font-size:12px;font-weight:600;color:rgba(255,255,255,.85)"></span>
     </div>
+    <button class="sbtn" onclick="openChangePasswordModal()" title="Change my password" style="background:rgba(255,255,255,.12)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+    </button>
     <button class="sbtn" onclick="logout()" title="Sign Out" style="background:rgba(255,255,255,.12)">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
     </button>
@@ -937,6 +945,32 @@ table tbody tr:hover td{background:#f5f9f6}
   </div>
 </div>
 
+<!-- Users — admin-only user management -->
+<div id="view-users" class="view">
+  <div class="container">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:12px">
+      <div>
+        <div class="ptitle" style="display:flex;align-items:center;gap:10px"><svg class="icn icn-lg"><use href="#icn-users"/></svg>Users</div>
+        <div class="psub" style="margin-bottom:0">Add, reset, or remove dashboard users. Passwords are scrypt-hashed at rest.</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="actbtn btn-gh" onclick="loadUsers()"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Refresh</button>
+        <button class="actbtn btn-ok" onclick="openAddUserModal()"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-plus"/></svg>Add User</button>
+      </div>
+    </div>
+
+    <div style="background:#f3f8f4;border:1px solid #d0e0d2;border-radius:8px;padding:12px 16px;margin-bottom:1rem;font-size:13px;color:#2c4a33;line-height:1.5">
+      <b>Two sources of users:</b> <b>Firebase</b> users are added here and can be reset or deleted from this page.
+      <b>Env-var</b> users (from Render) are read-only here — to rotate or remove them, edit the Render environment variables.
+      The bootstrap <code>admin</code> account (from <code>ADMIN_PASSWORD</code>) always exists as a safety net.
+    </div>
+
+    <div class="tcard">
+      <div id="users-table" style="padding:0"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Review Queue — unclassified merchants waiting to be added to the registry -->
 <div id="view-reviewqueue" class="view">
   <div class="container">
@@ -987,11 +1021,20 @@ const FB = '/fb';
 // server also accepts an X-Session header for backward compat, but the cookie
 // is canonical. CSRF is blocked by SameSite=Strict on the cookie.
 let _currentUser = '';
+let _currentRole = 'user';
 function getToken() { return ''; }            // legacy shim; cookie is used instead
 function getUser() { return _currentUser || 'User'; }
+function isAdmin() { return _currentRole === 'admin'; }
 
 function authHeaders(extra) {
   return Object.assign({'Content-Type':'application/json'}, extra||{});
+}
+
+function applyRoleVisibility() {
+  const show = isAdmin();
+  document.querySelectorAll('.admin-only').forEach(el => {
+    el.style.display = show ? '' : 'none';
+  });
 }
 
 async function hydrateCurrentUser() {
@@ -1000,6 +1043,8 @@ async function hydrateCurrentUser() {
     if (r.ok) {
       const d = await r.json();
       _currentUser = d.user || '';
+      _currentRole = d.role || 'user';
+      applyRoleVisibility();
       const lbl = document.getElementById('who');
       if (lbl) lbl.textContent = _currentUser || 'User';
       return true;
@@ -1193,6 +1238,7 @@ function showView(name, btn) {
   if (name==='dash') loadReports();
   if (name==='v2compare') { loadReports().then(renderV2Compare); }
   if (name==='reviewqueue') loadReviewQueue();
+  if (name==='users') loadUsers();
 }
 
 // ════════════════════════════════════════
@@ -3248,6 +3294,212 @@ async function logout() {
   // Clear any lingering legacy client-side state.
   try { sessionStorage.removeItem('cif_token'); sessionStorage.removeItem('cif_user'); } catch(e){}
   window.location.replace('/');
+}
+
+// ════════════════════════════════════════
+// USER MANAGEMENT (admin-only) + SELF PASSWORD CHANGE
+// ════════════════════════════════════════
+async function loadUsers() {
+  const box = document.getElementById('users-table');
+  if (!box) return;
+  box.innerHTML = `<div style="padding:40px;text-align:center;color:#888">Loading users…</div>`;
+  try {
+    const r = await fetch('/api/users', { credentials: 'include' });
+    const d = await r.json();
+    if (!r.ok) { box.innerHTML = `<div style="padding:30px;text-align:center;color:#c0392b">${d.error || 'Failed to load'}</div>`; return; }
+    renderUsers(d.users || []);
+  } catch (e) {
+    box.innerHTML = `<div style="padding:30px;text-align:center;color:#c0392b">Error: ${e.message}</div>`;
+  }
+}
+
+function renderUsers(users) {
+  const box = document.getElementById('users-table');
+  if (!users.length) {
+    box.innerHTML = `<div class="empty" style="padding:3rem;text-align:center"><div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-users"/></svg></div><div class="empty-t">No users yet</div><div class="empty-s">Click "Add User" to create the first one.</div></div>`;
+    return;
+  }
+  const rows = users.map(u => {
+    const when = (ts) => ts ? new Date(ts * 1000).toLocaleDateString() + ' ' + new Date(ts * 1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '—';
+    const rolePill = u.role === 'admin'
+      ? '<span class="pill pill-info">admin</span>'
+      : '<span class="pill pill-muted">user</span>';
+    const sourcePill = u.source === 'firebase'
+      ? '<span class="pill pill-ok">editable</span>'
+      : '<span class="pill pill-warn">env-var</span>';
+    const isSelf = u.username === _currentUser;
+    const isEnv = u.source !== 'firebase';
+    const actions = isEnv
+      ? '<span style="font-size:11px;color:var(--muted)">Rotate via Render env vars</span>'
+      : `
+        <button class="actbtn btn-gh" style="padding:4px 10px;font-size:12px" onclick="openResetUserModal(${JSON.stringify(u.username)})">Reset password</button>
+        ${isSelf ? '' : `<button class="actbtn" style="padding:4px 10px;font-size:12px;background:#fff5f5;color:var(--red);border:1px solid var(--red-border);margin-left:4px" onclick="deleteUser(${JSON.stringify(u.username)})">Delete</button>`}
+      `;
+    return `<tr>
+      <td style="padding:10px 12px"><b>${escHtml(u.username)}</b>${isSelf ? ' <span style="font-size:10px;color:var(--muted);font-weight:400">(you)</span>' : ''}</td>
+      <td style="padding:10px 12px">${rolePill}</td>
+      <td style="padding:10px 12px">${sourcePill}</td>
+      <td style="padding:10px 12px;font-size:12px;color:#555">${when(u.last_login)}</td>
+      <td style="padding:10px 12px;font-size:12px;color:#555">${escHtml(u.created_by || '')}</td>
+      <td style="padding:10px 12px;text-align:right;white-space:nowrap">${actions}</td>
+    </tr>`;
+  }).join('');
+  box.innerHTML = `<table style="width:100%;border-collapse:collapse">
+    <thead><tr style="background:var(--surface2)">
+      <th style="text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Username</th>
+      <th style="text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Role</th>
+      <th style="text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Source</th>
+      <th style="text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Last login</th>
+      <th style="text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Created by</th>
+      <th style="padding:10px 12px"></th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+
+function openUserModal(title, bodyHtml, onSubmit, submitLabel) {
+  closeUserModal();
+  const overlay = document.createElement('div');
+  overlay.id = 'user-modal-ov';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:5000;display:grid;place-items:center;padding:1rem';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:14px;padding:24px;width:100%;max-width:420px;box-shadow:0 24px 64px rgba(0,0,0,.25)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div style="font-size:17px;font-weight:700">${escHtml(title)}</div>
+        <button onclick="closeUserModal()" style="background:none;border:0;font-size:20px;cursor:pointer;color:var(--muted);line-height:1">&times;</button>
+      </div>
+      ${bodyHtml}
+      <div id="user-modal-err" style="display:none;margin-top:10px;padding:8px 12px;background:#fdecea;color:#b3261e;border:1px solid #f1baba;border-radius:8px;font-size:13px"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">
+        <button class="actbtn btn-gh" onclick="closeUserModal()">Cancel</button>
+        <button class="actbtn btn-ok" id="user-modal-submit">${escHtml(submitLabel)}</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeUserModal(); });
+  document.body.appendChild(overlay);
+  document.getElementById('user-modal-submit').onclick = async () => {
+    const btn = document.getElementById('user-modal-submit');
+    btn.disabled = true;
+    try { await onSubmit(); } catch (e) {
+      const errEl = document.getElementById('user-modal-err');
+      if (errEl) { errEl.textContent = e.message || 'Failed'; errEl.style.display = 'block'; }
+    }
+    btn.disabled = false;
+  };
+  setTimeout(() => overlay.querySelector('input')?.focus(), 50);
+}
+
+function closeUserModal() {
+  const ov = document.getElementById('user-modal-ov');
+  if (ov) ov.remove();
+}
+
+function modalInput(id, label, type, attrs = '') {
+  return `
+    <div style="margin-bottom:12px">
+      <label for="${id}" style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text2)">${escHtml(label)}</label>
+      <input id="${id}" type="${type}" ${attrs} style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:var(--sans)">
+    </div>`;
+}
+
+function openAddUserModal() {
+  openUserModal(
+    'Add user',
+    modalInput('nu-user', 'Username', 'text', 'autocomplete="off" autocapitalize="none" spellcheck="false"') +
+    modalInput('nu-pass', 'Password (min 8 chars)', 'password', 'autocomplete="new-password"') +
+    `<div style="margin-bottom:12px">
+       <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text2)">Role</label>
+       <select id="nu-role" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:var(--sans)">
+         <option value="user">user</option>
+         <option value="admin">admin</option>
+       </select>
+     </div>`,
+    async () => {
+      const username = document.getElementById('nu-user').value.trim().toLowerCase();
+      const password = document.getElementById('nu-pass').value;
+      const role = document.getElementById('nu-role').value;
+      const r = await fetch('/api/users/add', {
+        method: 'POST', credentials: 'include',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ username, password, role }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Failed to add user');
+      toast(`User "${username}" added`, 'ok');
+      closeUserModal();
+      loadUsers();
+    },
+    'Add user'
+  );
+}
+
+function openResetUserModal(username) {
+  openUserModal(
+    `Reset password for "${username}"`,
+    `<div style="font-size:13px;color:var(--muted);margin-bottom:10px">The user will need the new password on their next login.</div>` +
+    modalInput('rp-pass', 'New password (min 8 chars)', 'password', 'autocomplete="new-password"'),
+    async () => {
+      const password = document.getElementById('rp-pass').value;
+      const r = await fetch('/api/users/reset', {
+        method: 'POST', credentials: 'include',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ username, password }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Failed to reset password');
+      toast(`Password reset for "${username}"`, 'ok');
+      closeUserModal();
+      loadUsers();
+    },
+    'Reset password'
+  );
+}
+
+async function deleteUser(username) {
+  if (!confirm(`Delete user "${username}"? They'll be logged out immediately and won't be able to sign in.`)) return;
+  try {
+    const r = await fetch('/api/users/delete', {
+      method: 'POST', credentials: 'include',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ username }),
+    });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'Failed to delete', 'err'); return; }
+    toast(`User "${username}" deleted`, 'ok');
+    loadUsers();
+  } catch (e) {
+    toast('Error: ' + e.message, 'err');
+  }
+}
+
+function openChangePasswordModal() {
+  openUserModal(
+    'Change my password',
+    modalInput('cp-cur', 'Current password', 'password', 'autocomplete="current-password"') +
+    modalInput('cp-new', 'New password (min 8 chars)', 'password', 'autocomplete="new-password"') +
+    modalInput('cp-new2', 'Confirm new password', 'password', 'autocomplete="new-password"'),
+    async () => {
+      const cur = document.getElementById('cp-cur').value;
+      const n1 = document.getElementById('cp-new').value;
+      const n2 = document.getElementById('cp-new2').value;
+      if (n1 !== n2) throw new Error('New passwords do not match');
+      const r = await fetch('/api/password', {
+        method: 'POST', credentials: 'include',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ current_password: cur, new_password: n1 }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Failed to change password');
+      toast('Password changed. Please log in again with your new password.', 'ok');
+      closeUserModal();
+      setTimeout(logout, 900);
+    },
+    'Change password'
+  );
 }
 
 

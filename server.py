@@ -101,12 +101,17 @@ def record_login_attempt(ip: str, success: bool) -> None:
     _login_attempts[ip].append((time.time(), success))
 
 
-def make_session(username: str, ip: str) -> str:
+def make_session(username: str, ip: str, role: str = 'user') -> str:
     # 256 bits of entropy — no guessable content (no username, no timestamp).
     token = secrets.token_urlsafe(32)
     now = time.time()
-    sessions[token] = {'user': username, 'created': now, 'last_active': now, 'ip': ip}
+    sessions[token] = {'user': username, 'role': role, 'created': now, 'last_active': now, 'ip': ip}
     return token
+
+
+def is_admin_session(token: str) -> bool:
+    s = sessions.get(token) or {}
+    return s.get('role') == 'admin'
 
 
 def valid_session(token: str) -> bool:
@@ -146,21 +151,132 @@ def get_token_from_request(handler) -> str:
     return ''
 
 
-def load_users() -> dict:
+# ─────────────────────────────────────────────────────────────────────────────
+# User store — Firebase is the primary source of truth, env vars are a
+# bootstrap fallback so an accidentally corrupted Firebase can't lock everyone
+# out. Users added via the dashboard UI persist to /users/<name> in Firebase
+# and show up on the next cache refresh (or immediately via invalidate()).
+# ─────────────────────────────────────────────────────────────────────────────
+
+_USERNAME_RE = __import__('re').compile(r'^[a-z0-9_.-]{2,32}$')
+_USER_CACHE_TTL = 60  # seconds
+_user_cache = {'data': {}, 'loaded_at': 0.0}
+
+
+def valid_username(name: str) -> bool:
+    return bool(name) and bool(_USERNAME_RE.match(name))
+
+
+def valid_password(pw: str) -> tuple[bool, str]:
+    if not pw or len(pw) < 8:
+        return False, 'Password must be at least 8 characters.'
+    return True, ''
+
+
+def firebase_get_users() -> dict:
+    """Fetch /users subtree from Firebase. Returns {} on any error (caller
+    decides whether to fall back to env vars)."""
+    try:
+        with urllib.request.urlopen(f'{FB_BASE}/users.json', timeout=5) as r:
+            data = json.loads(r.read().decode() or 'null')
+        return data if isinstance(data, dict) else {}
+    except Exception as e:
+        print(f'[USERS] firebase fetch failed: {e}', flush=True)
+        return {}
+
+
+def firebase_put_user(username: str, record: dict) -> bool:
+    try:
+        payload = json.dumps(record).encode()
+        req = urllib.request.Request(
+            f'{FB_BASE}/users/{username}.json',
+            data=payload,
+            headers={'Content-Type': 'application/json'},
+            method='PUT',
+        )
+        with urllib.request.urlopen(req, timeout=5) as r:
+            r.read()
+        return True
+    except Exception as e:
+        print(f'[USERS] firebase put failed for {username}: {e}', flush=True)
+        return False
+
+
+def firebase_delete_user(username: str) -> bool:
+    try:
+        req = urllib.request.Request(
+            f'{FB_BASE}/users/{username}.json', method='DELETE',
+        )
+        with urllib.request.urlopen(req, timeout=5) as r:
+            r.read()
+        return True
+    except Exception as e:
+        print(f'[USERS] firebase delete failed for {username}: {e}', flush=True)
+        return False
+
+
+def _env_fallback_users() -> dict:
+    """Legacy env-var users in the same shape as Firebase records."""
     users = {}
     if ADMIN_PASSWORD:
-        users['admin'] = ADMIN_PASSWORD
-    else:
-        print('[AUTH WARN] ADMIN_PASSWORD not set — admin account is disabled.', flush=True)
+        users['admin'] = {'hash': ADMIN_PASSWORD, 'role': 'admin', 'source': 'env'}
     for i in range(1, 10):
         u = os.environ.get(f'USER_{i}', '')
         if u and ':' in u:
             name, pwd = u.split(':', 1)
-            users[name.strip()] = pwd.strip()
+            name = name.strip()
+            if valid_username(name):
+                users[name] = {'hash': pwd.strip(), 'role': 'user', 'source': 'env'}
     return users
 
 
-USERS = load_users()
+def get_users(force_reload: bool = False) -> dict:
+    """Return merged user map {name: {hash, role, ...}}. Firebase wins over env."""
+    now = time.time()
+    if not force_reload and now - _user_cache['loaded_at'] < _USER_CACHE_TTL and _user_cache['data']:
+        return _user_cache['data']
+    env_users = _env_fallback_users()
+    fb_users = firebase_get_users()
+    merged = dict(env_users)
+    for name, rec in fb_users.items():
+        if not isinstance(rec, dict) or not valid_username(name):
+            continue
+        # Firebase entries must have at least a hash; role defaults to 'user'.
+        if not rec.get('hash'):
+            continue
+        merged[name] = {
+            'hash': rec['hash'],
+            'role': rec.get('role', 'user'),
+            'source': 'firebase',
+            'created_at': rec.get('created_at'),
+            'created_by': rec.get('created_by'),
+            'last_login': rec.get('last_login'),
+        }
+    if not merged and ADMIN_PASSWORD is None:
+        print('[AUTH WARN] ADMIN_PASSWORD not set and no Firebase users — login is disabled.', flush=True)
+    _user_cache['data'] = merged
+    _user_cache['loaded_at'] = now
+    return merged
+
+
+def invalidate_user_cache() -> None:
+    _user_cache['loaded_at'] = 0.0
+
+
+# Backward-compat shim: some code paths still reference USERS as a dict.
+class _UsersProxy:
+    def get(self, name, default=None):
+        u = get_users().get(name)
+        return u['hash'] if u else default
+
+    def keys(self):
+        return get_users().keys()
+
+    def __contains__(self, name):
+        return name in get_users()
+
+
+USERS = _UsersProxy()
 
 
 def read_file(path):
@@ -284,7 +400,30 @@ class Handler(BaseHTTPRequestHandler):
             if not valid_session(token):
                 self.send_json(401, {'error': 'Unauthorized'}); return
             s = sessions.get(token, {})
-            self.send_json(200, {'user': s.get('user', ''), 'idle_timeout_seconds': SESSION_IDLE_SECONDS})
+            self.send_json(200, {
+                'user': s.get('user', ''),
+                'role': s.get('role', 'user'),
+                'idle_timeout_seconds': SESSION_IDLE_SECONDS,
+            })
+            return
+
+        if path == '/api/users':
+            if not valid_session(token):
+                self.send_json(401, {'error': 'Unauthorized'}); return
+            if not is_admin_session(token):
+                self.send_json(403, {'error': 'Admin access required'}); return
+            users = get_users(force_reload=True)
+            safe_list = []
+            for name, rec in sorted(users.items()):
+                safe_list.append({
+                    'username': name,
+                    'role': rec.get('role', 'user'),
+                    'source': rec.get('source', 'env'),
+                    'created_at': rec.get('created_at'),
+                    'created_by': rec.get('created_by'),
+                    'last_login': rec.get('last_login'),
+                })
+            self.send_json(200, {'users': safe_list})
             return
 
         if path == '/api/v2-unclassified':
@@ -503,6 +642,128 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        # ──────────────────────────────────────────────────────────────────
+        # User management (admin-only except /api/password which is self-serve)
+        # ──────────────────────────────────────────────────────────────────
+        if path in ('/api/users/add', '/api/users/reset', '/api/users/delete'):
+            if not is_admin_session(token):
+                self.send_json(403, {'error': 'Admin access required'}); return
+            session = sessions.get(token, {})
+            actor = session.get('user', '?')
+            try:
+                body = json.loads(raw)
+            except Exception:
+                self.send_json(400, {'error': 'Invalid JSON'}); return
+            username = (body.get('username') or '').strip().lower()
+
+            if path == '/api/users/add':
+                password = body.get('password') or ''
+                role = (body.get('role') or 'user').strip()
+                if role not in ('admin', 'user'):
+                    self.send_json(400, {'error': 'role must be admin or user'}); return
+                if not valid_username(username):
+                    self.send_json(400, {'error': 'Username must be 2-32 chars: lowercase letters, digits, dot, underscore, hyphen.'}); return
+                ok_pw, msg = valid_password(password)
+                if not ok_pw:
+                    self.send_json(400, {'error': msg}); return
+                if username in get_users(force_reload=True):
+                    self.send_json(409, {'error': f'User {username!r} already exists'}); return
+                record = {
+                    'hash': hash_password(password),
+                    'role': role,
+                    'created_at': int(time.time()),
+                    'created_by': actor,
+                }
+                if not firebase_put_user(username, record):
+                    self.send_json(500, {'error': 'Failed to persist user'}); return
+                invalidate_user_cache()
+                _audit('user.added', name=username, role=role, by=actor)
+                self.send_json(200, {'ok': True, 'username': username, 'role': role})
+                return
+
+            if path == '/api/users/reset':
+                password = body.get('password') or ''
+                ok_pw, msg = valid_password(password)
+                if not ok_pw:
+                    self.send_json(400, {'error': msg}); return
+                users_now = get_users(force_reload=True)
+                target = users_now.get(username)
+                if not target:
+                    self.send_json(404, {'error': f'User {username!r} not found'}); return
+                if target.get('source') == 'env':
+                    self.send_json(400, {'error': 'Env-var users must be rotated via Render; migrate by re-adding via Add User.'}); return
+                record = {
+                    'hash': hash_password(password),
+                    'role': target.get('role', 'user'),
+                    'created_at': target.get('created_at') or int(time.time()),
+                    'created_by': target.get('created_by') or actor,
+                    'last_login': target.get('last_login'),
+                    'reset_at': int(time.time()),
+                    'reset_by': actor,
+                }
+                if not firebase_put_user(username, record):
+                    self.send_json(500, {'error': 'Failed to persist password'}); return
+                invalidate_user_cache()
+                _audit('user.reset', name=username, by=actor)
+                self.send_json(200, {'ok': True, 'username': username})
+                return
+
+            if path == '/api/users/delete':
+                if username == actor:
+                    self.send_json(400, {'error': 'Cannot delete yourself'}); return
+                users_now = get_users(force_reload=True)
+                target = users_now.get(username)
+                if not target:
+                    self.send_json(404, {'error': f'User {username!r} not found'}); return
+                if target.get('source') == 'env':
+                    self.send_json(400, {'error': 'Env-var users must be removed via Render env vars.'}); return
+                if not firebase_delete_user(username):
+                    self.send_json(500, {'error': 'Failed to delete user'}); return
+                invalidate_user_cache()
+                # Kill any active sessions for the deleted user.
+                for t, s in list(sessions.items()):
+                    if s.get('user') == username:
+                        del sessions[t]
+                _audit('user.deleted', name=username, by=actor)
+                self.send_json(200, {'ok': True, 'username': username})
+                return
+
+        if path == '/api/password':
+            # Self-serve password change — any authenticated user.
+            session = sessions.get(token, {})
+            actor = session.get('user', '')
+            if not actor:
+                self.send_json(401, {'error': 'Unauthorized'}); return
+            try:
+                body = json.loads(raw)
+            except Exception:
+                self.send_json(400, {'error': 'Invalid JSON'}); return
+            current = body.get('current_password') or ''
+            new_pw = body.get('new_password') or ''
+            ok_pw, msg = valid_password(new_pw)
+            if not ok_pw:
+                self.send_json(400, {'error': msg}); return
+            user_record = get_users().get(actor) or {}
+            stored = user_record.get('hash')
+            if not stored or not verify_password(current, stored, who=actor):
+                self.send_json(401, {'error': 'Current password is incorrect'}); return
+            if user_record.get('source') == 'env':
+                self.send_json(400, {'error': 'Env-var users must change their password via Render env vars.'}); return
+            record = {
+                'hash': hash_password(new_pw),
+                'role': user_record.get('role', 'user'),
+                'created_at': user_record.get('created_at') or int(time.time()),
+                'created_by': user_record.get('created_by') or actor,
+                'last_login': user_record.get('last_login'),
+                'changed_at': int(time.time()),
+            }
+            if not firebase_put_user(actor, record):
+                self.send_json(500, {'error': 'Failed to save password'}); return
+            invalidate_user_cache()
+            _audit('user.password_changed', name=actor)
+            self.send_json(200, {'ok': True})
+            return
+
         if path == '/api/analyze':
             try:
                 body = json.loads(raw)
@@ -547,12 +808,23 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(raw)
             username = body.get('username', '').strip()
             password = body.get('password', '')  # no .strip() — allow trailing space if real
-            stored = USERS.get(username)
+            user_record = get_users().get(username) or {}
+            stored = user_record.get('hash')
             ok = bool(stored) and verify_password(password, stored, who=username)
             record_login_attempt(ip, ok)
             if ok:
-                tok = make_session(username, ip)
-                _audit('login.success', user=username, ip=ip)
+                role = user_record.get('role', 'user')
+                tok = make_session(username, ip, role=role)
+                # Best-effort update of last_login (Firebase-stored users only).
+                if user_record.get('source') == 'firebase':
+                    try:
+                        fb_rec = dict(user_record)
+                        fb_rec.pop('source', None)
+                        fb_rec['last_login'] = int(time.time())
+                        firebase_put_user(username, fb_rec)
+                    except Exception:
+                        pass
+                _audit('login.success', user=username, role=role, ip=ip)
                 resp_body = json.dumps({'ok': True, 'user': username}).encode()
                 self.send_response(200)
                 for k, v in CORS.items():

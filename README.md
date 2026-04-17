@@ -38,10 +38,32 @@ decline applications, and acts as the operator UI for the engine.
 - `ADMIN_PASSWORD` is required (no hardcoded default). If unset, the admin
   account is disabled on startup.
 
-## Setting / rotating a password
+## User management
+
+Two sources of users, both supported:
+
+### Firebase (preferred — managed from the dashboard UI)
+
+Log in as an admin, click **Users** in the nav, and use **Add User**,
+**Reset password**, or **Delete**. Any user can change their own password
+from the key icon in the header. Passwords are scrypt-hashed on the server
+before being written to Firebase — the UI never sees the hash.
+
+No Render redeploy needed. Changes take effect immediately (60s user-cache
+TTL, or instantly if the admin triggers an endpoint — cache is invalidated
+on every add/reset/delete).
+
+### Env-vars (bootstrap fallback — survives Firebase outage)
+
+The `ADMIN_PASSWORD` env var always provides a bootstrap `admin` account
+so you can't lock yourself out. `USER_1..9` env vars work the same way as
+before but are treated as read-only by the dashboard UI (rotate via Render
+env vars directly).
+
+To generate a hash for an env var:
 
 ```bash
-# Generate the hash
+# In the Render shell or locally
 python3 hash_password.py "my-new-long-random-pw"
 # → scrypt$abc123...$def456...
 
@@ -50,6 +72,14 @@ python3 hash_password.py "my-new-long-random-pw"
 # or for a named user:
 #   USER_1 = jane:scrypt$abc123...$def456...
 ```
+
+### Migrating env-var users to Firebase
+
+For each env-var user, log in as admin → Users → Add User → set their
+username + a fresh password + role → give them the new password out-of-band
+→ on the next deploy, remove the `USER_N` env var from Render. The Firebase
+entry wins over the env var, so there's no window where the user is locked
+out during the transition.
 
 ## Endpoints (summary)
 
