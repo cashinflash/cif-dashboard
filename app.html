@@ -1993,6 +1993,7 @@ function renderDash(){
 
   if(!filtered.length){
     c.innerHTML=`<div class="empty"><div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-inbox"/></svg></div><div class="empty-t">${apps.length?'No results':'No applications yet'}</div><div class="empty-s">${apps.length?'Try a different filter.':'Submit your first application to get started.'}</div>${!apps.length?'<button class="ecta" onclick="showView(\'single\',document.getElementById(\'nav-single\'))">+ New Analysis</button>':''}</div>`;
+    updateSelCount();  // no rows → no selection possible; hide Delete Selected
     return;
   }
 
@@ -2075,6 +2076,10 @@ function renderDash(){
     <th style="width:36px"><input type="checkbox" id="chk-all" onchange="toggleAllCheck(this)" style="cursor:pointer;width:15px;height:15px"></th>
     <th>Applicant</th><th>Score</th><th>Amount</th><th>Source</th><th>Date</th><th>Status</th>
   </tr></thead><tbody>${rows}</tbody></table>`;
+  // Table was rebuilt — every checkbox is fresh/unchecked. Re-sync the
+  // Delete Selected button + counter so stale state from pre-render doesn't
+  // linger (this is the "button doesn't disappear after delete" bug).
+  updateSelCount();
   filtered.forEach(a=>setTimeout(()=>{
     const wid='dw'+(a.firebaseId?.replace(/[^a-z0-9]/gi,'')||'');
     if(a.status==='Processing'||a.status==='Error'&&!a.score){
@@ -2476,13 +2481,47 @@ function updateSelCount() {
 async function deleteSelected() {
   const checked = Array.from(document.querySelectorAll('.row-chk:checked'));
   if (!checked.length) return;
-  if (!confirm(`Delete ${checked.length} selected report${checked.length>1?'s':''}?`)) return;
-  for (const cb of checked) {
-    const fbId = cb.dataset.id;
-    if (fbId) await fbDelete(`reports/${fbId}.json`);
+  const n = checked.length;
+  if (!confirm(`Delete ${n} selected report${n>1?'s':''}? This cannot be undone.`)) return;
+
+  const btn = document.getElementById('del-selected-btn');
+  const originalHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.style.opacity = '0.65';
+    btn.style.cursor = 'wait';
+    btn.innerHTML = `Deleting ${n}…`;
   }
-  await loadReports();
-  toast(`${checked.length} report${checked.length>1?'s':''} deleted`,'ok');
+  // Also lock individual row checkboxes so a second click doesn't race.
+  document.querySelectorAll('.row-chk, #chk-all').forEach(c => c.disabled = true);
+
+  // Parallel deletes — much faster than the old sequential loop and any
+  // failure is surfaced instead of silently swallowed.
+  const ids = checked.map(cb => cb.dataset.id).filter(Boolean);
+  const results = await Promise.allSettled(
+    ids.map(id => fbDelete(`reports/${id}.json`))
+  );
+  const failed = results.filter(r => r.status === 'rejected').length;
+
+  // Reload + re-render — renderDash() now resets the button via updateSelCount().
+  // Explicit reset here as a belt-and-suspenders in case loadReports throws.
+  if (btn) { btn.style.display = 'none'; btn.innerHTML = originalHtml; btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; }
+  const chkAll = document.getElementById('chk-all');
+  if (chkAll) chkAll.checked = false;
+
+  try {
+    await loadReports();
+  } catch (e) {
+    console.warn('loadReports after delete failed:', e);
+  }
+
+  if (failed === 0) {
+    toast(`${n} report${n>1?'s':''} deleted`, 'ok');
+  } else if (failed === n) {
+    toast(`Delete failed — none removed`, 'err');
+  } else {
+    toast(`${n - failed} deleted, ${failed} failed`, 'err');
+  }
 }
 
 // ════════════════════════════════════════
