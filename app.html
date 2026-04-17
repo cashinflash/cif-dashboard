@@ -448,16 +448,6 @@ table tbody tr:hover td{background:#f5f9f6}
     <button class="nb admin-only" id="nav-users" onclick="showView('users',this)" style="display:none"><svg class="icn"><use href="#icn-users"/></svg>Users</button>
   </div>
   <div class="hright">
-    <div style="position:relative">
-      <button class="profile-btn" id="profile-btn" onclick="toggleProfileDD()">
-        <span id="active-profile-label">Standard</span>
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-      </button>
-      <div class="profile-dd" id="profile-dd">
-        <div class="profile-dd-hdr">Switch Active Profile</div>
-        <div id="profile-dd-list"></div>
-      </div>
-    </div>
     <div class="ibadge">Internal Only</div>
     <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:9px;padding:5px 12px">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -1054,8 +1044,65 @@ async function hydrateCurrentUser() {
   return false;
 }
 
-// Auth is handled server-side via cookie
-// No client-side redirect needed
+// ── IDLE TIMEOUT ──
+// Server enforces a 30-min idle timeout via last_active tracking, but the
+// dashboard polls loadReports() every 8s which keeps the session warm
+// forever. For a true "walk away and get logged out" UX we track real
+// user activity in the browser and force a logout if there's been no
+// mouse/keyboard input for IDLE_TIMEOUT_MS.
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000;  // 30 minutes
+const IDLE_WARNING_MS = 60 * 1000;        // show warning 1 min before
+let _lastActivity = Date.now();
+let _idleCheckInterval = null;
+let _idleWarningShown = false;
+
+function _bumpActivity() {
+  _lastActivity = Date.now();
+  if (_idleWarningShown) {
+    const banner = document.getElementById('idle-warning');
+    if (banner) banner.remove();
+    _idleWarningShown = false;
+  }
+}
+
+function _showIdleWarning(secondsLeft) {
+  if (_idleWarningShown) {
+    const cnt = document.getElementById('idle-warning-secs');
+    if (cnt) cnt.textContent = secondsLeft;
+    return;
+  }
+  _idleWarningShown = true;
+  const banner = document.createElement('div');
+  banner.id = 'idle-warning';
+  banner.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:9999;background:#fff4e0;border:1px solid #f2d46c;color:#6b4d00;padding:10px 16px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.15);display:flex;align-items:center;gap:10px';
+  banner.innerHTML = `You'll be signed out for inactivity in <span id="idle-warning-secs">${secondsLeft}</span>s. <button style="background:var(--green);color:#fff;border:0;padding:6px 12px;border-radius:6px;font-weight:600;cursor:pointer;font-family:var(--sans);font-size:12px" onclick="_bumpActivity()">Stay signed in</button>`;
+  document.body.appendChild(banner);
+}
+
+function _checkIdle() {
+  const idle = Date.now() - _lastActivity;
+  const remaining = IDLE_TIMEOUT_MS - idle;
+  if (remaining <= 0) {
+    // Stop polling so no stray requests fire during logout.
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    if (_idleCheckInterval) { clearInterval(_idleCheckInterval); _idleCheckInterval = null; }
+    logout();
+    return;
+  }
+  if (remaining <= IDLE_WARNING_MS) {
+    _showIdleWarning(Math.ceil(remaining / 1000));
+  }
+}
+
+function startIdleTracker() {
+  // Count any real interaction as activity. Scroll alone is intentionally NOT
+  // tracked (you can leave the tab scrolling long content without touching it).
+  ['mousedown', 'keydown', 'touchstart', 'click'].forEach(ev =>
+    document.addEventListener(ev, _bumpActivity, { passive: true })
+  );
+  // Check every 15s — cheap, and catches timeout within 15s of the deadline.
+  _idleCheckInterval = setInterval(_checkIdle, 15000);
+}
 
 async function fbGet(path) {
   const r = await fetch(`${FB}/${path}`, {credentials:'include', headers:{'X-Session':getToken()}});
@@ -1143,6 +1190,7 @@ window.onload = async () => {
   updateProfileBadge();
   startDots();
   setupDragDrop();
+  startIdleTracker();
   // Always land on Dashboard
   showView('dash', document.getElementById('nav-dash'));
   loadReports();
@@ -1280,6 +1328,7 @@ function saveProfilesStore() { localStorage.setItem('cif_profiles',JSON.stringif
 
 function toggleProfileDD() {
   const dd = document.getElementById('profile-dd');
+  if (!dd) return;  // header picker was removed; Rules Engine page uses in-page controls instead
   dd.classList.toggle('open');
   if (dd.classList.contains('open')) renderProfileDD();
 }
@@ -1298,15 +1347,19 @@ function switchActive(n) {
   activeProfile = n;
   localStorage.setItem('cif_active_profile',n);
   updateProfileBadge();
-  document.getElementById('profile-dd').classList.remove('open');
+  const dd = document.getElementById('profile-dd');
+  if (dd) dd.classList.remove('open');
   // Push new active profile to Firebase
   pushSettingsToFirebase(n, profiles[n] || DR);
   toast(`Switched to "${n}" ✓`, 'ok');
 }
 
 function updateProfileBadge() {
-  document.getElementById('active-profile-label').textContent = activeProfile;
-  document.getElementById('single-profile-name').textContent = activeProfile;
+  // Header picker was removed; these elements may be absent. Be defensive.
+  const lbl = document.getElementById('active-profile-label');
+  if (lbl) lbl.textContent = activeProfile;
+  const sp = document.getElementById('single-profile-name');
+  if (sp) sp.textContent = activeProfile;
   const b = document.getElementById('batch-profile-name');
   if (b) b.textContent = activeProfile;
 }
@@ -3376,6 +3429,7 @@ function renderUsers(users) {
       ? `<button class="actbtn" style="padding:4px 12px;font-size:12px;background:#fff8e5;color:#6b4d00;border:1px solid #f2d46c;font-weight:600" onclick="migrateEnvUser('${u_name}')" title="Copy this env-var user to Firebase so you can reset or delete them here. Their current password keeps working.">Migrate to Firebase</button>`
       : `
         <button class="actbtn btn-gh" style="padding:4px 10px;font-size:12px" onclick="openResetUserModal('${u_name}')">Reset password</button>
+        ${isSelf ? '' : `<button class="actbtn btn-gh" style="padding:4px 10px;font-size:12px;margin-left:4px" onclick="changeUserRole('${u_name}','${u.role || 'user'}')">${u.role === 'admin' ? 'Make user' : 'Make admin'}</button>`}
         ${isSelf ? '' : `<button class="actbtn" style="padding:4px 10px;font-size:12px;background:#fff5f5;color:var(--red);border:1px solid var(--red-border);margin-left:4px" onclick="deleteUser('${u_name}')">Delete</button>`}
       `;
     return `<tr>
@@ -3518,6 +3572,28 @@ function openResetUserModal(username) {
     },
     'Reset password'
   );
+}
+
+async function changeUserRole(username, currentRole) {
+  const newRole = currentRole === 'admin' ? 'user' : 'admin';
+  const verb = newRole === 'admin' ? 'promote' : 'demote';
+  const msg = newRole === 'admin'
+    ? `Promote "${username}" to admin?\n\nAdmins can add/reset/delete other users and access the Users page.`
+    : `Demote "${username}" to user?\n\nThey'll lose access to the Users page and can't manage other accounts.`;
+  if (!confirm(msg)) return;
+  try {
+    const r = await fetch('/api/users/role', {
+      method: 'POST', credentials: 'include',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ username, role: newRole }),
+    });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || `Failed to ${verb}`, 'err'); return; }
+    toast(`"${username}" is now ${newRole}`, 'ok');
+    loadUsers();
+  } catch (e) {
+    toast('Error: ' + e.message, 'err');
+  }
 }
 
 async function deleteUser(username) {

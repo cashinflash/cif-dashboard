@@ -645,7 +645,7 @@ class Handler(BaseHTTPRequestHandler):
         # ──────────────────────────────────────────────────────────────────
         # User management (admin-only except /api/password which is self-serve)
         # ──────────────────────────────────────────────────────────────────
-        if path in ('/api/users/add', '/api/users/reset', '/api/users/delete', '/api/users/migrate-from-env'):
+        if path in ('/api/users/add', '/api/users/reset', '/api/users/delete', '/api/users/migrate-from-env', '/api/users/role'):
             if not is_admin_session(token):
                 self.send_json(403, {'error': 'Admin access required'}); return
             session = sessions.get(token, {})
@@ -733,6 +733,45 @@ class Handler(BaseHTTPRequestHandler):
                         del sessions[t]
                 _audit('user.deleted', name=username, by=actor)
                 self.send_json(200, {'ok': True, 'username': username})
+                return
+
+            if path == '/api/users/role':
+                # Change a Firebase user's role. Cannot change your own role
+                # (avoids accidentally demoting the only admin) and cannot
+                # edit env-var users (their role is Render-controlled).
+                new_role = (body.get('role') or '').strip()
+                if new_role not in ('admin', 'user'):
+                    self.send_json(400, {'error': "role must be 'admin' or 'user'"}); return
+                if username == actor:
+                    self.send_json(400, {'error': 'Cannot change your own role — ask another admin.'}); return
+                users_now = get_users(force_reload=True)
+                target = users_now.get(username)
+                if not target:
+                    self.send_json(404, {'error': f'User {username!r} not found'}); return
+                if target.get('source') == 'env':
+                    self.send_json(400, {'error': 'Env-var users can\'t change role here. Migrate to Firebase first.'}); return
+                if target.get('role') == new_role:
+                    self.send_json(200, {'ok': True, 'username': username, 'role': new_role, 'noop': True})
+                    return
+                record = {
+                    'hash': target['hash'],
+                    'role': new_role,
+                    'created_at': target.get('created_at') or int(time.time()),
+                    'created_by': target.get('created_by') or actor,
+                    'last_login': target.get('last_login'),
+                    'role_changed_at': int(time.time()),
+                    'role_changed_by': actor,
+                }
+                if not firebase_put_user(username, record):
+                    self.send_json(500, {'error': 'Failed to persist role'}); return
+                invalidate_user_cache()
+                # Update any live sessions for this user so the new role
+                # takes effect on their next request without a logout.
+                for t, s in sessions.items():
+                    if s.get('user') == username:
+                        s['role'] = new_role
+                _audit('user.role_changed', name=username, new_role=new_role, by=actor)
+                self.send_json(200, {'ok': True, 'username': username, 'role': new_role})
                 return
 
             if path == '/api/users/migrate-from-env':
