@@ -117,6 +117,25 @@ class Handler(BaseHTTPRequestHandler):
             self.send_html(200, data or b'App not found')
             return
 
+        if path == '/api/v2-unclassified':
+            if not valid_session(token):
+                self.send_json(401, {'error':'Unauthorized'}); return
+            try:
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/v2-unclassified',
+                    headers={'Content-Type':'application/json'})
+                with ur.urlopen(req, timeout=120) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[V2-UNCLASSIFIED ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         if path.startswith('/fb/'):
             if not valid_session(token):
                 self.send_json(401, {'error':'Unauthorized'}); return
@@ -283,6 +302,25 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 print(f'[ANALYZE-ENGINE ERROR] {e}', flush=True)
                 self.send_json(500, {'error':{'message':str(e)}})
+            return
+
+        if path == '/api/v2-entities-add':
+            try:
+                body = json.loads(raw)
+                payload = json.dumps(body).encode()
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/v2-entities-add',
+                    data=payload, headers={'Content-Type':'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=30) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[V2-ENTITIES-ADD ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
             return
 
         if path == '/api/analyze':

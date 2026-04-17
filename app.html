@@ -369,6 +369,8 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 <div id="mob-menu" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:200;" onclick="toggleMobMenu()">
   <div style="background:var(--green-dark);padding:2rem 1.5rem;display:flex;flex-direction:column;gap:8px">
     <button class="nb" onclick="showView('dash',this);toggleMobMenu()">Dashboard</button>
+    <button class="nb" onclick="showView('v2compare',this);toggleMobMenu()">🔬 v2 Compare <span id="v2div-count-mob" style="display:none;background:#c0392b;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px"></span></button>
+    <button class="nb" onclick="showView('reviewqueue',this);toggleMobMenu()">🏷 Review Queue <span id="rqcount-mob" style="display:none;background:#f39c12;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px"></span></button>
     <button class="nb" onclick="showView('single',document.getElementById('nav-single'));toggleMobMenu()">📄 New Analysis</button>
     <button class="nb" onclick="showView('batch',document.getElementById('nav-batch'));toggleMobMenu()">📋 Batch Analysis</button>
     <button class="nb" onclick="showView('rules',this);toggleMobMenu()">⚙ Rules Engine</button>
@@ -377,6 +379,8 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 </div>
 <div class="hnav">
     <button class="nb" id="nav-dash" onclick="showView('dash',this)">Dashboard</button>
+    <button class="nb" id="nav-v2compare" onclick="showView('v2compare',this)" style="display:flex;align-items:center;gap:6px">🔬 v2 Compare<span id="v2div-count" style="display:none;background:#c0392b;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">0</span></button>
+    <button class="nb" id="nav-reviewqueue" onclick="showView('reviewqueue',this)" style="display:flex;align-items:center;gap:6px">🏷 Review Queue<span id="rqcount" style="display:none;background:#f39c12;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">0</span></button>
     <div style="position:relative" id="analysis-dd-wrap">
       <button class="nb" id="nav-analysis" onclick="toggleAnalysisDD()" style="display:flex;align-items:center;gap:6px">
         Analysis <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
@@ -836,6 +840,77 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
   </div>
 </div>
 
+<!-- v2 Compare — divergence view between v1 and v2 decisions -->
+<div id="view-v2compare" class="view">
+  <div class="container">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:12px">
+      <div>
+        <div class="ptitle">🔬 v2 Compare</div>
+        <div class="psub" style="margin-bottom:0">Every application where v1 and v2 disagreed — each row is either a v2 bug to fix or evidence v2 caught something v1 missed.</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="actbtn btn-gh" onclick="loadReports().then(renderV2Compare)">↺ Refresh</button>
+        <button class="actbtn btn-ok" onclick="startBulkRerunV2()" style="margin:0">↻ Run v2 on historical</button>
+      </div>
+    </div>
+
+    <div id="v2-bulk-progress" style="display:none;margin-bottom:16px;padding:14px 18px;background:#eef5ee;border:1px solid #cfe0d0;border-radius:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px">
+        <div style="font-weight:700;font-size:13px" id="v2-bulk-text">Running v2 on 0 of 0…</div>
+        <button class="actbtn btn-gh" onclick="cancelBulkRerunV2()" style="padding:4px 12px;font-size:12px">Cancel</button>
+      </div>
+      <div style="height:8px;background:#d0dbd1;border-radius:6px;overflow:hidden">
+        <div id="v2-bulk-bar" style="height:100%;background:#1a6b3c;width:0%;transition:width 250ms"></div>
+      </div>
+      <div id="v2-bulk-sub" style="font-size:11px;color:#666;margin-top:6px"></div>
+    </div>
+
+    <div class="stats-row" style="margin-bottom:1rem">
+      <div class="sc tot"><div class="slbl">Total compared</div><div class="snum def" id="v2c-total">0</div><div class="spct" id="v2c-total-sub">reports with v2 run</div></div>
+      <div class="sc app"><div class="slbl">✓ Same decision</div><div class="snum grn" id="v2c-agree">0</div><div class="spct" id="v2c-agree-sub">v1 & v2 agree</div></div>
+      <div class="sc dec"><div class="slbl">⚠ Disagreed</div><div class="snum red" id="v2c-disagree">0</div><div class="spct" id="v2c-disagree-sub">needs your eye</div></div>
+      <div class="sc pen"><div class="slbl">🧮 Amount diff</div><div class="snum gld" id="v2c-amtdiff">0</div><div class="spct" id="v2c-amtdiff-sub">same outcome, different $</div></div>
+    </div>
+
+    <div class="tcard">
+      <div class="ttb">
+        <div class="sbox"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7c72" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" placeholder="Search applicants..." oninput="v2CompareSearch=this.value;renderV2Compare()"></div>
+        <select class="fsel" onchange="v2CompareFilter=this.value;renderV2Compare()">
+          <option value="disagree">Disagreements only</option>
+          <option value="v1ok-v2no">v1 approved, v2 declined</option>
+          <option value="v1no-v2ok">v1 declined, v2 approved</option>
+          <option value="amtdiff">Same outcome, different amount</option>
+          <option value="all">All compared</option>
+        </select>
+      </div>
+      <div id="v2c-table"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Review Queue — unclassified merchants waiting to be added to the registry -->
+<div id="view-reviewqueue" class="view">
+  <div class="container">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:12px">
+      <div>
+        <div class="ptitle">🏷 Review Queue</div>
+        <div class="psub" style="margin-bottom:0">Merchants v2 couldn't classify. Pick a category once — every future v2 run classifies it correctly.</div>
+      </div>
+      <button class="actbtn btn-gh" onclick="loadReviewQueue()">↺ Refresh</button>
+    </div>
+
+    <div class="stats-row" style="margin-bottom:1rem">
+      <div class="sc tot"><div class="slbl">Unique merchants</div><div class="snum def" id="rq-merchants">0</div><div class="spct">needing classification</div></div>
+      <div class="sc pen"><div class="slbl">Across transactions</div><div class="snum gld" id="rq-txns">0</div><div class="spct">unclassified items</div></div>
+      <div class="sc app"><div class="slbl">Registry size</div><div class="snum grn" id="rq-reg">—</div><div class="spct">classified merchants</div></div>
+    </div>
+
+    <div class="tcard">
+      <div id="rq-table"></div>
+    </div>
+  </div>
+</div>
+
 <div class="ov" id="ov" onclick="closeModalOut(event)">
   <div class="modal">
     <div class="mh"><div class="mt" id="mtitle">Detail</div><button class="mcl" onclick="closeModal()">✕</button></div>
@@ -1034,9 +1109,12 @@ function showView(name, btn) {
   if (name==='plaid') loadPlaidCustomers();
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
-  document.getElementById('view-'+name).classList.add('active');
+  const el = document.getElementById('view-'+name);
+  if (el) el.classList.add('active');
   if (btn) btn.classList.add('active');
   if (name==='dash') loadReports();
+  if (name==='v2compare') { loadReports().then(renderV2Compare); }
+  if (name==='reviewqueue') loadReviewQueue();
 }
 
 // ════════════════════════════════════════
@@ -1881,6 +1959,290 @@ function renderDash(){
       drawWheel(wid,a.score||0,44);
     }
   },80));
+}
+
+// ════════════════════════════════════════
+// V2 COMPARE — divergence view
+// ════════════════════════════════════════
+let v2CompareFilter = 'disagree';
+let v2CompareSearch = '';
+
+function classifyV2Comparison(a) {
+  // Normalize both sides to one of: approved | declined | pending | review_required
+  const v1 = String(a.claudeDecision || a.status || '').toUpperCase();
+  const v2 = String(a.v2Decision || '').toUpperCase();
+  if (!v2) return 'no-v2';
+  const v1ok = v1 === 'APPROVED';
+  const v2ok = v2 === 'APPROVE' || v2 === 'APPROVED';
+  if (v1ok && !v2ok) return 'v1ok-v2no';
+  if (!v1ok && v2ok) return 'v1no-v2ok';
+  // Both agree on outcome — check amounts
+  const v1Amt = parseInt(String(a.amount || '').replace(/[^0-9]/g, '')) || 0;
+  const v2Amt = parseInt(a.v2TierAmount || 0);
+  if (v1Amt !== v2Amt) return 'amtdiff';
+  return 'agree';
+}
+
+function renderV2Compare() {
+  const comparable = apps.filter(a => a.v2Decision);
+  const buckets = {'agree':0,'v1ok-v2no':0,'v1no-v2ok':0,'amtdiff':0,'no-v2':0};
+  comparable.forEach(a => { buckets[classifyV2Comparison(a)]++; });
+  const disagree = buckets['v1ok-v2no'] + buckets['v1no-v2ok'];
+
+  // Stat cards
+  document.getElementById('v2c-total').textContent = comparable.length;
+  document.getElementById('v2c-total-sub').textContent = `${apps.length - comparable.length} not yet run`;
+  document.getElementById('v2c-agree').textContent = buckets.agree;
+  document.getElementById('v2c-disagree').textContent = disagree;
+  document.getElementById('v2c-amtdiff').textContent = buckets.amtdiff;
+
+  // Nav badge: total needing attention (disagreements)
+  const badge = document.getElementById('v2div-count');
+  const badgeMob = document.getElementById('v2div-count-mob');
+  [badge, badgeMob].forEach(b => {
+    if (!b) return;
+    if (disagree > 0) { b.style.display = 'inline-block'; b.textContent = disagree; }
+    else { b.style.display = 'none'; }
+  });
+
+  // Table
+  const filtered = comparable.filter(a => {
+    const cls = classifyV2Comparison(a);
+    if (v2CompareFilter === 'disagree' && cls !== 'v1ok-v2no' && cls !== 'v1no-v2ok') return false;
+    if (v2CompareFilter === 'v1ok-v2no' && cls !== 'v1ok-v2no') return false;
+    if (v2CompareFilter === 'v1no-v2ok' && cls !== 'v1no-v2ok') return false;
+    if (v2CompareFilter === 'amtdiff' && cls !== 'amtdiff') return false;
+    // 'all' shows everything with v2 data
+    if (v2CompareSearch && !(a.name || '').toLowerCase().includes(v2CompareSearch.toLowerCase())) return false;
+    return true;
+  });
+
+  const c = document.getElementById('v2c-table');
+  if (!filtered.length) {
+    c.innerHTML = `<div class="empty" style="padding:3rem 2rem;text-align:center"><div class="empty-ic">🔬</div><div class="empty-t">No divergences in this filter</div><div class="empty-s">Try "All compared" to see everything.</div></div>`;
+    return;
+  }
+
+  const rows = filtered.map(a => {
+    const cls = classifyV2Comparison(a);
+    const v1 = String(a.claudeDecision || a.status || '—').toUpperCase();
+    const v2 = String(a.v2Decision || '—').toUpperCase();
+    const v1Amt = a.amount || '—';
+    const v2Amt = a.v2TierAmount ? `$${a.v2TierAmount}` : '—';
+    const v2Max = a.v2MaxAffordable !== undefined ? `$${a.v2MaxAffordable}` : '—';
+    const conf = a.v2Confidence !== undefined ? `${Math.round(a.v2Confidence * 100)}%` : '—';
+    const tag = cls === 'v1ok-v2no'
+      ? '<span style="background:#fff0e6;color:#d97706;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700">v2 stricter</span>'
+      : cls === 'v1no-v2ok'
+      ? '<span style="background:#eef9f1;color:#1a6b3c;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700">v2 approved</span>'
+      : cls === 'amtdiff'
+      ? '<span style="background:#fffbea;color:#b07500;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700">different $</span>'
+      : '<span style="background:#eef5ee;color:#475;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700">agree</span>';
+    const reasons = (() => {
+      try { return JSON.parse(a.v2ReasonsJson || '[]').slice(0,2).join(' · '); }
+      catch { return ''; }
+    })();
+    return `<tr style="cursor:pointer" onclick="openModal('${a.firebaseId}')">
+      <td><div class="nbig">${a.name || '—'}</div><div class="nsub" style="font-size:11px">${a.date || ''} ${a.time || ''}</div></td>
+      <td>${tag}</td>
+      <td><div><b>${v1}</b></div><div style="font-size:12px;color:#666">${v1Amt}</div></td>
+      <td><div><b style="color:${v2.startsWith('APPROV')?'#1a6b3c':'#c0392b'}">${v2}</b></div><div style="font-size:12px;color:#666">${v2Amt}<span style="color:#999">&nbsp;·&nbsp;max ${v2Max}</span></div></td>
+      <td style="text-align:center">${conf}</td>
+      <td style="font-size:11px;color:#555;max-width:320px">${reasons}</td>
+    </tr>`;
+  }).join('');
+
+  c.innerHTML = `<table><thead><tr>
+    <th>Applicant</th><th>Pattern</th><th>v1</th><th>v2</th><th>Conf</th><th>v2 top reasons</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// ════════════════════════════════════════
+// BULK v2 re-run
+// ════════════════════════════════════════
+let _bulkRerunCancel = false;
+
+async function startBulkRerunV2() {
+  const pending = apps.filter(a => a.extractedData !== null && !a.v2RunAt);
+  // Note: extractedData check may not be accessible on client-side Firebase shape;
+  // we treat 'has not been run' (no v2RunAt) as the signal to try.
+  const eligible = apps.filter(a => !a.v2RunAt);
+  if (!eligible.length) {
+    toast('All reports already have v2 data ✓', 'ok');
+    return;
+  }
+  if (!confirm(`Run v2 on ${eligible.length} historical report${eligible.length===1?'':'s'}?\n\nThis will not affect v1 decisions. Estimated time: ~${Math.ceil(eligible.length * 2)} seconds.`)) return;
+
+  _bulkRerunCancel = false;
+  const bar = document.getElementById('v2-bulk-progress');
+  const barFill = document.getElementById('v2-bulk-bar');
+  const text = document.getElementById('v2-bulk-text');
+  const sub = document.getElementById('v2-bulk-sub');
+  bar.style.display = 'block';
+
+  let done = 0, errored = 0, startAt = Date.now();
+  for (const a of eligible) {
+    if (_bulkRerunCancel) break;
+    try {
+      const resp = await fetch('/api/rerun-v2', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {'Content-Type':'application/json','X-Session':getToken()},
+        body: JSON.stringify({firebase_id: a.firebaseId})
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        a.v2Decision = (data.decision || '').toUpperCase();
+        a.v2TierAmount = data.tier_amount;
+        a.v2MaxAffordable = data.max_affordable_loan;
+        a.v2Confidence = data.confidence;
+        a.v2Report = data.report_html;
+        a.v2ReasonsJson = JSON.stringify(data.reasons || []);
+        a.v2ReconciliationOk = data.reconciliation_ok;
+        a.v2ReconciliationError = data.reconciliation_error;
+        a.v2RunAt = Date.now();
+      } else {
+        errored++;
+      }
+    } catch (e) {
+      errored++;
+    }
+    done++;
+    const pct = Math.round((done / eligible.length) * 100);
+    barFill.style.width = pct + '%';
+    text.textContent = `Running v2 on ${done} of ${eligible.length}… (${pct}%)`;
+    const elapsed = (Date.now() - startAt) / 1000;
+    const rate = done > 0 ? elapsed / done : 1;
+    const remain = Math.max(0, Math.round((eligible.length - done) * rate));
+    sub.textContent = `${errored} errored · ~${remain}s remaining`;
+    // Re-render current view if visible
+    if (done % 5 === 0) renderV2Compare();
+    // Small delay so we don't hammer the server
+    await new Promise(r => setTimeout(r, 250));
+  }
+  text.textContent = _bulkRerunCancel
+    ? `Cancelled after ${done} of ${eligible.length}`
+    : `Done: ${done - errored} succeeded, ${errored} errored`;
+  barFill.style.width = '100%';
+  sub.textContent = '';
+  renderV2Compare();
+  setTimeout(() => { bar.style.display = 'none'; }, 4000);
+  toast(_bulkRerunCancel ? 'Cancelled' : `v2 run complete: ${done - errored}/${done}`, errored ? 'err' : 'ok');
+}
+
+function cancelBulkRerunV2() { _bulkRerunCancel = true; }
+
+// ════════════════════════════════════════
+// REVIEW QUEUE — unclassified merchants
+// ════════════════════════════════════════
+async function loadReviewQueue() {
+  const container = document.getElementById('rq-table');
+  container.innerHTML = `<div style="padding:40px;text-align:center;color:#888">Scanning reports for unclassified merchants…</div>`;
+  try {
+    const resp = await fetch('/api/v2-unclassified', {
+      credentials: 'include',
+      headers: {'X-Session': getToken()}
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      container.innerHTML = `<div style="padding:40px;text-align:center;color:#c0392b">${data.error || 'Failed to load'}</div>`;
+      return;
+    }
+    renderReviewQueue(data);
+  } catch (e) {
+    container.innerHTML = `<div style="padding:40px;text-align:center;color:#c0392b">Error: ${e.message}</div>`;
+  }
+}
+
+function renderReviewQueue(data) {
+  const merchants = data.merchants || [];
+  document.getElementById('rq-merchants').textContent = merchants.length;
+  document.getElementById('rq-txns').textContent = merchants.reduce((s,m)=>s+m.count, 0);
+  document.getElementById('rq-reg').textContent = data.registry_size ?? '—';
+
+  // Nav badge
+  const badge = document.getElementById('rqcount');
+  const badgeMob = document.getElementById('rqcount-mob');
+  [badge, badgeMob].forEach(b => {
+    if (!b) return;
+    if (merchants.length > 0) { b.style.display = 'inline-block'; b.textContent = merchants.length; }
+    else { b.style.display = 'none'; }
+  });
+
+  const container = document.getElementById('rq-table');
+  if (!merchants.length) {
+    container.innerHTML = `<div class="empty" style="padding:3rem;text-align:center"><div class="empty-ic">🏷</div><div class="empty-t">No unclassified merchants</div><div class="empty-s">v2 knows every merchant in your historical data.</div></div>`;
+    return;
+  }
+
+  const creditOpts = ['payroll','gig_income','govt_benefits','pension','child_support','p2p_received','fintech_advance','loan_proceeds','internal_transfer','cash_deposit','mobile_deposit','account_verification','bnpl_refund','other_credit'];
+  const debitOpts = ['rent','utilities','phone','internet','insurance','groceries','gas_fuel','restaurants','subscriptions','loan_payment','fintech_repayment','bnpl_payment','atm','money_order','p2p_sent','medical','transportation','childcare','speculative','account_verification','internal_transfer','fee','other_expense'];
+
+  const rows = merchants.map((m, i) => {
+    const samples = (m.samples || []).slice(0,3).map(s =>
+      `<div style="font-size:11px;color:#666;padding:1px 0">${s.is_credit ? '▲' : '▼'} $${(s.amount||0).toFixed(2)} · ${s.date || ''}</div>`
+    ).join('');
+    const credOpts = creditOpts.map(o => `<option value="${o}">${o}</option>`).join('');
+    const debOpts = debitOpts.map(o => `<option value="${o}">${o}</option>`).join('');
+    return `<tr>
+      <td style="vertical-align:top;padding:10px 12px">
+        <div style="font-weight:700;font-size:13px">${m.pattern}</div>
+        <div style="font-size:11px;color:#888;margin-top:2px">${m.count} transaction${m.count===1?'':'s'} across ${m.reports} report${m.reports===1?'':'s'}</div>
+        <div style="margin-top:4px">${samples}</div>
+      </td>
+      <td style="vertical-align:top;padding:10px 12px;min-width:190px">
+        <div style="font-size:10px;color:#666;margin-bottom:2px;text-transform:uppercase">If incoming</div>
+        <select id="rq-credit-${i}" style="font-size:12px;padding:5px 6px;border:1px solid #ddd;border-radius:6px;background:#fff;width:100%">
+          <option value="">— none (don't match credit) —</option>${credOpts}
+        </select>
+      </td>
+      <td style="vertical-align:top;padding:10px 12px;min-width:190px">
+        <div style="font-size:10px;color:#666;margin-bottom:2px;text-transform:uppercase">If outgoing</div>
+        <select id="rq-debit-${i}" style="font-size:12px;padding:5px 6px;border:1px solid #ddd;border-radius:6px;background:#fff;width:100%">
+          <option value="">— none (don't match debit) —</option>${debOpts}
+        </select>
+      </td>
+      <td style="vertical-align:top;padding:10px 12px;text-align:right">
+        <button class="actbtn btn-ok" style="padding:6px 14px;font-size:12px;margin:0" onclick="saveEntity(${i})" data-pattern="${encodeURIComponent(m.pattern)}">Add to registry</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  container.innerHTML = `<table style="width:100%">
+    <thead><tr>
+      <th style="text-align:left;padding:10px 12px">Merchant pattern</th>
+      <th style="text-align:left;padding:10px 12px">Credit category</th>
+      <th style="text-align:left;padding:10px 12px">Debit category</th>
+      <th style="text-align:right;padding:10px 12px">Action</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+async function saveEntity(idx) {
+  const btn = document.querySelector(`button[onclick="saveEntity(${idx})"]`);
+  const pattern = btn ? decodeURIComponent(btn.getAttribute('data-pattern') || '') : '';
+  if (!pattern) { toast('Pattern missing', 'err'); return; }
+  const creditCat = document.getElementById(`rq-credit-${idx}`).value || null;
+  const debitCat = document.getElementById(`rq-debit-${idx}`).value || null;
+  if (!creditCat && !debitCat) {
+    toast('Pick at least one direction', 'err');
+    return;
+  }
+  try {
+    const resp = await fetch('/api/v2-entities-add', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {'Content-Type':'application/json','X-Session':getToken()},
+      body: JSON.stringify({pattern, credit: creditCat, debit: debitCat})
+    });
+    const data = await resp.json();
+    if (!resp.ok) { toast(data.error || 'Failed to save', 'err'); return; }
+    toast(`Added "${pattern}" to registry ✓`, 'ok');
+    loadReviewQueue(); // refresh — the merchant should disappear
+  } catch (e) {
+    toast('Error: ' + e.message, 'err');
+  }
 }
 
 function filterDash(v){srch=v;renderDash();}
