@@ -735,6 +735,30 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200, {'ok': True, 'username': username})
                 return
 
+            if path == '/api/users/migrate-from-env':
+                # One-click migration: copy the env-var user's existing hash
+                # to Firebase unchanged. User's current password keeps
+                # working; admin gets Reset/Delete on them going forward.
+                users_now = get_users(force_reload=True)
+                target = users_now.get(username)
+                if not target:
+                    self.send_json(404, {'error': f'User {username!r} not found'}); return
+                if target.get('source') != 'env':
+                    self.send_json(400, {'error': f'User {username!r} is not an env-var user'}); return
+                record = {
+                    'hash': target['hash'],  # preserve existing hash
+                    'role': target.get('role', 'user'),
+                    'created_at': int(time.time()),
+                    'created_by': actor,
+                    'migrated_from': 'env-var',
+                }
+                if not firebase_put_user(username, record):
+                    self.send_json(500, {'error': 'Failed to persist user'}); return
+                invalidate_user_cache()
+                _audit('user.migrated', name=username, by=actor)
+                self.send_json(200, {'ok': True, 'username': username})
+                return
+
         if path == '/api/password':
             # Self-serve password change — any authenticated user.
             session = sessions.get(token, {})

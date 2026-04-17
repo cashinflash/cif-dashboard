@@ -3329,11 +3329,15 @@ function renderUsers(users) {
       : '<span class="pill pill-warn">env-var</span>';
     const isSelf = u.username === _currentUser;
     const isEnv = u.source !== 'firebase';
+    // Usernames are validated server-side to /^[a-z0-9_.-]{2,32}$/ so inline
+    // interpolation in onclick attributes is safe. JSON.stringify breaks the
+    // attribute because of embedded double quotes.
+    const u_name = u.username;
     const actions = isEnv
-      ? `<span style="font-size:11px;color:var(--muted)" title="Click 'Add User' with this username to migrate to a Firebase-managed entry, then you can reset or delete them here. The env var can be removed from Render afterwards.">Rotate via Render env vars — <a href="#" onclick="event.preventDefault();openAddUserModalPrefill(${JSON.stringify(u.username)})" style="color:var(--green);text-decoration:underline;font-weight:600">migrate &rarr;</a></span>`
+      ? `<button class="actbtn" style="padding:4px 12px;font-size:12px;background:#fff8e5;color:#6b4d00;border:1px solid #f2d46c;font-weight:600" onclick="migrateEnvUser('${u_name}')" title="Copy this env-var user to Firebase so you can reset or delete them here. Their current password keeps working.">Migrate to Firebase</button>`
       : `
-        <button class="actbtn btn-gh" style="padding:4px 10px;font-size:12px" onclick="openResetUserModal(${JSON.stringify(u.username)})">Reset password</button>
-        ${isSelf ? '' : `<button class="actbtn" style="padding:4px 10px;font-size:12px;background:#fff5f5;color:var(--red);border:1px solid var(--red-border);margin-left:4px" onclick="deleteUser(${JSON.stringify(u.username)})">Delete</button>`}
+        <button class="actbtn btn-gh" style="padding:4px 10px;font-size:12px" onclick="openResetUserModal('${u_name}')">Reset password</button>
+        ${isSelf ? '' : `<button class="actbtn" style="padding:4px 10px;font-size:12px;background:#fff5f5;color:var(--red);border:1px solid var(--red-border);margin-left:4px" onclick="deleteUser('${u_name}')">Delete</button>`}
       `;
     return `<tr>
       <td style="padding:10px 12px"><b>${escHtml(u.username)}</b>${isSelf ? ' <span style="font-size:10px;color:var(--muted);font-weight:400">(you)</span>' : ''}</td>
@@ -3407,20 +3411,27 @@ function modalInput(id, label, type, attrs = '', extraStyle = '') {
     </div>`;
 }
 
-function openAddUserModalPrefill(username) {
-  openAddUserModal(username);
+async function migrateEnvUser(username) {
+  if (!confirm(`Migrate "${username}" from env-var to Firebase?\n\nTheir current password keeps working. After this, you'll be able to reset or delete them from this page. The matching USER_N env var on Render becomes dormant and can be removed on your next convenient deploy.`)) return;
+  try {
+    const r = await fetch('/api/users/migrate-from-env', {
+      method: 'POST', credentials: 'include',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ username }),
+    });
+    const d = await r.json();
+    if (!r.ok) { toast(d.error || 'Failed to migrate', 'err'); return; }
+    toast(`"${username}" migrated — Reset/Delete now available`, 'ok');
+    loadUsers();
+  } catch (e) {
+    toast('Error: ' + e.message, 'err');
+  }
 }
 
-function openAddUserModal(prefillUsername) {
-  const banner = prefillUsername
-    ? `<div style="background:#fff8e5;border:1px solid #f2d46c;color:#6b4d00;border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:12px;line-height:1.5"><b>Migrating env-var user "${escHtml(prefillUsername)}":</b> creating a Firebase entry here will take precedence over the env var immediately. You can reset or delete them from this page afterwards. Remove the matching <code>USER_N</code> env var from Render on your next convenient deploy.</div>`
-    : '';
-  const usernameAttrs = `autocomplete="off" autocapitalize="none" spellcheck="false" value="${escHtml(prefillUsername || '')}"${prefillUsername ? ' readonly' : ''}`;
-  const usernameStyle = prefillUsername ? 'background:#f5f9f6;color:#555' : '';
+function openAddUserModal() {
   openUserModal(
-    prefillUsername ? `Migrate "${prefillUsername}" to Firebase` : 'Add user',
-    banner +
-    modalInput('nu-user', 'Username', 'text', usernameAttrs, usernameStyle) +
+    'Add user',
+    modalInput('nu-user', 'Username', 'text', 'autocomplete="off" autocapitalize="none" spellcheck="false"') +
     modalInput('nu-pass', 'Password (min 8 chars)', 'password', 'autocomplete="new-password"') +
     `<div style="margin-bottom:12px">
        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text2)">Role</label>
