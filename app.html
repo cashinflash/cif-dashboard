@@ -1844,6 +1844,7 @@ ${a.extractedSSN?`<div style="display:flex;align-items:center;justify-content:sp
 </div>
 <div style="display:flex;border-bottom:1px solid var(--border)">
   <button onclick="mTab('report','${fbId}',this)" id="mtab-report-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--green);border-bottom:2px solid var(--green);cursor:pointer;font-family:var(--sans)">📄 Report</button>
+  <button onclick="mTab('v2','${fbId}',this)" id="mtab-v2-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">🔬 v2 Engine${a.v2Decision ? ' <span style=&quot;background:#eef9f1;color:#1a6b3c;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:2px&quot;>run</span>' : ''}</button>
   <button onclick="mTab('appdata','${fbId}',this)" id="mtab-appdata-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📋 Application</button>
   <button onclick="mTab('docs','${fbId}',this)" id="mtab-docs-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📁 Documents</button>
   <button onclick="mTab('notes','${fbId}',this)" id="mtab-notes-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📝 Notes</button>
@@ -1871,6 +1872,7 @@ ${(a.fcf!=null||a.monthlyIncome!=null)?`<div class="msummary">
   </div>` :
   highlightTierBreakdown(stripFences(a.report||''))
 }</div></div>
+<div id="mpanel-v2-${fbId}" style="display:none">${buildV2Panel(a)}</div>
 <div id="mpanel-appdata-${fbId}" style="display:none">${buildAppDetails(a.applicationData||{})}</div>
 <div id="mpanel-docs-${fbId}" style="display:none">${buildDocsPanel(a)}</div>
 <div id="mpanel-notes-${fbId}" style="display:none">
@@ -1889,7 +1891,7 @@ ${(a.fcf!=null||a.monthlyIncome!=null)?`<div class="msummary">
 }
 
 function mTab(tab, fbId, btn) {
-  const panels = ['report','appdata','docs','notes'];
+  const panels = ['report','v2','appdata','docs','notes'];
   panels.forEach(p => {
     const el = document.getElementById('mpanel-'+p+'-'+fbId);
     const b = document.getElementById('mtab-'+p+'-'+fbId);
@@ -2091,6 +2093,106 @@ async function updStatusWithAmt(fbId,s){
   await loadReports();openModal(fbId);toast('Updated to '+s+' ✓','ok');
 }
 function copyModal(fbId){const a=apps.find(x=>x.firebaseId===fbId);if(a){const t=document.createElement('div');t.innerHTML=a.report;navigator.clipboard.writeText(t.textContent).then(()=>toast('Copied ✓','ok'));}}
+
+// ════════════════════════════════════════
+// ENGINE V2 — shadow-mode re-run + side-by-side
+// ════════════════════════════════════════
+function buildV2Panel(a) {
+  const hasRun = a.v2Decision && a.v2Report;
+  const runAt = a.v2RunAt ? new Date(a.v2RunAt).toLocaleString() : '';
+  const v1Decision = a.claudeDecision || a.status || '—';
+  const v1Amount = a.amount || 'N/A';
+
+  const runButton = `
+    <button onclick="runV2('${a.firebaseId}')" id="v2run-${a.firebaseId}"
+            style="background:#1a6b3c;color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+      ${hasRun ? '↻ Re-run with v2' : '🔬 Run with v2'}
+    </button>
+    ${hasRun ? `<span style="margin-left:10px;font-size:11px;color:#888">Last run: ${runAt}</span>` : ''}
+  `;
+
+  if (!hasRun) {
+    return `
+      <div style="padding:30px 20px;text-align:center">
+        <div style="font-size:14px;color:#333;font-weight:600;margin-bottom:8px">Engine v2 has not run on this report yet</div>
+        <div style="font-size:12px;color:#666;margin-bottom:20px;max-width:480px;margin-left:auto;margin-right:auto">
+          v2 is the new deterministic underwriting engine running in shadow mode.
+          Re-running will use the stored transaction data and produce a parallel decision
+          with full affordability breakdown. v1's decision is not affected.
+        </div>
+        ${runButton}
+      </div>
+    `;
+  }
+
+  const comparison = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;background:#f8f8f8;border-radius:8px;margin-bottom:14px">
+      <div style="padding:10px 12px;background:#fff;border-radius:6px;border-left:3px solid #888">
+        <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px">v1 (current)</div>
+        <div style="font-size:18px;font-weight:700;margin-top:2px">${v1Decision}</div>
+        <div style="font-size:13px;color:#555">${v1Amount}</div>
+      </div>
+      <div style="padding:10px 12px;background:#fff;border-radius:6px;border-left:3px solid ${a.v2Decision==='APPROVE'?'#1a6b3c':'#c0392b'}">
+        <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px">v2 (shadow)</div>
+        <div style="font-size:18px;font-weight:700;margin-top:2px;color:${a.v2Decision==='APPROVE'?'#1a6b3c':'#c0392b'}">${a.v2Decision}</div>
+        <div style="font-size:13px;color:#555">$${a.v2TierAmount ?? 0} (max affordable $${a.v2MaxAffordable ?? 0})</div>
+      </div>
+    </div>
+  `;
+
+  return `
+    <div style="padding:12px 4px 4px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-size:15px;font-weight:700">Engine v2 — shadow comparison</div>
+          <div style="font-size:11px;color:#888">Deterministic pipeline; no AI in the decision path</div>
+        </div>
+        ${runButton}
+      </div>
+      ${comparison}
+      <div class="mrhtml">${a.v2Report || ''}</div>
+    </div>
+  `;
+}
+
+async function runV2(fbId) {
+  const btn = document.getElementById('v2run-'+fbId);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;margin-right:6px;vertical-align:-2px"></span> Running...'; }
+  try {
+    const resp = await fetch('/api/rerun-v2', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {'Content-Type':'application/json','X-Session':getToken()},
+      body: JSON.stringify({firebase_id: fbId})
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      toast(data.error || 'v2 run failed', 'err');
+      if (btn) { btn.disabled = false; btn.innerHTML = '🔬 Run with v2'; }
+      return;
+    }
+    toast('v2 decision: '+String(data.decision||'').toUpperCase()+' $'+(data.tier_amount||0), 'ok');
+    // Refresh the report in the local cache & rerender
+    const a = apps.find(x=>x.firebaseId===fbId);
+    if (a) {
+      a.v2Decision = (data.decision||'').toUpperCase();
+      a.v2TierAmount = data.tier_amount;
+      a.v2MaxAffordable = data.max_affordable_loan;
+      a.v2Confidence = data.confidence;
+      a.v2Report = data.report_html;
+      a.v2ReasonsJson = JSON.stringify(data.reasons || []);
+      a.v2ReconciliationOk = data.reconciliation_ok;
+      a.v2ReconciliationError = data.reconciliation_error;
+      a.v2RunAt = Date.now();
+    }
+    // Rerender the v2 panel
+    const panel = document.getElementById('mpanel-v2-'+fbId);
+    if (panel && a) panel.innerHTML = buildV2Panel(a);
+  } catch (e) {
+    toast('v2 run error: '+e.message, 'err');
+    if (btn) { btn.disabled = false; btn.innerHTML = '🔬 Run with v2'; }
+  }
+}
 
 async function delApp(fbId){if(!confirm('Delete this application?'))return;await fbDelete(`reports/${fbId}.json`);closeModal();await loadReports();toast('Deleted','ok');}
 
