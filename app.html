@@ -907,6 +907,12 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
       <div class="sc app"><div class="slbl">Registry size</div><div class="snum grn" id="rq-reg">—</div><div class="spct">classified merchants</div></div>
     </div>
 
+    <div style="background:#f3f8f4;border:1px solid #d0e0d2;border-radius:8px;padding:12px 16px;margin-bottom:1rem;font-size:13px;color:#2c4a33;line-height:1.5">
+      <b>How this works:</b> each row is a merchant v2 didn't recognize, with sample transactions below so you can see what it is.
+      <b>If the suggestion looks right</b>, hit <b>Confirm ✓</b>. <b>If it's wrong or missing</b>, override the dropdowns first.
+      <b>Not a real merchant?</b> Hit <b>Skip</b> to dismiss it forever (noise, typos, one-offs). Picking a category here teaches the engine — every future v2 run will classify it correctly.
+    </div>
+
     <div class="tcard">
       <div id="rq-table"></div>
     </div>
@@ -2165,6 +2171,60 @@ async function loadReviewQueue() {
   }
 }
 
+// Credit categories — label + short human description shown as the dropdown option text.
+const RQ_CREDIT_OPTIONS = [
+  ['payroll',              'Payroll — wages from an employer'],
+  ['gig_income',           'Gig income — Uber/Lyft/DoorDash/Instacart payouts'],
+  ['govt_benefits',        'Govt benefits — SSA, SSI, EDD, IRS refund, unemployment'],
+  ['pension',              'Pension / retirement'],
+  ['child_support',        'Child support received'],
+  ['p2p_received',         'P2P received — Zelle/Venmo/Cash App from someone'],
+  ['fintech_advance',      'Fintech advance — Earnin/Dave/Brigit/MoneyLion paid IN'],
+  ['loan_proceeds',        'Loan proceeds — 3rd-party lender disbursement (Upstart, subprime)'],
+  ['internal_transfer',    'Internal transfer — moving money between own accounts'],
+  ['cash_deposit',         'Cash deposit — ATM/branch cash in'],
+  ['mobile_deposit',       'Mobile deposit — check scanned via phone'],
+  ['account_verification', 'Account verification — micro-deposit (e.g. $0.01 pings)'],
+  ['bnpl_refund',          'BNPL refund — Klarna/Afterpay/Affirm refund'],
+  ['other_credit',         'Other credit — catch-all (avoid if possible)'],
+];
+
+// Debit categories — label + short human description.
+const RQ_DEBIT_OPTIONS = [
+  ['rent',                 'Rent — landlord or property management'],
+  ['utilities',            'Utilities — electric/gas/water'],
+  ['phone',                'Phone bill — T-Mobile/Verizon/AT&T/etc'],
+  ['internet',             'Internet — Spectrum/Xfinity/etc'],
+  ['insurance',            'Insurance — auto/health/life'],
+  ['groceries',            'Groceries — supermarkets'],
+  ['gas_fuel',             'Gas/fuel — gas stations'],
+  ['restaurants',          'Restaurants / food delivery'],
+  ['subscriptions',        'Subscriptions — Netflix/Spotify/Prime/etc'],
+  ['loan_payment',         'Loan payment — auto/student/credit-card/personal loan'],
+  ['fintech_repayment',    'Fintech repayment — Earnin/Dave/MoneyLion pulling back OUT'],
+  ['bnpl_payment',         'BNPL payment — Klarna/Afterpay/Affirm installment'],
+  ['atm',                  'ATM withdrawal — cash out at ATM'],
+  ['money_order',          'Money order purchase'],
+  ['p2p_sent',             'P2P sent — Zelle/Venmo/Cash App out to someone'],
+  ['medical',              'Medical — doctor/hospital/pharmacy'],
+  ['transportation',       'Transportation — Uber/Lyft/parking/transit'],
+  ['childcare',            'Childcare — daycare/preschool'],
+  ['speculative',          'Speculative — casino/crypto/sports betting/lottery'],
+  ['account_verification', 'Account verification — micro-debit pings'],
+  ['internal_transfer',    'Internal transfer — to own savings/checking'],
+  ['fee',                  'Fee — overdraft/NSF/service fee'],
+  ['other_expense',        'Other expense — catch-all (avoid if possible)'],
+];
+
+function _rqSelectHTML(id, options, selected, noneLabel) {
+  const opts = options.map(([v, label]) =>
+    `<option value="${v}"${v===selected ? ' selected' : ''}>${label}</option>`
+  ).join('');
+  return `<select id="${id}" style="font-size:12px;padding:5px 6px;border:1px solid #ddd;border-radius:6px;background:#fff;width:100%">
+    <option value="">— ${noneLabel} —</option>${opts}
+  </select>`;
+}
+
 function renderReviewQueue(data) {
   const merchants = data.merchants || [];
   document.getElementById('rq-merchants').textContent = merchants.length;
@@ -2186,35 +2246,38 @@ function renderReviewQueue(data) {
     return;
   }
 
-  const creditOpts = ['payroll','gig_income','govt_benefits','pension','child_support','p2p_received','fintech_advance','loan_proceeds','internal_transfer','cash_deposit','mobile_deposit','account_verification','bnpl_refund','other_credit'];
-  const debitOpts = ['rent','utilities','phone','internet','insurance','groceries','gas_fuel','restaurants','subscriptions','loan_payment','fintech_repayment','bnpl_payment','atm','money_order','p2p_sent','medical','transportation','childcare','speculative','account_verification','internal_transfer','fee','other_expense'];
-
   const rows = merchants.map((m, i) => {
-    const samples = (m.samples || []).slice(0,3).map(s =>
-      `<div style="font-size:11px;color:#666;padding:1px 0">${s.is_credit ? '▲' : '▼'} $${(s.amount||0).toFixed(2)} · ${s.date || ''}</div>`
-    ).join('');
-    const credOpts = creditOpts.map(o => `<option value="${o}">${o}</option>`).join('');
-    const debOpts = debitOpts.map(o => `<option value="${o}">${o}</option>`).join('');
+    const samples = (m.samples || []).slice(0,3).map(s => {
+      const desc = (s.description || '').replace(/</g,'&lt;');
+      return `<div style="font-size:11px;color:#555;padding:2px 0;border-top:1px dashed #eee">
+        <span style="display:inline-block;min-width:54px;color:${s.is_credit?'#1a6b3c':'#c0392b'};font-weight:600">${s.is_credit ? '▲ IN' : '▼ OUT'} $${(s.amount||0).toFixed(2)}</span>
+        <span style="color:#333">${desc}</span>
+        <span style="color:#999">&nbsp;·&nbsp;${s.date || ''}</span>
+      </div>`;
+    }).join('');
+    const sugg = m.suggestion_source && m.suggestion_source !== 'none';
+    const suggHint = sugg ? `<div style="font-size:10px;color:#1a6b3c;margin-top:4px">💡 Suggested from ${m.suggestion_source}</div>` : '';
+    const directionHint = `<div style="font-size:10px;color:#888;margin-top:3px">${m.credit_count||0} incoming · ${m.debit_count||0} outgoing</div>`;
     return `<tr>
       <td style="vertical-align:top;padding:10px 12px">
         <div style="font-weight:700;font-size:13px">${m.pattern}</div>
-        <div style="font-size:11px;color:#888;margin-top:2px">${m.count} transaction${m.count===1?'':'s'} across ${m.reports} report${m.reports===1?'':'s'}</div>
-        <div style="margin-top:4px">${samples}</div>
+        <div style="font-size:11px;color:#888;margin-top:2px">${m.count} txn${m.count===1?'':'s'} · ${m.reports} report${m.reports===1?'':'s'}</div>
+        ${directionHint}
+        ${suggHint}
+        <div style="margin-top:6px">${samples}</div>
       </td>
-      <td style="vertical-align:top;padding:10px 12px;min-width:190px">
-        <div style="font-size:10px;color:#666;margin-bottom:2px;text-transform:uppercase">If incoming</div>
-        <select id="rq-credit-${i}" style="font-size:12px;padding:5px 6px;border:1px solid #ddd;border-radius:6px;background:#fff;width:100%">
-          <option value="">— none (don't match credit) —</option>${credOpts}
-        </select>
+      <td style="vertical-align:top;padding:10px 12px;min-width:240px">
+        <div style="font-size:10px;color:#666;margin-bottom:2px;text-transform:uppercase">If incoming (credit)</div>
+        ${_rqSelectHTML('rq-credit-'+i, RQ_CREDIT_OPTIONS, m.suggested_credit || '', "don't match credit")}
       </td>
-      <td style="vertical-align:top;padding:10px 12px;min-width:190px">
-        <div style="font-size:10px;color:#666;margin-bottom:2px;text-transform:uppercase">If outgoing</div>
-        <select id="rq-debit-${i}" style="font-size:12px;padding:5px 6px;border:1px solid #ddd;border-radius:6px;background:#fff;width:100%">
-          <option value="">— none (don't match debit) —</option>${debOpts}
-        </select>
+      <td style="vertical-align:top;padding:10px 12px;min-width:240px">
+        <div style="font-size:10px;color:#666;margin-bottom:2px;text-transform:uppercase">If outgoing (debit)</div>
+        ${_rqSelectHTML('rq-debit-'+i, RQ_DEBIT_OPTIONS, m.suggested_debit || '', "don't match debit")}
       </td>
-      <td style="vertical-align:top;padding:10px 12px;text-align:right">
-        <button class="actbtn btn-ok" style="padding:6px 14px;font-size:12px;margin:0" onclick="saveEntity(${i})" data-pattern="${encodeURIComponent(m.pattern)}">Add to registry</button>
+      <td style="vertical-align:top;padding:10px 12px;text-align:right;white-space:nowrap">
+        <button class="actbtn btn-ok" style="padding:6px 14px;font-size:12px;margin:0 0 6px 0" onclick="saveEntity(${i})" data-pattern="${encodeURIComponent(m.pattern)}">${sugg ? 'Confirm ✓' : 'Add'}</button>
+        <br>
+        <button class="actbtn btn-gh" style="padding:4px 10px;font-size:11px;margin:0" onclick="skipMerchant(${i})" data-pattern="${encodeURIComponent(m.pattern)}" title="Dismiss as noise / not a real merchant">Skip</button>
       </td>
     </tr>`;
   }).join('');
@@ -2222,12 +2285,33 @@ function renderReviewQueue(data) {
   container.innerHTML = `<table style="width:100%">
     <thead><tr>
       <th style="text-align:left;padding:10px 12px">Merchant pattern</th>
-      <th style="text-align:left;padding:10px 12px">Credit category</th>
-      <th style="text-align:left;padding:10px 12px">Debit category</th>
+      <th style="text-align:left;padding:10px 12px">If INCOMING</th>
+      <th style="text-align:left;padding:10px 12px">If OUTGOING</th>
       <th style="text-align:right;padding:10px 12px">Action</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
+}
+
+async function skipMerchant(idx) {
+  const btn = document.querySelector(`button[onclick="skipMerchant(${idx})"]`);
+  const pattern = btn ? decodeURIComponent(btn.getAttribute('data-pattern') || '') : '';
+  if (!pattern) { toast('Pattern missing', 'err'); return; }
+  if (!confirm(`Dismiss "${pattern}" from the Review Queue?\n\nIt won't appear again unless you explicitly remove it from the skip list. Transactions matching it will stay categorized as unclassified.`)) return;
+  try {
+    const resp = await fetch('/api/v2-unclassified-skip', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {'Content-Type':'application/json','X-Session':getToken()},
+      body: JSON.stringify({pattern})
+    });
+    const data = await resp.json();
+    if (!resp.ok) { toast(data.error || 'Failed to skip', 'err'); return; }
+    toast(`Dismissed "${pattern}" ✓`, 'ok');
+    loadReviewQueue();
+  } catch (e) {
+    toast('Error: ' + e.message, 'err');
+  }
 }
 
 async function saveEntity(idx) {
