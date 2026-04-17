@@ -645,7 +645,7 @@ class Handler(BaseHTTPRequestHandler):
         # ──────────────────────────────────────────────────────────────────
         # User management (admin-only except /api/password which is self-serve)
         # ──────────────────────────────────────────────────────────────────
-        if path in ('/api/users/add', '/api/users/reset', '/api/users/delete'):
+        if path in ('/api/users/add', '/api/users/reset', '/api/users/delete', '/api/users/migrate-from-env'):
             if not is_admin_session(token):
                 self.send_json(403, {'error': 'Admin access required'}); return
             session = sessions.get(token, {})
