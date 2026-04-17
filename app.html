@@ -1663,6 +1663,49 @@ function drawStatDonuts(tot,pend,appr,decl){
   drawStatDonut('sc-dec-c',rev>0?decl/rev:0,'#c0392b','rgba(192,57,43,.1)');
 }
 
+// ════════════════════════════════════════
+// DATE GROUPING
+// ════════════════════════════════════════
+function groupAppsByDay(list) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today); yesterday.setDate(today.getDate()-1);
+  const weekAgo = new Date(today); weekAgo.setDate(today.getDate()-7);
+
+  const bucketKey = (a) => {
+    const ts = a.createdAt || 0;
+    if (ts) return new Date(ts).toISOString().slice(0,10); // YYYY-MM-DD
+    if (a.date) return a.date; // Fallback; may be a human string
+    return 'unknown';
+  };
+
+  const bucketLabel = (key, ts) => {
+    if (key === 'unknown') return 'Undated';
+    const d = new Date(ts || key);
+    if (isNaN(d.getTime())) return key;
+    const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    if (dayStart.getTime() === today.getTime()) return 'Today';
+    if (dayStart.getTime() === yesterday.getTime()) return 'Yesterday';
+    if (dayStart >= weekAgo) {
+      return d.toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'});
+    }
+    return d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+  };
+
+  const buckets = {};
+  const order = [];
+  list.forEach(a => {
+    const k = bucketKey(a);
+    if (!(k in buckets)) { buckets[k] = []; order.push(k); }
+    buckets[k].push(a);
+  });
+  return order.map(k => ({
+    key: k,
+    label: bucketLabel(k, buckets[k][0] ? buckets[k][0].createdAt : null),
+    items: buckets[k]
+  }));
+}
+
 function renderDash(){
   const tot=apps.length;
   const pend=apps.filter(a=>a.status==='Pending').length;
@@ -1720,23 +1763,33 @@ function renderDash(){
   c.dataset.structureKey = structureKey;
   c.dataset.renderKey = dataKey;
 
-  const rows=filtered.map(a=>{
-    const wid='dw'+(a.firebaseId?.replace(/[^a-z0-9]/gi,'')||'');
-    const ok=a.status==='Approved';
-    return `<tr data-id="${a.firebaseId}" data-score="${a.score||0}" oncontextmenu="showCtxMenu(event,'${a.firebaseId}')" style="cursor:pointer">
-      <td onclick="event.stopPropagation()"><input type="checkbox" class="row-chk" data-id="${a.firebaseId}" onchange="updateSelCount()" style="cursor:pointer;width:15px;height:15px"></td>
-      <td onclick="openModal('${a.firebaseId}')">
-        <div class="nbig">${a.name||'—'}</div>
-        <div class="nsub">${a.filename||''}</div>
-      </td>
-      <td onclick="openModal('${a.firebaseId}')" style="background:${scoreBg(a.score||0)};text-align:center;padding:8px">
-        <canvas id="${wid}" width="44" height="44"></canvas>
-      </td>
-      <td onclick="openModal('${a.firebaseId}')" class="amt-cell abig" style="font-size:${ok?'15px':'13px'};color:${ok?'var(--green)':'var(--muted)'}">${ok?(a.amount||'—'):'—'}</td>
-      <td onclick="openModal('${a.firebaseId}')">${srcBadge(a.source)}</td>
-      <td onclick="openModal('${a.firebaseId}')" style="color:var(--muted);font-size:12px">${a.date||''}<br><span style="font-size:11px;color:var(--muted2)">${a.time||''}</span></td>
-      <td onclick="openModal('${a.firebaseId}')"><span class="pill pill-${a.status?.toLowerCase()||'p'}">${a.status||'Pending'}</span></td>
-    </tr>`;
+  // Group by day for readability. Uses createdAt when present, otherwise
+  // falls back to the stored `date` field. Header rows are decorative;
+  // actual data rows still use data-id so in-place updates work.
+  const groups = groupAppsByDay(filtered);
+
+  const rows = groups.map(group => {
+    const header = `<tr class="day-group-header"><td colspan="7" style="background:#f6f8f7;padding:8px 16px;font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:1px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)">${group.label} <span style="color:var(--muted2);font-weight:500;margin-left:8px">${group.items.length} application${group.items.length===1?'':'s'}</span></td></tr>`;
+    const body = group.items.map(a=>{
+      const wid='dw'+(a.firebaseId?.replace(/[^a-z0-9]/gi,'')||'');
+      const ok=a.status==='Approved';
+      const v2Badge = a.v2Decision ? ` <span title="v2: ${a.v2Decision} $${a.v2TierAmount||0}" style="background:${a.v2Decision==='APPROVE'?'#eef9f1':'#fff4f0'};color:${a.v2Decision==='APPROVE'?'#1a6b3c':'#c0392b'};padding:1px 5px;border-radius:8px;font-size:9px;font-weight:700;margin-left:4px">v2</span>` : '';
+      return `<tr data-id="${a.firebaseId}" data-score="${a.score||0}" oncontextmenu="showCtxMenu(event,'${a.firebaseId}')" style="cursor:pointer">
+        <td onclick="event.stopPropagation()"><input type="checkbox" class="row-chk" data-id="${a.firebaseId}" onchange="updateSelCount()" style="cursor:pointer;width:15px;height:15px"></td>
+        <td onclick="openModal('${a.firebaseId}')">
+          <div class="nbig">${a.name||'—'}${v2Badge}</div>
+          <div class="nsub">${a.filename||''}</div>
+        </td>
+        <td onclick="openModal('${a.firebaseId}')" style="background:${scoreBg(a.score||0)};text-align:center;padding:8px">
+          <canvas id="${wid}" width="44" height="44"></canvas>
+        </td>
+        <td onclick="openModal('${a.firebaseId}')" class="amt-cell abig" style="font-size:${ok?'15px':'13px'};color:${ok?'var(--green)':'var(--muted)'}">${ok?(a.amount||'—'):'—'}</td>
+        <td onclick="openModal('${a.firebaseId}')">${srcBadge(a.source)}</td>
+        <td onclick="openModal('${a.firebaseId}')" style="color:var(--muted);font-size:12px">${a.date||''}<br><span style="font-size:11px;color:var(--muted2)">${a.time||''}</span></td>
+        <td onclick="openModal('${a.firebaseId}')"><span class="pill pill-${a.status?.toLowerCase()||'p'}">${a.status||'Pending'}</span></td>
+      </tr>`;
+    }).join('');
+    return header + body;
   }).join('');
 
   c.innerHTML=`<table><thead><tr>
