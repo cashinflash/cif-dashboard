@@ -3081,12 +3081,28 @@ function buildV2Panel(a) {
   const v1Decision = a.claudeDecision || a.status || '—';
   const v1Amount = a.amount || 'N/A';
 
+  const canRefresh = !!a.plaidAssetToken;
+  const acctCount = a.connectedAccountCount;
+  const refreshedAt = a.plaidRefreshedAt ? new Date(a.plaidRefreshedAt).toLocaleString() : '';
   const runButton = `
-    <button onclick="runV2('${a.firebaseId}')" id="v2run-${a.firebaseId}"
-            style="background:#1a6b3c;color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
-      ${hasRun ? '↻ Re-run with v2' : '🔬 Run with v2'}
-    </button>
-    ${hasRun ? `<span style="margin-left:10px;font-size:11px;color:#888">Last run: ${runAt}</span>` : ''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button onclick="runV2('${a.firebaseId}')" id="v2run-${a.firebaseId}"
+              style="background:#1a6b3c;color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+        ${hasRun ? 'Re-run with v2 (stored data)' : 'Run with v2'}
+      </button>
+      ${canRefresh ? `
+        <button onclick="refreshFromPlaid('${a.firebaseId}')" id="plaidref-${a.firebaseId}"
+                title="Pulls fresh data from Plaid across ALL connected accounts, then re-runs v2. Use this when you suspect the stored extraction missed an account (e.g., payroll is on Chime but applicant connected a secondary bank too)."
+                style="background:#fff8e5;color:#6b4d00;border:1px solid #f2d46c;padding:10px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+          Refresh from Plaid &amp; Re-run
+        </button>
+      ` : ''}
+    </div>
+    <div style="font-size:11px;color:#888;margin-top:8px">
+      ${hasRun ? `Last v2 run: ${runAt}` : ''}
+      ${refreshedAt ? ` &nbsp;\u00b7\u00b7\u00b7 Plaid refreshed: ${refreshedAt}` : ''}
+      ${acctCount ? ` &nbsp;\u00b7\u00b7\u00b7 <b>${acctCount} Plaid account${acctCount > 1 ? 's' : ''} connected</b>` : ''}
+    </div>
   `;
 
   if (!hasRun) {
@@ -3174,6 +3190,53 @@ async function runV2(fbId) {
   } catch (e) {
     toast('v2 run error: '+e.message, 'err');
     if (btn) { btn.disabled = false; btn.innerHTML = '🔬 Run with v2'; }
+  }
+}
+
+// Re-fetches the Plaid asset report using the stored access token, runs it
+// through the new multi-account extractor, overwrites extractedData in
+// Firebase, then re-runs v2. Use this when you suspect the original
+// extraction missed an account (Jairo Canas pattern — payroll was in a
+// second Plaid-connected account that the old extractor discarded).
+async function refreshFromPlaid(fbId) {
+  if (!confirm(
+    'Refresh this applicant\'s data from Plaid?\n\n' +
+    'This pulls a fresh asset report across ALL connected accounts and re-runs v2. ' +
+    'Takes up to ~2 minutes. v1 decision is not changed automatically.'
+  )) return;
+
+  const btn = document.getElementById('plaidref-'+fbId);
+  if (btn) {
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+    btn.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border:2px solid #6b4d00;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;margin-right:6px;vertical-align:-2px"></span> Fetching from Plaid...';
+  }
+  try {
+    const resp = await fetch('/api/refresh-from-plaid', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ firebase_id: fbId }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) {
+      toast(data.error || 'Refresh failed', 'err');
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = 'Refresh from Plaid &amp; Re-run'; }
+      return;
+    }
+    const n = data.connected_account_count || 1;
+    const income = (data.v2_verified_income_monthly || 0).toFixed(0);
+    toast(
+      `Plaid refreshed: ${n} account${n>1?'s':''}, ${data.transaction_count} txns. ` +
+      `v2 says ${String(data.v2_decision || '').toUpperCase()} — verified income $${income}/mo.`,
+      'ok'
+    );
+    logAudit('plaid.refreshed', fbId, `${n} accounts, v2 ${data.v2_decision}`);
+    await loadReports();
+    openModal(fbId);
+  } catch (e) {
+    toast('Refresh error: ' + e.message, 'err');
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = 'Refresh from Plaid &amp; Re-run'; }
   }
 }
 
