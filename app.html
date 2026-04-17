@@ -87,13 +87,6 @@ header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8
 .ibadge{background:var(--gold);color:white;font-size:10px;font-weight:700;padding:4px 10px;border-radius:20px;letter-spacing:.08em;text-transform:uppercase}
 .sbtn{width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.8);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .sbtn:hover{background:rgba(255,255,255,.2);color:white}
-.profile-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:white;font-size:11px;font-weight:600;padding:5px 12px;border-radius:20px;cursor:pointer;font-family:var(--sans);display:flex;align-items:center;gap:6px;position:relative}
-.profile-dd{display:none;position:absolute;right:0;top:calc(100% + 8px);background:white;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-lg);min-width:160px;z-index:999;overflow:hidden}
-.profile-dd.open{display:block}
-.profile-dd-hdr{padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);border-bottom:1px solid var(--border)}
-.profile-dd-item{padding:10px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;transition:background .1s}
-.profile-dd-item:hover{background:var(--bg)}
-.profile-dd-item.active{font-weight:700;color:var(--green)}
 .sp{display:none;background:var(--surface);border-bottom:1px solid var(--border)}
 .sp.open{display:block}
 .si{max-width:960px;margin:0 auto;padding:1rem 1.5rem;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
@@ -369,6 +362,14 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 /* Row hover on tables */
 table tbody tr{transition:background .12s}
 table tbody tr:hover td{background:#f5f9f6}
+/* Keyboard focus (J/K navigation) */
+table tbody tr.kbd-focus td{background:#e6f4ea !important;box-shadow:inset 3px 0 0 var(--green)}
+/* Inline keyboard-key styling for the shortcut help panel */
+kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;background:var(--surface2);color:var(--text);text-align:center;min-width:22px}
+/* Quick-filter pills */
+.qfp{padding:5px 12px;border-radius:999px;border:1px solid var(--border);background:#fff;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--sans);transition:all .15s}
+.qfp:hover{border-color:var(--green);color:var(--green)}
+.qfp.active{background:var(--green);border-color:var(--green);color:#fff}
 /* Status pill — shape + color + text (not color-only). */
 .pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;line-height:1}
 .pill-ok{background:#e6f4ea;color:#106c3a;border:1px solid #b5dcbf}
@@ -426,6 +427,7 @@ table tbody tr:hover td{background:#f5f9f6}
     <button class="nb" onclick="showView('rules',this);toggleMobMenu()"><svg class="icn"><use href="#icn-sliders"/></svg>Rules Engine</button>
     <button class="nb" onclick="showView('plaid',this);toggleMobMenu()"><svg class="icn"><use href="#icn-bank"/></svg>Plaid Customers</button>
     <button class="nb admin-only" onclick="showView('users',this);toggleMobMenu()" style="display:none"><svg class="icn"><use href="#icn-users"/></svg>Users</button>
+    <button class="nb admin-only" onclick="showView('audit',this);toggleMobMenu()" style="display:none"><svg class="icn"><use href="#icn-file"/></svg>Audit log</button>
   </div>
 </div>
 <div class="hnav">
@@ -446,6 +448,7 @@ table tbody tr:hover td{background:#f5f9f6}
     <button class="nb" id="nav-rules" onclick="showView('rules',this)"><svg class="icn"><use href="#icn-sliders"/></svg>Rules Engine</button>
     <button class="nb" id="nav-plaid" onclick="showView('plaid',this)"><svg class="icn"><use href="#icn-bank"/></svg>Plaid Customers</button>
     <button class="nb admin-only" id="nav-users" onclick="showView('users',this)" style="display:none"><svg class="icn"><use href="#icn-users"/></svg>Users</button>
+    <button class="nb admin-only" id="nav-audit" onclick="showView('audit',this)" style="display:none"><svg class="icn"><use href="#icn-file"/></svg>Audit log</button>
   </div>
   <div class="hright">
     <div class="ibadge">Internal Only</div>
@@ -453,6 +456,7 @@ table tbody tr:hover td{background:#f5f9f6}
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       <span id="user-label" style="font-size:12px;font-weight:600;color:rgba(255,255,255,.85)"></span>
     </div>
+    <button class="sbtn" onclick="showShortcutHelp()" title="Keyboard shortcuts (?)" style="background:rgba(255,255,255,.12);font-size:13px;font-weight:700">?</button>
     <button class="sbtn" onclick="openChangePasswordModal()" title="Change my password" style="background:rgba(255,255,255,.12)">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
     </button>
@@ -874,11 +878,22 @@ table tbody tr:hover td{background:#f5f9f6}
         </div>
       </div>
     </div>
+    <!-- Saved filter pills: one-click views for the most common queries. -->
+    <div id="quick-filters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="qfp" data-qf="all" onclick="setQuickFilter('all')">All</button>
+      <button class="qfp" data-qf="today" onclick="setQuickFilter('today')">Today</button>
+      <button class="qfp" data-qf="pending" onclick="setQuickFilter('pending')">Pending</button>
+      <button class="qfp" data-qf="pending24" onclick="setQuickFilter('pending24')">Pending &gt; 24h</button>
+      <button class="qfp" data-qf="declined" onclick="setQuickFilter('declined')">Declined</button>
+      <button class="qfp" data-qf="approved" onclick="setQuickFilter('approved')">Approved</button>
+      <button class="qfp" data-qf="autodecide" onclick="setQuickFilter('autodecide')">Auto-decide candidates</button>
+      <button class="qfp" style="margin-left:auto;border-color:var(--green);color:var(--green)" onclick="exportCSV()">Export CSV</button>
+    </div>
     <div class="tcard">
       <div class="ttb">
-        <div class="sbox"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7c72" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" placeholder="Search applicants..." oninput="filterDash(this.value)"></div>
+        <div class="sbox"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7c72" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" placeholder="Search applicants... (press / to focus)" oninput="filterDash(this.value)"></div>
         <select class="fsel" onchange="filterStatus(this.value)"><option value="">All statuses</option><option value="Approved">Approved</option><option value="Declined">Declined</option><option value="Pending">Pending</option></select>
-        <button id="del-selected-btn" class="actbtn btn-gh" onclick="deleteSelected()" style="display:none;color:var(--red);border-color:var(--red-border)">🗑 Delete Selected (<span id="sel-count">0</span>)</button>
+        <button id="del-selected-btn" class="actbtn btn-gh" onclick="deleteSelected()" style="display:none;color:var(--red);border-color:var(--red-border)">Delete Selected (<span id="sel-count">0</span>)</button>
       </div>
       <div id="dtable"></div>
     </div>
@@ -931,6 +946,25 @@ table tbody tr:hover td{background:#f5f9f6}
         </select>
       </div>
       <div id="v2c-table"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Audit log — admin-only, shows who did what when -->
+<div id="view-audit" class="view">
+  <div class="container">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:12px">
+      <div>
+        <div class="ptitle" style="display:flex;align-items:center;gap:10px"><svg class="icn icn-lg"><use href="#icn-file"/></svg>Audit log</div>
+        <div class="psub" style="margin-bottom:0">Every decision, note, deletion, and user-management action. Most recent first.</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="actbtn btn-gh" onclick="loadAuditLog()"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Refresh</button>
+        <button class="actbtn btn-gh" onclick="exportAuditCSV()">Export CSV</button>
+      </div>
+    </div>
+    <div class="tcard">
+      <div id="audit-table" style="padding:0"></div>
     </div>
   </div>
 </div>
@@ -1256,9 +1290,39 @@ async function saveReport(data) {
   }
 }
 
+// Conflict-safe report update.
+// Reads the remote updatedAt just before write and compares to the local copy.
+// If they differ, a second underwriter has edited this record since we loaded
+// it — surface the conflict instead of silently overwriting their work.
 async function updateReport(id, data) {
-  try { await fbPatch(`reports/${id}.json`, data); }
-  catch(e) { toast('Update failed','err'); }
+  try {
+    const local = apps.find(a => a.firebaseId === id);
+    const localUpdatedAt = local && local.updatedAt ? Number(local.updatedAt) : 0;
+    if (localUpdatedAt) {
+      try {
+        const remote = await fbGet(`reports/${id}/updatedAt.json`);
+        const remoteUpdatedAt = remote ? Number(remote) : 0;
+        if (remoteUpdatedAt && remoteUpdatedAt > localUpdatedAt) {
+          const proceed = confirm(
+            'This application was just updated by another user.\n\n' +
+            'Saving now will overwrite their changes. Click Cancel to ' +
+            'reload first and see what changed, or OK to save anyway.'
+          );
+          if (!proceed) { await loadReports(); throw new Error('Conflict — reloaded'); }
+        }
+      } catch (readErr) {
+        if (readErr.message?.startsWith('Conflict')) throw readErr;
+        // If the read fails for network reasons, fall through and attempt the write.
+      }
+    }
+    // Always stamp updatedAt on every write so future conflict checks work.
+    const payload = { ...data, updatedAt: Date.now() };
+    await fbPatch(`reports/${id}.json`, payload);
+    if (local) Object.assign(local, payload);
+  } catch (e) {
+    if (e.message?.startsWith('Conflict')) return;  // handled above
+    toast('Update failed', 'err');
+  }
 }
 
 function updateSyncStatus(ok) {
@@ -1287,6 +1351,7 @@ function showView(name, btn) {
   if (name==='v2compare') { loadReports().then(renderV2Compare); }
   if (name==='reviewqueue') loadReviewQueue();
   if (name==='users') loadUsers();
+  if (name==='audit') loadAuditLog();
 }
 
 // ════════════════════════════════════════
@@ -1326,32 +1391,12 @@ function deleteProfile(n) {
 
 function saveProfilesStore() { localStorage.setItem('cif_profiles',JSON.stringify(profiles)); }
 
-function toggleProfileDD() {
-  const dd = document.getElementById('profile-dd');
-  if (!dd) return;  // header picker was removed; Rules Engine page uses in-page controls instead
-  dd.classList.toggle('open');
-  if (dd.classList.contains('open')) renderProfileDD();
-}
-
-function renderProfileDD() {
-  const list = document.getElementById('profile-dd-list');
-  if (!list) return;
-  list.innerHTML = Object.keys(profiles).map(n => `
-    <div class="profile-dd-item ${n===activeProfile?'active':''}" onclick="switchActive('${n}')">
-      ${n}
-      ${n===activeProfile?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>':''}
-    </div>`).join('');
-}
-
 function switchActive(n) {
   activeProfile = n;
   localStorage.setItem('cif_active_profile',n);
   updateProfileBadge();
-  const dd = document.getElementById('profile-dd');
-  if (dd) dd.classList.remove('open');
-  // Push new active profile to Firebase
   pushSettingsToFirebase(n, profiles[n] || DR);
-  toast(`Switched to "${n}" ✓`, 'ok');
+  toast(`Switched to "${n}"`, 'ok');
 }
 
 function updateProfileBadge() {
@@ -1364,11 +1409,6 @@ function updateProfileBadge() {
   if (b) b.textContent = activeProfile;
 }
 
-document.addEventListener('click', e => {
-  const btn = document.getElementById('profile-btn');
-  const dd = document.getElementById('profile-dd');
-  if (btn && dd && !btn.contains(e.target) && !dd.contains(e.target)) dd.classList.remove('open');
-});
 
 // ════════════════════════════════════════
 // RULES UI
@@ -2041,7 +2081,8 @@ function renderDash(){
     ? `${Math.round(declToday/reviewedToday*100)}% today · ${decl.toLocaleString()} all-time`
     : `${decl.toLocaleString()} declined all-time`;
 
-  const filtered=apps.filter(a=>(!srch||a.name?.toLowerCase().includes(srch.toLowerCase()))&&(!stFilter||a.status===stFilter));
+  updateQuickFilterActive();
+  const filtered=applyQuickFilter(apps.filter(a=>(!srch||a.name?.toLowerCase().includes(srch.toLowerCase()))&&(!stFilter||a.status===stFilter)));
   const c=document.getElementById('dtable');
 
   if(!filtered.length){
@@ -2107,11 +2148,17 @@ function renderDash(){
       const wid='dw'+(a.firebaseId?.replace(/[^a-z0-9]/gi,'')||'');
       const ok=a.status==='Approved';
       const v2Badge = a.v2Decision ? ` <span title="v2: ${a.v2Decision} $${a.v2TierAmount||0}" style="background:${a.v2Decision==='APPROVE'?'#eef9f1':'#fff4f0'};color:${a.v2Decision==='APPROVE'?'#1a6b3c':'#c0392b'};padding:1px 5px;border-radius:8px;font-size:9px;font-weight:700;margin-left:4px">v2</span>` : '';
-      return `<tr data-id="${a.firebaseId}" data-day-group="${stateKey}" data-score="${a.score||0}" oncontextmenu="showCtxMenu(event,'${a.firebaseId}')" style="cursor:pointer;display:${rowDisplay}">
+      const autoBadge = a.v2AutoDecide ? ` <span title="High confidence, no review flags — engine would 1-click approve" style="background:#e6f4ea;color:#1a6b3c;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;margin-left:4px">auto ✓</span>` : '';
+      // FCF monthly (stored on v2 shadow or as part of v1 report metadata).
+      const fcf = (typeof a.v2MaxAffordable === 'number' || typeof a.v2FcfMonthly === 'number') ? (a.v2FcfMonthly ?? null) : null;
+      const fcfCell = fcf != null
+        ? `<span style="font-family:var(--mono);font-size:12px;color:${fcf>=300?'var(--green)':fcf>=0?'var(--muted)':'var(--red)'}">$${Math.round(fcf).toLocaleString()}/mo</span>`
+        : '<span style="color:var(--muted2);font-size:12px">—</span>';
+      return `<tr data-id="${a.firebaseId}" data-kbd="${a.firebaseId}" data-day-group="${stateKey}" data-score="${a.score||0}" oncontextmenu="showCtxMenu(event,'${a.firebaseId}')" style="cursor:pointer;display:${rowDisplay}">
         <td onclick="event.stopPropagation()"><input type="checkbox" class="row-chk" data-id="${a.firebaseId}" onchange="updateSelCount()" style="cursor:pointer;width:15px;height:15px"></td>
         <td onclick="openModal('${a.firebaseId}')">
-          <div class="nbig">${a.name||'—'}${v2Badge}</div>
-          <div class="nsub">${a.filename||''}</div>
+          <div class="nbig">${a.name||'—'}${v2Badge}${autoBadge}</div>
+          <div class="nsub">${a.filename||''} ${fcf!=null ? '· FCF ' + fcfCell : ''}</div>
         </td>
         <td onclick="openModal('${a.firebaseId}')" style="background:${scoreBg(a.score||0)};text-align:center;padding:8px">
           <canvas id="${wid}" width="44" height="44"></canvas>
@@ -2518,6 +2565,80 @@ function filterDash(v){srch=v;renderDash();}
 
 function filterStatus(v){stFilter=v;renderDash();}
 
+// Persisted one-click filter presets. localStorage keeps the choice across
+// refresh so the underwriter always lands where they left off.
+let quickFilter = localStorage.getItem('cif_quick_filter') || 'all';
+function setQuickFilter(name) {
+  quickFilter = name;
+  localStorage.setItem('cif_quick_filter', name);
+  // Status dropdown is disjoint from the quick filters — reset it when a
+  // preset is picked so it doesn't compound unexpectedly.
+  if (name !== 'all') stFilter = '';
+  renderDash();
+}
+function applyQuickFilter(list) {
+  const now = Date.now();
+  switch (quickFilter) {
+    case 'today': {
+      const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
+      return list.filter(a => (a.createdAt || 0) >= startOfDay.getTime());
+    }
+    case 'pending':
+      return list.filter(a => a.status === 'Pending');
+    case 'pending24':
+      return list.filter(a => a.status === 'Pending' && (a.createdAt || 0) < now - 24*60*60*1000);
+    case 'declined':
+      return list.filter(a => a.status === 'Declined');
+    case 'approved':
+      return list.filter(a => a.status === 'Approved');
+    case 'autodecide':
+      return list.filter(a => !!a.v2AutoDecide);
+    case 'all':
+    default:
+      return list;
+  }
+}
+function updateQuickFilterActive() {
+  document.querySelectorAll('#quick-filters .qfp').forEach(b => {
+    b.classList.toggle('active', b.dataset.qf === quickFilter);
+  });
+}
+
+// CSV export of the currently-visible (filtered) rows. Safer than "all apps"
+// — the filter you chose is what you get. Quotes are escaped per RFC 4180.
+function _csvEscape(v) {
+  if (v == null) return '';
+  const s = String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+function exportCSV() {
+  const list = _dashVisibleApps();
+  if (!list.length) { toast('Nothing to export for this filter', 'err'); return; }
+  const rows = [['Name','Status','Amount','Score','FCF Monthly','v2 Decision','Auto-decide','Date','Time']];
+  for (const a of list) {
+    rows.push([
+      a.name || '',
+      a.status || '',
+      a.amount || '',
+      a.score ?? '',
+      (typeof a.v2FcfMonthly === 'number' ? a.v2FcfMonthly : ''),
+      a.v2Decision || '',
+      a.v2AutoDecide ? 'yes' : '',
+      a.date || '',
+      a.time || '',
+    ]);
+  }
+  const csv = rows.map(r => r.map(_csvEscape).join(',')).join('\r\n');
+  const stamp = new Date().toISOString().slice(0,10);
+  const blob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `cif-reports-${stamp}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  toast(`Exported ${list.length} row${list.length>1?'s':''}`, 'ok');
+}
+
 function toggleAllCheck(cb) {
   document.querySelectorAll('.row-chk').forEach(c => c.checked = cb.checked);
   updateSelCount();
@@ -2570,10 +2691,12 @@ async function deleteSelected() {
 
   if (failed === 0) {
     toast(`${n} report${n>1?'s':''} deleted`, 'ok');
+    logAudit('report.bulk_delete', '', `count=${n}`);
   } else if (failed === n) {
     toast(`Delete failed — none removed`, 'err');
   } else {
     toast(`${n - failed} deleted, ${failed} failed`, 'err');
+    logAudit('report.bulk_delete', '', `count=${n - failed}; failed=${failed}`);
   }
 }
 
@@ -2582,6 +2705,7 @@ async function deleteSelected() {
 // ════════════════════════════════════════
 function openModal(fbId){
   const a=apps.find(x=>x.firebaseId===fbId);if(!a)return;
+  _currentModalFbId = fbId;
   // Determine effective decision from all available signals
   const cdec = (a.claudeDecision||'').toUpperCase();
   // Use status field as primary truth — it's set by server after processing
@@ -2596,7 +2720,9 @@ function openModal(fbId){
   const isPendingReview = effectiveDecision==='PENDING_REVIEW';
   const dc = ok?'ok':isDeclined?'no':isProcessing?'pending':'';
   document.getElementById('mtitle').textContent=a.formName||a.name||'Application';
+  const dupeBannerHtml = _buildDupeBanner(a);
   document.getElementById('mbody').innerHTML=`
+${dupeBannerHtml}
 <div class="mdh ${dc||'pending'}">
   <div class="mdh-inner" style="flex:1">
     <div style="flex:1">
@@ -2630,7 +2756,8 @@ ${a.extractedSSN?`<div style="display:flex;align-items:center;justify-content:sp
     ${a.status!=='Approved'?`<div style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,var(--green-dark),var(--green));border-radius:10px;padding:6px 8px 6px 14px"><span style="font-size:13px;font-weight:700;color:white">$</span><input id="modal-approve-amt" type="text" placeholder="255" value="${a.amount&&a.amount!=='N/A'?a.amount.replace('$',''):''}" style="width:60px;border:none;background:transparent;font-size:15px;font-weight:800;color:white;outline:none;font-family:var(--sans)" oninput="const b=document.getElementById('approve-btn-${fbId}');if(b)b.textContent='✓ Approve $'+this.value"><button class="mact-primary" onclick="updStatusWithAmt('${fbId}','Approved')" style="background:rgba(255,255,255,.25);color:white;border:1px solid rgba(255,255,255,.3)" id="approve-btn-${fbId}">✓ Approve${a.amount&&a.amount!=='N/A'?' '+a.amount:''}</button></div>`:'<span style="background:var(--green-light);color:var(--green);border:1px solid var(--green-border);border-radius:9px;padding:7px 16px;font-size:13px;font-weight:700">✓ Approved</span>'}
     ${a.status!=='Declined'?`<button class="mact-primary" onclick="updStatus('${fbId}','Declined')" style="background:var(--red);color:white">✕ Decline</button>`:'<span style="background:var(--red-light);color:var(--red);border:1px solid var(--red-border);border-radius:9px;padding:7px 16px;font-size:13px;font-weight:700">✕ Declined</span>'}
     ${(isDeclined||a.status==='Declined')?`<button class="mact-primary" onclick="openDenialModal('${fbId}')" style="background:#e8650a;color:white">📧 Denial Email</button>`:''}
-    ${(a.status==='Error'||a.status==='Processing')&&a.plaidAccessToken?`<button class="mact-primary" onclick="rerunFromModal('${fbId}')" style="background:var(--blue);color:white">↺ Retry</button>`:''}
+<!-- Retry button disabled: /api/rerun-plaid currently creates an orphan Processing record. Will re-enable when the backend handler is finished. -->
+    ${''}
   </div>
   <div style="display:flex;gap:6px;margin-left:auto">
     <button class="mact-secondary" onclick="copyModal('${fbId}')">⎘ Copy</button>
@@ -2672,10 +2799,11 @@ ${(a.fcf!=null||a.monthlyIncome!=null)?`<div class="msummary">
 <div id="mpanel-docs-${fbId}" style="display:none">${buildDocsPanel(a)}</div>
 <div id="mpanel-notes-${fbId}" style="display:none">
   <div style="padding:8px 0">
-    <textarea style="width:100%;min-height:160px;border:1.5px solid var(--border2);border-radius:10px;padding:13px;font-size:13.5px;font-family:var(--sans);color:var(--text);background:var(--bg);resize:vertical;line-height:1.7" id="mnt${fbId}" placeholder="Add underwriter notes — observations, conditions, follow-up items...">${a.notes||''}</textarea>
+    <div id="notes-thread-${fbId}" style="max-height:340px;overflow-y:auto;padding:4px 2px;margin-bottom:10px">${renderNotesThread(a)}</div>
+    <textarea style="width:100%;min-height:100px;border:1.5px solid var(--border2);border-radius:10px;padding:13px;font-size:13.5px;font-family:var(--sans);color:var(--text);background:var(--bg);resize:vertical;line-height:1.7" id="mnt${fbId}" placeholder="Add a note — observations, conditions, follow-up items..."></textarea>
     <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-      <button class="nsave" onclick="saveModalNotes('${fbId}')">Save Notes</button>
-      <span style="font-size:11px;color:var(--muted)">Auto-saves as you type</span>
+      <button class="nsave" onclick="addThreadedNote('${fbId}')">Post note</button>
+      <span style="font-size:11px;color:var(--muted)">Posted as <b>${escHtml(_currentUser || 'you')}</b> with a timestamp.</span>
     </div>
   </div>
 </div>
@@ -2878,14 +3006,69 @@ async function downloadDoc(url, filename) {
   }
 }
 
-async function saveModalNotes(fbId){const ta=document.getElementById('mnt'+fbId);if(!ta)return;await updateReport(fbId,{notes:ta.value,updatedAt:Date.now()});toast('Notes saved ✓','ok');}
-async function updStatus(fbId,s){await updateReport(fbId,{status:s,updatedAt:Date.now()});await loadReports();openModal(fbId);toast('Updated to '+s+' ✓','ok');}
+// ── Threaded notes ──
+// Legacy shape: a.notes is a single string. New shape: a.notesThread is an
+// array of {author, at, text}. renderNotesThread handles both: any legacy
+// string gets shown as a single read-only "imported" entry at the top.
+function renderNotesThread(a) {
+  const thread = Array.isArray(a.notesThread) ? a.notesThread.slice() : [];
+  const legacy = typeof a.notes === 'string' ? a.notes.trim() : '';
+  const entries = [];
+  if (legacy) {
+    entries.push({ author: '(imported)', at: a.updatedAt || a.createdAt || 0, text: legacy, legacy: true });
+  }
+  entries.push(...thread);
+  entries.sort((x, y) => (y.at || 0) - (x.at || 0));
+  if (!entries.length) {
+    return '<div style="font-size:12px;color:var(--muted);padding:10px;text-align:center">No notes yet. Add the first one below.</div>';
+  }
+  return entries.map(e => {
+    const when = e.at ? new Date(e.at).toLocaleString() : '(no date)';
+    return `<div style="border-left:3px solid ${e.legacy ? '#ccd6ce' : 'var(--green)'};padding:8px 12px;margin-bottom:8px;background:${e.legacy?'#f7faf7':'#fff'};border-radius:0 8px 8px 0">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px"><b style="color:var(--text)">${escHtml(e.author || 'unknown')}</b> · ${escHtml(when)}${e.legacy ? ' · <span style="color:#a15c00">imported</span>' : ''}</div>
+      <div style="font-size:13px;color:var(--text);line-height:1.6;white-space:pre-wrap">${escHtml(e.text || '')}</div>
+    </div>`;
+  }).join('');
+}
+
+async function addThreadedNote(fbId) {
+  const ta = document.getElementById('mnt' + fbId);
+  if (!ta) return;
+  const text = (ta.value || '').trim();
+  if (!text) { toast('Write something first', 'err'); return; }
+  const a = apps.find(x => x.firebaseId === fbId);
+  if (!a) return;
+  const thread = Array.isArray(a.notesThread) ? a.notesThread.slice() : [];
+  thread.push({
+    author: _currentUser || 'unknown',
+    at: Date.now(),
+    text,
+  });
+  await updateReport(fbId, { notesThread: thread });
+  a.notesThread = thread;
+  ta.value = '';
+  const container = document.getElementById('notes-thread-' + fbId);
+  if (container) container.innerHTML = renderNotesThread(a);
+  logAudit('note.added', a.name || fbId, text.slice(0, 80));
+  toast('Note posted', 'ok');
+}
+
+// Legacy single-blob save path kept for any lingering callers.
+async function saveModalNotes(fbId){const ta=document.getElementById('mnt'+fbId);if(!ta)return;await updateReport(fbId,{notes:ta.value});toast('Notes saved','ok');}
+async function updStatus(fbId,s){
+  const a = apps.find(x => x.firebaseId === fbId);
+  await updateReport(fbId,{status:s});
+  logAudit(`decision.${s.toLowerCase()}`, a?.name || fbId, `amount=${a?.amount || '-'}`);
+  await loadReports();openModal(fbId);toast('Updated to '+s,'ok');
+}
 async function updStatusWithAmt(fbId,s){
   const inp=document.getElementById('modal-approve-amt');
   const amt=inp?inp.value.trim():'';
   const final=amt?'$'+amt.replace('$',''):'N/A';
-  await updateReport(fbId,{status:s,amount:final,updatedAt:Date.now()});
-  await loadReports();openModal(fbId);toast('Updated to '+s+' ✓','ok');
+  const a = apps.find(x => x.firebaseId === fbId);
+  await updateReport(fbId,{status:s,amount:final});
+  logAudit(`decision.${s.toLowerCase()}`, a?.name || fbId, `amount=${final}`);
+  await loadReports();openModal(fbId);toast('Updated to '+s,'ok');
 }
 function copyModal(fbId){const a=apps.find(x=>x.firebaseId===fbId);if(a){const t=document.createElement('div');t.innerHTML=a.report;navigator.clipboard.writeText(t.textContent).then(()=>toast('Copied ✓','ok'));}}
 
@@ -2996,8 +3179,245 @@ async function runV2(fbId) {
 
 async function delApp(fbId){if(!confirm('Delete this application?'))return;await fbDelete(`reports/${fbId}.json`);closeModal();await loadReports();toast('Deleted','ok');}
 
-function closeModal(){document.getElementById('ov').classList.remove('open');}
+// ════════════════════════════════════════
+// AUDIT LOG
+// Writes to Firebase /audit/<id> on every decision/note/delete/user action.
+// Admin page reads the last 200 entries, newest first. [AUDIT] log lines
+// still appear in Render for server-side actions; this captures the
+// client-driven ones too.
+// ════════════════════════════════════════
+async function logAudit(action, targetName, details) {
+  try {
+    const rec = {
+      action,
+      user: _currentUser || 'unknown',
+      target: targetName || '',
+      at: Date.now(),
+      details: details || '',
+    };
+    // Firebase RTDB doesn't have server-gen IDs without POST, but we use PATCH
+    // via our proxy which defaults to "update under this key". Use a
+    // client-generated ordered key (timestamp + rand) for easy newest-first sort.
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    await fbPatch(`audit/${id}.json`, rec);
+  } catch (e) { /* audit failure shouldn't block the action */ }
+}
+
+async function loadAuditLog() {
+  const box = document.getElementById('audit-table');
+  if (!box) return;
+  box.innerHTML = `<div style="padding:40px;text-align:center;color:#888">Loading audit log…</div>`;
+  try {
+    const data = await fbGet('audit.json');
+    const rows = Object.entries(data || {})
+      .map(([id, r]) => ({ id, ...(r || {}) }))
+      .filter(r => r.at)
+      .sort((a, b) => (b.at || 0) - (a.at || 0))
+      .slice(0, 200);
+    if (!rows.length) {
+      box.innerHTML = `<div class="empty" style="padding:3rem;text-align:center"><div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-file"/></svg></div><div class="empty-t">No audit events yet</div><div class="empty-s">Decisions, notes, deletions, and user-management actions will show up here.</div></div>`;
+      return;
+    }
+    const tbody = rows.map(r => {
+      const when = new Date(r.at).toLocaleString();
+      const actionColor = r.action?.startsWith('decision.approve') ? '#1a6b3c' : r.action?.startsWith('decision.decline') || r.action?.startsWith('report.delete') ? '#c0392b' : r.action?.startsWith('user.') ? '#1d4ed8' : '#475';
+      return `<tr>
+        <td style="padding:8px 12px;font-size:12px;color:#555;white-space:nowrap">${escHtml(when)}</td>
+        <td style="padding:8px 12px;font-weight:600">${escHtml(r.user || '?')}</td>
+        <td style="padding:8px 12px"><span style="color:${actionColor};font-family:var(--mono);font-size:12px;font-weight:600">${escHtml(r.action || '')}</span></td>
+        <td style="padding:8px 12px">${escHtml(r.target || '')}</td>
+        <td style="padding:8px 12px;font-size:12px;color:#555">${escHtml(r.details || '')}</td>
+      </tr>`;
+    }).join('');
+    box.innerHTML = `<table style="width:100%;border-collapse:collapse">
+      <thead><tr style="background:var(--surface2)">
+        <th style="text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">When</th>
+        <th style="text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">User</th>
+        <th style="text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Action</th>
+        <th style="text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Target</th>
+        <th style="text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Details</th>
+      </tr></thead>
+      <tbody>${tbody}</tbody></table>`;
+  } catch (e) {
+    box.innerHTML = `<div style="padding:30px;text-align:center;color:#c0392b">Failed to load audit log: ${escHtml(e.message)}</div>`;
+  }
+}
+
+async function exportAuditCSV() {
+  try {
+    const data = await fbGet('audit.json');
+    const rows = Object.values(data || {}).filter(r => r && r.at).sort((a, b) => (b.at || 0) - (a.at || 0));
+    if (!rows.length) { toast('Nothing to export', 'err'); return; }
+    const header = ['When', 'User', 'Action', 'Target', 'Details'];
+    const csv = [header, ...rows.map(r => [new Date(r.at).toISOString(), r.user || '', r.action || '', r.target || '', r.details || ''])]
+      .map(r => r.map(_csvEscape).join(',')).join('\r\n');
+    const blob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `cif-audit-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast(`Exported ${rows.length} rows`, 'ok');
+  } catch (e) { toast('Export failed: ' + e.message, 'err'); }
+}
+
+// ════════════════════════════════════════
+// DUPE DETECTION
+// Scans the already-loaded apps array for prior applications from the same
+// person (phone, SSN last-4, or normalized name). Banner appears above the
+// modal header. Zero backend work — everything we need is already in memory.
+// ════════════════════════════════════════
+function _normName(s) {
+  return String(s || '').toLowerCase().replace(/[^a-z\s]/g, '').replace(/\s+/g, ' ').trim();
+}
+function _digits(s) { return String(s || '').replace(/\D/g, ''); }
+
+function _findDupes(target) {
+  const tPhone = _digits(target.applicationData?.phone);
+  const tSsn = _digits(target.applicationData?.ssn).slice(-4);
+  const tName = _normName(target.formName || target.name);
+  const hits = [];
+  for (const a of apps) {
+    if (!a || a.firebaseId === target.firebaseId) continue;
+    const aPhone = _digits(a.applicationData?.phone);
+    const aSsn = _digits(a.applicationData?.ssn).slice(-4);
+    const aName = _normName(a.formName || a.name);
+    let matchedOn = null;
+    if (tPhone && aPhone && tPhone === aPhone) matchedOn = 'phone';
+    else if (tSsn && aSsn && tSsn.length === 4 && tSsn === aSsn) matchedOn = 'SSN last-4';
+    else if (tName && aName && tName === aName) matchedOn = 'name';
+    if (matchedOn) hits.push({ app: a, on: matchedOn });
+  }
+  // Most recent first — helps underwriter spot the last decision fast.
+  return hits.sort((x, y) => (y.app.createdAt || 0) - (x.app.createdAt || 0));
+}
+
+function _buildDupeBanner(a) {
+  const hits = _findDupes(a);
+  if (!hits.length) return '';
+  const rows = hits.slice(0, 5).map(h => {
+    const when = h.app.createdAt ? new Date(h.app.createdAt).toLocaleDateString() : '(no date)';
+    const statusColor = h.app.status === 'Approved' ? '#1a6b3c' : h.app.status === 'Declined' ? '#c0392b' : '#6b7c72';
+    return `<li style="margin:3px 0">
+      <a href="#" onclick="event.preventDefault();openModal('${h.app.firebaseId}')" style="color:#b3261e;text-decoration:underline;font-weight:600">${h.app.name || '(no name)'}</a>
+      — matched on ${h.on} ·
+      <span style="color:${statusColor};font-weight:700">${h.app.status || 'Pending'}</span>
+      ${h.app.amount ? ' · ' + h.app.amount : ''}
+      <span style="color:#6b7c72">· ${when}</span>
+    </li>`;
+  }).join('');
+  const extra = hits.length > 5 ? `<div style="font-size:11px;color:#6b7c72;margin-top:4px">+${hits.length - 5} more</div>` : '';
+  return `
+    <div style="background:#fdecea;border:1px solid #f1baba;border-left:4px solid #b3261e;color:#6b1410;padding:12px 16px;margin:0 0 12px 0;border-radius:8px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px">⚠ ${hits.length} prior application${hits.length>1?'s':''} from this applicant</div>
+      <ul style="margin:0;padding-left:18px;font-size:12px;line-height:1.6">${rows}</ul>
+      ${extra}
+    </div>`;
+}
+
+function closeModal(){document.getElementById('ov').classList.remove('open'); _currentModalFbId=null;}
 function closeModalOut(e){if(e.target===document.getElementById('ov'))closeModal();}
+
+// ════════════════════════════════════════
+// KEYBOARD SHORTCUTS
+// A — approve open modal    D — decline open modal
+// J / K — next / previous row on the dashboard (vim-style)
+// Enter — open selected row's modal
+// / — focus search box
+// Esc — close modal (via native behavior already wired)
+// ? — show shortcut cheat sheet
+// ════════════════════════════════════════
+let _currentModalFbId = null;
+let _dashCursor = -1;  // index into the currently-rendered filtered list
+
+function _dashVisibleApps() {
+  // Mirrors the filter in renderDash() so keyboard navigation matches what's on screen.
+  return applyQuickFilter(apps.filter(a =>
+    (!srch || a.name?.toLowerCase().includes(srch.toLowerCase())) &&
+    (!stFilter || a.status === stFilter)
+  ));
+}
+
+function _highlightDashRow(fbId) {
+  document.querySelectorAll('#dtable tr[data-kbd]').forEach(r => r.classList.remove('kbd-focus'));
+  if (!fbId) return;
+  const row = document.querySelector(`#dtable tr[data-kbd="${fbId}"]`);
+  if (row) { row.classList.add('kbd-focus'); row.scrollIntoView({block:'nearest', behavior:'smooth'}); }
+}
+
+function _moveDashCursor(delta) {
+  const list = _dashVisibleApps();
+  if (!list.length) return;
+  _dashCursor = Math.max(0, Math.min(list.length - 1, (_dashCursor < 0 ? 0 : _dashCursor + delta)));
+  _highlightDashRow(list[_dashCursor]?.firebaseId);
+}
+
+function showShortcutHelp() {
+  const existing = document.getElementById('kbd-help');
+  if (existing) { existing.remove(); return; }
+  const panel = document.createElement('div');
+  panel.id = 'kbd-help';
+  panel.style.cssText = 'position:fixed;right:20px;bottom:20px;z-index:9000;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.2);padding:16px 18px;font-size:12px;line-height:1.7;max-width:260px';
+  panel.innerHTML = `
+    <div style="font-weight:700;font-size:13px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">Keyboard shortcuts <button onclick="document.getElementById('kbd-help').remove()" style="border:0;background:none;cursor:pointer;color:var(--muted);font-size:16px;line-height:1">&times;</button></div>
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 10px">
+      <kbd>J</kbd><span>Next row</span>
+      <kbd>K</kbd><span>Previous row</span>
+      <kbd>Enter</kbd><span>Open selected row</span>
+      <kbd>A</kbd><span>Approve (in modal)</span>
+      <kbd>D</kbd><span>Decline (in modal)</span>
+      <kbd>/</kbd><span>Focus search</span>
+      <kbd>Esc</kbd><span>Close modal</span>
+      <kbd>?</kbd><span>Toggle this help</span>
+    </div>`;
+  document.body.appendChild(panel);
+}
+
+document.addEventListener('keydown', (e) => {
+  // Don't hijack keys when the user is typing in an input/textarea/contenteditable.
+  const t = e.target;
+  const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+  if (typing && e.key !== 'Escape') return;
+
+  const modalOpen = document.getElementById('ov')?.classList.contains('open');
+
+  // Esc closes the modal.
+  if (e.key === 'Escape' && modalOpen) { closeModal(); e.preventDefault(); return; }
+
+  // In-modal approve/decline.
+  if (modalOpen && _currentModalFbId) {
+    if (e.key === 'a' || e.key === 'A') {
+      e.preventDefault();
+      updStatus(_currentModalFbId, 'Approved');
+      return;
+    }
+    if (e.key === 'd' || e.key === 'D') {
+      e.preventDefault();
+      updStatus(_currentModalFbId, 'Declined');
+      return;
+    }
+  }
+
+  // On dashboard only (not inside modal).
+  if (!modalOpen) {
+    const dashActive = document.getElementById('view-dash')?.classList.contains('active');
+    if (!dashActive) return;
+    if (e.key === 'j' || e.key === 'ArrowDown') { e.preventDefault(); _moveDashCursor(1); return; }
+    if (e.key === 'k' || e.key === 'ArrowUp')   { e.preventDefault(); _moveDashCursor(-1); return; }
+    if (e.key === 'Enter') {
+      const list = _dashVisibleApps();
+      if (_dashCursor >= 0 && list[_dashCursor]) openModal(list[_dashCursor].firebaseId);
+      return;
+    }
+    if (e.key === '/') {
+      e.preventDefault();
+      const input = document.querySelector('#view-dash input[placeholder*="earch" i], #view-dash input[type="text"]');
+      if (input) input.focus();
+      return;
+    }
+    if (e.key === '?') { e.preventDefault(); showShortcutHelp(); return; }
+  }
+});
 
 // ════════════════════════════════════════
 // SCORE WHEEL
@@ -3151,7 +3571,7 @@ function renderPlaidCustomers(list) {
         <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Last report: ${c.lastReport||'—'}</div>
         <div style="display:flex;gap:8px">
           <button onclick="openModal('${c.firebaseId}')" class="actbtn btn-gh" style="flex:1;font-size:12px;text-align:center">View</button>
-          <button onclick="rerunPlaidReport('${c.firebaseId}','${c.accessToken}','${c.name}')" class="actbtn ${c.accessToken?'btn-ok':'btn-gh'}" style="flex:1;font-size:12px;text-align:center${c.accessToken?'':';opacity:.6'}">↺ Re-run</button>
+          <button disabled title="Re-run temporarily disabled — backend handler incomplete. Ask the applicant to reconnect via the application form." class="actbtn btn-gh" style="flex:1;font-size:12px;text-align:center;opacity:.5;cursor:not-allowed">Re-run (unavailable)</button>
         </div>
       </div>`).join('');
   } else {
@@ -3170,7 +3590,7 @@ function renderPlaidCustomers(list) {
       <td><span class="pill pill-${c.status?.toLowerCase()||'p'}">${c.status||'—'}</span></td>
       <td>
         <button onclick="openModal('${c.firebaseId}')" class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;margin-right:4px">View</button>
-        ${c.accessToken ? `<button onclick="rerunPlaidReport('${c.firebaseId}','${c.accessToken}','${c.name}')" class="actbtn btn-ok" style="font-size:11px;padding:5px 10px">↺ Re-run Report</button>` : `<button onclick="alert('This customer needs to reconnect via the application form to generate a new report.')" class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;opacity:.6">↺ Re-run Report</button>`}
+        <button disabled title="Re-run temporarily disabled — backend handler incomplete. Ask the applicant to reconnect via the application form." class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;opacity:.5;cursor:not-allowed">Re-run Report (unavailable)</button>
       </td>
     </tr>`).join('')}
     </tbody>
