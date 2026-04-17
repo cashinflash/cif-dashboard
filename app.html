@@ -1705,16 +1705,27 @@ function groupAppsByDay(list) {
   const yesterday = new Date(today); yesterday.setDate(today.getDate()-1);
   const weekAgo = new Date(today); weekAgo.setDate(today.getDate()-7);
 
+  // Bucket key uses LOCAL date components, not UTC. Using toISOString()
+  // would split "late-evening-today" into tomorrow's bucket on any timezone
+  // west of UTC — the bug that produced two "Today" groups.
+  const localDateKey = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
   const bucketKey = (a) => {
     const ts = a.createdAt || 0;
-    if (ts) return new Date(ts).toISOString().slice(0,10); // YYYY-MM-DD
+    if (ts) return localDateKey(new Date(ts));
     if (a.date) return a.date; // Fallback; may be a human string
     return 'unknown';
   };
 
   const bucketLabel = (key, ts) => {
     if (key === 'unknown') return 'Undated';
-    const d = new Date(ts || key);
+    // Prefer the original timestamp so the displayed day matches the bucket.
+    const d = ts ? new Date(ts) : new Date(key + 'T12:00:00');
     if (isNaN(d.getTime())) return key;
     const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
     if (dayStart.getTime() === today.getTime()) return 'Today';
@@ -1746,11 +1757,15 @@ function renderDash(){
   const decl=apps.filter(a=>a.status==='Declined').length;
 
   // ── Today's stats (primary numbers in the cards) ──
+  // Use LOCAL date components, not toISOString (which is UTC and splits
+  // late-evening-today into tomorrow's bucket west of UTC).
   const _now = new Date();
-  const todayKey = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate()).toISOString().slice(0,10);
+  const _pad = n => String(n).padStart(2,'0');
+  const _localKey = d => `${d.getFullYear()}-${_pad(d.getMonth()+1)}-${_pad(d.getDate())}`;
+  const todayKey = _localKey(_now);
   const todayApps = apps.filter(a => {
     const ts = a.createdAt || 0;
-    return ts ? new Date(ts).toISOString().slice(0,10) === todayKey : false;
+    return ts ? _localKey(new Date(ts)) === todayKey : false;
   });
   const totToday = todayApps.length;
   const pendToday = todayApps.filter(a=>a.status==='Pending').length;
