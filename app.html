@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<link rel="icon" type="image/png" href="https://cashinflash.com/wp-content/uploads/2025/11/favicon-1.png">
+<link rel="icon" type="image/png" href="/favicon.png">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>Cash in Flash — Internal Portal</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
   --green:#1a6b3c;--green-mid:#1e7d46;--green-dark:#144f2c;
@@ -199,7 +199,8 @@ header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8
 .re-tab{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:8px 16px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;font-family:var(--sans);transition:.15s}
 .re-tab:hover{background:var(--green-light);color:var(--green);border-color:var(--green-border)}
 .re-tab.active{background:var(--green);color:white;border-color:var(--green)}
-.rs-hdr-icon{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.rs-hdr-icon{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center}
+.rs-hdr-icon .icn{width:17px;height:17px}
 .rs-hdr-title{font-size:14px;font-weight:700;color:var(--text)}
 .rs-hdr-sub{font-size:12px;color:var(--muted);margin-left:auto}
 .rs-body{padding:18px}
@@ -355,45 +356,91 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @keyframes wheelSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .wheel-processing{animation:wheelSpin 1.2s linear infinite;transform-origin:50% 50%;}
+/* Icon utility */
+.icn{width:16px;height:16px;flex-shrink:0;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke:currentColor}
+.icn-sm{width:13px;height:13px}
+.icn-lg{width:22px;height:22px}
+.nb{display:inline-flex;align-items:center;gap:6px}
+.nb .icn{opacity:.85}
+.nb.active .icn,.nb:hover .icn{opacity:1}
+/* Section header icon — replaces emoji squares */
+.rs-hdr-icon{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;flex-shrink:0}
+.rs-hdr-icon .icn{width:17px;height:17px}
+/* Row hover on tables */
+table tbody tr{transition:background .12s}
+table tbody tr:hover td{background:#f5f9f6}
+/* Status pill — shape + color + text (not color-only). */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;line-height:1}
+.pill-ok{background:#e6f4ea;color:#106c3a;border:1px solid #b5dcbf}
+.pill-err{background:#fdecea;color:#b3261e;border:1px solid #f1baba}
+.pill-warn{background:#fff4e0;color:#a15c00;border:1px solid #f0c98a}
+.pill-info{background:#eaf2ff;color:#1d4ed8;border:1px solid #b8ccef}
+.pill-muted{background:#eef2ef;color:#475;border:1px solid #d7dfd9}
+.pill::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.8}
 </style>
 </head>
 <body>
+
+<!-- Icon sprite: Lucide-style outline icons referenced via <use href="#icn-NAME"/> -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="icn-dashboard" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></symbol>
+    <symbol id="icn-compare" viewBox="0 0 24 24"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></symbol>
+    <symbol id="icn-tag" viewBox="0 0 24 24"><path d="M20.59 13.41 13.41 20.59a2 2 0 0 1-2.82 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.5"/></symbol>
+    <symbol id="icn-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></symbol>
+    <symbol id="icn-layers" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></symbol>
+    <symbol id="icn-sliders" viewBox="0 0 24 24"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></symbol>
+    <symbol id="icn-bank" viewBox="0 0 24 24"><line x1="3" y1="21" x2="21" y2="21"/><path d="M3 10l9-7 9 7"/><line x1="5" y1="10" x2="5" y2="21"/><line x1="9" y1="10" x2="9" y2="21"/><line x1="15" y1="10" x2="15" y2="21"/><line x1="19" y1="10" x2="19" y2="21"/></symbol>
+    <symbol id="icn-refresh" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/><path d="M20.49 15A9 9 0 0 1 5.64 18.36L1 14"/></symbol>
+    <symbol id="icn-check" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></symbol>
+    <symbol id="icn-x-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></symbol>
+    <symbol id="icn-alert" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+    <symbol id="icn-chart" viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></symbol>
+    <symbol id="icn-trending-down" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></symbol>
+    <symbol id="icn-trending-up" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></symbol>
+    <symbol id="icn-inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+    <symbol id="icn-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></symbol>
+    <symbol id="icn-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></symbol>
+    <symbol id="icn-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  </defs>
+</svg>
+
 <header>
   <div style="display:flex;align-items:center;gap:14px">
-    <img class="logo" src="https://sp-ao.shortpixel.ai/client/to_webp,q_lossless,ret_img/https://cashinflash.com/wp-content/uploads/2025/08/white_logo_350.png" alt="" onerror="this.style.display='none';document.querySelector('.logo-fb').style.display='block'">
-    <span class="logo-fb">Cash in Flash</span>
+    <img class="logo" src="/favicon.png" alt="Cash in Flash" style="height:32px;border-radius:6px" onerror="this.style.display='none';document.querySelector('.logo-fb').style.display='block'">
+    <span class="logo-fb" style="color:white;font-size:17px;font-weight:700;letter-spacing:.01em">Cash in Flash</span>
     <div class="hdiv"></div>
-    <div class="hsub">Internal Portal</div>
+    <div class="hsub">Underwriting Portal</div>
   </div>
   <button id="mob-menu-btn" onclick="toggleMobMenu()" style="display:none;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:6px 10px;color:white;cursor:pointer;font-size:18px;line-height:1">☰</button>
 <div id="mob-menu" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:200;" onclick="toggleMobMenu()">
   <div style="background:var(--green-dark);padding:2rem 1.5rem;display:flex;flex-direction:column;gap:8px">
-    <button class="nb" onclick="showView('dash',this);toggleMobMenu()">Dashboard</button>
-    <button class="nb" onclick="showView('v2compare',this);toggleMobMenu()">🔬 v2 Compare <span id="v2div-count-mob" style="display:none;background:#c0392b;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px"></span></button>
-    <button class="nb" onclick="showView('reviewqueue',this);toggleMobMenu()">🏷 Review Queue <span id="rqcount-mob" style="display:none;background:#f39c12;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px"></span></button>
-    <button class="nb" onclick="showView('single',document.getElementById('nav-single'));toggleMobMenu()">📄 New Analysis</button>
-    <button class="nb" onclick="showView('batch',document.getElementById('nav-batch'));toggleMobMenu()">📋 Batch Analysis</button>
-    <button class="nb" onclick="showView('rules',this);toggleMobMenu()">⚙ Rules Engine</button>
-    <button class="nb" onclick="showView('plaid',this);toggleMobMenu()">🏦 Plaid Customers</button>
+    <button class="nb" onclick="showView('dash',this);toggleMobMenu()"><svg class="icn"><use href="#icn-dashboard"/></svg>Dashboard</button>
+    <button class="nb" onclick="showView('v2compare',this);toggleMobMenu()"><svg class="icn"><use href="#icn-compare"/></svg>v2 Compare <span id="v2div-count-mob" style="display:none;background:#c0392b;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px"></span></button>
+    <button class="nb" onclick="showView('reviewqueue',this);toggleMobMenu()"><svg class="icn"><use href="#icn-tag"/></svg>Review Queue <span id="rqcount-mob" style="display:none;background:#f39c12;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px"></span></button>
+    <button class="nb" onclick="showView('single',document.getElementById('nav-single'));toggleMobMenu()"><svg class="icn"><use href="#icn-file"/></svg>New Analysis</button>
+    <button class="nb" onclick="showView('batch',document.getElementById('nav-batch'));toggleMobMenu()"><svg class="icn"><use href="#icn-layers"/></svg>Batch Analysis</button>
+    <button class="nb" onclick="showView('rules',this);toggleMobMenu()"><svg class="icn"><use href="#icn-sliders"/></svg>Rules Engine</button>
+    <button class="nb" onclick="showView('plaid',this);toggleMobMenu()"><svg class="icn"><use href="#icn-bank"/></svg>Plaid Customers</button>
   </div>
 </div>
 <div class="hnav">
-    <button class="nb" id="nav-dash" onclick="showView('dash',this)">Dashboard</button>
-    <button class="nb" id="nav-v2compare" onclick="showView('v2compare',this)" style="display:flex;align-items:center;gap:6px">🔬 v2 Compare<span id="v2div-count" style="display:none;background:#c0392b;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">0</span></button>
-    <button class="nb" id="nav-reviewqueue" onclick="showView('reviewqueue',this)" style="display:flex;align-items:center;gap:6px">🏷 Review Queue<span id="rqcount" style="display:none;background:#f39c12;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">0</span></button>
+    <button class="nb" id="nav-dash" onclick="showView('dash',this)"><svg class="icn"><use href="#icn-dashboard"/></svg>Dashboard</button>
+    <button class="nb" id="nav-v2compare" onclick="showView('v2compare',this)"><svg class="icn"><use href="#icn-compare"/></svg>v2 Compare<span id="v2div-count" style="display:none;background:#c0392b;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">0</span></button>
+    <button class="nb" id="nav-reviewqueue" onclick="showView('reviewqueue',this)"><svg class="icn"><use href="#icn-tag"/></svg>Review Queue<span id="rqcount" style="display:none;background:#f39c12;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">0</span></button>
     <div style="position:relative" id="analysis-dd-wrap">
-      <button class="nb" id="nav-analysis" onclick="toggleAnalysisDD()" style="display:flex;align-items:center;gap:6px">
-        Analysis <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      <button class="nb" id="nav-analysis" onclick="toggleAnalysisDD()">
+        <svg class="icn"><use href="#icn-file"/></svg>Analysis <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
-      <div id="analysis-dd" style="display:none;position:absolute;top:calc(100% + 8px);left:0;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-lg);min-width:170px;overflow:hidden;z-index:300">
-        <div onclick="showView('single',document.getElementById('nav-analysis'));toggleAnalysisDD()" style="padding:11px 16px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:8px" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">📄 New Analysis</div>
-        <div onclick="showView('batch',document.getElementById('nav-analysis'));toggleAnalysisDD()" style="padding:11px 16px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:8px;border-top:1px solid var(--border)" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">📋 Batch Analysis</div>
+      <div id="analysis-dd" style="display:none;position:absolute;top:calc(100% + 8px);left:0;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-lg);min-width:180px;overflow:hidden;z-index:300">
+        <div onclick="showView('single',document.getElementById('nav-analysis'));toggleAnalysisDD()" style="padding:11px 16px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:8px" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''"><svg class="icn"><use href="#icn-file"/></svg>New Analysis</div>
+        <div onclick="showView('batch',document.getElementById('nav-analysis'));toggleAnalysisDD()" style="padding:11px 16px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:8px;border-top:1px solid var(--border)" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''"><svg class="icn"><use href="#icn-layers"/></svg>Batch Analysis</div>
       </div>
     </div>
     <button class="nb" id="nav-single" style="display:none"></button>
     <button class="nb" id="nav-batch" style="display:none"></button>
-    <button class="nb" id="nav-rules" onclick="showView('rules',this)">⚙ Rules Engine</button>
-    <button class="nb" id="nav-plaid" onclick="showView('plaid',this)">🏦 Plaid Customers</button>
+    <button class="nb" id="nav-rules" onclick="showView('rules',this)"><svg class="icn"><use href="#icn-sliders"/></svg>Rules Engine</button>
+    <button class="nb" id="nav-plaid" onclick="showView('plaid',this)"><svg class="icn"><use href="#icn-bank"/></svg>Plaid Customers</button>
   </div>
   <div class="hright">
     <div style="position:relative">
@@ -421,7 +468,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 
 <div class="proc" id="proc">
   <div class="pcard">
-    <img class="plogo" src="https://sp-ao.shortpixel.ai/client/to_webp,q_lossless,ret_img/https://cashinflash.com/wp-content/uploads/2025/08/logo_500px.png" alt="" onerror="this.style.display='none';document.querySelector('.plogofb').style.display='block'">
+    <img class="plogo" src="/favicon.png" alt="Cash in Flash" onerror="this.style.display='none';document.querySelector('.plogofb').style.display='block'">
     <div class="plogofb">Cash in Flash</div>
     <div class="pring"></div>
     <div class="ptit">Analyzing Document</div>
@@ -524,12 +571,12 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 <!-- RULES ENGINE -->
 <div id="view-rules" class="view">
   <div class="container">
-    <div class="ptitle">⚙ Rules Engine</div>
+    <div class="ptitle" style="display:flex;align-items:center;gap:10px"><svg class="icn icn-lg"><use href="#icn-sliders"/></svg>Rules Engine</div>
     <div class="psub">Full control over every underwriting variable. Changes apply to all future analyses immediately.</div>
 
     <!-- PROFILE BAR -->
     <div class="card">
-      <div class="card-hdr"><span style="font-size:16px">📋</span><span class="card-hdr-title">Risk Profiles</span><span class="card-hdr-sub">Select a profile to edit</span></div>
+      <div class="card-hdr"><svg class="icn" style="color:white"><use href="#icn-layers"/></svg><span class="card-hdr-title">Risk Profiles</span><span class="card-hdr-sub">Select a profile to edit</span></div>
       <div class="card-body">
         <div class="profiles-bar" id="profiles-bar"></div>
         <div class="new-profile-row"><input class="new-profile-input" type="text" id="new-profile-name" placeholder="New profile name..."><button class="actbtn btn-blue" onclick="addProfile()">+ Add Profile</button></div>
@@ -544,19 +591,19 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
           <span style="font-size:12px;font-weight:600;color:var(--gold-dark)">Allow PDF uploads on apply form</span>
           <label class="tog"><input type="checkbox" id="allow-pdf-toggle" onchange="savePdfSetting(this.checked)" checked><span class="tog-slider"></span></label>
         </div>
-        <button class="actbtn" onclick="resetProfileToDefaults()" style="background:#fff5f5;color:#c0392b;border:1.5px solid #f5b8b0;font-family:var(--sans)" title="Reset this profile to factory defaults">↺ Reset to Defaults</button>
-        <button class="actbtn btn-ok" onclick="saveRules()">💾 Save Rules</button>
+        <button class="actbtn" onclick="resetProfileToDefaults()" style="background:#fff5f5;color:#c0392b;border:1.5px solid #f5b8b0;font-family:var(--sans)" title="Reset this profile to factory defaults"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Reset to Defaults</button>
+        <button class="actbtn btn-ok" onclick="saveRules()"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-check"/></svg>Save Rules</button>
       </div>
     </div>
 
     <!-- SECTION TABS -->
     <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
-      <button class="re-tab active" id="retab-income" onclick="showReTab('income')">💵 Income</button>
-      <button class="re-tab" id="retab-expense" onclick="showReTab('expense')">💸 Expenses</button>
-      <button class="re-tab" id="retab-fcf" onclick="showReTab('fcf')">📊 FCF & Tiers</button>
-      <button class="re-tab" id="retab-risk" onclick="showReTab('risk')">⚠️ Risk Adjustments</button>
-      <button class="re-tab" id="retab-behavior" onclick="showReTab('behavior')">📈 Behavioral</button>
-      <button class="re-tab" id="retab-decline" onclick="showReTab('decline')">🚫 Auto-Decline</button>
+      <button class="re-tab active" id="retab-income" onclick="showReTab('income')"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:6px"><use href="#icn-trending-up"/></svg>Income</button>
+      <button class="re-tab" id="retab-expense" onclick="showReTab('expense')"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:6px"><use href="#icn-trending-down"/></svg>Expenses</button>
+      <button class="re-tab" id="retab-fcf" onclick="showReTab('fcf')"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:6px"><use href="#icn-chart"/></svg>FCF &amp; Tiers</button>
+      <button class="re-tab" id="retab-risk" onclick="showReTab('risk')"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:6px"><use href="#icn-alert"/></svg>Risk Adjustments</button>
+      <button class="re-tab" id="retab-behavior" onclick="showReTab('behavior')"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:6px"><use href="#icn-trending-up"/></svg>Behavioral</button>
+      <button class="re-tab" id="retab-decline" onclick="showReTab('decline')"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:6px"><use href="#icn-x-circle"/></svg>Auto-Decline</button>
     </div>
 
     <!-- ══════════════════════════════════════ -->
@@ -564,7 +611,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
     <!-- ══════════════════════════════════════ -->
     <div id="retab-content-income" class="re-tab-content">
       <div class="rules-grid">
-        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--green-light)">💵</div><div><div class="rs-hdr-title">Income Verification Rules</div><div class="rs-hdr-sub">What qualifies as verified income</div></div></div><div class="rs-body">
+        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--green-light);color:var(--green)"><svg class="icn"><use href="#icn-trending-up"/></svg></div><div><div class="rs-hdr-title">Income Verification Rules</div><div class="rs-hdr-sub">What qualifies as verified income</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Minimum verified paychecks required<small>Require at least this many payroll deposits in statement. 1 = lenient, 2 = recommended</small></div><input class="rule-input" type="number" id="r-min-paychecks" value="1" min="1" max="5"></div>
           <div class="rule-row"><div class="rule-label">Count payroll/direct deposit<small>ACH payroll from employers</small></div><label class="tog"><input type="checkbox" id="r-inc-payroll" checked><span class="tog-slider"></span></label></div>
           <div class="rule-row"><div class="rule-label">Count government benefits<small>SSA, SSI, disability, unemployment, EDD</small></div><label class="tog"><input type="checkbox" id="r-inc-govt" checked><span class="tog-slider"></span></label></div>
@@ -573,13 +620,13 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
           <div class="rule-row"><div class="rule-label">Count child support / alimony<small>Court-ordered support payments</small></div><label class="tog"><input type="checkbox" id="r-inc-support"><span class="tog-slider"></span></label></div>
         </div></div>
 
-        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--gold-light)">💸</div><div><div class="rs-hdr-title">P2P & Transfer Handling</div><div class="rs-hdr-sub">Configure how Zelle, Venmo, CashApp deposits and outflows are treated</div></div></div><div class="rs-body">
+        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--gold-light);color:var(--gold-dark)"><svg class="icn"><use href="#icn-refresh"/></svg></div><div><div class="rs-hdr-title">P2P & Transfer Handling</div><div class="rs-hdr-sub">Configure how Zelle, Venmo, CashApp deposits and outflows are treated</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">P2P Received (Zelle/Venmo/CashApp income)<small>Exclude: never count. Recurring: count repeat senders at %. All: count all at %.</small></div><select class="rule-select" id="r-p2p-received-mode"><option value="exclude">Exclude All</option><option value="recurring">Count Recurring at %</option><option value="all">Count All at %</option></select></div>
           <div class="rule-row"><div class="rule-label">P2P Received counting %<small>What % of P2P deposits to count (e.g., 50% = half value)</small></div><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-p2p-received-pct" value="50" style="width:70px"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div>
           <div class="rule-row"><div class="rule-label">P2P Sent (Zelle/Venmo/CashApp outflows)<small>Exclude: don't count. Recurring: count repeat recipients as expenses.</small></div><select class="rule-select" id="r-p2p-sent-mode"><option value="exclude">Exclude All</option><option value="recurring">Count Recurring as Expenses</option></select></div>
         </div></div>
 
-        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">🚫</div><div><div class="rs-hdr-title">Always Exclude from Income</div><div class="rs-hdr-sub">These are never counted as income regardless of settings</div></div></div><div class="rs-body">
+        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light);color:var(--red)"><svg class="icn"><use href="#icn-x-circle"/></svg></div><div><div class="rs-hdr-title">Always Exclude from Income</div><div class="rs-hdr-sub">These are never counted as income regardless of settings</div></div></div><div class="rs-body">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 32px">
             <div class="rule-row"><div class="rule-label">Internal account transfers<small>Moving money between own accounts</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
             <div class="rule-row"><div class="rule-label">Fintech / payday app advances<small>Dave, Brigit, Earnin, etc.</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
@@ -595,7 +642,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
     <!-- ══════════════════════════════════════ -->
     <div id="retab-content-expense" class="re-tab-content" style="display:none">
       <div class="rules-grid">
-        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#e8f5e9">🏠</div><div><div class="rs-hdr-title">Minimum Living Expense Floor</div><div class="rs-hdr-sub">Applied when verified card expenses are below this amount — prevents unrealistically high FCF</div></div></div><div class="rs-body">
+        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#e8f5e9;color:var(--green)"><svg class="icn"><use href="#icn-chart"/></svg></div><div><div class="rs-hdr-title">Minimum Living Expense Floor</div><div class="rs-hdr-sub">Applied when verified card expenses are below this amount — prevents unrealistically high FCF</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Enable minimum expense floor<small>If ON, uses floor when actual expenses are lower. If OFF, uses $0 when no expenses found.</small></div><label class="tog"><input type="checkbox" id="r-expense-floor-on" checked><span class="tog-slider"></span></label></div>
           <div class="rule-row"><div class="rule-label">Minimum monthly expense floor<small>Recommended: $800–$1,200 for California single adult</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-expense-floor" value="500" min="0" max="3000"></div></div>
           <div style="background:var(--gold-light);border:1px solid var(--gold-border);border-radius:10px;padding:12px 16px;margin-top:8px;font-size:12px;color:var(--gold-dark);line-height:1.7">
@@ -605,7 +652,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
           <div class="rule-row"><div class="rule-label">Money Order Threshold<small>Retail store purchases above this amount classified as money orders, not groceries.</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-money-order-threshold" min="100" max="1000" step="50" value="200" style="width:90px"></div></div>
         </div></div>
 
-        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--green-light)">✅</div><div><div class="rs-hdr-title">Count as Expenses</div><div class="rs-hdr-sub">These categories are verified expenses</div></div></div><div class="rs-body">
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--green-light);color:var(--green)"><svg class="icn"><use href="#icn-check"/></svg></div><div><div class="rs-hdr-title">Count as Expenses</div><div class="rs-hdr-sub">These categories are verified expenses</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Rent / mortgage payments<small>ACH housing payments</small></div><label class="tog"><input type="checkbox" id="r-exp-rent" checked><span class="tog-slider"></span></label></div>
           <div class="rule-row"><div class="rule-label">Utility bills<small>Electric, gas, water, internet</small></div><label class="tog"><input type="checkbox" id="r-exp-utilities" checked><span class="tog-slider"></span></label></div>
           <div class="rule-row"><div class="rule-label">Phone / telecom<small>T-Mobile, Verizon, prepaid, etc.</small></div><label class="tog"><input type="checkbox" id="r-exp-phone" checked><span class="tog-slider"></span></label></div>
@@ -624,7 +671,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
           <div class="rule-row"><div class="rule-label">Detect bounced/returned payments<small>Match returned check credits against debits to avoid double-counting</small></div><label class="tog"><input type="checkbox" id="r-bounced-detection" checked><span class="tog-slider"></span></label></div>
         </div></div>
 
-        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">❌</div><div><div class="rs-hdr-title">Always Exclude from Expenses</div><div class="rs-hdr-sub">Mirrors the income exclusion rules</div></div></div><div class="rs-body">
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light);color:var(--red)"><svg class="icn"><use href="#icn-x-circle"/></svg></div><div><div class="rs-hdr-title">Always Exclude from Expenses</div><div class="rs-hdr-sub">Mirrors the income exclusion rules</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Zelle / Venmo / P2P outflows<small>Same logic as income — P2P is excluded both ways</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
           <div class="rule-row"><div class="rule-label">Internal transfers (own accounts)<small>Moving money between own accounts</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
           <div class="rule-row"><div class="rule-label">Fintech / payday app repayments<small>Repaying Dave, Brigit, etc. — flagged separately</small></div><span style="font-size:12px;font-weight:700;color:var(--red);background:var(--red-light);padding:4px 10px;border-radius:6px">Always Excluded</span></div>
@@ -641,19 +688,19 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
     <!-- ══════════════════════════════════════ -->
     <div id="retab-content-fcf" class="re-tab-content" style="display:none">
       <div class="rules-grid">
-        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--green-light)">💰</div><div><div class="rs-hdr-title">Loan Limits</div></div></div><div class="rs-body">
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--green-light);color:var(--green)"><svg class="icn"><use href="#icn-chart"/></svg></div><div><div class="rs-hdr-title">Loan Limits</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Minimum loan amount<small>Lowest approvable amount</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-loan-min" value="100" min="50" max="255"></div></div>
           <div class="rule-row"><div class="rule-label">Maximum loan amount<small>Highest approvable amount</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-loan-max" value="255" min="100" max="255"></div></div>
         </div></div>
 
-        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--gold-light)">📊</div><div><div class="rs-hdr-title">FCF Tier Thresholds</div><div class="rs-hdr-sub">Minimum monthly FCF required for each tier</div></div></div><div class="rs-body">
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--gold-light);color:var(--gold-dark)"><svg class="icn"><use href="#icn-chart"/></svg></div><div><div class="rs-hdr-title">FCF Tier Thresholds</div><div class="rs-hdr-sub">Minimum monthly FCF required for each tier</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Tier 1<small>Loan amount & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan $</span><input class="rule-input" type="number" id="r-t1-amount" value="100" style="width:70px"><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t1-fcf" value="150" style="width:70px"></div></div>
           <div class="rule-row"><div class="rule-label">Tier 2<small>Loan amount & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan $</span><input class="rule-input" type="number" id="r-t2-amount" value="150" style="width:70px"><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t2-fcf" value="300" style="width:70px"></div></div>
           <div class="rule-row"><div class="rule-label">Tier 3<small>Loan amount & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan $</span><input class="rule-input" type="number" id="r-t3-amount" value="200" style="width:70px"><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t3-fcf" value="425" style="width:70px"></div></div>
           <div class="rule-row"><div class="rule-label">Tier 4<small>Uses Max Loan & min FCF</small></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:var(--muted)">Loan = Max</span><span style="font-size:12px;color:var(--muted)">FCF ≥ $</span><input class="rule-input" type="number" id="r-t4-fcf" value="550" style="width:70px"></div></div>
         </div></div>
 
-        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#e3f2fd">🧮</div><div><div class="rs-hdr-title">FCF Formula Preview</div><div class="rs-hdr-sub">Based on your current settings</div></div></div><div class="rs-body">
+        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#e3f2fd;color:#1d4ed8"><svg class="icn"><use href="#icn-chart"/></svg></div><div><div class="rs-hdr-title">FCF Formula Preview</div><div class="rs-hdr-sub">Based on your current settings</div></div></div><div class="rs-body">
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
             <div style="background:var(--green-light);border:1px solid var(--green-border);border-radius:10px;padding:14px;text-align:center">
               <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;margin-bottom:6px">Tier 1</div>
@@ -685,30 +732,30 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
     <!-- ══════════════════════════════════════ -->
     <div id="retab-content-risk" class="re-tab-content" style="display:none">
       <div class="rules-grid">
-        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">⚠️</div><div><div class="rs-hdr-title">NSF / Returned Items</div><div class="rs-hdr-sub">Non-sufficient fund fees and returned payments</div></div></div><div class="rs-body">
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light);color:var(--red)"><svg class="icn"><use href="#icn-alert"/></svg></div><div><div class="rs-hdr-title">NSF / Returned Items</div><div class="rs-hdr-sub">Non-sufficient fund fees and returned payments</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Drop 1 tier at<small>NSFs trigger a tier reduction</small></div><input class="rule-input" type="number" id="r-nsf-drop" value="2" min="1"></div>
           <div class="rule-row"><div class="rule-label">Cap at $100 at<small>NSFs that cap the approval</small></div><input class="rule-input" type="number" id="r-nsf-cap" value="4" min="1"></div>
           <div class="rule-row"><div class="rule-label">Drop 2 tiers / cap at<small>NSFs — v2: drops tiers instead of declining</small></div><input class="rule-input" type="number" id="r-nsf-decline" value="5" min="1"></div>
         </div></div>
 
-        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--amber-light)">📱</div><div><div class="rs-hdr-title">Fintech / Payday App Usage</div><div class="rs-hdr-sub">Counted by UNIQUE apps, not total interactions — Dave used 10× still = 1 app</div></div></div><div class="rs-body">
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--amber-light);color:var(--amber)"><svg class="icn"><use href="#icn-alert"/></svg></div><div><div class="rs-hdr-title">Fintech / Payday App Usage</div><div class="rs-hdr-sub">Counted by UNIQUE apps, not total interactions — Dave used 10× still = 1 app</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Drop 1 tier at<small>Unique apps (e.g. 3 = using Dave + Earnin + Cleo)</small></div><input class="rule-input" type="number" id="r-ft-drop" value="5" min="1"></div>
           <div class="rule-row"><div class="rule-label">Cap at $100 at<small>Unique apps before capping</small></div><input class="rule-input" type="number" id="r-ft-cap" value="7" min="1"></div>
           <div class="rule-row"><div class="rule-label">Drop 2 tiers / cap at<small>Unique apps — v2: drops tiers instead of declining</small></div><input class="rule-input" type="number" id="r-ft-decline" value="9" min="1"></div>
           <div class="rule-row"><div class="rule-label">Hard cap at $100 at<small>Unique apps — v2: hard caps instead of absolute decline</small></div><input class="rule-input" type="number" id="r-ft-abs" value="11" min="1"></div>
         </div></div>
 
-        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">📉</div><div><div class="rs-hdr-title">Negative Balance Days</div><div class="rs-hdr-sub">Days ending balance was below $0</div></div></div><div class="rs-body">
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light);color:var(--red)"><svg class="icn"><use href="#icn-trending-down"/></svg></div><div><div class="rs-hdr-title">Negative Balance Days</div><div class="rs-hdr-sub">Days ending balance was below $0</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Cap at $100 at<small>Days negative before capping</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-neg-cap-r" min="1" max="20" value="7" oninput="syncR('r-neg-cap','r-neg-cap-r')"><input class="rule-input" type="number" id="r-neg-cap" value="7" oninput="syncR('r-neg-cap-r','r-neg-cap',true)"></div></div>
           <div class="rule-row"><div class="rule-label">Drop 2 tiers / cap at<small>Days negative — v2: drops tiers instead of declining</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-neg-dec-r" min="1" max="30" value="10" oninput="syncR('r-neg-dec','r-neg-dec-r')"><input class="rule-input" type="number" id="r-neg-dec" value="10" oninput="syncR('r-neg-dec-r','r-neg-dec',true)"></div></div>
         </div></div>
 
-        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--amber-light)">🎰</div><div><div class="rs-hdr-title">Speculative Activity</div><div class="rs-hdr-sub">Gambling, crypto, and high-risk spending as % of income</div></div></div><div class="rs-body">
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--amber-light);color:var(--amber)"><svg class="icn"><use href="#icn-alert"/></svg></div><div><div class="rs-hdr-title">Speculative Activity</div><div class="rs-hdr-sub">Gambling, crypto, and high-risk spending as % of income</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Drop 1 tier at<small>% of income on gambling/crypto</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-spec-drop-r" min="1" max="100" value="35" oninput="syncR('r-spec-drop','r-spec-drop-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-spec-drop" value="35" oninput="syncR('r-spec-drop-r','r-spec-drop',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
           <div class="rule-row"><div class="rule-label">Cap at $100 at<small>% that caps the approval</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-spec-cap-r" min="1" max="100" value="50" oninput="syncR('r-spec-cap','r-spec-cap-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-spec-cap" value="50" oninput="syncR('r-spec-cap-r','r-spec-cap',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
         </div></div>
 
-        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#e3f2fd">📊</div><div><div class="rs-hdr-title">Debt-to-Income Ratio</div><div class="rs-hdr-sub">DTI = (loan payments + fintech repayments + BNPL + recurring P2P) / monthly income. Higher DTI = more debt burden.</div></div></div><div class="rs-body">
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#e3f2fd;color:#1d4ed8"><svg class="icn"><use href="#icn-chart"/></svg></div><div><div class="rs-hdr-title">Debt-to-Income Ratio</div><div class="rs-hdr-sub">DTI = (loan payments + fintech repayments + BNPL + recurring P2P) / monthly income. Higher DTI = more debt burden.</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Drop 1 Tier at DTI<small>Drop one loan tier when DTI exceeds this %</small></div><div style="display:flex;align-items:center;gap:4px"><input class="rule-input" type="number" id="r-dti-drop" min="20" max="80" step="5" value="45" style="width:70px"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div>
           <div class="rule-row"><div class="rule-label">Drop 2 Tiers at DTI<small>Drop two loan tiers when DTI exceeds this %</small></div><div style="display:flex;align-items:center;gap:4px"><input class="rule-input" type="number" id="r-dti-drop2" min="30" max="90" step="5" value="60" style="width:70px"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div>
         </div></div>
@@ -720,24 +767,24 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
     <!-- ══════════════════════════════════════ -->
     <div id="retab-content-behavior" class="re-tab-content" style="display:none">
       <div class="rules-grid">
-        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#f3e5f5">🔄</div><div><div class="rs-hdr-title">Account Velocity</div><div class="rs-hdr-sub">High velocity = money flowing through but not staying (sign of financial stress)</div></div></div><div class="rs-body">
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#f3e5f5;color:#7b1fa2"><svg class="icn"><use href="#icn-refresh"/></svg></div><div><div class="rs-hdr-title">Account Velocity</div><div class="rs-hdr-sub">High velocity = money flowing through but not staying (sign of financial stress)</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Enable velocity check<small>Flags accounts where outflows are close to inflows</small></div><label class="tog"><input type="checkbox" id="r-velocity-on" checked><span class="tog-slider"></span></label></div>
           <div class="rule-row"><div class="rule-label">Drop 1 tier at velocity<small>Outflows ÷ Inflows ratio — 90% = spending 90 cents of every dollar received</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-velocity-drop-r" min="50" max="100" value="90" oninput="syncR('r-velocity-drop','r-velocity-drop-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-velocity-drop" value="90" oninput="syncR('r-velocity-drop-r','r-velocity-drop',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
           <div class="rule-row"><div class="rule-label">Cap at $100 at velocity<small>Ratio that caps at $100</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-velocity-cap-r" min="50" max="100" value="98" oninput="syncR('r-velocity-cap','r-velocity-cap-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-velocity-cap" value="98" oninput="syncR('r-velocity-cap-r','r-velocity-cap',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
         </div></div>
 
-        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#fce4ec">💰</div><div><div class="rs-hdr-title">Ending Balance Health</div><div class="rs-hdr-sub">Low ending balances indicate paycheck-to-paycheck living</div></div></div><div class="rs-body">
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#fce4ec;color:#c2185b"><svg class="icn"><use href="#icn-chart"/></svg></div><div><div class="rs-hdr-title">Ending Balance Health</div><div class="rs-hdr-sub">Low ending balances indicate paycheck-to-paycheck living</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Enable ending balance check<small>Flags customers who always end near $0</small></div><label class="tog"><input type="checkbox" id="r-endbal-on" checked><span class="tog-slider"></span></label></div>
           <div class="rule-row"><div class="rule-label">Flag if ending balance below<small>Balance at end of statement period</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-endbal-flag" value="25" min="0"></div></div>
           <div class="rule-row"><div class="rule-label">Drop 1 tier if ending balance below<small>Very low ending balance triggers tier drop</small></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:13px;font-weight:600;color:var(--muted)">$</span><input class="rule-input" type="number" id="r-endbal-drop" value="5" min="0"></div></div>
         </div></div>
 
-        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#e8f5e9">📅</div><div><div class="rs-hdr-title">Income Consistency</div><div class="rs-hdr-sub">Recurring vs one-time income signals</div></div></div><div class="rs-body">
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#e8f5e9;color:var(--green)"><svg class="icn"><use href="#icn-chart"/></svg></div><div><div class="rs-hdr-title">Income Consistency</div><div class="rs-hdr-sub">Recurring vs one-time income signals</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Require at least 2 paychecks in 30-day window<small>Single paycheck = unconfirmed employment pattern</small></div><label class="tog"><input type="checkbox" id="r-require-2-checks"><span class="tog-slider"></span></label></div>
           <div class="rule-row"><div class="rule-label">Flag income variance above<small>If pay amounts vary by more than this % between checks</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-income-variance-r" min="5" max="50" value="25" oninput="syncR('r-income-variance','r-income-variance-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-income-variance" value="25" oninput="syncR('r-income-variance-r','r-income-variance',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
         </div></div>
 
-        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#fff9c4">⚡</div><div><div class="rs-hdr-title">Fintech Dependency Score</div><div class="rs-hdr-sub">Measures reliance on cash advances as % of income</div></div></div><div class="rs-body">
+        <div class="rules-section"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:#fff9c4;color:#b07a00"><svg class="icn"><use href="#icn-alert"/></svg></div><div><div class="rs-hdr-title">Fintech Dependency Score</div><div class="rs-hdr-sub">Measures reliance on cash advances as % of income</div></div></div><div class="rs-body">
           <div class="rule-row"><div class="rule-label">Flag if fintech advances exceed % of income<small>Advances ÷ Verified income — high % = dependency</small></div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-ft-dep-r" min="5" max="100" value="30" oninput="syncR('r-ft-dep','r-ft-dep-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-ft-dep" value="30" oninput="syncR('r-ft-dep-r','r-ft-dep',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
           <div class="rule-row"><div class="rule-label">Cap at $100 if fintech advances exceed % of income</div><div style="display:flex;align-items:center;gap:8px"><input type="range" class="rule-range" id="r-ft-dep-cap-r" min="10" max="100" value="60" oninput="syncR('r-ft-dep-cap','r-ft-dep-cap-r')"><div style="display:flex;align-items:center;gap:2px"><input class="rule-input" type="number" id="r-ft-dep-cap" value="60" oninput="syncR('r-ft-dep-cap-r','r-ft-dep-cap',true)"><span style="font-size:12px;color:var(--muted);font-weight:600">%</span></div></div></div>
         </div></div>
@@ -749,7 +796,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
     <!-- ══════════════════════════════════════ -->
     <div id="retab-content-decline" class="re-tab-content" style="display:none">
       <div class="rules-grid">
-        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light)">🚫</div><div><div class="rs-hdr-title">Auto-Decline Conditions</div><div class="rs-hdr-sub">Set the action for each condition</div></div></div>
+        <div class="rules-section" style="grid-column:1/-1"><div class="rs-hdr"><div class="rs-hdr-icon" style="background:var(--red-light);color:var(--red)"><svg class="icn"><use href="#icn-x-circle"/></svg></div><div><div class="rs-hdr-title">Auto-Decline Conditions</div><div class="rs-hdr-sub">Set the action for each condition</div></div></div>
         <div class="rs-body">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 32px">
             <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:8px 0 6px;display:grid;grid-template-columns:1fr 160px;gap:12px"><span>Condition</span><span style="text-align:center">Action</span></div>
@@ -776,8 +823,8 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 <!-- PLAID CUSTOMERS VIEW -->
 <div id="view-plaid" class="view">
   <div class="phead">
-    <div><div class="ptitle">🏦 Plaid Customers</div><div class="psub">Customers who connected via Plaid — rerun reports anytime</div></div>
-    <button class="actbtn btn-gh" onclick="loadPlaidCustomers()">↺ Refresh</button>
+    <div><div class="ptitle" style="display:flex;align-items:center;gap:10px"><svg class="icn icn-lg"><use href="#icn-bank"/></svg>Plaid Customers</div><div class="psub">Customers who connected via Plaid — rerun reports anytime</div></div>
+    <button class="actbtn btn-gh" onclick="loadPlaidCustomers()"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Refresh</button>
   </div>
   <div style="margin-bottom:16px">
     <input type="text" id="plaid-search" placeholder="Search by name, phone or email..."
@@ -785,7 +832,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
       style="width:100%;border:1.5px solid var(--border2);border-radius:10px;padding:10px 14px;font-size:14px;font-family:var(--sans)">
   </div>
   <div id="plaid-list">
-    <div class="empty"><div class="empty-ic">🏦</div><div class="empty-t">No Plaid customers yet</div><div class="empty-s">Customers who connect via Plaid will appear here</div></div>
+    <div class="empty"><div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-bank"/></svg></div><div class="empty-t">No Plaid customers yet</div><div class="empty-s">Customers who connect via Plaid will appear here</div></div>
   </div>
 </div>
 
@@ -794,14 +841,14 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
     <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:12px">
       <div><div class="ptitle">Applications Dashboard</div><div class="psub" style="margin-bottom:0">All decisions — synced across all devices</div></div>
       <div style="display:flex;gap:8px">
-        <button class="actbtn btn-gh" onclick="loadReports()">↺ Refresh</button>
+        <button class="actbtn btn-gh" onclick="loadReports()"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Refresh</button>
         <button class="actbtn btn-ok" onclick="showView('single',document.getElementById('nav-single'))" style="margin:0">+ New Analysis</button>
       </div>
     </div>
     <div id="sync-status"></div>
     <div class="stats-row">
       <div class="sc tot">
-        <div class="slbl">📋 Total</div>
+        <div class="slbl">Total</div>
         <div style="display:flex;align-items:center;gap:10px">
           <div style="flex:1"><div class="snum def" id="st">0</div><div class="spct" id="st-sub">All applications</div></div>
           <canvas id="sc-tot-c" width="56" height="56" style="flex-shrink:0;opacity:.8"></canvas>
@@ -845,12 +892,12 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
   <div class="container">
     <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:12px">
       <div>
-        <div class="ptitle">🔬 v2 Compare</div>
+        <div class="ptitle" style="display:flex;align-items:center;gap:10px"><svg class="icn icn-lg"><use href="#icn-compare"/></svg>v2 Compare</div>
         <div class="psub" style="margin-bottom:0">Every application where v1 and v2 disagreed — each row is either a v2 bug to fix or evidence v2 caught something v1 missed.</div>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="actbtn btn-gh" onclick="loadReports().then(renderV2Compare)">↺ Refresh</button>
-        <button class="actbtn btn-ok" onclick="startBulkRerunV2()" style="margin:0">↻ Run v2 on historical</button>
+        <button class="actbtn btn-gh" onclick="loadReports().then(renderV2Compare)"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Refresh</button>
+        <button class="actbtn btn-ok" onclick="startBulkRerunV2()" style="margin:0"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Run v2 on historical</button>
       </div>
     </div>
 
@@ -867,10 +914,10 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 
     <div class="stats-row" style="margin-bottom:1rem">
       <div class="sc tot"><div class="slbl">Total compared</div><div class="snum def" id="v2c-total">0</div><div class="spct" id="v2c-total-sub">reports with v2 run</div></div>
-      <div class="sc app"><div class="slbl">✓ Same decision</div><div class="snum grn" id="v2c-agree">0</div><div class="spct" id="v2c-agree-sub">v1 & v2 agree</div></div>
-      <div class="sc dec"><div class="slbl">⚠ Disagreed</div><div class="snum red" id="v2c-disagree">0</div><div class="spct" id="v2c-disagree-sub">needs your eye</div></div>
-      <div class="sc pen"><div class="slbl">🧮 Amount diff</div><div class="snum gld" id="v2c-amtdiff">0</div><div class="spct" id="v2c-amtdiff-sub">same outcome, different $</div></div>
-      <div class="sc app"><div class="slbl">✅ Auto-decide</div><div class="snum grn" id="v2c-autodecide">0</div><div class="spct" id="v2c-autodecide-sub">engine would 1-click</div></div>
+      <div class="sc app"><div class="slbl">Same decision</div><div class="snum grn" id="v2c-agree">0</div><div class="spct" id="v2c-agree-sub">v1 &amp; v2 agree</div></div>
+      <div class="sc dec"><div class="slbl">Disagreed</div><div class="snum red" id="v2c-disagree">0</div><div class="spct" id="v2c-disagree-sub">needs your eye</div></div>
+      <div class="sc pen"><div class="slbl">Amount diff</div><div class="snum gld" id="v2c-amtdiff">0</div><div class="spct" id="v2c-amtdiff-sub">same outcome, different $</div></div>
+      <div class="sc app"><div class="slbl">Auto-decide</div><div class="snum grn" id="v2c-autodecide">0</div><div class="spct" id="v2c-autodecide-sub">engine would 1-click</div></div>
     </div>
 
     <div class="tcard">
@@ -895,10 +942,10 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
   <div class="container">
     <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:12px">
       <div>
-        <div class="ptitle">🏷 Review Queue</div>
+        <div class="ptitle" style="display:flex;align-items:center;gap:10px"><svg class="icn icn-lg"><use href="#icn-tag"/></svg>Review Queue</div>
         <div class="psub" style="margin-bottom:0">Merchants v2 couldn't classify. Pick a category once — every future v2 run classifies it correctly.</div>
       </div>
-      <button class="actbtn btn-gh" onclick="loadReviewQueue()">↺ Refresh</button>
+      <button class="actbtn btn-gh" onclick="loadReviewQueue()"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Refresh</button>
     </div>
 
     <div class="stats-row" style="margin-bottom:1rem">
@@ -935,11 +982,31 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 const FB = '/fb';
 
 // ── AUTH ──
-function getToken() { return sessionStorage.getItem('cif_token') || ''; }
-function getUser() { return sessionStorage.getItem('cif_user') || 'User'; }
+// Token lives in an HttpOnly cookie (not readable by JS, not stealable via XSS).
+// All fetches use credentials:'include' so the browser sends the cookie. The
+// server also accepts an X-Session header for backward compat, but the cookie
+// is canonical. CSRF is blocked by SameSite=Strict on the cookie.
+let _currentUser = '';
+function getToken() { return ''; }            // legacy shim; cookie is used instead
+function getUser() { return _currentUser || 'User'; }
 
 function authHeaders(extra) {
-  return Object.assign({'Content-Type':'application/json','X-Session': getToken()}, extra||{});
+  return Object.assign({'Content-Type':'application/json'}, extra||{});
+}
+
+async function hydrateCurrentUser() {
+  try {
+    const r = await fetch('/api/me', { credentials: 'include' });
+    if (r.ok) {
+      const d = await r.json();
+      _currentUser = d.user || '';
+      const lbl = document.getElementById('who');
+      if (lbl) lbl.textContent = _currentUser || 'User';
+      return true;
+    }
+    if (r.status === 401) { window.location.replace('/'); return false; }
+  } catch (e) { /* ignore; UI stays as "User" */ }
+  return false;
 }
 
 // Auth is handled server-side via cookie
@@ -1022,6 +1089,9 @@ let pollTimer=null;
 // INIT
 // ════════════════════════════════════════
 window.onload = async () => {
+  // Fetch current user (and validate session) from the server. If 401, we
+  // redirect to /login. This replaces the old sessionStorage-based display.
+  await hydrateCurrentUser();
   await loadKey();
   renderProfiles();
   loadRulesUI(editingProfile);
@@ -1039,7 +1109,7 @@ window.onload = async () => {
 async function loadKey() {
   // API key is stored server-side — just update user label
   const lbl = document.getElementById('user-label');
-  if (lbl) lbl.textContent = sessionStorage.getItem('cif_user') || 'User';
+  if (lbl) lbl.textContent = _currentUser || 'User';
 }
 
 async function saveKey() {}
@@ -1876,7 +1946,7 @@ function renderDash(){
   const c=document.getElementById('dtable');
 
   if(!filtered.length){
-    c.innerHTML=`<div class="empty"><div class="empty-ic">📋</div><div class="empty-t">${apps.length?'No results':'No applications yet'}</div><div class="empty-s">${apps.length?'Try a different filter.':'Submit your first application to get started.'}</div>${!apps.length?'<button class="ecta" onclick="showView(\'single\',document.getElementById(\'nav-single\'))">+ New Analysis</button>':''}</div>`;
+    c.innerHTML=`<div class="empty"><div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-inbox"/></svg></div><div class="empty-t">${apps.length?'No results':'No applications yet'}</div><div class="empty-s">${apps.length?'Try a different filter.':'Submit your first application to get started.'}</div>${!apps.length?'<button class="ecta" onclick="showView(\'single\',document.getElementById(\'nav-single\'))">+ New Analysis</button>':''}</div>`;
     return;
   }
 
@@ -2031,7 +2101,7 @@ function renderV2Compare() {
 
   const c = document.getElementById('v2c-table');
   if (!filtered.length) {
-    c.innerHTML = `<div class="empty" style="padding:3rem 2rem;text-align:center"><div class="empty-ic">🔬</div><div class="empty-t">No divergences in this filter</div><div class="empty-s">Try "All compared" to see everything.</div></div>`;
+    c.innerHTML = `<div class="empty" style="padding:3rem 2rem;text-align:center"><div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-compare"/></svg></div><div class="empty-t">No divergences in this filter</div><div class="empty-s">Try "All compared" to see everything.</div></div>`;
     return;
   }
 
@@ -2242,7 +2312,7 @@ function renderReviewQueue(data) {
 
   const container = document.getElementById('rq-table');
   if (!merchants.length) {
-    container.innerHTML = `<div class="empty" style="padding:3rem;text-align:center"><div class="empty-ic">🏷</div><div class="empty-t">No unclassified merchants</div><div class="empty-s">v2 knows every merchant in your historical data.</div></div>`;
+    container.innerHTML = `<div class="empty" style="padding:3rem;text-align:center"><div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-tag"/></svg></div><div class="empty-t">No unclassified merchants</div><div class="empty-s">v2 knows every merchant in your historical data.</div></div>`;
     return;
   }
 
@@ -2430,11 +2500,11 @@ ${a.extractedSSN?`<div style="display:flex;align-items:center;justify-content:sp
   </div>
 </div>
 <div style="display:flex;border-bottom:1px solid var(--border)">
-  <button onclick="mTab('report','${fbId}',this)" id="mtab-report-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--green);border-bottom:2px solid var(--green);cursor:pointer;font-family:var(--sans)">📄 Report</button>
-  <button onclick="mTab('v2','${fbId}',this)" id="mtab-v2-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">🔬 v2 Engine${a.v2Decision ? ' <span style=&quot;background:#eef9f1;color:#1a6b3c;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:2px&quot;>run</span>' : ''}</button>
-  <button onclick="mTab('appdata','${fbId}',this)" id="mtab-appdata-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📋 Application</button>
-  <button onclick="mTab('docs','${fbId}',this)" id="mtab-docs-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📁 Documents</button>
-  <button onclick="mTab('notes','${fbId}',this)" id="mtab-notes-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">📝 Notes</button>
+  <button onclick="mTab('report','${fbId}',this)" id="mtab-report-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--green);border-bottom:2px solid var(--green);cursor:pointer;font-family:var(--sans)">Report</button>
+  <button onclick="mTab('v2','${fbId}',this)" id="mtab-v2-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">v2 Engine${a.v2Decision ? ' <span style=&quot;background:#eef9f1;color:#1a6b3c;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:2px&quot;>run</span>' : ''}</button>
+  <button onclick="mTab('appdata','${fbId}',this)" id="mtab-appdata-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Application</button>
+  <button onclick="mTab('docs','${fbId}',this)" id="mtab-docs-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Documents</button>
+  <button onclick="mTab('notes','${fbId}',this)" id="mtab-notes-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Notes</button>
 </div>
 </div>
 ${(a.fcf!=null||a.monthlyIncome!=null)?`<div class="msummary">
@@ -2925,7 +2995,7 @@ function renderPlaidCustomers(list) {
   const el = document.getElementById('plaid-list');
   if (!el) return;
   if (!list.length) {
-    el.innerHTML = '<div class="empty"><div class="empty-ic">🏦</div><div class="empty-t">No Plaid customers found</div><div class="empty-s">Customers who connect their bank via Plaid will appear here</div></div>';
+    el.innerHTML = '<div class="empty"><div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-bank"/></svg></div><div class="empty-t">No Plaid customers found</div><div class="empty-s">Customers who connect their bank via Plaid will appear here</div></div>';
     return;
   }
   const isMobile = window.innerWidth <= 768;
@@ -3173,11 +3243,10 @@ async function sendDenialEmail() {
 
 async function logout() {
   try {
-    await fetch('/api/logout', {method:'POST', credentials:'include', headers:{'Content-Type':'application/json','X-Session':getToken()}});
+    await fetch('/api/logout', {method:'POST', credentials:'include', headers:{'Content-Type':'application/json'}});
   } catch(e){}
-  sessionStorage.removeItem('cif_token');
-  sessionStorage.removeItem('cif_user');
-  document.cookie = 'cif_token=; Path=/; Max-Age=0';
+  // Clear any lingering legacy client-side state.
+  try { sessionStorage.removeItem('cif_token'); sessionStorage.removeItem('cif_user'); } catch(e){}
   window.location.replace('/');
 }
 
