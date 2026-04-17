@@ -870,6 +870,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
       <div class="sc app"><div class="slbl">✓ Same decision</div><div class="snum grn" id="v2c-agree">0</div><div class="spct" id="v2c-agree-sub">v1 & v2 agree</div></div>
       <div class="sc dec"><div class="slbl">⚠ Disagreed</div><div class="snum red" id="v2c-disagree">0</div><div class="spct" id="v2c-disagree-sub">needs your eye</div></div>
       <div class="sc pen"><div class="slbl">🧮 Amount diff</div><div class="snum gld" id="v2c-amtdiff">0</div><div class="spct" id="v2c-amtdiff-sub">same outcome, different $</div></div>
+      <div class="sc app"><div class="slbl">✅ Auto-decide</div><div class="snum grn" id="v2c-autodecide">0</div><div class="spct" id="v2c-autodecide-sub">engine would 1-click</div></div>
     </div>
 
     <div class="tcard">
@@ -880,6 +881,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
           <option value="v1ok-v2no">v1 approved, v2 declined</option>
           <option value="v1no-v2ok">v1 declined, v2 approved</option>
           <option value="amtdiff">Same outcome, different amount</option>
+          <option value="autodecide">Auto-decide candidates</option>
           <option value="all">All compared</option>
         </select>
       </div>
@@ -1990,11 +1992,14 @@ function renderV2Compare() {
   const disagree = buckets['v1ok-v2no'] + buckets['v1no-v2ok'];
 
   // Stat cards
+  const autoDecideCount = comparable.filter(a => a.v2AutoDecide).length;
   document.getElementById('v2c-total').textContent = comparable.length;
   document.getElementById('v2c-total-sub').textContent = `${apps.length - comparable.length} not yet run`;
   document.getElementById('v2c-agree').textContent = buckets.agree;
   document.getElementById('v2c-disagree').textContent = disagree;
   document.getElementById('v2c-amtdiff').textContent = buckets.amtdiff;
+  const adEl = document.getElementById('v2c-autodecide');
+  if (adEl) adEl.textContent = autoDecideCount;
 
   // Nav badge: total needing attention (disagreements)
   const badge = document.getElementById('v2div-count');
@@ -2012,6 +2017,7 @@ function renderV2Compare() {
     if (v2CompareFilter === 'v1ok-v2no' && cls !== 'v1ok-v2no') return false;
     if (v2CompareFilter === 'v1no-v2ok' && cls !== 'v1no-v2ok') return false;
     if (v2CompareFilter === 'amtdiff' && cls !== 'amtdiff') return false;
+    if (v2CompareFilter === 'autodecide' && !a.v2AutoDecide) return false;
     // 'all' shows everything with v2 data
     if (v2CompareSearch && !(a.name || '').toLowerCase().includes(v2CompareSearch.toLowerCase())) return false;
     return true;
@@ -2042,18 +2048,22 @@ function renderV2Compare() {
       try { return JSON.parse(a.v2ReasonsJson || '[]').slice(0,2).join(' · '); }
       catch { return ''; }
     })();
+    const autoTag = a.v2AutoDecide
+      ? '<span title="High confidence, no review flags, reconciliation passed — engine would one-click approve" style="background:#e6f4ea;color:#1a6b3c;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:700">✅ auto</span>'
+      : '<span style="color:#bbb;font-size:11px">—</span>';
     return `<tr style="cursor:pointer" onclick="openModal('${a.firebaseId}')">
       <td><div class="nbig">${a.name || '—'}</div><div class="nsub" style="font-size:11px">${a.date || ''} ${a.time || ''}</div></td>
       <td>${tag}</td>
       <td><div><b>${v1}</b></div><div style="font-size:12px;color:#666">${v1Amt}</div></td>
       <td><div><b style="color:${v2.startsWith('APPROV')?'#1a6b3c':'#c0392b'}">${v2}</b></div><div style="font-size:12px;color:#666">${v2Amt}<span style="color:#999">&nbsp;·&nbsp;max ${v2Max}</span></div></td>
       <td style="text-align:center">${conf}</td>
+      <td style="text-align:center">${autoTag}</td>
       <td style="font-size:11px;color:#555;max-width:320px">${reasons}</td>
     </tr>`;
   }).join('');
 
   c.innerHTML = `<table><thead><tr>
-    <th>Applicant</th><th>Pattern</th><th>v1</th><th>v2</th><th>Conf</th><th>v2 top reasons</th>
+    <th>Applicant</th><th>Pattern</th><th>v1</th><th>v2</th><th>Conf</th><th>Auto</th><th>v2 top reasons</th>
   </tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -2100,6 +2110,7 @@ async function startBulkRerunV2() {
         a.v2ReasonsJson = JSON.stringify(data.reasons || []);
         a.v2ReconciliationOk = data.reconciliation_ok;
         a.v2ReconciliationError = data.reconciliation_error;
+        a.v2AutoDecide = !!data.auto_decide_candidate;
         a.v2RunAt = Date.now();
       } else {
         errored++;
@@ -2628,6 +2639,10 @@ function buildV2Panel(a) {
         <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px">v2 (shadow)</div>
         <div style="font-size:18px;font-weight:700;margin-top:2px;color:${a.v2Decision==='APPROVE'?'#1a6b3c':'#c0392b'}">${a.v2Decision}</div>
         <div style="font-size:13px;color:#555">$${a.v2TierAmount ?? 0} (max affordable $${a.v2MaxAffordable ?? 0})</div>
+        ${a.v2AutoDecide
+          ? '<div style="display:inline-block;margin-top:6px;padding:2px 8px;border-radius:10px;background:#e6f4ea;color:#1a6b3c;font-size:10px;font-weight:700;letter-spacing:0.3px">✅ AUTO-DECIDE CANDIDATE</div>'
+          : '<div style="display:inline-block;margin-top:6px;padding:2px 8px;border-radius:10px;background:#fff4e0;color:#a15c00;font-size:10px;font-weight:700;letter-spacing:0.3px">👀 REVIEW REQUIRED</div>'
+        }
       </div>
     </div>
   `;
@@ -2675,6 +2690,7 @@ async function runV2(fbId) {
       a.v2ReasonsJson = JSON.stringify(data.reasons || []);
       a.v2ReconciliationOk = data.reconciliation_ok;
       a.v2ReconciliationError = data.reconciliation_error;
+      a.v2AutoDecide = !!data.auto_decide_candidate;
       a.v2RunAt = Date.now();
     }
     // Rerender the v2 panel
