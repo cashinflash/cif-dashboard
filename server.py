@@ -666,7 +666,12 @@ class Handler(BaseHTTPRequestHandler):
                 ok_pw, msg = valid_password(password)
                 if not ok_pw:
                     self.send_json(400, {'error': msg}); return
-                if username in get_users(force_reload=True):
+                existing = get_users(force_reload=True).get(username)
+                # Allow shadowing env-var users so they can be migrated to
+                # Firebase-managed. Firebase entries win over env vars, so
+                # re-adding alex (env-var) as alex (firebase) lets admin
+                # reset/delete them going forward.
+                if existing and existing.get('source') == 'firebase':
                     self.send_json(409, {'error': f'User {username!r} already exists'}); return
                 record = {
                     'hash': hash_password(password),
@@ -674,11 +679,13 @@ class Handler(BaseHTTPRequestHandler):
                     'created_at': int(time.time()),
                     'created_by': actor,
                 }
+                if existing and existing.get('source') == 'env':
+                    record['migrated_from'] = 'env-var'
                 if not firebase_put_user(username, record):
                     self.send_json(500, {'error': 'Failed to persist user'}); return
                 invalidate_user_cache()
-                _audit('user.added', name=username, role=role, by=actor)
-                self.send_json(200, {'ok': True, 'username': username, 'role': role})
+                _audit('user.added', name=username, role=role, by=actor, shadow_env=bool(existing))
+                self.send_json(200, {'ok': True, 'username': username, 'role': role, 'shadowed_env_var': bool(existing)})
                 return
 
             if path == '/api/users/reset':
