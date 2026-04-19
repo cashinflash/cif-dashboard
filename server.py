@@ -857,6 +857,68 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, {'ok': True})
             return
 
+        # ──────────────────────────────────────────────────────────────────
+        # Phantom-report cleanup — JotForm leftovers
+        # A "phantom" report was written via the old unauthenticated /submit
+        # path (pre Round 14) with no bank data at all. Round 14 closed the
+        # intake but pre-existing records stay in Firebase until purged.
+        # ──────────────────────────────────────────────────────────────────
+        if path == '/api/admin/phantom-reports':
+            if not is_admin_session(token):
+                self.send_json(403, {'error': 'Admin access required'}); return
+            session = sessions.get(token, {})
+            actor = session.get('user', '?')
+            try:
+                body = json.loads(raw or '{}')
+            except Exception:
+                self.send_json(400, {'error': 'Invalid JSON'}); return
+            action = (body.get('action') or 'list').strip()
+            if action not in ('list', 'purge'):
+                self.send_json(400, {'error': "action must be 'list' or 'purge'"}); return
+            try:
+                with urllib.request.urlopen(f'{FB_BASE}/reports.json', timeout=30) as r:
+                    all_reports = json.loads(r.read().decode() or '{}') or {}
+            except Exception as e:
+                self.send_json(502, {'error': f'Firebase read failed: {e}'}); return
+            phantoms = []
+            for fid, rec in all_reports.items():
+                if not isinstance(rec, dict): continue
+                # Phantom = no bank data anywhere AND no gov ID upload.
+                # Legit applications always have at least one of these.
+                if (not rec.get('plaidAccessToken')
+                    and not rec.get('plaidAssetToken')
+                    and not rec.get('bankStatementUrl')
+                    and not rec.get('govIdUrl')):
+                    phantoms.append({
+                        'firebaseId': fid,
+                        'name': rec.get('name') or 'Unknown',
+                        'source': rec.get('source') or '',
+                        'date': rec.get('date') or '',
+                        'time': rec.get('time') or '',
+                        'createdAt': rec.get('createdAt') or 0,
+                        'amount': rec.get('amount') or '',
+                    })
+            phantoms.sort(key=lambda p: p.get('createdAt') or 0, reverse=True)
+            if action == 'list':
+                self.send_json(200, {'count': len(phantoms), 'phantoms': phantoms})
+                return
+            # action == 'purge'
+            confirm = body.get('confirm')
+            if confirm is not True:
+                self.send_json(400, {'error': "purge requires confirm=true"}); return
+            deleted, errors = [], []
+            for p in phantoms:
+                fid = p['firebaseId']
+                try:
+                    req = urllib.request.Request(f'{FB_BASE}/reports/{fid}.json', method='DELETE')
+                    with urllib.request.urlopen(req, timeout=10): pass
+                    deleted.append(fid)
+                except Exception as e:
+                    errors.append({'firebaseId': fid, 'error': str(e)})
+            _audit('phantoms.purged', by=actor, count=len(deleted), errors=len(errors))
+            self.send_json(200, {'deleted': len(deleted), 'errors': errors, 'deletedIds': deleted})
+            return
+
         if path == '/api/analyze':
             try:
                 body = json.loads(raw)

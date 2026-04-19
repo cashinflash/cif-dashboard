@@ -992,6 +992,20 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
     <div class="tcard">
       <div id="users-table" style="padding:0"></div>
     </div>
+
+    <!-- Phantom report cleanup (JotForm leftovers) -->
+    <div style="margin-top:2rem">
+      <div class="ptitle" style="display:flex;align-items:center;gap:10px;font-size:1.1rem"><svg class="icn icn-lg"><use href="#icn-trash"/></svg>Phantom report cleanup</div>
+      <div class="psub" style="margin-bottom:1rem">
+        Legacy JotForm submissions wrote records with no bank data. Round 14 closed the intake so no new ones can be created, but old ones still show up in the dashboard. This tool finds and removes them.
+        <br><b>Phantom criteria:</b> no Plaid token AND no bank statement AND no gov ID AND no Plaid asset token.
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:1rem">
+        <button class="actbtn btn-gh" onclick="scanPhantoms()">Scan for phantoms</button>
+        <button class="actbtn btn-danger" id="btn-purge-phantoms" style="display:none" onclick="purgePhantoms()">Delete all phantoms</button>
+      </div>
+      <div id="phantoms-result" style="font-size:13px"></div>
+    </div>
   </div>
 </div>
 
@@ -3874,6 +3888,80 @@ async function logout() {
 // ════════════════════════════════════════
 // USER MANAGEMENT (admin-only) + SELF PASSWORD CHANGE
 // ════════════════════════════════════════
+// ─── Phantom report cleanup (JotForm leftovers) ───
+let _phantomIds = [];
+
+async function scanPhantoms() {
+  const out = document.getElementById('phantoms-result');
+  const purgeBtn = document.getElementById('btn-purge-phantoms');
+  out.innerHTML = '<div class="spinner" style="margin:12px 0"></div> Scanning…';
+  purgeBtn.style.display = 'none';
+  try {
+    const r = await fetch('/api/admin/phantom-reports', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify({action: 'list'})
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'scan failed');
+    _phantomIds = (d.phantoms || []).map(p => p.firebaseId);
+    if (d.count === 0) {
+      out.innerHTML = '<div style="color:#2c7a2c">✓ No phantom records found. Dashboard is clean.</div>';
+      return;
+    }
+    const rows = (d.phantoms || []).slice(0, 50).map(p => `
+      <tr>
+        <td>${p.name || '—'}</td>
+        <td style="color:#888">${p.date || '—'} ${p.time || ''}</td>
+        <td style="color:#888;font-family:monospace;font-size:11px">${p.firebaseId}</td>
+        <td style="color:#888">${p.source || '—'}</td>
+      </tr>`).join('');
+    out.innerHTML = `
+      <div style="margin-bottom:1rem">
+        Found <b>${d.count}</b> phantom record${d.count === 1 ? '' : 's'}. Review the list below then click "Delete all phantoms" to remove them.
+        ${d.count > 50 ? `<br><i>Showing the first 50.</i>` : ''}
+      </div>
+      <table class="sc" style="width:100%;font-size:12px">
+        <thead><tr><th>Name</th><th>Date</th><th>Firebase ID</th><th>Source</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    purgeBtn.textContent = `Delete all ${d.count} phantom${d.count === 1 ? '' : 's'}`;
+    purgeBtn.style.display = '';
+  } catch (e) {
+    out.innerHTML = `<div style="color:#c0392b">Error: ${e.message}</div>`;
+  }
+}
+
+async function purgePhantoms() {
+  if (!_phantomIds.length) return;
+  if (!confirm(`Delete ${_phantomIds.length} phantom record(s) permanently? This cannot be undone.`)) return;
+  const out = document.getElementById('phantoms-result');
+  out.innerHTML = '<div class="spinner" style="margin:12px 0"></div> Deleting…';
+  document.getElementById('btn-purge-phantoms').disabled = true;
+  try {
+    const r = await fetch('/api/admin/phantom-reports', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify({action: 'purge', confirm: true})
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'purge failed');
+    out.innerHTML = `
+      <div style="color:#2c7a2c">
+        ✓ Deleted <b>${d.deleted}</b> record${d.deleted === 1 ? '' : 's'}.
+        ${d.errors && d.errors.length ? `<br>${d.errors.length} error(s): ${d.errors.map(e => e.firebaseId).join(', ')}` : ''}
+      </div>`;
+    document.getElementById('btn-purge-phantoms').style.display = 'none';
+    // Refresh the main dashboard since records changed
+    if (typeof loadReports === 'function') loadReports();
+  } catch (e) {
+    out.innerHTML = `<div style="color:#c0392b">Error: ${e.message}</div>`;
+    document.getElementById('btn-purge-phantoms').disabled = false;
+  }
+}
+
 async function loadUsers() {
   const box = document.getElementById('users-table');
   if (!box) return;
