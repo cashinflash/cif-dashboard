@@ -474,19 +474,10 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         # ─── Instant-Funding vault — staff views ─────────────────
-        # List pending submissions (HTML page)
-        if path in ('/if', '/if/'):
-            if not valid_session(token):
-                self.send_response(302); self.send_header('Location', '/'); self.end_headers(); return
-            data = read_file(os.path.join(DIR, 'if_list.html'))
-            self.send_html(200, data or b'IF list page missing'); return
-
-        # Single submission view (HTML page) — /if/view/<id>
-        if path.startswith('/if/view/'):
-            if not valid_session(token):
-                self.send_response(302); self.send_header('Location', '/'); self.end_headers(); return
-            data = read_file(os.path.join(DIR, 'if_view.html'))
-            self.send_html(200, data or b'IF view page missing'); return
+        # The standalone /if and /if/view/<id> HTML pages were removed
+        # in favor of a native tab inside the main dashboard (app.html
+        # → showView('if') + revealIFCard). Only the JSON proxies
+        # below are reachable; staff navigate to /app to see the vault.
 
         # JSON: list of pending submissions (used by the HTML page via fetch)
         if path == '/api/if/list':
