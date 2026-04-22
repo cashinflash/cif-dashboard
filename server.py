@@ -13,7 +13,7 @@ ANTHROPIC_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 # Both live in Render env vars — set once per deploy.
 IF_API_BASE = os.environ.get(
     'IF_API_BASE',
-    'https://anh066l1wf.execute-api.us-east-1.amazonaws.com'
+    'https://anh066l1wf.execute-api.us-east-1.amazonaws.com/dev'
 ).rstrip('/')
 IF_VIEW_SECRET = os.environ.get('IF_VIEW_SECRET', '')
 
