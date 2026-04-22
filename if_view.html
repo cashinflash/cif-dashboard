@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Card submission · Cash in Flash</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<style>
+:root{--brand:#1a6b3c;--brand-dark:#0f4425;--ink:#111a14;--muted:#6b7c72;--border:#d5ded8;--bg:#f5f7f6;--danger:#b3261e;--warn-bg:#fff8e5;--warn-border:#f2d46c;--warn-ink:#6b4d00;}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'Poppins',system-ui,sans-serif;color:var(--ink);background:var(--bg);}
+header.h{background:linear-gradient(135deg,#0f4425 0%,#1a6b3c 100%);color:#fff;padding:24px 0;}
+header.h .inner{max-width:860px;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:20px;}
+header.h h1{font-size:1.3rem;font-weight:700;}
+header.h p{font-size:.85rem;opacity:.85;margin-top:2px;}
+.back-btn{color:#fff;text-decoration:none;font-size:.88rem;font-weight:600;padding:8px 14px;border:1px solid rgba(255,255,255,.35);border-radius:8px;transition:background-color .15s;}
+.back-btn:hover{background:rgba(255,255,255,.12);}
+main{max-width:860px;margin:0 auto;padding:28px 24px 60px;}
+.warn{background:var(--warn-bg);border:1px solid var(--warn-border);color:var(--warn-ink);padding:12px 16px;border-radius:8px;font-size:.88rem;line-height:1.5;margin-bottom:22px;display:flex;gap:10px;align-items:flex-start;}
+.warn svg{flex:0 0 auto;margin-top:2px;}
+.card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:28px 32px;margin-bottom:22px;}
+.card h2{font-size:.82rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:600;margin-bottom:14px;}
+.row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #eff2f0;gap:16px;}
+.row:last-child{border-bottom:0;}
+.row .k{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+.row .v{font-size:1rem;font-weight:600;color:var(--ink);text-align:right;}
+.row .v.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;letter-spacing:.02em;}
+.row .v.big{font-size:1.35rem;}
+.copy-btn{background:#fff;border:1px solid var(--border);color:var(--ink);font-family:inherit;font-size:.72rem;font-weight:600;padding:3px 8px;border-radius:6px;cursor:pointer;margin-left:8px;}
+.copy-btn:hover{border-color:var(--brand);color:var(--brand);}
+.copy-btn.copied{background:var(--brand);color:#fff;border-color:var(--brand);}
+.actions{display:flex;gap:12px;margin-top:10px;flex-wrap:wrap;}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 22px;border-radius:8px;border:0;font-family:inherit;font-size:.95rem;font-weight:600;cursor:pointer;text-decoration:none;}
+.btn-primary{background:var(--brand);color:#fff;}
+.btn-primary:hover{background:var(--brand-dark);}
+.btn-ghost{background:#fff;border:1px solid var(--border);color:var(--ink);}
+.btn-ghost:hover{border-color:var(--brand);}
+.loading,.error,.purged{text-align:center;padding:60px 24px;}
+.loading .spinner{width:32px;height:32px;border:3px solid #e4e8e6;border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.error h2,.purged h2{font-size:1.15rem;font-weight:700;color:var(--ink);margin-bottom:8px;}
+.error p,.purged p{color:var(--muted);line-height:1.55;max-width:500px;margin:0 auto;}
+.error svg{color:var(--danger);margin-bottom:12px;}
+.purged svg{color:var(--brand);margin-bottom:12px;}
+</style>
+</head>
+<body>
+
+<header class="h">
+  <div class="inner">
+    <div>
+      <h1>Card submission — view once</h1>
+      <p>This page reveals the full card data one time, then the record is deleted.</p>
+    </div>
+    <a href="/if/" class="back-btn">← All submissions</a>
+  </div>
+</header>
+
+<main>
+
+<div id="loading" class="loading">
+  <div class="spinner" aria-hidden="true"></div>
+  <p>Retrieving and decrypting…</p>
+</div>
+
+<div id="content" hidden>
+  <div class="warn">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <div><strong>One-time reveal.</strong> The encrypted vault record has already been deleted — this data won't be available if you refresh or reopen this link. Enter it into Vergent now, then close this tab.</div>
+  </div>
+
+  <div class="card">
+    <h2>Borrower + cardholder</h2>
+    <div class="row">
+      <span class="k">Borrower</span>
+      <span class="v" id="borrower">—</span>
+    </div>
+    <div class="row">
+      <span class="k">Cardholder</span>
+      <span class="v" id="cardholder">—</span>
+    </div>
+    <div class="row">
+      <span class="k">Submitted</span>
+      <span class="v mono" id="submittedAt">—</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Card details</h2>
+    <div class="row">
+      <span class="k">Card number</span>
+      <span>
+        <span class="v big mono" id="cardNumber">—</span>
+        <button class="copy-btn" data-copy="cardNumber" type="button">Copy</button>
+      </span>
+    </div>
+    <div class="row">
+      <span class="k">Card type</span>
+      <span class="v" id="cardType">—</span>
+    </div>
+    <div class="row">
+      <span class="k">Expiration</span>
+      <span>
+        <span class="v mono" id="expiration">—</span>
+        <button class="copy-btn" data-copy="expiration" type="button">Copy</button>
+      </span>
+    </div>
+    <div class="row">
+      <span class="k">CVV</span>
+      <span>
+        <span class="v mono" id="cvv">—</span>
+        <button class="copy-btn" data-copy="cvv" type="button">Copy</button>
+      </span>
+    </div>
+    <div class="row">
+      <span class="k">Billing ZIP</span>
+      <span>
+        <span class="v mono" id="billingZip">—</span>
+        <button class="copy-btn" data-copy="billingZip" type="button">Copy</button>
+      </span>
+    </div>
+  </div>
+
+  <div class="actions">
+    <a href="https://cashinflash.my.vergentlms.com/login" target="_blank" rel="noopener" class="btn btn-primary">Open Vergent →</a>
+    <button type="button" class="btn btn-ghost" id="copyAllBtn">Copy all fields</button>
+    <a href="/if/" class="btn btn-ghost">Back to list</a>
+  </div>
+</div>
+
+<div id="err" class="error" hidden>
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+  <h2 id="errTitle">Couldn't retrieve this submission</h2>
+  <p id="errDetail">—</p>
+  <div class="actions" style="justify-content:center;margin-top:18px;"><a href="/if/" class="btn btn-ghost">Back to list</a></div>
+</div>
+
+</main>
+
+<script>
+(function(){
+  'use strict';
+
+  const parts = window.location.pathname.split('/');
+  const subId = decodeURIComponent(parts[parts.length - 1] || '');
+
+  const loading = document.getElementById('loading');
+  const content = document.getElementById('content');
+  const errBox = document.getElementById('err');
+
+  function showError(title, detail){
+    loading.hidden = true; content.hidden = true; errBox.hidden = false;
+    document.getElementById('errTitle').textContent = title;
+    document.getElementById('errDetail').textContent = detail;
+  }
+
+  function setText(id, value){
+    const el = document.getElementById(id);
+    if(el) el.textContent = (value == null || value === '') ? '—' : value;
+  }
+
+  function formatExp(m, y){
+    if(!m || !y) return '—';
+    return String(m).padStart(2,'0') + '/' + String(y);
+  }
+
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-copy');
+      const val = document.getElementById(id).textContent.trim();
+      try{ await navigator.clipboard.writeText(val); }catch(_){/*noop*/}
+      const prev = btn.textContent;
+      btn.textContent = 'Copied'; btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = prev; btn.classList.remove('copied'); }, 1200);
+    });
+  });
+
+  document.getElementById('copyAllBtn').addEventListener('click', async () => {
+    const lines = [
+      'Borrower: '     + document.getElementById('borrower').textContent,
+      'Cardholder: '   + document.getElementById('cardholder').textContent,
+      'Card Number: '  + document.getElementById('cardNumber').textContent,
+      'Card Type: '    + document.getElementById('cardType').textContent,
+      'Expiration: '   + document.getElementById('expiration').textContent,
+      'CVV: '          + document.getElementById('cvv').textContent,
+      'Billing ZIP: '  + document.getElementById('billingZip').textContent,
+    ].join('\n');
+    try{ await navigator.clipboard.writeText(lines); }catch(_){/*noop*/}
+    const btn = document.getElementById('copyAllBtn');
+    const prev = btn.textContent;
+    btn.textContent = 'Copied all'; btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = prev; btn.classList.remove('copied'); }, 1500);
+  });
+
+  (async () => {
+    if(!subId){ showError('Missing submission ID', 'The URL is malformed.'); return; }
+    try{
+      const r = await fetch('/api/if/view/' + encodeURIComponent(subId), {credentials:'same-origin', cache:'no-store'});
+      if(r.status === 401){ window.location.href = '/'; return; }
+      if(r.status === 404){ showError('Record not found', 'This submission has either already been viewed, expired, or never existed. If the customer just submitted, check the list view.'); return; }
+      if(!r.ok) throw new Error('http ' + r.status);
+      const d = await r.json();
+
+      setText('borrower', d.borrowerName);
+      setText('cardholder', d.cardholderName);
+      setText('submittedAt', d.submittedAt);
+      setText('cardNumber', d.cardNumber);
+      setText('cardType', d.cardType);
+      setText('expiration', formatExp(d.expMonth, d.expYear));
+      setText('cvv', d.cvv);
+      setText('billingZip', d.billingZip);
+
+      loading.hidden = true; content.hidden = false;
+    }catch(e){
+      showError("Couldn't decrypt this submission", e.message);
+    }
+  })();
+})();
+</script>
+
+</body></html>
