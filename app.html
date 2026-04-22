@@ -426,6 +426,7 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
     <button class="nb" onclick="showView('batch',document.getElementById('nav-batch'));toggleMobMenu()"><svg class="icn"><use href="#icn-layers"/></svg>Batch Analysis</button>
     <button class="nb" onclick="showView('rules',this);toggleMobMenu()"><svg class="icn"><use href="#icn-sliders"/></svg>Rules Engine</button>
     <button class="nb" onclick="showView('plaid',this);toggleMobMenu()"><svg class="icn"><use href="#icn-bank"/></svg>Plaid Customers</button>
+    <button class="nb" onclick="showView('if',this);toggleMobMenu()"><svg class="icn"><use href="#icn-file"/></svg>Instant Funding <span id="ifcount-mob" style="display:none;background:#0E8741;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px"></span></button>
     <button class="nb admin-only" onclick="showView('users',this);toggleMobMenu()" style="display:none"><svg class="icn"><use href="#icn-users"/></svg>Users</button>
     <button class="nb admin-only" onclick="showView('audit',this);toggleMobMenu()" style="display:none"><svg class="icn"><use href="#icn-file"/></svg>Audit log</button>
   </div>
@@ -447,6 +448,7 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
     <button class="nb" id="nav-batch" style="display:none"></button>
     <button class="nb" id="nav-rules" onclick="showView('rules',this)"><svg class="icn"><use href="#icn-sliders"/></svg>Rules Engine</button>
     <button class="nb" id="nav-plaid" onclick="showView('plaid',this)"><svg class="icn"><use href="#icn-bank"/></svg>Plaid Customers</button>
+    <button class="nb" id="nav-if" onclick="showView('if',this)"><svg class="icn"><use href="#icn-file"/></svg>Instant Funding<span id="ifcount" style="display:none;background:#0E8741;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px">0</span></button>
     <button class="nb admin-only" id="nav-users" onclick="showView('users',this)" style="display:none"><svg class="icn"><use href="#icn-users"/></svg>Users</button>
     <button class="nb admin-only" id="nav-audit" onclick="showView('audit',this)" style="display:none"><svg class="icn"><use href="#icn-file"/></svg>Audit log</button>
   </div>
@@ -838,6 +840,22 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
   </div>
 </div>
 
+<div id="view-if" class="view">
+  <div class="phead">
+    <div>
+      <div class="ptitle" style="display:flex;align-items:center;gap:10px">
+        <svg class="icn icn-lg"><use href="#icn-file"/></svg>Instant Funding submissions
+      </div>
+      <div class="psub">Debit cards submitted via cashinflash.com/if. Click <strong>View card</strong> to reveal once — the record is purged after.</div>
+    </div>
+    <button class="actbtn btn-gh" onclick="loadIFSubmissions()">
+      <svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Refresh
+    </button>
+  </div>
+  <div id="if-status" style="margin-bottom:12px;color:var(--muted);font-size:13px"></div>
+  <div id="if-table"></div>
+</div>
+
 <div id="view-dash" class="view">
   <div class="container">
     <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:12px">
@@ -1225,10 +1243,23 @@ window.onload = async () => {
   startDots();
   setupDragDrop();
   startIdleTracker();
-  // Always land on Dashboard
-  showView('dash', document.getElementById('nav-dash'));
+  // Deep-link: email notifications link to /app?if=<UUID>. Land on
+  // the Instant Funding tab and auto-open the reveal modal for that
+  // submission. Strip the query param after so a refresh doesn't
+  // re-open the (already-purged) record.
+  const _ifQ = new URLSearchParams(location.search).get('if');
+  if (_ifQ) {
+    showView('if', document.getElementById('nav-if'));
+    history.replaceState(null, '', '/app');
+    setTimeout(() => revealIFCard(_ifQ), 50);
+  } else {
+    // Always land on Dashboard
+    showView('dash', document.getElementById('nav-dash'));
+  }
   loadReports();
   pollTimer = setInterval(loadReports, 8000);
+  // Silent bg fetch to prime the IF badge count
+  if (typeof loadIFSubmissions === 'function') loadIFSubmissions();
 };
 
 
@@ -1350,6 +1381,7 @@ function showView(name, btn) {
   if (name==='dash') loadReports();
   if (name==='v2compare') { loadReports().then(renderV2Compare); }
   if (name==='reviewqueue') loadReviewQueue();
+  if (name==='if') loadIFSubmissions();
   if (name==='users') loadUsers();
   if (name==='audit') loadAuditLog();
 }
@@ -2369,6 +2401,194 @@ async function startBulkRerunV2() {
 }
 
 function cancelBulkRerunV2() { _bulkRerunCancel = true; }
+
+// ════════════════════════════════════════
+// INSTANT FUNDING — /if card submissions
+// ════════════════════════════════════════
+// Data lives in a KMS-encrypted DynamoDB vault on AWS, fronted by
+// cif-portal-if-dev. `/api/if/list` returns metadata only (no PAN).
+// `/api/if/view/<id>` decrypts once and deletes the record — we
+// never cache plaintext on the page or in a stateful JS variable.
+
+function _ifEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+
+function _ifRelTime(iso){
+  if(!iso) return '';
+  const t=new Date(iso); if(isNaN(t)) return iso;
+  const d=Math.floor((Date.now()-t.getTime())/1000);
+  if(d<60) return 'just now';
+  if(d<3600) return Math.floor(d/60)+' min ago';
+  if(d<86400) return Math.floor(d/3600)+' hr ago';
+  return Math.floor(d/86400)+' days ago';
+}
+function _ifTtlLeft(epoch){
+  if(!epoch) return '—';
+  const left=epoch-Math.floor(Date.now()/1000);
+  if(left<=0) return 'expired';
+  if(left<3600) return Math.floor(left/60)+'m left';
+  if(left<86400) return Math.floor(left/3600)+'h left';
+  return Math.floor(left/86400)+'d left';
+}
+
+async function loadIFSubmissions(){
+  const status=document.getElementById('if-status');
+  const table=document.getElementById('if-table');
+  table.innerHTML=`<div style="padding:40px;text-align:center;color:#888">Loading submissions…</div>`;
+  status.textContent='';
+  try{
+    const r=await fetch('/api/if/list',{credentials:'include'});
+    if(r.status===401){ window.location.replace('/'); return; }
+    if(!r.ok){ throw new Error('http '+r.status); }
+    const body=await r.json();
+    renderIFSubmissions(body.submissions||[]);
+  }catch(e){
+    table.innerHTML=`<div style="padding:40px;text-align:center;color:#b3261e">Couldn't load submissions: ${_ifEsc(e.message)}</div>`;
+    status.textContent='';
+  }
+}
+
+function renderIFSubmissions(rows){
+  const status=document.getElementById('if-status');
+  const table=document.getElementById('if-table');
+  const badge=document.getElementById('ifcount');
+  const badgeMob=document.getElementById('ifcount-mob');
+  const pending=rows.filter(r=>r.status!=='processed');
+  if(badge){ badge.textContent=pending.length; badge.style.display=pending.length?'inline-block':'none'; }
+  if(badgeMob){ badgeMob.textContent=pending.length; badgeMob.style.display=pending.length?'inline-block':'none'; }
+  if(!rows.length){
+    table.innerHTML=`<div class="empty"><div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-file"/></svg></div><div class="empty-t">No submissions yet</div><div class="empty-s">When a customer submits their debit card at cashinflash.com/if it will appear here.</div></div>`;
+    status.textContent='';
+    return;
+  }
+  status.textContent=rows.length+(rows.length===1?' submission':' submissions');
+  const body=rows.map(s=>{
+    const exp=s.expMonth?String(s.expMonth).padStart(2,'0')+'/'+String(s.expYear||'').slice(-2):'—';
+    return `<tr>
+      <td title="${_ifEsc(s.submittedAt||'')}" style="color:#555">${_ifEsc(_ifRelTime(s.submittedAt))}</td>
+      <td><strong>${_ifEsc(s.borrowerName||'—')}</strong></td>
+      <td>${_ifEsc(s.cardholderName||'—')}</td>
+      <td><span style="font-weight:600">${_ifEsc(s.brand||'Card')}</span> <span style="font-family:ui-monospace,Menlo,Consolas,monospace;color:#666">•••• ${_ifEsc(s.last4||'----')}</span></td>
+      <td style="font-family:ui-monospace,Menlo,Consolas,monospace">${_ifEsc(exp)}</td>
+      <td style="font-family:ui-monospace,Menlo,Consolas,monospace">${_ifEsc(s.billingZip||'—')}</td>
+      <td style="color:#555;font-size:12px">${_ifEsc(_ifTtlLeft(s.ttlEpoch))}</td>
+      <td style="text-align:right"><button class="actbtn btn-ok" onclick="revealIFCard('${_ifEsc(s.submissionId)}')">View card</button></td>
+    </tr>`;
+  }).join('');
+  table.innerHTML=`<table class="tbl" style="width:100%;border-collapse:collapse">
+    <thead><tr style="text-align:left;border-bottom:1px solid var(--border);background:#fafbfa">
+      <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">Submitted</th>
+      <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">Borrower</th>
+      <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">Cardholder</th>
+      <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">Card</th>
+      <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">Exp</th>
+      <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">ZIP</th>
+      <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">Expires</th>
+      <th></th>
+    </tr></thead>
+    <tbody>${body}</tbody>
+  </table>`;
+  // Row hover highlight
+  table.querySelectorAll('tbody tr').forEach(tr=>{
+    tr.style.borderBottom='1px solid #eff2f0';
+    tr.querySelectorAll('td').forEach(td=>td.style.padding='12px');
+  });
+}
+
+async function revealIFCard(id){
+  const ov=document.getElementById('ov');
+  const mt=document.getElementById('mtitle');
+  const mb=document.getElementById('mbody');
+  mt.textContent='Card details — one-time reveal';
+  mb.innerHTML=`<div style="padding:40px;text-align:center;color:#888">Retrieving and decrypting…</div>`;
+  ov.classList.add('open');
+  let data=null;
+  try{
+    const r=await fetch('/api/if/view/'+encodeURIComponent(id),{credentials:'include',cache:'no-store'});
+    if(r.status===401){ window.location.replace('/'); return; }
+    if(r.status===404){
+      mb.innerHTML=`<div style="padding:28px;text-align:center"><div style="color:#b3261e;font-weight:600;margin-bottom:6px">Not found</div><div style="color:#555">This submission was already viewed, expired, or never existed.</div></div>`;
+      return;
+    }
+    if(!r.ok) throw new Error('http '+r.status);
+    data=await r.json();
+  }catch(e){
+    mb.innerHTML=`<div style="padding:28px;text-align:center"><div style="color:#b3261e;font-weight:600;margin-bottom:6px">Couldn't retrieve this submission</div><div style="color:#555">${_ifEsc(e.message)}</div></div>`;
+    return;
+  }
+  const exp=data.expMonth?String(data.expMonth).padStart(2,'0')+'/'+String(data.expYear||''):'—';
+  const row=(k,v,copy)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #eff2f0;gap:14px">
+    <span style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.05em">${_ifEsc(k)}</span>
+    <span style="font-weight:600;text-align:right">
+      <span id="if-field-${_ifEsc(copy||k)}" style="${copy?'font-family:ui-monospace,Menlo,Consolas,monospace':''}">${_ifEsc(v||'—')}</span>
+      ${copy?`<button class="actbtn btn-gh" style="margin-left:8px;padding:2px 8px;font-size:11px" onclick="_ifCopy('if-field-${_ifEsc(copy)}',this)">Copy</button>`:''}
+    </span>
+  </div>`;
+  mb.innerHTML=`
+    <div style="background:#fff8e5;border:1px solid #f2d46c;color:#6b4d00;padding:12px 14px;border-radius:8px;font-size:13px;line-height:1.5;margin-bottom:18px">
+      <strong>One-time reveal.</strong> The encrypted vault record has been deleted. Closing this window will lose access — enter the data into Vergent now.
+    </div>
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:14px">
+      <div style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Borrower &amp; cardholder</div>
+      ${row('Borrower',data.borrowerName)}
+      ${row('Cardholder',data.cardholderName)}
+      ${row('Submitted',data.submittedAt||'—')}
+    </div>
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 18px">
+      <div style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Card details</div>
+      ${row('Card number',data.cardNumber,'cardNumber')}
+      ${row('Card type',data.cardType)}
+      ${row('Expiration',exp,'expiration')}
+      ${row('CVV',data.cvv,'cvv')}
+      ${row('Billing ZIP',data.billingZip,'billingZip')}
+    </div>
+    <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
+      <a href="https://cashinflash.my.vergentlms.com/login" target="_blank" rel="noopener" class="actbtn btn-ok" style="text-decoration:none">Open Vergent →</a>
+      <button class="actbtn btn-gh" onclick="_ifCopyAll()">Copy all fields</button>
+      <button class="actbtn btn-gh" onclick="closeModal()">Done</button>
+    </div>`;
+  // Cache values for the "Copy all" helper
+  window._ifPending={
+    Borrower:data.borrowerName, Cardholder:data.cardholderName,
+    CardNumber:data.cardNumber, CardType:data.cardType,
+    Expiration:exp, CVV:data.cvv, BillingZIP:data.billingZip,
+  };
+}
+
+function _ifCopy(elId,btn){
+  const el=document.getElementById(elId); if(!el) return;
+  const v=el.textContent.trim();
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(v); }
+  const p=btn.textContent; btn.textContent='Copied'; btn.style.background='var(--green,#0E8741)'; btn.style.color='#fff';
+  setTimeout(()=>{ btn.textContent=p; btn.style.background=''; btn.style.color=''; },1100);
+}
+
+function _ifCopyAll(){
+  const p=window._ifPending||{};
+  const lines=['Borrower: '+(p.Borrower||''),'Cardholder: '+(p.Cardholder||''),
+    'Card Number: '+(p.CardNumber||''),'Card Type: '+(p.CardType||''),
+    'Expiration: '+(p.Expiration||''),'CVV: '+(p.CVV||''),'Billing ZIP: '+(p.BillingZIP||'')].join('\n');
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(lines); }
+  if(typeof toast==='function') toast('Copied all fields','ok');
+}
+
+// When the modal closes via close/cancel/backdrop, wipe card fields
+// from the DOM and refresh the table so the (now-deleted) submission
+// disappears. The modal's close handler (closeModal / closeModalOut)
+// runs even when we reveal IF card, but it doesn't know about us —
+// patch via an observer on the overlay's class changes.
+(function(){
+  const ov=document.getElementById('ov');
+  if(!ov) return;
+  const mo=new MutationObserver(()=>{
+    if(!ov.classList.contains('open')){
+      window._ifPending=null;
+      const mb=document.getElementById('mbody');
+      const title=(document.getElementById('mtitle')||{}).textContent||'';
+      if(mb && title.indexOf('Card details')===0){ mb.innerHTML=''; loadIFSubmissions(); }
+    }
+  });
+  mo.observe(ov,{attributes:true,attributeFilter:['class']});
+})();
 
 // ════════════════════════════════════════
 // REVIEW QUEUE — unclassified merchants
