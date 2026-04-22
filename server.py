@@ -7,6 +7,16 @@ PORT = int(os.environ.get('PORT', 8080))
 FB_BASE = 'https://cashinflash-a1dce-default-rtdb.firebaseio.com'
 ANTHROPIC_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 
+# Instant-Funding vault (for /if page submissions).
+# IF_API_BASE is the cif-portal HttpApi root (no trailing /api).
+# IF_VIEW_SECRET is the shared secret for GET /api/if/list + /view.
+# Both live in Render env vars — set once per deploy.
+IF_API_BASE = os.environ.get(
+    'IF_API_BASE',
+    'https://anh066l1wf.execute-api.us-east-1.amazonaws.com'
+).rstrip('/')
+IF_VIEW_SECRET = os.environ.get('IF_VIEW_SECRET', '')
+
 # Admin password is required — no hardcoded default. If ADMIN_PASSWORD is not
 # set in the environment, the admin account is disabled.
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
@@ -461,6 +471,77 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(body)
             except Exception as e:
                 self.send_json(500, {'error': str(e)})
+            return
+
+        # ─── Instant-Funding vault — staff views ─────────────────
+        # List pending submissions (HTML page)
+        if path in ('/if', '/if/'):
+            if not valid_session(token):
+                self.send_response(302); self.send_header('Location', '/'); self.end_headers(); return
+            data = read_file(os.path.join(DIR, 'if_list.html'))
+            self.send_html(200, data or b'IF list page missing'); return
+
+        # Single submission view (HTML page) — /if/view/<id>
+        if path.startswith('/if/view/'):
+            if not valid_session(token):
+                self.send_response(302); self.send_header('Location', '/'); self.end_headers(); return
+            data = read_file(os.path.join(DIR, 'if_view.html'))
+            self.send_html(200, data or b'IF view page missing'); return
+
+        # JSON: list of pending submissions (used by the HTML page via fetch)
+        if path == '/api/if/list':
+            if not valid_session(token):
+                self.send_json(401, {'error': 'Unauthorized'}); return
+            try:
+                req = urllib.request.Request(
+                    f'{IF_API_BASE}/api/if/list',
+                    headers={'X-View-Secret': IF_VIEW_SECRET, 'Accept': 'application/json'},
+                )
+                with urllib.request.urlopen(req, timeout=10) as r:
+                    body = r.read()
+                self.send_response(r.getcode())
+                for k, v in CORS.items(): self.send_header(k, v)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except urllib.error.HTTPError as e:
+                self.send_json(e.code, {'error': f'upstream {e.code}'})
+            except Exception as e:
+                self.send_json(502, {'error': str(e)})
+            return
+
+        # JSON: view-once plaintext for a single submission. Hitting this
+        # burns the vault record — Lambda deletes it after decrypting.
+        if path.startswith('/api/if/view/'):
+            if not valid_session(token):
+                self.send_json(401, {'error': 'Unauthorized'}); return
+            sub_id = path[len('/api/if/view/'):]
+            if not sub_id:
+                self.send_json(400, {'error': 'missing id'}); return
+            try:
+                req = urllib.request.Request(
+                    f'{IF_API_BASE}/api/if/view/{sub_id}',
+                    headers={'X-View-Secret': IF_VIEW_SECRET, 'Accept': 'application/json'},
+                )
+                with urllib.request.urlopen(req, timeout=10) as r:
+                    body = r.read()
+                _audit('if_view', user=sessions.get(token, {}).get('user', '?'),
+                       ip=_client_ip(self), submission_id=sub_id)
+                self.send_response(r.getcode())
+                for k, v in CORS.items(): self.send_header(k, v)
+                self.send_header('Content-Type', 'application/json')
+                # Never cache — this response contains full PAN/CVV and
+                # is single-use.
+                self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, private')
+                self.send_header('Pragma', 'no-cache')
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except urllib.error.HTTPError as e:
+                self.send_json(e.code, {'error': f'upstream {e.code}'})
+            except Exception as e:
+                self.send_json(502, {'error': str(e)})
             return
 
         self.send_json(404, {'error': 'not found'})
