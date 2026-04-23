@@ -3520,8 +3520,16 @@ function copyModal(fbId){const a=apps.find(x=>x.firebaseId===fbId);if(a){const t
 function buildV2Panel(a) {
   const hasRun = a.v2Decision && a.v2Report;
   const runAt = a.v2RunAt ? new Date(a.v2RunAt).toLocaleString() : '';
-  const v1Decision = a.claudeDecision || a.status || '—';
-  const v1Amount = a.amount || 'N/A';
+  // When v2 is the authoritative engine for this applicant, the "v1" side
+  // of the comparison pulls from the shadow copy that server.py stashed
+  // before promoting v2 into the canonical fields.
+  const v2IsPrimary = (a.engineVersionPrimary === 'v2');
+  const v1Decision = v2IsPrimary
+    ? (a.v1ShadowDecision || '—')
+    : (a.claudeDecision || a.status || '—');
+  const v1Amount = v2IsPrimary
+    ? (a.v1ShadowAmount || 'N/A')
+    : (a.amount || 'N/A');
 
   const canRefresh = !!a.plaidAssetToken;
   const acctCount = a.connectedAccountCount;
@@ -3561,30 +3569,36 @@ function buildV2Panel(a) {
     `;
   }
 
+  const v2Card = `
+    <div style="padding:10px 12px;background:#fff;border-radius:6px;border-left:3px solid ${a.v2Decision==='APPROVE'?'#1a6b3c':'#c0392b'}">
+      <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px">v2 ${v2IsPrimary ? '(primary)' : '(shadow)'}</div>
+      <div style="font-size:18px;font-weight:700;margin-top:2px;color:${a.v2Decision==='APPROVE'?'#1a6b3c':'#c0392b'}">${a.v2Decision}</div>
+      <div style="font-size:13px;color:#555">$${a.v2TierAmount ?? 0} (max affordable $${a.v2MaxAffordable ?? 0})</div>
+      ${a.v2AutoDecide
+        ? '<div style="display:inline-block;margin-top:6px;padding:2px 8px;border-radius:10px;background:#e6f4ea;color:#1a6b3c;font-size:10px;font-weight:700;letter-spacing:0.3px">✅ AUTO-DECIDE CANDIDATE</div>'
+        : '<div style="display:inline-block;margin-top:6px;padding:2px 8px;border-radius:10px;background:#fff4e0;color:#a15c00;font-size:10px;font-weight:700;letter-spacing:0.3px">👀 REVIEW REQUIRED</div>'
+      }
+    </div>
+  `;
+  const v1Card = `
+    <div style="padding:10px 12px;background:#fff;border-radius:6px;border-left:3px solid #888">
+      <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px">v1 ${v2IsPrimary ? '(shadow)' : '(current)'}</div>
+      <div style="font-size:18px;font-weight:700;margin-top:2px">${v1Decision}</div>
+      <div style="font-size:13px;color:#555">${v1Amount}</div>
+    </div>
+  `;
   const comparison = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;background:#f8f8f8;border-radius:8px;margin-bottom:14px">
-      <div style="padding:10px 12px;background:#fff;border-radius:6px;border-left:3px solid #888">
-        <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px">v1 (current)</div>
-        <div style="font-size:18px;font-weight:700;margin-top:2px">${v1Decision}</div>
-        <div style="font-size:13px;color:#555">${v1Amount}</div>
-      </div>
-      <div style="padding:10px 12px;background:#fff;border-radius:6px;border-left:3px solid ${a.v2Decision==='APPROVE'?'#1a6b3c':'#c0392b'}">
-        <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px">v2 (shadow)</div>
-        <div style="font-size:18px;font-weight:700;margin-top:2px;color:${a.v2Decision==='APPROVE'?'#1a6b3c':'#c0392b'}">${a.v2Decision}</div>
-        <div style="font-size:13px;color:#555">$${a.v2TierAmount ?? 0} (max affordable $${a.v2MaxAffordable ?? 0})</div>
-        ${a.v2AutoDecide
-          ? '<div style="display:inline-block;margin-top:6px;padding:2px 8px;border-radius:10px;background:#e6f4ea;color:#1a6b3c;font-size:10px;font-weight:700;letter-spacing:0.3px">✅ AUTO-DECIDE CANDIDATE</div>'
-          : '<div style="display:inline-block;margin-top:6px;padding:2px 8px;border-radius:10px;background:#fff4e0;color:#a15c00;font-size:10px;font-weight:700;letter-spacing:0.3px">👀 REVIEW REQUIRED</div>'
-        }
-      </div>
+      ${v2IsPrimary ? v2Card + v1Card : v1Card + v2Card}
     </div>
   `;
 
+  const headerTitle = v2IsPrimary ? 'Engine v2 — primary' : 'Engine v2 — shadow comparison';
   return `
     <div style="padding:12px 4px 4px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <div>
-          <div style="font-size:15px;font-weight:700">Engine v2 — shadow comparison</div>
+          <div style="font-size:15px;font-weight:700">${headerTitle}</div>
           <div style="font-size:11px;color:#888">Deterministic pipeline; no AI in the decision path</div>
         </div>
         ${runButton}
