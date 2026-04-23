@@ -841,30 +841,32 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
 </div>
 
 <div id="view-if" class="view">
-  <div class="phead">
-    <div>
-      <div class="ptitle" style="display:flex;align-items:center;gap:10px">
-        <svg class="icn icn-lg"><use href="#icn-file"/></svg>Instant Funding
+  <div class="container">
+    <div class="phead">
+      <div>
+        <div class="ptitle" style="display:flex;align-items:center;gap:10px">
+          <svg class="icn icn-lg"><use href="#icn-file"/></svg>Instant Funding
+        </div>
+        <div class="psub">Debit cards submitted via <strong>cashinflash.com/if</strong>. Click <strong>View card</strong> to copy the details into Vergent.</div>
       </div>
-      <div class="psub">Debit cards submitted via <strong>cashinflash.com/if</strong>. Click <strong>View card</strong> to copy the details into Vergent.</div>
+      <button class="actbtn btn-gh" onclick="loadIFSubmissions()">
+        <svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Refresh
+      </button>
     </div>
-    <button class="actbtn btn-gh" onclick="loadIFSubmissions()">
-      <svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Refresh
-    </button>
+
+    <!-- Stat cards -->
+    <div id="if-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px"></div>
+
+    <!-- Search -->
+    <div style="margin-bottom:16px">
+      <input type="text" id="if-search" placeholder="Search by borrower, cardholder, last-4, or brand…"
+        oninput="filterIFSubmissions(this.value)"
+        style="width:100%;border:1.5px solid var(--border2);border-radius:10px;padding:10px 14px;font-size:14px;font-family:var(--sans)">
+    </div>
+
+    <div id="if-status" style="margin-bottom:12px;color:var(--muted);font-size:13px"></div>
+    <div id="if-table"></div>
   </div>
-
-  <!-- Stat cards -->
-  <div id="if-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px"></div>
-
-  <!-- Search -->
-  <div style="margin-bottom:16px">
-    <input type="text" id="if-search" placeholder="Search by borrower, cardholder, last-4, or brand…"
-      oninput="filterIFSubmissions(this.value)"
-      style="width:100%;border:1.5px solid var(--border2);border-radius:10px;padding:10px 14px;font-size:14px;font-family:var(--sans)">
-  </div>
-
-  <div id="if-status" style="margin-bottom:12px;color:var(--muted);font-size:13px"></div>
-  <div id="if-table"></div>
 </div>
 
 <div id="view-dash" class="view">
