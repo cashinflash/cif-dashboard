@@ -3221,6 +3221,14 @@ function buildIFCardPanel(fbId) {
   //      customer saw a "call us" alert; staff need to follow up.
   const app = apps.find(x => x.firebaseId === fbId);
   const appData = (app && app.applicationData) || {};
+
+  // The apply form's /link-if PATCH fires *after* the customer sees
+  // the success screen, so an admin who opens the modal within a
+  // couple of seconds can easily beat the write. Kick off a fresh
+  // Firebase read + IF list reload in the background — if either
+  // comes back with new linkage data we re-render this panel in
+  // place. Never blocks the initial render.
+  _ifRefreshPanel(fbId);
   if (!s) {
     const linkedSubId = appData.ifSubmissionId;
     if (linkedSubId && Array.isArray(window._ifRows)) {
@@ -3280,6 +3288,53 @@ function buildIFCardPanel(fbId) {
       <button class="actbtn btn-gh" onclick="deleteIFSubmission('${_ifEsc(s.submissionId)}','${safeName}')" style="color:var(--red,#b3261e);border-color:var(--red-border,#f5b1b1)">Delete permanently</button>
     </div>
   </div>`;
+}
+
+// Async Debit-Card-panel refresh. Pulls a fresh copy of the
+// application from Firebase AND reloads the IF submissions list,
+// then if either surfaces new linkage metadata we didn't have
+// locally, re-render the panel in place. Guarded by a per-fbId
+// in-flight flag so repeated modal opens don't pile up network
+// calls.
+window._ifRefreshInFlight = window._ifRefreshInFlight || {};
+async function _ifRefreshPanel(fbId) {
+  if (!fbId || window._ifRefreshInFlight[fbId]) return;
+  window._ifRefreshInFlight[fbId] = true;
+  let changed = false;
+  try {
+    const fresh = await fbGet(`reports/${fbId}.json`).catch(()=>null);
+    if (fresh && typeof fresh === 'object') {
+      const idx = apps.findIndex(x => x.firebaseId === fbId);
+      if (idx >= 0) {
+        const oldAD = apps[idx].applicationData || {};
+        const newAD = fresh.applicationData || {};
+        if (oldAD.ifSubmissionId !== newAD.ifSubmissionId ||
+            oldAD.ifSubmitError  !== newAD.ifSubmitError  ||
+            oldAD.ifCardLast4    !== newAD.ifCardLast4    ||
+            oldAD.ifCardBrand    !== newAD.ifCardBrand) {
+          apps[idx] = {...fresh, firebaseId: fbId};
+          changed = true;
+          console.log('[IF] refreshed applicationData from Firebase', newAD);
+        }
+      }
+    }
+  } catch(e) { console.warn('[IF] fbGet refresh failed', e); }
+
+  // Also pull the IF list in case the vault has metadata we don't.
+  try {
+    if (typeof loadIFSubmissions === 'function') {
+      const beforeKeys = Object.keys(window._ifByApp || {}).length;
+      await loadIFSubmissions();
+      const afterKeys  = Object.keys(window._ifByApp || {}).length;
+      if (afterKeys !== beforeKeys) changed = true;
+    }
+  } catch(e) { console.warn('[IF] list refresh failed', e); }
+
+  if (changed) {
+    const panel = document.getElementById('mpanel-ifcard-' + fbId);
+    if (panel) panel.innerHTML = buildIFCardPanel(fbId);
+  }
+  delete window._ifRefreshInFlight[fbId];
 }
 
 function buildAppDetails(d) {
