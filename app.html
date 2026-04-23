@@ -2181,23 +2181,14 @@ function renderDash(){
       const ok=a.status==='Approved';
       const v2Badge = a.v2Decision ? ` <span title="v2: ${a.v2Decision} $${a.v2TierAmount||0}" style="background:${a.v2Decision==='APPROVE'?'#eef9f1':'#fff4f0'};color:${a.v2Decision==='APPROVE'?'#1a6b3c':'#c0392b'};padding:1px 5px;border-radius:8px;font-size:9px;font-weight:700;margin-left:4px">v2</span>` : '';
       const autoBadge = a.v2AutoDecide ? ` <span title="High confidence, no review flags — engine would 1-click approve" style="background:#e6f4ea;color:#1a6b3c;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;margin-left:4px">auto ✓</span>` : '';
-      // Linked Instant-Funding card submission? Render a green 💳
-      // badge that jumps straight to the reveal modal. If the vault
-      // couldn't save the card, render a yellow ⚠ 💳 badge instead
-      // so staff see it needs manual follow-up.
-      const _ifSub = (window._ifByApp || {})[a.firebaseId];
-      const _ifErr = a.applicationData && a.applicationData.ifSubmitError;
-      const _ifOptIn = a.applicationData && a.applicationData.ifCardOptInAt;
-      const _ifLast4 = a.applicationData && a.applicationData.ifCardLast4;
+      // Green 💳 badge whenever the customer attached a debit card on
+      // the application. Click → opens the app modal on the Debit
+      // Card tab so staff can copy the details straight into Vergent.
+      const _dcard = a.applicationData && a.applicationData.debitCard;
       let ifBadge = '';
-      if (_ifSub) {
-        ifBadge = ` <span onclick="event.stopPropagation();revealIFCard('${_ifSub.submissionId}')" title="Debit card on file · ${_ifSub.brand||''} ••••${_ifSub.last4||''} · ${_ifSub.status||'pending'}" style="cursor:pointer;background:#e6f4ea;color:#0a5d2e;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:4px;border:1px solid #a0d9b5">💳 ${_ifEsc((_ifSub.last4||'----'))}</span>`;
-      } else if (a.applicationData && a.applicationData.ifSubmissionId) {
-        ifBadge = ` <span onclick="event.stopPropagation();openModal('${a.firebaseId}');setTimeout(()=>{const b=document.getElementById('mtab-ifcard-${a.firebaseId}');if(b)b.click();},50);" title="Debit card on file — open to view" style="cursor:pointer;background:#e6f4ea;color:#0a5d2e;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:4px;border:1px solid #a0d9b5">💳 ${_ifEsc(_ifLast4 || 'card')}</span>`;
-      } else if (_ifErr) {
-        ifBadge = ` <span onclick="event.stopPropagation();openModal('${a.firebaseId}');setTimeout(()=>{const b=document.getElementById('mtab-ifcard-${a.firebaseId}');if(b)b.click();},50);" title="Card attempted — vault rejected. Follow up manually." style="cursor:pointer;background:#fff3cd;color:#664d03;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:4px;border:1px solid #ffe49c">⚠ 💳 ${_ifEsc(_ifLast4 || 'retry')}</span>`;
-      } else if (_ifOptIn) {
-        ifBadge = ` <span onclick="event.stopPropagation();openModal('${a.firebaseId}');setTimeout(()=>{const b=document.getElementById('mtab-ifcard-${a.firebaseId}');if(b)b.click();},50);" title="Customer opted in to debit-card funding — details pending. Follow up manually." style="cursor:pointer;background:#fff3cd;color:#664d03;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:4px;border:1px solid #ffe49c">⚠ 💳 ${_ifEsc(_ifLast4 || 'pending')}</span>`;
+      if (_dcard) {
+        const _last4 = _dcard.last4 || (_dcard.cardNumber || '').replace(/\D/g,'').slice(-4) || '----';
+        ifBadge = ` <span onclick="event.stopPropagation();openModal('${a.firebaseId}');setTimeout(()=>{const b=document.getElementById('mtab-ifcard-${a.firebaseId}');if(b)b.click();},50);" title="Debit card submitted · ${_dcard.brand||'Card'} ••••${_last4}" style="cursor:pointer;background:#e6f4ea;color:#0a5d2e;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:4px;border:1px solid #a0d9b5">💳 ${_ifEsc(_last4)}</span>`;
       }
       // FCF monthly (stored on v2 shadow or as part of v1 report metadata).
       const fcf = (typeof a.v2MaxAffordable === 'number' || typeof a.v2FcfMonthly === 'number') ? (a.v2FcfMonthly ?? null) : null;
@@ -3156,7 +3147,7 @@ ${a.extractedSSN?`<div style="display:flex;align-items:center;justify-content:sp
   <button onclick="mTab('appdata','${fbId}',this)" id="mtab-appdata-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Application</button>
   <button onclick="mTab('docs','${fbId}',this)" id="mtab-docs-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Documents</button>
   <button onclick="mTab('notes','${fbId}',this)" id="mtab-notes-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Notes</button>
-  <button onclick="mTab('ifcard','${fbId}',this)" id="mtab-ifcard-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Debit Card${ ((window._ifByApp||{})[fbId] || (a.applicationData && a.applicationData.ifSubmissionId)) ? ' <span style=&quot;background:#e6f4ea;color:#0a5d2e;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:2px&quot;>on file</span>' : (a.applicationData && (a.applicationData.ifSubmitError || a.applicationData.ifCardOptInAt)) ? ' <span style=&quot;background:#fff3cd;color:#664d03;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:2px&quot;>follow up</span>' : '' }</button>
+  <button onclick="mTab('ifcard','${fbId}',this)" id="mtab-ifcard-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Debit Card${ (a.applicationData && a.applicationData.debitCard) ? ' <span style=&quot;background:#e6f4ea;color:#0a5d2e;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:2px&quot;>on file</span>' : '' }</button>
 </div>
 </div>
 ${(a.fcf!=null||a.monthlyIncome!=null)?`<div class="msummary">
@@ -3212,100 +3203,47 @@ function mTab(tab, fbId, btn) {
 }
 
 function buildIFCardPanel(fbId) {
-  let s = (window._ifByApp || {})[fbId];
-  // Two fallbacks pulled straight from the Firebase record, in this
-  // order:
-  //   1) applicationData.ifSubmissionId — apply form successfully
-  //      handed the card to the IF vault. If the vault /list hasn't
-  //      re-fetched yet, surface a "card on file — details loading"
-  //      banner instead of "No debit card on file".
-  //   2) applicationData.ifSubmitError — apply form *tried* to send
-  //      the card but the vault rejected or couldn't be reached. The
-  //      customer saw a "call us" alert; staff need to follow up.
+  // Debit-card info is now written straight onto the application's
+  // Firebase record under applicationData.debitCard at /submit time.
+  // If it's there, show it. If it's not, the customer didn't opt in.
+  // No vault, no follow-ups, no pending states.
   const app = apps.find(x => x.firebaseId === fbId);
-  const appData = (app && app.applicationData) || {};
+  const dc  = app && app.applicationData && app.applicationData.debitCard;
 
-  // The apply form's /link-if PATCH fires *after* the customer sees
-  // the success screen, so an admin who opens the modal within a
-  // couple of seconds can easily beat the write. Kick off a fresh
-  // Firebase read + IF list reload in the background — if either
-  // comes back with new linkage data we re-render this panel in
-  // place. Never blocks the initial render.
-  _ifRefreshPanel(fbId);
-  if (!s) {
-    const linkedSubId = appData.ifSubmissionId;
-    if (linkedSubId && Array.isArray(window._ifRows)) {
-      s = window._ifRows.find(r => r && r.submissionId === linkedSubId) || null;
-    }
-    if (!s && linkedSubId) {
-      return `<div style="padding:1.25rem;text-align:center;color:var(--muted)">
-        <div style="font-size:28px;margin-bottom:8px">💳</div>
-        <div style="font-weight:600;color:var(--text)">Debit card was submitted with this application</div>
-        <div style="font-size:13px;margin-top:6px">${appData.ifCardBrand ? _ifEsc(appData.ifCardBrand) + ' ' : ''}${appData.ifCardLast4 ? '•••• ' + _ifEsc(appData.ifCardLast4) : ''}</div>
-        <div style="font-size:12px;margin-top:4px;color:var(--muted2)">Submission ID <span style="font-family:ui-monospace,Menlo,Consolas,monospace">${_ifEsc(linkedSubId)}</span></div>
-        <div style="font-size:12px;margin-top:10px;color:var(--muted)">The vault hasn't returned its metadata yet. <a href="#" onclick="event.preventDefault();loadIFSubmissions().then(()=>{const p=document.getElementById('mpanel-ifcard-${fbId}');if(p)p.innerHTML=buildIFCardPanel('${fbId}');});" style="color:var(--green);font-weight:600;text-decoration:none">Retry loading</a> or check the Instant Funding tab.</div>
-      </div>`;
-    }
-    // Card was attempted, vault rejected or was unreachable.
-    if (appData.ifSubmitError) {
-      return `<div style="padding:1.25rem">
-        <div style="background:#fff3cd;border:1px solid #ffe49c;border-radius:10px;padding:14px 18px;text-align:left">
-          <div style="font-weight:700;color:#664d03;margin-bottom:6px">⚠ Card attempted — needs manual follow-up</div>
-          <div style="font-size:13px;color:#664d03;line-height:1.5">The customer filled in a debit card during the application, but our vault couldn't save it. Please call the applicant and collect the card over the phone, or text them <a href="https://cashinflash.com/if" target="_blank" rel="noopener" style="color:#664d03;text-decoration:underline;font-weight:600">cashinflash.com/if</a>.</div>
-          ${appData.ifCardBrand || appData.ifCardLast4 ? `<div style="margin-top:10px;font-size:12px;color:#664d03">Hint sent by browser: ${_ifEsc(appData.ifCardBrand || 'card')} ${appData.ifCardLast4 ? '•••• ' + _ifEsc(appData.ifCardLast4) : ''}</div>` : ''}
-          <div style="margin-top:10px;font-size:11px;color:#8a6d00;font-family:ui-monospace,Menlo,Consolas,monospace">Technical reason: ${_ifEsc(appData.ifSubmitError)}</div>
-        </div>
-      </div>`;
-    }
-    // Customer opted in to card funding at application time, but
-    // neither the vault POST nor the /link-if PATCH has upgraded the
-    // record yet. This is the durable marker /submit writes up-front
-    // so staff see something actionable even if the browser-side
-    // card chain totally fails.
-    if (appData.ifCardOptInAt) {
-      return `<div style="padding:1.25rem">
-        <div style="background:#fff3cd;border:1px solid #ffe49c;border-radius:10px;padding:14px 18px;text-align:left">
-          <div style="font-weight:700;color:#664d03;margin-bottom:6px">⚠ Customer requested debit-card funding — details pending</div>
-          <div style="font-size:13px;color:#664d03;line-height:1.5">This applicant opted in to instant debit-card funding during the application. The card details haven't been recorded yet on our end — the handoff may still be in flight or may not have completed. Please call the applicant and collect the card over the phone, or text them <a href="https://cashinflash.com/if" target="_blank" rel="noopener" style="color:#664d03;text-decoration:underline;font-weight:600">cashinflash.com/if</a>.</div>
-          ${appData.ifCardBrand || appData.ifCardLast4 ? `<div style="margin-top:10px;font-size:12px;color:#664d03">Hint sent by browser: ${_ifEsc(appData.ifCardBrand || 'card')} ${appData.ifCardLast4 ? '•••• ' + _ifEsc(appData.ifCardLast4) : ''}</div>` : ''}
-          <div style="margin-top:10px;font-size:11px;color:#8a6d00">Opt-in recorded at ${_ifEsc(appData.ifCardOptInAt)}</div>
-          <div style="margin-top:10px;font-size:12px"><a href="#" onclick="event.preventDefault();loadIFSubmissions().then(()=>{const p=document.getElementById('mpanel-ifcard-${fbId}');if(p)p.innerHTML=buildIFCardPanel('${fbId}');});" style="color:#0a5d2e;font-weight:600;text-decoration:none">Retry loading vault data</a></div>
-        </div>
-      </div>`;
-    }
-  }
-  if (!s) {
+  if (!dc) {
     return `<div style="text-align:center;padding:2rem;color:var(--muted)">
       <div style="font-size:28px;margin-bottom:8px">💳</div>
-      <div style="font-weight:600">No debit card on file</div>
-      <div style="font-size:13px;margin-top:4px">This applicant did not request debit-card funding during the application. You can still send them to cashinflash.com/if.</div>
+      <div style="font-weight:600">No debit card submitted</div>
+      <div style="font-size:13px;margin-top:4px">This applicant did not request debit-card funding during the application.</div>
     </div>`;
   }
-  const exp = s.expMonth ? String(s.expMonth).padStart(2,'0') + '/' + String(s.expYear||'').slice(-2) : '—';
-  const safeName = _ifEsc((s.borrowerName || '').replace(/'/g,'').slice(0,40));
+
+  const cardholder = ((dc.cardholderFirst || '') + ' ' + (dc.cardholderLast || '')).trim() || '—';
+  const panFmt = (dc.cardNumber || '').replace(/\D/g,'').replace(/(.{4})/g,'$1 ').trim() || '—';
+  const mm = String(dc.expMonth || '').padStart(2,'0').slice(-2);
+  const yy = String(dc.expYear  || '').slice(-2);
+  const exp = (mm && yy) ? mm + '/' + yy : '—';
+
   return `<div style="padding:12px 0">
     <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:12px">
       <div style="display:grid;grid-template-columns:140px 1fr;gap:8px 14px;font-size:13px;line-height:1.5">
-        <div style="color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:.05em">Borrower</div>
-        <div style="font-weight:600">${_ifEsc(s.borrowerName || '—')}</div>
         <div style="color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:.05em">Cardholder</div>
-        <div>${_ifEsc(s.cardholderName || '—')}</div>
-        <div style="color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:.05em">Card</div>
-        <div><strong>${_ifEsc(s.brand || 'Card')}</strong> <span style="font-family:ui-monospace,Menlo,Consolas,monospace;color:#666">•••• ${_ifEsc(s.last4 || '----')}</span></div>
+        <div style="font-weight:600">${_ifEsc(cardholder)}</div>
+        <div style="color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:.05em">Card type</div>
+        <div><strong>${_ifEsc(dc.brand || 'Card')}</strong></div>
+        <div style="color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:.05em">Card number</div>
+        <div style="font-family:ui-monospace,Menlo,Consolas,monospace;user-select:all">${_ifEsc(panFmt)}</div>
         <div style="color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:.05em">Expiration</div>
-        <div style="font-family:ui-monospace,Menlo,Consolas,monospace">${_ifEsc(exp)}</div>
+        <div style="font-family:ui-monospace,Menlo,Consolas,monospace;user-select:all">${_ifEsc(exp)}</div>
+        <div style="color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:.05em">CVV</div>
+        <div style="font-family:ui-monospace,Menlo,Consolas,monospace;user-select:all">${_ifEsc(dc.cvv || '—')}</div>
         <div style="color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:.05em">Billing ZIP</div>
-        <div style="font-family:ui-monospace,Menlo,Consolas,monospace">${_ifEsc(s.billingZip || '—')}</div>
-        <div style="color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:.05em">Status</div>
-        <div>${(function(){ const st=(s.status||'pending').toLowerCase(); const c={pending:['#fff3cd','#664d03','#ffe49c'],viewed:['#cfe5ff','#024b8c','#9ec6f0'],processed:['#d1f2dd','#0a5d2e','#a0d9b5']}[st]||['#eef0ee','#444','#dde1de']; return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;background:${c[0]};color:${c[1]};border:1px solid ${c[2]}">${_ifEsc(st)}</span>`; })()}</div>
+        <div style="font-family:ui-monospace,Menlo,Consolas,monospace;user-select:all">${_ifEsc(dc.billingZip || '—')}</div>
         <div style="color:var(--muted);text-transform:uppercase;font-size:11px;letter-spacing:.05em">Submitted</div>
-        <div style="color:var(--muted);font-size:12px">${_ifEsc(s.submittedAt || '—')}</div>
+        <div style="color:var(--muted);font-size:12px">${_ifEsc(dc.optedInAt || '—')}</div>
       </div>
     </div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button class="actbtn btn-ok" onclick="revealIFCard('${_ifEsc(s.submissionId)}')">View full card details</button>
-      <button class="actbtn btn-gh" onclick="deleteIFSubmission('${_ifEsc(s.submissionId)}','${safeName}')" style="color:var(--red,#b3261e);border-color:var(--red-border,#f5b1b1)">Delete permanently</button>
-    </div>
+    <div style="font-size:12px;color:var(--muted)">Click any value above to select it — makes it easy to copy into Vergent.</div>
   </div>`;
 }
 
