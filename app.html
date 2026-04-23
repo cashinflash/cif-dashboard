@@ -245,6 +245,7 @@ header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8
 .sbox{display:flex;align-items:center;gap:8px;border:1px solid var(--border2);border-radius:9px;padding:9px 14px;background:white;flex:1;max-width:320px}
 .sbox input{border:none;background:none;font-size:14px;color:var(--text);outline:none;width:100%;font-family:var(--sans)}
 .fsel{border:1px solid var(--border2);border-radius:9px;padding:8px 12px;font-size:14px;background:white;color:var(--text);font-family:var(--sans);cursor:pointer}
+.src-site{font-size:10px;color:var(--muted2);margin-top:3px;font-style:italic;letter-spacing:.02em}
 table{width:100%;border-collapse:collapse;font-size:14px}
 thead{background:var(--surface2)}
 th{text-align:left;padding:13px 20px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border)}
@@ -893,6 +894,7 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
       <div class="ttb">
         <div class="sbox"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7c72" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" placeholder="Search applicants... (press / to focus)" oninput="filterDash(this.value)"></div>
         <select class="fsel" onchange="filterStatus(this.value)"><option value="">All statuses</option><option value="Approved">Approved</option><option value="Declined">Declined</option><option value="Pending">Pending</option></select>
+        <select id="src-site-filter" class="fsel" onchange="filterSourceSite(this.value)"><option value="">All source sites</option></select>
         <button id="del-selected-btn" class="actbtn btn-gh" onclick="deleteSelected()" style="display:none;color:var(--red);border-color:var(--red-border)">Delete Selected (<span id="sel-count">0</span>)</button>
       </div>
       <div id="dtable"></div>
@@ -1208,7 +1210,7 @@ let activeProfile = localStorage.getItem('cif_active_profile') || 'Standard';
 let editingProfile = activeProfile;
 let sFile=null,sReport='',sName='',sDecision='',sAmount='',sReason='',sScore=0,sPendingId=null;
 let bFiles=[],bRunning=false,bSaved=0;
-let srch='',stFilter='';
+let srch='',stFilter='',siteFilter='';
 let pollTimer=null;
 
 // ════════════════════════════════════════
@@ -2082,7 +2084,24 @@ function renderDash(){
     : `${decl.toLocaleString()} declined all-time`;
 
   updateQuickFilterActive();
-  const filtered=applyQuickFilter(apps.filter(a=>(!srch||a.name?.toLowerCase().includes(srch.toLowerCase()))&&(!stFilter||a.status===stFilter)));
+  // Keep the Source Site dropdown in sync with the distinct source_site
+  // values present in apps. `__direct__` represents records with no
+  // source_site (direct submissions to apply.cashinflash.com).
+  const _siteSel = document.getElementById('src-site-filter');
+  if (_siteSel) {
+    const _sites = [...new Set(apps.map(a => a.source_site).filter(Boolean))].sort();
+    const _hasDirect = apps.some(a => !a.source_site);
+    const _want = ['', ...(_hasDirect ? ['__direct__'] : []), ..._sites];
+    const _have = [...(_siteSel.options)].map(o => o.value);
+    if (_want.join('\x1f') !== _have.join('\x1f')) {
+      _siteSel.innerHTML = _want.map(v => {
+        const lbl = v === '' ? 'All source sites' : v === '__direct__' ? '(direct — no source site)' : v;
+        return `<option value="${v}">${lbl}</option>`;
+      }).join('');
+      _siteSel.value = siteFilter;
+    }
+  }
+  const filtered=applyQuickFilter(apps.filter(a=>(!srch||a.name?.toLowerCase().includes(srch.toLowerCase()))&&(!stFilter||a.status===stFilter)&&(!siteFilter||(siteFilter==='__direct__'?!a.source_site:a.source_site===siteFilter))));
   const c=document.getElementById('dtable');
 
   if(!filtered.length){
@@ -2164,7 +2183,7 @@ function renderDash(){
           <canvas id="${wid}" width="44" height="44"></canvas>
         </td>
         <td onclick="openModal('${a.firebaseId}')" class="amt-cell abig" style="font-size:${ok?'15px':'13px'};color:${ok?'var(--green)':'var(--muted)'}">${ok?(a.amount||'—'):'—'}</td>
-        <td onclick="openModal('${a.firebaseId}')">${srcBadge(a.source)}</td>
+        <td onclick="openModal('${a.firebaseId}')">${srcBadge(a.source)}${a.source_site?`<div class="src-site">via ${a.source_site}</div>`:''}</td>
         <td onclick="openModal('${a.firebaseId}')" style="color:var(--muted);font-size:12px">${a.date||''}<br><span style="font-size:11px;color:var(--muted2)">${a.time||''}</span></td>
         <td onclick="openModal('${a.firebaseId}')"><span class="pill pill-${a.status?.toLowerCase()||'p'}">${a.status||'Pending'}</span></td>
       </tr>`;
@@ -2564,6 +2583,8 @@ async function saveEntity(idx) {
 function filterDash(v){srch=v;renderDash();}
 
 function filterStatus(v){stFilter=v;renderDash();}
+
+function filterSourceSite(v){siteFilter=v;renderDash();}
 
 // Persisted one-click filter presets. localStorage keeps the choice across
 // refresh so the underwriter always lands where they left off.
@@ -3397,7 +3418,8 @@ function _dashVisibleApps() {
   // Mirrors the filter in renderDash() so keyboard navigation matches what's on screen.
   return applyQuickFilter(apps.filter(a =>
     (!srch || a.name?.toLowerCase().includes(srch.toLowerCase())) &&
-    (!stFilter || a.status === stFilter)
+    (!stFilter || a.status === stFilter) &&
+    (!siteFilter || (siteFilter === '__direct__' ? !a.source_site : a.source_site === siteFilter))
   ));
 }
 
