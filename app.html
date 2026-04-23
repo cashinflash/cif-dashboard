@@ -420,8 +420,6 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
 <div id="mob-menu" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:200;" onclick="toggleMobMenu()">
   <div style="background:var(--green-dark);padding:2rem 1.5rem;display:flex;flex-direction:column;gap:8px">
     <button class="nb" onclick="showView('dash',this);toggleMobMenu()"><svg class="icn"><use href="#icn-dashboard"/></svg>Dashboard</button>
-    <button class="nb" onclick="showView('v2compare',this);toggleMobMenu()"><svg class="icn"><use href="#icn-compare"/></svg>v2 Compare <span id="v2div-count-mob" style="display:none;background:#c0392b;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px"></span></button>
-    <button class="nb" onclick="showView('reviewqueue',this);toggleMobMenu()"><svg class="icn"><use href="#icn-tag"/></svg>Review Queue <span id="rqcount-mob" style="display:none;background:#f39c12;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px"></span></button>
     <button class="nb" onclick="showView('single',document.getElementById('nav-single'));toggleMobMenu()"><svg class="icn"><use href="#icn-file"/></svg>New Analysis</button>
     <button class="nb" onclick="showView('batch',document.getElementById('nav-batch'));toggleMobMenu()"><svg class="icn"><use href="#icn-layers"/></svg>Batch Analysis</button>
     <button class="nb" onclick="showView('rules',this);toggleMobMenu()"><svg class="icn"><use href="#icn-sliders"/></svg>Rules Engine</button>
@@ -433,8 +431,6 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
 </div>
 <div class="hnav">
     <button class="nb" id="nav-dash" onclick="showView('dash',this)"><svg class="icn"><use href="#icn-dashboard"/></svg>Dashboard</button>
-    <button class="nb" id="nav-v2compare" onclick="showView('v2compare',this)"><svg class="icn"><use href="#icn-compare"/></svg>v2 Compare<span id="v2div-count" style="display:none;background:#c0392b;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">0</span></button>
-    <button class="nb" id="nav-reviewqueue" onclick="showView('reviewqueue',this)"><svg class="icn"><use href="#icn-tag"/></svg>Review Queue<span id="rqcount" style="display:none;background:#f39c12;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">0</span></button>
     <div style="position:relative" id="analysis-dd-wrap">
       <button class="nb" id="nav-analysis" onclick="toggleAnalysisDD()">
         <svg class="icn"><use href="#icn-file"/></svg>Analysis <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
