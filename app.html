@@ -2547,10 +2547,14 @@ async function revealIFCard(id){
     </div>
     <div style="background:#f7fafa;border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:14px">
       <div style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Push to Vergent</div>
-      <p style="margin:0 0 10px;color:#333;font-size:13px;line-height:1.5">Enter the customer's Vergent ID to tokenize this card with Repay and save it on the customer's profile automatically.</p>
+      <p style="margin:0 0 10px;color:#333;font-size:13px;line-height:1.5">We'll auto-match the borrower to a Vergent customer by name and save this card on their profile (tokenized via Repay). If the name matches more than one customer, we'll ask you to pick.</p>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="text" id="if-vid-${_ifEsc(data.submissionId)}" placeholder="Vergent customer ID (e.g. 601488)" inputmode="numeric" maxlength="10" style="flex:1;min-width:200px;height:38px;padding:0 12px;border:1px solid var(--border);border-radius:8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px">
         <button class="actbtn btn-ok" onclick="pushIFToVergent('${_ifEsc(data.submissionId)}')">Push to Vergent</button>
+        <button class="actbtn btn-gh" onclick="document.getElementById('if-manual-${_ifEsc(data.submissionId)}').style.display='flex'" style="font-size:12px">Use a specific customer ID</button>
+      </div>
+      <div id="if-manual-${_ifEsc(data.submissionId)}" style="display:none;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
+        <input type="text" id="if-vid-${_ifEsc(data.submissionId)}" placeholder="Vergent customer ID (e.g. 601488)" inputmode="numeric" maxlength="10" style="flex:1;min-width:200px;height:38px;padding:0 12px;border:1px solid var(--border);border-radius:8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px">
+        <button class="actbtn btn-ok" onclick="pushIFToVergent('${_ifEsc(data.submissionId)}', document.getElementById('if-vid-${_ifEsc(data.submissionId)}').value)">Push with this ID</button>
       </div>
       <div id="if-push-status-${_ifEsc(data.submissionId)}" style="margin-top:10px;font-size:13px;line-height:1.4"></div>
     </div>
@@ -2568,32 +2572,67 @@ async function revealIFCard(id){
   };
 }
 
-async function pushIFToVergent(id){
-  const vidEl=document.getElementById('if-vid-'+id);
+async function pushIFToVergent(id, explicitCid){
   const statusEl=document.getElementById('if-push-status-'+id);
-  const cid=(vidEl.value||'').replace(/\D/g,'');
-  if(!cid){ statusEl.innerHTML=`<span style="color:#b3261e">Enter the Vergent customer ID first.</span>`; return; }
-  statusEl.innerHTML=`<span style="color:#666">Tokenizing with Repay and saving to Vergent…</span>`;
+  const manualBox=document.getElementById('if-manual-'+id);
+  // Empty cid → backend auto-matches by borrower name. A non-empty
+  // cid (from the manual input) bypasses the match step.
+  const cid=(explicitCid||'').replace(/\D/g,'');
+  statusEl.innerHTML=`<span style="color:#666">Looking up Vergent customer and saving the card…</span>`;
   try{
     const r=await fetch('/api/if/push-to-vergent',{
       method:'POST', credentials:'include',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({submissionId:id,vergentCustomerId:cid}),
+      body:JSON.stringify(cid ? {submissionId:id, vergentCustomerId:cid} : {submissionId:id}),
     });
     if(r.status===401){ window.location.replace('/'); return; }
     const d=await r.json().catch(()=>({}));
+
     if(r.ok && d.success){
+      const matched = d.autoMatched ? ' (auto-matched by name)' : '';
       statusEl.innerHTML=`<div style="background:#d1f2dd;border:1px solid #a0d9b5;color:#0a5d2e;padding:10px 12px;border-radius:8px;font-weight:600">
-        ✓ Card saved to Vergent customer ${_ifEsc(d.vergentCustomerId)} (Vergent card id ${_ifEsc(d.vergentCardId||'—')}).
+        ✓ Card saved to Vergent customer ${_ifEsc(d.vergentCustomerId)}${matched} — Vergent card id ${_ifEsc(d.vergentCardId||'—')}.
       </div>`;
       if(typeof toast==='function') toast('Card pushed to Vergent','ok');
       setTimeout(()=>{ closeModal(); loadIFSubmissions(); },2000);
       return;
     }
+
+    // Ambiguous match — backend found multiple Vergent customers
+    // with this borrower's name. Render a quick picker.
+    if(r.status===200 && d.error==='ambiguous_match' && Array.isArray(d.candidates)){
+      const cands=d.candidates.map(c=>{
+        const phones=(c.phones||[]).map(p=>p.phoneNumber||p).join(', ');
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #eff2f0;gap:10px">
+          <div>
+            <strong>${_ifEsc(c.firstName||'')} ${_ifEsc(c.lastName||'')}</strong>
+            <span style="color:#666;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;margin-left:8px">#${_ifEsc(c.customerId)}</span>
+            ${phones?`<div style="color:#888;font-size:12px">${_ifEsc(phones)}</div>`:''}
+          </div>
+          <button class="actbtn btn-ok" style="font-size:12px;padding:5px 10px" onclick="pushIFToVergent('${_ifEsc(id)}','${_ifEsc(c.customerId)}')">Use this one</button>
+        </div>`;
+      }).join('');
+      statusEl.innerHTML=`<div style="background:#fff8e5;border:1px solid #f2d46c;color:#6b4d00;padding:12px 14px;border-radius:8px;line-height:1.4">
+        We found <strong>${d.candidates.length}</strong> Vergent customers named "${_ifEsc(d.borrowerName||'')}". Pick the right one:
+        <div style="background:#fff;border-radius:6px;margin-top:8px;padding:0 12px">${cands}</div>
+        <div style="margin-top:8px;color:#555;font-size:12px">…or enter a specific customer ID below.</div>
+      </div>`;
+      if(manualBox) manualBox.style.display='flex';
+      return;
+    }
+
+    if(r.status===404 && d.error==='no_vergent_match'){
+      statusEl.innerHTML=`<div style="background:#fff8e5;border:1px solid #f2d46c;color:#6b4d00;padding:10px 12px;border-radius:8px;line-height:1.4">
+        We couldn't find a Vergent customer named <strong>${_ifEsc(d.borrowerName||'')}</strong>. Enter the customer's Vergent ID below and try again.
+      </div>`;
+      if(manualBox) manualBox.style.display='flex';
+      return;
+    }
+
     const detail=(d&&(d.detail||d.error))||('http '+r.status);
     statusEl.innerHTML=`<div style="background:#fde8e8;border:1px solid #f5b1b1;color:#8a1f1f;padding:10px 12px;border-radius:8px;line-height:1.4">
       Couldn't push to Vergent. ${_ifEsc(detail)}<br>
-      <span style="color:#555;font-size:12px">The vault record is still here — you can retry, or use Mark processed if you've entered it manually.</span>
+      <span style="color:#555;font-size:12px">The vault record is still here — retry, or use Mark processed if you've entered it manually.</span>
     </div>`;
   }catch(e){
     statusEl.innerHTML=`<div style="color:#b3261e">Network error: ${_ifEsc(e.message)}. Please try again.</div>`;
