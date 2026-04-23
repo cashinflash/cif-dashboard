@@ -844,14 +844,25 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
   <div class="phead">
     <div>
       <div class="ptitle" style="display:flex;align-items:center;gap:10px">
-        <svg class="icn icn-lg"><use href="#icn-file"/></svg>Instant Funding submissions
+        <svg class="icn icn-lg"><use href="#icn-file"/></svg>Instant Funding
       </div>
-      <div class="psub">Debit cards submitted via cashinflash.com/if. Click <strong>View card</strong> to reveal once — the record is purged after.</div>
+      <div class="psub">Debit cards submitted via <strong>cashinflash.com/if</strong>. Click <strong>View card</strong> to copy the details into Vergent.</div>
     </div>
     <button class="actbtn btn-gh" onclick="loadIFSubmissions()">
       <svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Refresh
     </button>
   </div>
+
+  <!-- Stat cards -->
+  <div id="if-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px"></div>
+
+  <!-- Search -->
+  <div style="margin-bottom:16px">
+    <input type="text" id="if-search" placeholder="Search by borrower, cardholder, last-4, or brand…"
+      oninput="filterIFSubmissions(this.value)"
+      style="width:100%;border:1.5px solid var(--border2);border-radius:10px;padding:10px 14px;font-size:14px;font-family:var(--sans)">
+  </div>
+
   <div id="if-status" style="margin-bottom:12px;color:var(--muted);font-size:13px"></div>
   <div id="if-table"></div>
 </div>
@@ -2478,21 +2489,42 @@ async function loadIFSubmissions(){
 function renderIFSubmissions(rows){
   const status=document.getElementById('if-status');
   const table=document.getElementById('if-table');
+  const stats=document.getElementById('if-stats');
   const badge=document.getElementById('ifcount');
   const badgeMob=document.getElementById('ifcount-mob');
-  const pending=rows.filter(r=>r.status!=='processed');
+  const pending  = rows.filter(r => (r.status||'pending').toLowerCase() !== 'processed');
+  const processed= rows.filter(r => (r.status||'').toLowerCase() === 'processed');
   if(badge){ badge.textContent=pending.length; badge.style.display=pending.length?'inline-block':'none'; }
   if(badgeMob){ badgeMob.textContent=pending.length; badgeMob.style.display=pending.length?'inline-block':'none'; }
+
+  // Stat cards
+  if (stats) {
+    const card = (label, val, tint) => `<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px">${label}</div>
+      <div style="font-size:24px;font-weight:800;color:${tint||'var(--text)'};letter-spacing:-.02em">${val}</div>
+    </div>`;
+    stats.innerHTML =
+      card('Total submissions', rows.length)
+    + card('Action needed',     pending.length,   pending.length ? '#b38700' : 'var(--muted)')
+    + card('Processed',         processed.length, 'var(--green,#0E8741)');
+  }
+
   if(!rows.length){
-    table.innerHTML=`<div class="empty"><div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-file"/></svg></div><div class="empty-t">No submissions yet</div><div class="empty-s">When a customer submits their debit card at cashinflash.com/if it will appear here.</div></div>`;
+    table.innerHTML=`<div class="empty" style="background:#fff;border:1px dashed var(--border);border-radius:12px"><div class="empty-ic"><svg class="icn icn-lg" style="width:44px;height:44px;color:var(--muted2)"><use href="#icn-file"/></svg></div><div class="empty-t">No submissions yet</div><div class="empty-s">When a customer submits their debit card at <strong>cashinflash.com/if</strong> it will appear here.</div></div>`;
     status.textContent='';
     return;
   }
-  status.textContent=rows.length+(rows.length===1?' submission':' submissions');
+  status.textContent=`${rows.length}${rows.length===1?' submission':' submissions'} · ${pending.length} pending`;
+
   const statusBadge=st=>{
     const s=(st||'pending').toLowerCase();
     const color={pending:['#fff3cd','#664d03','#ffe49c'],processed:['#d1f2dd','#0a5d2e','#a0d9b5']}[s]||['#eef0ee','#444','#dde1de'];
-    return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;background:${color[0]};color:${color[1]};border:1px solid ${color[2]}">${_ifEsc(s)}</span>`;
+    return `<span style="display:inline-block;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;background:${color[0]};color:${color[1]};border:1px solid ${color[2]}">${_ifEsc(s)}</span>`;
+  };
+  const brandChip=b=>{
+    const key=(b||'').toLowerCase();
+    const c={visa:['#1a1f71','#fff'],mastercard:['#eb001b','#fff'],amex:['#2e77bb','#fff'],discover:['#ff6000','#fff']}[key]||['#e9ecee','#333'];
+    return `<span style="display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:.04em;background:${c[0]};color:${c[1]};white-space:nowrap">${_ifEsc(b||'Card')}</span>`;
   };
   const body=rows.map(s=>{
     const borrowerName   = ((s.borrowerFirst||'')  +' '+(s.borrowerLast||'')  ).trim() || '—';
@@ -2502,38 +2534,61 @@ function renderIFSubmissions(rows){
     const exp = (mm && yy) ? mm+'/'+yy : '—';
     const rowKey = _ifEsc(s.firebaseId || '');
     const nameAttr = _ifEsc(borrowerName.replace(/'/g,'').slice(0,40));
-    return `<tr>
-      <td title="${_ifEsc(s.submittedAt||'')}" style="color:#555">${_ifEsc(_ifRelTime(s.submittedAt))}</td>
-      <td><strong>${_ifEsc(borrowerName)}</strong></td>
-      <td>${_ifEsc(cardholderName)}</td>
-      <td><span style="font-weight:600">${_ifEsc(s.brand||'Card')}</span> <span style="font-family:ui-monospace,Menlo,Consolas,monospace;color:#666">•••• ${_ifEsc(s.last4||'----')}</span></td>
-      <td style="font-family:ui-monospace,Menlo,Consolas,monospace">${_ifEsc(exp)}</td>
-      <td style="font-family:ui-monospace,Menlo,Consolas,monospace">${_ifEsc(s.billingZip||'—')}</td>
-      <td>${statusBadge(s.status)}</td>
-      <td style="text-align:right;white-space:nowrap">
-        <button class="actbtn btn-ok" onclick="revealIFCard('${rowKey}')">View card</button>
-        <button class="actbtn btn-gh" title="Delete submission" onclick="event.stopPropagation();deleteIFSubmission('${rowKey}','${nameAttr}')" style="color:var(--red,#b3261e);border-color:var(--red-border,#f5b1b1);padding:4px 8px;font-size:12px">🗑</button>
+    const sameName = borrowerName === cardholderName;
+    return `<tr style="cursor:pointer;transition:background .12s" onclick="revealIFCard('${rowKey}')" onmouseover="this.style.background='#f8faf9'" onmouseout="this.style.background=''">
+      <td style="padding:14px 16px">
+        <div style="font-weight:700;color:var(--text);font-size:14px">${_ifEsc(borrowerName)}</div>
+        <div style="color:var(--muted);font-size:12px;margin-top:2px">${sameName ? 'Same cardholder' : 'Cardholder: '+_ifEsc(cardholderName)}</div>
+      </td>
+      <td style="padding:14px 16px;white-space:nowrap">
+        ${brandChip(s.brand)}
+        <span style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;color:var(--text2);margin-left:8px">•••• ${_ifEsc(s.last4||'----')}</span>
+      </td>
+      <td style="padding:14px 16px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;color:var(--text2);white-space:nowrap">${_ifEsc(exp)}</td>
+      <td style="padding:14px 16px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;color:var(--text2);white-space:nowrap">${_ifEsc(s.billingZip||'—')}</td>
+      <td style="padding:14px 16px;white-space:nowrap">${statusBadge(s.status)}</td>
+      <td style="padding:14px 16px;color:var(--muted);font-size:12px;white-space:nowrap" title="${_ifEsc(s.submittedAt||'')}">${_ifEsc(_ifRelTime(s.submittedAt))}</td>
+      <td style="padding:14px 16px;text-align:right;white-space:nowrap">
+        <button class="actbtn btn-ok" onclick="event.stopPropagation();revealIFCard('${rowKey}')" style="font-size:12px">View card</button>
+        <button class="actbtn btn-gh" title="Delete submission" onclick="event.stopPropagation();deleteIFSubmission('${rowKey}','${nameAttr}')" style="color:var(--red,#b3261e);border-color:var(--red-border,#f5b1b1);padding:4px 8px;font-size:12px;margin-left:4px">🗑</button>
       </td>
     </tr>`;
   }).join('');
-  table.innerHTML=`<table class="tbl" style="width:100%;border-collapse:collapse">
-    <thead><tr style="text-align:left;border-bottom:1px solid var(--border);background:#fafbfa">
-      <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">Submitted</th>
-      <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">Borrower</th>
-      <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">Cardholder</th>
-      <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">Card</th>
-      <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">Exp</th>
-      <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">ZIP</th>
-      <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">Status</th>
-      <th></th>
-    </tr></thead>
-    <tbody>${body}</tbody>
-  </table>`;
-  // Row hover highlight
-  table.querySelectorAll('tbody tr').forEach(tr=>{
-    tr.style.borderBottom='1px solid #eff2f0';
-    tr.querySelectorAll('td').forEach(td=>td.style.padding='12px');
+  table.innerHTML=`<div style="background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden">
+    <table class="tbl" style="width:100%;border-collapse:collapse">
+      <thead><tr style="text-align:left;background:#f8faf9;border-bottom:1px solid var(--border)">
+        <th style="padding:11px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700">Borrower</th>
+        <th style="padding:11px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700">Card</th>
+        <th style="padding:11px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700">Exp</th>
+        <th style="padding:11px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700">ZIP</th>
+        <th style="padding:11px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700">Status</th>
+        <th style="padding:11px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700">Submitted</th>
+        <th></th>
+      </tr></thead>
+      <tbody>${body}</tbody>
+    </table>
+  </div>`;
+  // Row separators (every row except the last)
+  const trs = table.querySelectorAll('tbody tr');
+  trs.forEach((tr,i)=>{ if (i < trs.length-1) tr.style.borderBottom='1px solid #eff2f0'; });
+}
+
+// Filter the currently-loaded IF submissions by a free-text query
+// across borrower name, cardholder name, brand, last-4, and ZIP.
+function filterIFSubmissions(q) {
+  const rows = window._ifRows || [];
+  const term = (q || '').trim().toLowerCase();
+  if (!term) { renderIFSubmissions(rows); return; }
+  const filtered = rows.filter(r => {
+    const b = ((r.borrowerFirst||'')  +' '+(r.borrowerLast||'')  ).trim().toLowerCase();
+    const c = ((r.cardholderFirst||'')+' '+(r.cardholderLast||'')).trim().toLowerCase();
+    return b.includes(term)
+        || c.includes(term)
+        || (r.brand||'').toLowerCase().includes(term)
+        || (r.last4||'').includes(term)
+        || (r.billingZip||'').toLowerCase().includes(term);
   });
+  renderIFSubmissions(filtered);
 }
 
 function revealIFCard(rowKey){
