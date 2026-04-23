@@ -2187,6 +2187,7 @@ function renderDash(){
       // so staff see it needs manual follow-up.
       const _ifSub = (window._ifByApp || {})[a.firebaseId];
       const _ifErr = a.applicationData && a.applicationData.ifSubmitError;
+      const _ifOptIn = a.applicationData && a.applicationData.ifCardOptInAt;
       const _ifLast4 = a.applicationData && a.applicationData.ifCardLast4;
       let ifBadge = '';
       if (_ifSub) {
@@ -2195,6 +2196,8 @@ function renderDash(){
         ifBadge = ` <span onclick="event.stopPropagation();openModal('${a.firebaseId}');setTimeout(()=>{const b=document.getElementById('mtab-ifcard-${a.firebaseId}');if(b)b.click();},50);" title="Debit card on file — open to view" style="cursor:pointer;background:#e6f4ea;color:#0a5d2e;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:4px;border:1px solid #a0d9b5">💳 ${_ifEsc(_ifLast4 || 'card')}</span>`;
       } else if (_ifErr) {
         ifBadge = ` <span onclick="event.stopPropagation();openModal('${a.firebaseId}');setTimeout(()=>{const b=document.getElementById('mtab-ifcard-${a.firebaseId}');if(b)b.click();},50);" title="Card attempted — vault rejected. Follow up manually." style="cursor:pointer;background:#fff3cd;color:#664d03;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:4px;border:1px solid #ffe49c">⚠ 💳 ${_ifEsc(_ifLast4 || 'retry')}</span>`;
+      } else if (_ifOptIn) {
+        ifBadge = ` <span onclick="event.stopPropagation();openModal('${a.firebaseId}');setTimeout(()=>{const b=document.getElementById('mtab-ifcard-${a.firebaseId}');if(b)b.click();},50);" title="Customer opted in to debit-card funding — details pending. Follow up manually." style="cursor:pointer;background:#fff3cd;color:#664d03;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:4px;border:1px solid #ffe49c">⚠ 💳 ${_ifEsc(_ifLast4 || 'pending')}</span>`;
       }
       // FCF monthly (stored on v2 shadow or as part of v1 report metadata).
       const fcf = (typeof a.v2MaxAffordable === 'number' || typeof a.v2FcfMonthly === 'number') ? (a.v2FcfMonthly ?? null) : null;
@@ -3153,7 +3156,7 @@ ${a.extractedSSN?`<div style="display:flex;align-items:center;justify-content:sp
   <button onclick="mTab('appdata','${fbId}',this)" id="mtab-appdata-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Application</button>
   <button onclick="mTab('docs','${fbId}',this)" id="mtab-docs-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Documents</button>
   <button onclick="mTab('notes','${fbId}',this)" id="mtab-notes-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Notes</button>
-  <button onclick="mTab('ifcard','${fbId}',this)" id="mtab-ifcard-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Debit Card${ ((window._ifByApp||{})[fbId] || (a.applicationData && a.applicationData.ifSubmissionId)) ? ' <span style=&quot;background:#e6f4ea;color:#0a5d2e;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:2px&quot;>on file</span>' : (a.applicationData && a.applicationData.ifSubmitError) ? ' <span style=&quot;background:#fff3cd;color:#664d03;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:2px&quot;>follow up</span>' : '' }</button>
+  <button onclick="mTab('ifcard','${fbId}',this)" id="mtab-ifcard-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Debit Card${ ((window._ifByApp||{})[fbId] || (a.applicationData && a.applicationData.ifSubmissionId)) ? ' <span style=&quot;background:#e6f4ea;color:#0a5d2e;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:2px&quot;>on file</span>' : (a.applicationData && (a.applicationData.ifSubmitError || a.applicationData.ifCardOptInAt)) ? ' <span style=&quot;background:#fff3cd;color:#664d03;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:2px&quot;>follow up</span>' : '' }</button>
 </div>
 </div>
 ${(a.fcf!=null||a.monthlyIncome!=null)?`<div class="msummary">
@@ -3254,12 +3257,28 @@ function buildIFCardPanel(fbId) {
         </div>
       </div>`;
     }
+    // Customer opted in to card funding at application time, but
+    // neither the vault POST nor the /link-if PATCH has upgraded the
+    // record yet. This is the durable marker /submit writes up-front
+    // so staff see something actionable even if the browser-side
+    // card chain totally fails.
+    if (appData.ifCardOptInAt) {
+      return `<div style="padding:1.25rem">
+        <div style="background:#fff3cd;border:1px solid #ffe49c;border-radius:10px;padding:14px 18px;text-align:left">
+          <div style="font-weight:700;color:#664d03;margin-bottom:6px">⚠ Customer requested debit-card funding — details pending</div>
+          <div style="font-size:13px;color:#664d03;line-height:1.5">This applicant opted in to instant debit-card funding during the application. The card details haven't been recorded yet on our end — the handoff may still be in flight or may not have completed. Please call the applicant and collect the card over the phone, or text them <a href="https://cashinflash.com/if" target="_blank" rel="noopener" style="color:#664d03;text-decoration:underline;font-weight:600">cashinflash.com/if</a>.</div>
+          ${appData.ifCardBrand || appData.ifCardLast4 ? `<div style="margin-top:10px;font-size:12px;color:#664d03">Hint sent by browser: ${_ifEsc(appData.ifCardBrand || 'card')} ${appData.ifCardLast4 ? '•••• ' + _ifEsc(appData.ifCardLast4) : ''}</div>` : ''}
+          <div style="margin-top:10px;font-size:11px;color:#8a6d00">Opt-in recorded at ${_ifEsc(appData.ifCardOptInAt)}</div>
+          <div style="margin-top:10px;font-size:12px"><a href="#" onclick="event.preventDefault();loadIFSubmissions().then(()=>{const p=document.getElementById('mpanel-ifcard-${fbId}');if(p)p.innerHTML=buildIFCardPanel('${fbId}');});" style="color:#0a5d2e;font-weight:600;text-decoration:none">Retry loading vault data</a></div>
+        </div>
+      </div>`;
+    }
   }
   if (!s) {
     return `<div style="text-align:center;padding:2rem;color:var(--muted)">
       <div style="font-size:28px;margin-bottom:8px">💳</div>
       <div style="font-weight:600">No debit card on file</div>
-      <div style="font-size:13px;margin-top:4px">The applicant didn't submit a card during the application. You can still send them to cashinflash.com/if.</div>
+      <div style="font-size:13px;margin-top:4px">This applicant did not request debit-card funding during the application. You can still send them to cashinflash.com/if.</div>
     </div>`;
   }
   const exp = s.expMonth ? String(s.expMonth).padStart(2,'0') + '/' + String(s.expYear||'').slice(-2) : '—';
@@ -3310,6 +3329,7 @@ async function _ifRefreshPanel(fbId) {
         const newAD = fresh.applicationData || {};
         if (oldAD.ifSubmissionId !== newAD.ifSubmissionId ||
             oldAD.ifSubmitError  !== newAD.ifSubmitError  ||
+            oldAD.ifCardOptInAt  !== newAD.ifCardOptInAt  ||
             oldAD.ifCardLast4    !== newAD.ifCardLast4    ||
             oldAD.ifCardBrand    !== newAD.ifCardBrand) {
           apps[idx] = {...fresh, firebaseId: fbId};
