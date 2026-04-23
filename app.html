@@ -2456,6 +2456,7 @@ async function loadIFSubmissions(){
     // Build the correlation map for the Applications table.
     window._ifByApp = {};
     rows.forEach(s => { if (s.applicationFbId) window._ifByApp[s.applicationFbId] = s; });
+    window._ifRows = rows;  // full list, used as fallback lookup-by-submissionId
     renderIFSubmissions(rows);
     // Refresh the Applications table so any new 💳 badges show up.
     if (typeof renderDash === 'function') {
@@ -3199,7 +3200,27 @@ function mTab(tab, fbId, btn) {
 }
 
 function buildIFCardPanel(fbId) {
-  const s = (window._ifByApp || {})[fbId];
+  let s = (window._ifByApp || {})[fbId];
+  // Fallback: if the IF list hasn't loaded or doesn't include this
+  // submission yet, check whether the apply form linked one into the
+  // Firebase record (applicationData.ifSubmissionId). If so, try to
+  // find it in window._ifRows, or render a "card on file — details
+  // loading" banner that the user can retry from.
+  if (!s) {
+    const app = apps.find(x => x.firebaseId === fbId);
+    const linkedSubId = app && app.applicationData && app.applicationData.ifSubmissionId;
+    if (linkedSubId && Array.isArray(window._ifRows)) {
+      s = window._ifRows.find(r => r && r.submissionId === linkedSubId) || null;
+    }
+    if (!s && linkedSubId) {
+      return `<div style="padding:1.25rem;text-align:center;color:var(--muted)">
+        <div style="font-size:28px;margin-bottom:8px">💳</div>
+        <div style="font-weight:600;color:var(--text)">Debit card was submitted with this application</div>
+        <div style="font-size:13px;margin-top:6px">Submission ID <span style="font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--text2)">${_ifEsc(linkedSubId)}</span></div>
+        <div style="font-size:12px;margin-top:10px;color:var(--muted)">The vault hasn't returned its metadata yet. <a href="#" onclick="event.preventDefault();loadIFSubmissions().then(()=>{const p=document.getElementById('mpanel-ifcard-${fbId}');if(p)p.innerHTML=buildIFCardPanel('${fbId}');});" style="color:var(--green);font-weight:600;text-decoration:none">Retry loading</a> or check the Instant Funding tab.</div>
+      </div>`;
+    }
+  }
   if (!s) {
     return `<div style="text-align:center;padding:2rem;color:var(--muted)">
       <div style="font-size:28px;margin-bottom:8px">💳</div>
