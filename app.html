@@ -2461,6 +2461,11 @@ function renderIFSubmissions(rows){
     return;
   }
   status.textContent=rows.length+(rows.length===1?' submission':' submissions');
+  const statusBadge=st=>{
+    const s=(st||'pending').toLowerCase();
+    const color={pending:['#fff3cd','#664d03','#ffe49c'],viewed:['#cfe5ff','#024b8c','#9ec6f0'],processed:['#d1f2dd','#0a5d2e','#a0d9b5']}[s]||['#eef0ee','#444','#dde1de'];
+    return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;background:${color[0]};color:${color[1]};border:1px solid ${color[2]}">${_ifEsc(s)}</span>`;
+  };
   const body=rows.map(s=>{
     const exp=s.expMonth?String(s.expMonth).padStart(2,'0')+'/'+String(s.expYear||'').slice(-2):'—';
     return `<tr>
@@ -2470,6 +2475,7 @@ function renderIFSubmissions(rows){
       <td><span style="font-weight:600">${_ifEsc(s.brand||'Card')}</span> <span style="font-family:ui-monospace,Menlo,Consolas,monospace;color:#666">•••• ${_ifEsc(s.last4||'----')}</span></td>
       <td style="font-family:ui-monospace,Menlo,Consolas,monospace">${_ifEsc(exp)}</td>
       <td style="font-family:ui-monospace,Menlo,Consolas,monospace">${_ifEsc(s.billingZip||'—')}</td>
+      <td>${statusBadge(s.status)}</td>
       <td style="color:#555;font-size:12px">${_ifEsc(_ifTtlLeft(s.ttlEpoch))}</td>
       <td style="text-align:right"><button class="actbtn btn-ok" onclick="revealIFCard('${_ifEsc(s.submissionId)}')">View card</button></td>
     </tr>`;
@@ -2482,6 +2488,7 @@ function renderIFSubmissions(rows){
       <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">Card</th>
       <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">Exp</th>
       <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">ZIP</th>
+      <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">Status</th>
       <th style="padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#666">Expires</th>
       <th></th>
     </tr></thead>
@@ -2498,7 +2505,7 @@ async function revealIFCard(id){
   const ov=document.getElementById('ov');
   const mt=document.getElementById('mtitle');
   const mb=document.getElementById('mbody');
-  mt.textContent='Card details — one-time reveal';
+  mt.textContent='Card details';
   mb.innerHTML=`<div style="padding:40px;text-align:center;color:#888">Retrieving and decrypting…</div>`;
   ov.classList.add('open');
   let data=null;
@@ -2506,7 +2513,7 @@ async function revealIFCard(id){
     const r=await fetch('/api/if/view/'+encodeURIComponent(id),{credentials:'include',cache:'no-store'});
     if(r.status===401){ window.location.replace('/'); return; }
     if(r.status===404){
-      mb.innerHTML=`<div style="padding:28px;text-align:center"><div style="color:#b3261e;font-weight:600;margin-bottom:6px">Not found</div><div style="color:#555">This submission was already viewed, expired, or never existed.</div></div>`;
+      mb.innerHTML=`<div style="padding:28px;text-align:center"><div style="color:#b3261e;font-weight:600;margin-bottom:6px">Not found</div><div style="color:#555">This submission was already processed, expired, or never existed.</div></div>`;
       return;
     }
     if(!r.ok) throw new Error('http '+r.status);
@@ -2524,16 +2531,13 @@ async function revealIFCard(id){
     </span>
   </div>`;
   mb.innerHTML=`
-    <div style="background:#fff8e5;border:1px solid #f2d46c;color:#6b4d00;padding:12px 14px;border-radius:8px;font-size:13px;line-height:1.5;margin-bottom:18px">
-      <strong>One-time reveal.</strong> The encrypted vault record has been deleted. Closing this window will lose access — enter the data into Vergent now.
-    </div>
     <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:14px">
       <div style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Borrower &amp; cardholder</div>
       ${row('Borrower',data.borrowerName)}
       ${row('Cardholder',data.cardholderName)}
       ${row('Submitted',data.submittedAt||'—')}
     </div>
-    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 18px">
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:14px">
       <div style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Card details</div>
       ${row('Card number',data.cardNumber,'cardNumber')}
       ${row('Card type',data.cardType)}
@@ -2541,9 +2545,19 @@ async function revealIFCard(id){
       ${row('CVV',data.cvv,'cvv')}
       ${row('Billing ZIP',data.billingZip,'billingZip')}
     </div>
-    <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
-      <a href="https://cashinflash.my.vergentlms.com/login" target="_blank" rel="noopener" class="actbtn btn-ok" style="text-decoration:none">Open Vergent →</a>
+    <div style="background:#f7fafa;border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:14px">
+      <div style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Push to Vergent</div>
+      <p style="margin:0 0 10px;color:#333;font-size:13px;line-height:1.5">Enter the customer's Vergent ID to tokenize this card with Repay and save it on the customer's profile automatically.</p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="if-vid-${_ifEsc(data.submissionId)}" placeholder="Vergent customer ID (e.g. 601488)" inputmode="numeric" maxlength="10" style="flex:1;min-width:200px;height:38px;padding:0 12px;border:1px solid var(--border);border-radius:8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px">
+        <button class="actbtn btn-ok" onclick="pushIFToVergent('${_ifEsc(data.submissionId)}')">Push to Vergent</button>
+      </div>
+      <div id="if-push-status-${_ifEsc(data.submissionId)}" style="margin-top:10px;font-size:13px;line-height:1.4"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;justify-content:flex-end">
+      <a href="https://cashinflash.my.vergentlms.com/login" target="_blank" rel="noopener" class="actbtn btn-gh" style="text-decoration:none">Open Vergent ↗</a>
       <button class="actbtn btn-gh" onclick="_ifCopyAll()">Copy all fields</button>
+      <button class="actbtn btn-gh" onclick="markIFProcessed('${_ifEsc(data.submissionId)}')">Mark processed (manual entry)</button>
       <button class="actbtn btn-gh" onclick="closeModal()">Done</button>
     </div>`;
   // Cache values for the "Copy all" helper
@@ -2552,6 +2566,55 @@ async function revealIFCard(id){
     CardNumber:data.cardNumber, CardType:data.cardType,
     Expiration:exp, CVV:data.cvv, BillingZIP:data.billingZip,
   };
+}
+
+async function pushIFToVergent(id){
+  const vidEl=document.getElementById('if-vid-'+id);
+  const statusEl=document.getElementById('if-push-status-'+id);
+  const cid=(vidEl.value||'').replace(/\D/g,'');
+  if(!cid){ statusEl.innerHTML=`<span style="color:#b3261e">Enter the Vergent customer ID first.</span>`; return; }
+  statusEl.innerHTML=`<span style="color:#666">Tokenizing with Repay and saving to Vergent…</span>`;
+  try{
+    const r=await fetch('/api/if/push-to-vergent',{
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({submissionId:id,vergentCustomerId:cid}),
+    });
+    if(r.status===401){ window.location.replace('/'); return; }
+    const d=await r.json().catch(()=>({}));
+    if(r.ok && d.success){
+      statusEl.innerHTML=`<div style="background:#d1f2dd;border:1px solid #a0d9b5;color:#0a5d2e;padding:10px 12px;border-radius:8px;font-weight:600">
+        ✓ Card saved to Vergent customer ${_ifEsc(d.vergentCustomerId)} (Vergent card id ${_ifEsc(d.vergentCardId||'—')}).
+      </div>`;
+      if(typeof toast==='function') toast('Card pushed to Vergent','ok');
+      setTimeout(()=>{ closeModal(); loadIFSubmissions(); },2000);
+      return;
+    }
+    const detail=(d&&(d.detail||d.error))||('http '+r.status);
+    statusEl.innerHTML=`<div style="background:#fde8e8;border:1px solid #f5b1b1;color:#8a1f1f;padding:10px 12px;border-radius:8px;line-height:1.4">
+      Couldn't push to Vergent. ${_ifEsc(detail)}<br>
+      <span style="color:#555;font-size:12px">The vault record is still here — you can retry, or use Mark processed if you've entered it manually.</span>
+    </div>`;
+  }catch(e){
+    statusEl.innerHTML=`<div style="color:#b3261e">Network error: ${_ifEsc(e.message)}. Please try again.</div>`;
+  }
+}
+
+async function markIFProcessed(id){
+  if(!confirm('Mark this submission processed and delete the vault record? Use this when you\'ve already entered the card into Vergent yourself.')) return;
+  try{
+    const r=await fetch('/api/if/mark-processed',{
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({submissionId:id}),
+    });
+    if(r.status===401){ window.location.replace('/'); return; }
+    if(typeof toast==='function') toast('Submission marked processed','ok');
+    closeModal();
+    loadIFSubmissions();
+  }catch(e){
+    if(typeof toast==='function') toast('Mark processed failed: '+e.message,'err');
+  }
 }
 
 function _ifCopy(elId,btn){
@@ -2571,11 +2634,12 @@ function _ifCopyAll(){
   if(typeof toast==='function') toast('Copied all fields','ok');
 }
 
-// When the modal closes via close/cancel/backdrop, wipe card fields
-// from the DOM and refresh the table so the (now-deleted) submission
-// disappears. The modal's close handler (closeModal / closeModalOut)
-// runs even when we reveal IF card, but it doesn't know about us —
-// patch via an observer on the overlay's class changes.
+// When the modal closes (close/cancel/backdrop), wipe card fields
+// out of the DOM so PAN/CVV don't linger. We do NOT auto-refresh the
+// table on close anymore — the record only disappears when staff push
+// to Vergent or click Mark processed (both of which call
+// loadIFSubmissions themselves). Closing the modal without action
+// leaves the row in 'viewed' status so they can come back.
 (function(){
   const ov=document.getElementById('ov');
   if(!ov) return;
@@ -2584,7 +2648,11 @@ function _ifCopyAll(){
       window._ifPending=null;
       const mb=document.getElementById('mbody');
       const title=(document.getElementById('mtitle')||{}).textContent||'';
-      if(mb && title.indexOf('Card details')===0){ mb.innerHTML=''; loadIFSubmissions(); }
+      if(mb && title.indexOf('Card details')===0){
+        mb.innerHTML='';
+        // Refresh once in case status changed elsewhere — cheap.
+        loadIFSubmissions();
+      }
     }
   });
   mo.observe(ov,{attributes:true,attributeFilter:['class']});
