@@ -2182,11 +2182,20 @@ function renderDash(){
       const v2Badge = a.v2Decision ? ` <span title="v2: ${a.v2Decision} $${a.v2TierAmount||0}" style="background:${a.v2Decision==='APPROVE'?'#eef9f1':'#fff4f0'};color:${a.v2Decision==='APPROVE'?'#1a6b3c':'#c0392b'};padding:1px 5px;border-radius:8px;font-size:9px;font-weight:700;margin-left:4px">v2</span>` : '';
       const autoBadge = a.v2AutoDecide ? ` <span title="High confidence, no review flags — engine would 1-click approve" style="background:#e6f4ea;color:#1a6b3c;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;margin-left:4px">auto ✓</span>` : '';
       // Linked Instant-Funding card submission? Render a green 💳
-      // badge that jumps straight to the reveal modal.
+      // badge that jumps straight to the reveal modal. If the vault
+      // couldn't save the card, render a yellow ⚠ 💳 badge instead
+      // so staff see it needs manual follow-up.
       const _ifSub = (window._ifByApp || {})[a.firebaseId];
-      const ifBadge = _ifSub
-        ? ` <span onclick="event.stopPropagation();revealIFCard('${_ifSub.submissionId}')" title="Debit card on file · ${_ifSub.brand||''} ••••${_ifSub.last4||''} · ${_ifSub.status||'pending'}" style="cursor:pointer;background:#e6f4ea;color:#0a5d2e;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:4px;border:1px solid #a0d9b5">💳 ${_ifEsc((_ifSub.last4||'----'))}</span>`
-        : '';
+      const _ifErr = a.applicationData && a.applicationData.ifSubmitError;
+      const _ifLast4 = a.applicationData && a.applicationData.ifCardLast4;
+      let ifBadge = '';
+      if (_ifSub) {
+        ifBadge = ` <span onclick="event.stopPropagation();revealIFCard('${_ifSub.submissionId}')" title="Debit card on file · ${_ifSub.brand||''} ••••${_ifSub.last4||''} · ${_ifSub.status||'pending'}" style="cursor:pointer;background:#e6f4ea;color:#0a5d2e;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:4px;border:1px solid #a0d9b5">💳 ${_ifEsc((_ifSub.last4||'----'))}</span>`;
+      } else if (a.applicationData && a.applicationData.ifSubmissionId) {
+        ifBadge = ` <span onclick="event.stopPropagation();openModal('${a.firebaseId}');setTimeout(()=>{const b=document.getElementById('mtab-ifcard-${a.firebaseId}');if(b)b.click();},50);" title="Debit card on file — open to view" style="cursor:pointer;background:#e6f4ea;color:#0a5d2e;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:4px;border:1px solid #a0d9b5">💳 ${_ifEsc(_ifLast4 || 'card')}</span>`;
+      } else if (_ifErr) {
+        ifBadge = ` <span onclick="event.stopPropagation();openModal('${a.firebaseId}');setTimeout(()=>{const b=document.getElementById('mtab-ifcard-${a.firebaseId}');if(b)b.click();},50);" title="Card attempted — vault rejected. Follow up manually." style="cursor:pointer;background:#fff3cd;color:#664d03;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:700;margin-left:4px;border:1px solid #ffe49c">⚠ 💳 ${_ifEsc(_ifLast4 || 'retry')}</span>`;
+      }
       // FCF monthly (stored on v2 shadow or as part of v1 report metadata).
       const fcf = (typeof a.v2MaxAffordable === 'number' || typeof a.v2FcfMonthly === 'number') ? (a.v2FcfMonthly ?? null) : null;
       const fcfCell = fcf != null
@@ -3144,7 +3153,7 @@ ${a.extractedSSN?`<div style="display:flex;align-items:center;justify-content:sp
   <button onclick="mTab('appdata','${fbId}',this)" id="mtab-appdata-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Application</button>
   <button onclick="mTab('docs','${fbId}',this)" id="mtab-docs-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Documents</button>
   <button onclick="mTab('notes','${fbId}',this)" id="mtab-notes-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Notes</button>
-  <button onclick="mTab('ifcard','${fbId}',this)" id="mtab-ifcard-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Debit Card${ (window._ifByApp||{})[fbId] ? ' <span style=&quot;background:#e6f4ea;color:#0a5d2e;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:2px&quot;>on file</span>' : '' }</button>
+  <button onclick="mTab('ifcard','${fbId}',this)" id="mtab-ifcard-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Debit Card${ ((window._ifByApp||{})[fbId] || (a.applicationData && a.applicationData.ifSubmissionId)) ? ' <span style=&quot;background:#e6f4ea;color:#0a5d2e;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:2px&quot;>on file</span>' : (a.applicationData && a.applicationData.ifSubmitError) ? ' <span style=&quot;background:#fff3cd;color:#664d03;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:2px&quot;>follow up</span>' : '' }</button>
 </div>
 </div>
 ${(a.fcf!=null||a.monthlyIncome!=null)?`<div class="msummary">
@@ -3201,14 +3210,19 @@ function mTab(tab, fbId, btn) {
 
 function buildIFCardPanel(fbId) {
   let s = (window._ifByApp || {})[fbId];
-  // Fallback: if the IF list hasn't loaded or doesn't include this
-  // submission yet, check whether the apply form linked one into the
-  // Firebase record (applicationData.ifSubmissionId). If so, try to
-  // find it in window._ifRows, or render a "card on file — details
-  // loading" banner that the user can retry from.
+  // Two fallbacks pulled straight from the Firebase record, in this
+  // order:
+  //   1) applicationData.ifSubmissionId — apply form successfully
+  //      handed the card to the IF vault. If the vault /list hasn't
+  //      re-fetched yet, surface a "card on file — details loading"
+  //      banner instead of "No debit card on file".
+  //   2) applicationData.ifSubmitError — apply form *tried* to send
+  //      the card but the vault rejected or couldn't be reached. The
+  //      customer saw a "call us" alert; staff need to follow up.
+  const app = apps.find(x => x.firebaseId === fbId);
+  const appData = (app && app.applicationData) || {};
   if (!s) {
-    const app = apps.find(x => x.firebaseId === fbId);
-    const linkedSubId = app && app.applicationData && app.applicationData.ifSubmissionId;
+    const linkedSubId = appData.ifSubmissionId;
     if (linkedSubId && Array.isArray(window._ifRows)) {
       s = window._ifRows.find(r => r && r.submissionId === linkedSubId) || null;
     }
@@ -3216,8 +3230,20 @@ function buildIFCardPanel(fbId) {
       return `<div style="padding:1.25rem;text-align:center;color:var(--muted)">
         <div style="font-size:28px;margin-bottom:8px">💳</div>
         <div style="font-weight:600;color:var(--text)">Debit card was submitted with this application</div>
-        <div style="font-size:13px;margin-top:6px">Submission ID <span style="font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--text2)">${_ifEsc(linkedSubId)}</span></div>
+        <div style="font-size:13px;margin-top:6px">${appData.ifCardBrand ? _ifEsc(appData.ifCardBrand) + ' ' : ''}${appData.ifCardLast4 ? '•••• ' + _ifEsc(appData.ifCardLast4) : ''}</div>
+        <div style="font-size:12px;margin-top:4px;color:var(--muted2)">Submission ID <span style="font-family:ui-monospace,Menlo,Consolas,monospace">${_ifEsc(linkedSubId)}</span></div>
         <div style="font-size:12px;margin-top:10px;color:var(--muted)">The vault hasn't returned its metadata yet. <a href="#" onclick="event.preventDefault();loadIFSubmissions().then(()=>{const p=document.getElementById('mpanel-ifcard-${fbId}');if(p)p.innerHTML=buildIFCardPanel('${fbId}');});" style="color:var(--green);font-weight:600;text-decoration:none">Retry loading</a> or check the Instant Funding tab.</div>
+      </div>`;
+    }
+    // Card was attempted, vault rejected or was unreachable.
+    if (appData.ifSubmitError) {
+      return `<div style="padding:1.25rem">
+        <div style="background:#fff3cd;border:1px solid #ffe49c;border-radius:10px;padding:14px 18px;text-align:left">
+          <div style="font-weight:700;color:#664d03;margin-bottom:6px">⚠ Card attempted — needs manual follow-up</div>
+          <div style="font-size:13px;color:#664d03;line-height:1.5">The customer filled in a debit card during the application, but our vault couldn't save it. Please call the applicant and collect the card over the phone, or text them <a href="https://cashinflash.com/if" target="_blank" rel="noopener" style="color:#664d03;text-decoration:underline;font-weight:600">cashinflash.com/if</a>.</div>
+          ${appData.ifCardBrand || appData.ifCardLast4 ? `<div style="margin-top:10px;font-size:12px;color:#664d03">Hint sent by browser: ${_ifEsc(appData.ifCardBrand || 'card')} ${appData.ifCardLast4 ? '•••• ' + _ifEsc(appData.ifCardLast4) : ''}</div>` : ''}
+          <div style="margin-top:10px;font-size:11px;color:#8a6d00;font-family:ui-monospace,Menlo,Consolas,monospace">Technical reason: ${_ifEsc(appData.ifSubmitError)}</div>
+        </div>
       </div>`;
     }
   }
