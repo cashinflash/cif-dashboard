@@ -3305,10 +3305,14 @@ ${(a.fcf!=null||a.monthlyIncome!=null||a.v2Confidence!=null)?(()=>{
   //   engineVersionPrimary=='v2' (see cif-apply/server.py _run_v2_shadow).
   //   Max offer + Confidence — always sourced from v2's shadow run.
   const fcf = a.fcf||0;
-  const maxAff = (typeof a.v2MaxAffordable==='number') ? a.v2MaxAffordable : null;
+  // Max offer reads v2TierAmount (the FINAL decision tier after hard-declines
+  // have run), NOT v2MaxAffordable (which is the pure FCF math, ignoring
+  // hard-declines). For someone declined by, say, severe fintech stacking,
+  // the actual offer is $0 even though the cash-flow math could afford $255.
+  const offer = (typeof a.v2TierAmount==='number') ? a.v2TierAmount : null;
   const conf = (typeof a.v2Confidence==='number') ? a.v2Confidence : null;
   const fcfColor = fcf >= 0 ? 'var(--green)' : 'var(--red)';
-  const offerColor = (maxAff && maxAff > 0) ? 'var(--green)' : 'var(--muted)';
+  const offerColor = (offer && offer > 0) ? 'var(--green)' : 'var(--muted)';
   // Three-band confidence coloring — matches the auto-approve floor (0.50)
   // in engine_v2/policy/engine.py: below that, v2 flips to REVIEW_REQUIRED.
   const confColor = conf == null ? 'var(--muted)'
@@ -3334,8 +3338,8 @@ ${(a.fcf!=null||a.monthlyIncome!=null||a.v2Confidence!=null)?(()=>{
     </div>
     <div class="msummary-item">
       <div class="msummary-label">Max offer</div>
-      <div class="msummary-value" style="color:${offerColor}">${maxAff == null ? '—' : ('$' + maxAff)}</div>
-      <div class="msummary-sub">what v2 would offer</div>
+      <div class="msummary-value" style="color:${offerColor}">${offer == null ? '—' : ('$' + offer)}</div>
+      <div class="msummary-sub">${offer == null ? 'not yet run' : (offer > 0 ? 'v2 offers' : 'declined by v2')}</div>
     </div>
     <div class="msummary-item">
       <div class="msummary-label">Confidence</div>
