@@ -300,9 +300,10 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .mact-bar{display:flex;gap:8px;padding:14px 0;flex-wrap:wrap;align-items:center}
 .msticky{position:sticky;top:57px;background:var(--surface);z-index:2;margin:0 -24px;padding:0 24px;border-bottom:1px solid var(--border)}
 .msummary{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:12px 0}
-.msummary-item{text-align:center;padding:8px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:8px}
+.msummary-item{text-align:center;padding:10px 4px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px}
 .msummary-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
 .msummary-value{font-size:14px;font-weight:800;color:var(--text);margin-top:2px}
+.msummary-sub{font-size:9px;color:var(--muted2);margin-top:3px;font-weight:500}
 .mdh-stats{display:flex;gap:0;background:rgba(0,0,0,.15);border-top:1px solid rgba(255,255,255,.1)}
 .mdh-stat{flex:1;text-align:center;padding:10px 8px;border-right:1px solid rgba(255,255,255,.1)}
 .mdh-stat:last-child{border-right:none}
@@ -3298,13 +3299,51 @@ ${a.extractedSSN?`<div style="display:flex;align-items:center;justify-content:sp
   <button onclick="mTab('ifcard','${fbId}',this)" id="mtab-ifcard-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Debit Card${ (a.applicationData && a.applicationData.debitCard) ? ' <span style=&quot;background:#e6f4ea;color:#0a5d2e;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:2px&quot;>on file</span>' : '' }</button>
 </div>
 </div>
-${(a.fcf!=null||a.monthlyIncome!=null)?`<div class="msummary">
-  <div class="msummary-item"><div class="msummary-label">Income</div><div class="msummary-value" style="color:var(--green)">$${Math.round(a.monthlyIncome||0).toLocaleString()}</div></div>
-  <div class="msummary-item"><div class="msummary-label">Expenses</div><div class="msummary-value" style="color:var(--red)">$${Math.round(a.monthlyExpenses||0).toLocaleString()}</div></div>
-  <div class="msummary-item"><div class="msummary-label">FCF</div><div class="msummary-value" style="color:${(a.fcf||0)>=0?'var(--green)':'var(--red)'}">$${Math.round(a.fcf||0).toLocaleString()}</div></div>
-  <div class="msummary-item"><div class="msummary-label">Fintech</div><div class="msummary-value">${a.fintechCount||0}</div></div>
-  <div class="msummary-item"><div class="msummary-label">NSFs</div><div class="msummary-value">${a.nsfCount||0}</div></div>
-</div>`:''}
+${(a.fcf!=null||a.monthlyIncome!=null||a.v2Confidence!=null)?(()=>{
+  // 5-second read of the applicant. Sources:
+  //   Income / Obligations / FCF — canonical fields, now v2-sourced when
+  //   engineVersionPrimary=='v2' (see cif-apply/server.py _run_v2_shadow).
+  //   Max offer + Confidence — always sourced from v2's shadow run.
+  const fcf = a.fcf||0;
+  const maxAff = (typeof a.v2MaxAffordable==='number') ? a.v2MaxAffordable : null;
+  const conf = (typeof a.v2Confidence==='number') ? a.v2Confidence : null;
+  const fcfColor = fcf >= 0 ? 'var(--green)' : 'var(--red)';
+  const offerColor = (maxAff && maxAff > 0) ? 'var(--green)' : 'var(--muted)';
+  // Three-band confidence coloring — matches the auto-approve floor (0.50)
+  // in engine_v2/policy/engine.py: below that, v2 flips to REVIEW_REQUIRED.
+  const confColor = conf == null ? 'var(--muted)'
+    : (conf >= 0.80 ? 'var(--green)'
+    : (conf >= 0.60 ? '#a15c00'
+    : 'var(--red)'));
+  const confPct = conf == null ? '—' : Math.round(conf*100)+'%';
+  return `<div class="msummary">
+    <div class="msummary-item">
+      <div class="msummary-label">Verified income</div>
+      <div class="msummary-value" style="color:var(--green)">$${Math.round(a.monthlyIncome||0).toLocaleString()}</div>
+      <div class="msummary-sub">monthly</div>
+    </div>
+    <div class="msummary-item">
+      <div class="msummary-label">Obligations</div>
+      <div class="msummary-value" style="color:var(--red)">$${Math.round(a.monthlyExpenses||0).toLocaleString()}</div>
+      <div class="msummary-sub">committed monthly</div>
+    </div>
+    <div class="msummary-item">
+      <div class="msummary-label">FCF / mo</div>
+      <div class="msummary-value" style="color:${fcfColor}">$${Math.round(fcf).toLocaleString()}</div>
+      <div class="msummary-sub">free cash flow</div>
+    </div>
+    <div class="msummary-item">
+      <div class="msummary-label">Max offer</div>
+      <div class="msummary-value" style="color:${offerColor}">${maxAff == null ? '—' : ('$' + maxAff)}</div>
+      <div class="msummary-sub">what v2 would offer</div>
+    </div>
+    <div class="msummary-item">
+      <div class="msummary-label">Confidence</div>
+      <div class="msummary-value" style="color:${confColor}">${confPct}</div>
+      <div class="msummary-sub">${conf == null ? 'not yet run' : (conf >= 0.50 ? 'above approve floor' : 'below approve floor')}</div>
+    </div>
+  </div>`;
+})():''}
 <div id="mpanel-report-${fbId}">${buildReportPanel(a)}</div>
 <div id="mpanel-appdata-${fbId}" style="display:none">${buildAppDetails(a.applicationData||{})}</div>
 <div id="mpanel-docs-${fbId}" style="display:none">${buildDocsPanel(a)}</div>
