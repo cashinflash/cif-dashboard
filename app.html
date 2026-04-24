@@ -263,6 +263,11 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .empty-t{font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px}
 .empty-s{font-size:13px;color:var(--muted);margin-bottom:18px}
 .ecta{background:var(--green);color:white;border:none;border-radius:10px;padding:11px 24px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+/* Skeleton loaders — show the shape of the coming content instead of a
+   blank canvas or a spinner. Used on the dashboard table during the
+   initial load. */
+.skel{background:linear-gradient(90deg,#eef2ef 0%,#f6faf8 50%,#eef2ef 100%);background-size:200% 100%;animation:skelPulse 1.4s ease-in-out infinite;border-radius:4px;display:inline-block}
+@keyframes skelPulse{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:1.5rem}
 .ov.open{display:flex}
 .modal{background:var(--surface);border-radius:18px;width:100%;max-width:1100px;min-width:min(85vw,1100px);max-height:95vh;overflow-y:auto;animation:fadeUp .25s ease;box-shadow:var(--shadow-lg)}
@@ -907,8 +912,12 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
         </div>
       </div>
     </div>
-    <!-- Saved filter pills: one-click views for the most common queries. -->
-    <div id="quick-filters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+    <!-- Saved filter pills: one-click views for the most common queries.
+         First row is workflow-state (all / today / pending / decline /
+         approve). Second group is v2 audit lenses (engines disagree,
+         reconciliation failed, low confidence, review required) — the
+         checks we run when tuning or spot-checking the engine. -->
+    <div id="quick-filters" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
       <button class="qfp" data-qf="all" onclick="setQuickFilter('all')">All</button>
       <button class="qfp" data-qf="today" onclick="setQuickFilter('today')">Today</button>
       <button class="qfp" data-qf="pending" onclick="setQuickFilter('pending')">Pending</button>
@@ -916,6 +925,11 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
       <button class="qfp" data-qf="declined" onclick="setQuickFilter('declined')">Declined</button>
       <button class="qfp" data-qf="approved" onclick="setQuickFilter('approved')">Approved</button>
       <button class="qfp" data-qf="autodecide" onclick="setQuickFilter('autodecide')">Auto-decide candidates</button>
+      <span style="width:1px;height:20px;background:var(--border);margin:0 4px"></span>
+      <button class="qfp" data-qf="review" onclick="setQuickFilter('review')" title="v2 marked this applicant REVIEW_REQUIRED — needs a human before disbursement.">Review required</button>
+      <button class="qfp" data-qf="lowconf" onclick="setQuickFilter('lowconf')" title="v2 confidence below the auto-approve floor (0.50). Spot-check the income / classification signals.">Low confidence</button>
+      <button class="qfp" data-qf="disagree" onclick="setQuickFilter('disagree')" title="v1 shadow + v2 primary reached different outcomes. Useful while v1 is still running in shadow.">Engines disagree</button>
+      <button class="qfp" data-qf="reconfail" onclick="setQuickFilter('reconfail')" title="Statement transactions don't balance. Likely a wrong is_credit flag or missing txns.">Reconciliation failed</button>
       <button class="qfp" style="margin-left:auto;border-color:var(--green);color:var(--green)" onclick="exportCSV()">Export CSV</button>
     </div>
     <div class="tcard">
@@ -1302,8 +1316,16 @@ window.onload = async () => {
     // Dashboard when no hash is present (parseRoute() returns 'dash').
     const { view, fbId } = parseRoute();
     if (view === 'app' && fbId) {
+      // Reloaded directly on a detail URL. Render dashboard skeleton first
+      // (so the page doesn't look empty), then try to open the detail as
+      // soon as loadReports has populated apps[]. Retry a few times in
+      // case Firebase is slow.
       _renderView('dash', document.getElementById('nav-dash'));
-      setTimeout(() => openModal(fbId), 300);  // wait for apps[] to populate
+      const tryOpen = (retries) => {
+        if (apps.find(x => x.firebaseId === fbId)) { openModal(fbId); return; }
+        if (retries > 0) setTimeout(() => tryOpen(retries - 1), 200);
+      };
+      tryOpen(25);  // ~5s of retries total
     } else {
       _renderView(view, document.getElementById('nav-' + view));
     }
@@ -1345,6 +1367,11 @@ function setupDragDrop() {
 // ════════════════════════════════════════
 // FIREBASE LOAD
 // ════════════════════════════════════════
+// Tracks whether loadReports has finished at least once. Used by renderDash
+// to show a skeleton on first paint instead of the empty state (which would
+// otherwise say "No applications yet" for the ~500ms before data arrives).
+let _reportsLoaded = false;
+
 async function loadReports() {
   try {
     const data = await fbGet('reports.json');
@@ -1355,12 +1382,33 @@ async function loadReports() {
     } else {
       apps = [];
     }
+    _reportsLoaded = true;
     renderDash();
     updateSyncStatus(true);
   } catch(e) {
+    // Don't flip _reportsLoaded on failure — keep the skeleton so the user
+    // knows we're still trying (poll retries every 8s).
     updateSyncStatus(false);
     console.warn('Load reports failed:', e);
   }
+}
+
+// Dashboard table skeleton — 8 rows shaped roughly like real rows so the
+// layout doesn't jump when data arrives.
+function _renderDashSkeleton() {
+  const c = document.getElementById('dtable');
+  if (!c) return;
+  const rows = Array.from({length: 8}, () => `
+    <tr>
+      <td style="padding:14px 10px"><span class="skel" style="height:10px;width:60%"></span><br><span class="skel" style="height:8px;width:40%;margin-top:6px"></span></td>
+      <td style="padding:14px 10px;text-align:center"><span class="skel" style="height:24px;width:36px;border-radius:12px"></span></td>
+      <td style="padding:14px 10px"><span class="skel" style="height:10px;width:55px"></span></td>
+      <td style="padding:14px 10px"><span class="skel" style="height:10px;width:70px"></span></td>
+      <td style="padding:14px 10px"><span class="skel" style="height:10px;width:65px"></span></td>
+      <td style="padding:14px 10px"><span class="skel" style="height:20px;width:70px;border-radius:10px"></span></td>
+    </tr>
+  `).join('');
+  c.innerHTML = `<table style="width:100%;border-collapse:collapse"><tbody>${rows}</tbody></table>`;
 }
 
 async function saveReport(data) {
@@ -2234,6 +2282,14 @@ function renderDash(){
   const filtered=applyQuickFilter(apps.filter(a=>(!srch||a.name?.toLowerCase().includes(srch.toLowerCase()))&&(!stFilter||a.status===stFilter)));
   const c=document.getElementById('dtable');
 
+  // First-paint skeleton — shown only before loadReports has ever succeeded.
+  // Once data arrives, real rows take over; if the API is permanently failing,
+  // the skeleton stays up and updateSyncStatus surfaces the offline marker.
+  if (!_reportsLoaded && !apps.length) {
+    _renderDashSkeleton();
+    return;
+  }
+
   if(!filtered.length){
     c.innerHTML=`<div class="empty"><div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-inbox"/></svg></div><div class="empty-t">${apps.length?'No results':'No applications yet'}</div><div class="empty-s">${apps.length?'Try a different filter.':'Submit your first application to get started.'}</div>${!apps.length?'<button class="ecta" onclick="showView(\'single\',document.getElementById(\'nav-single\'))">+ New Analysis</button>':''}</div>`;
     updateSelCount();  // no rows → no selection possible; hide Delete Selected
@@ -3037,6 +3093,24 @@ function applyQuickFilter(list) {
       return list.filter(a => a.status === 'Approved');
     case 'autodecide':
       return list.filter(a => !!a.v2AutoDecide);
+    // v2-era audit filters
+    case 'disagree':
+      // v1 shadow decision differs from v2's — spot-check anywhere the
+      // engines diverge on an application that's already routed to v2.
+      return list.filter(a => {
+        if (a.engineVersionPrimary !== 'v2' || !a.v1ShadowDecision) return false;
+        const v1 = String(a.v1ShadowDecision).toUpperCase().slice(0, 3);
+        const v2 = String(a.v2Decision || '').toUpperCase().slice(0, 3);
+        return v1 && v2 && v1 !== v2;
+      });
+    case 'reconfail':
+      return list.filter(a => a.v2ReconciliationOk === false);
+    case 'lowconf':
+      // Everything below the auto-approve confidence floor we set in
+      // engine_v2/policy/engine.py. Worth a manual eyeball.
+      return list.filter(a => typeof a.v2Confidence === 'number' && a.v2Confidence < 0.5);
+    case 'review':
+      return list.filter(a => String(a.v2Decision || '').toUpperCase() === 'REVIEW_REQUIRED');
     case 'all':
     default:
       return list;
