@@ -267,6 +267,10 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .ov.open{display:flex}
 .modal{background:var(--surface);border-radius:18px;width:100%;max-width:1100px;min-width:min(85vw,1100px);max-height:95vh;overflow-y:auto;animation:fadeUp .25s ease;box-shadow:var(--shadow-lg)}
 .mh{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1}
+/* Inside the full-page detail view the page itself scrolls, and the
+   global header is already sticky — the per-card sticky header would
+   disappear behind the nav bar. Make it static instead. */
+#view-detail .mh{position:static}
 .mt{font-size:18px;font-weight:700;letter-spacing:-.02em}
 .mcl{width:32px;height:32px;background:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:15px}
 .mcl:hover{background:var(--border)}
@@ -1049,6 +1053,32 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════════════════════
+     APPLICATION DETAIL — full-page view. Routed via #/app/<firebaseId>.
+     Populated by openModal() (which still carries the historical name
+     but now renders into #detailTitle / #detailBody as a view, not an
+     overlay).
+     ═══════════════════════════════════════════════════════════════ -->
+<div id="view-detail" class="view">
+  <div class="container" style="max-width:1400px;padding-top:16px;padding-bottom:40px">
+    <div style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <button onclick="closeModal()" style="background:var(--surface);border:1px solid var(--border);padding:8px 14px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;color:var(--text);display:inline-flex;align-items:center;gap:8px;font-family:inherit">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 6 9 12 15 18"/></svg>
+        Back to Dashboard
+      </button>
+      <div id="detailActions" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    </div>
+    <div style="background:var(--surface);border-radius:18px;box-shadow:var(--shadow-lg);overflow:hidden">
+      <div class="mh"><div class="mt" id="detailTitle">Application</div></div>
+      <div class="mb" id="detailBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     Overlay modal — still used by revealIFCard() for the IF card
+     quick-reveal flow. Does NOT host the application detail anymore.
+     ═══════════════════════════════════════════════════════════════ -->
 <div class="ov" id="ov" onclick="closeModalOut(event)">
   <div class="modal">
     <div class="mh"><div class="mt" id="mtitle">Detail</div><button class="mcl" onclick="closeModal()">✕</button></div>
@@ -1452,8 +1482,8 @@ function router() {
     if (_currentModalFbId !== fbId) openModal(fbId);
     return;
   }
-  // Close the modal if it was open and we're navigating away to a list view.
-  if (_currentModalFbId) closeModal();
+  // Close any open modal/detail state before rendering the next list view.
+  if (_currentModalFbId) closeModal({fromRouter: true});
   _renderView(view, document.getElementById('nav-' + view));
 }
 
@@ -3121,9 +3151,13 @@ function openModal(fbId){
   const a=apps.find(x=>x.firebaseId===fbId);if(!a)return;
   _currentModalFbId = fbId;
   // Keep the URL in sync so the detail view is shareable + the browser
-  // back button closes the modal instead of leaving the page.
+  // back button returns to the dashboard.
   const appHash = '#/app/' + encodeURIComponent(fbId);
   if (location.hash !== appHash) history.pushState(null, '', appHash);
+  // Render as a full-page view, not an overlay.
+  _renderView('detail');
+  // Scroll to top — feels like a real page transition rather than a popover.
+  window.scrollTo({top: 0, behavior: 'instant'});
   // Determine effective decision from all available signals
   const cdec = (a.claudeDecision||'').toUpperCase();
   // Use status field as primary truth — it's set by server after processing
@@ -3137,9 +3171,9 @@ function openModal(fbId){
   const isProcessing = effectiveDecision==='PROCESSING';
   const isPendingReview = effectiveDecision==='PENDING_REVIEW';
   const dc = ok?'ok':isDeclined?'no':isProcessing?'pending':'';
-  document.getElementById('mtitle').textContent=a.formName||a.name||'Application';
+  document.getElementById('detailTitle').textContent=a.formName||a.name||'Application';
   const dupeBannerHtml = _buildDupeBanner(a);
-  document.getElementById('mbody').innerHTML=`
+  document.getElementById('detailBody').innerHTML=`
 ${dupeBannerHtml}
 <div class="mdh ${dc||'pending'}">
   <div class="mdh-inner" style="flex:1">
@@ -3213,7 +3247,6 @@ ${(a.fcf!=null||a.monthlyIncome!=null)?`<div class="msummary">
 </div>
 
 `;
-  document.getElementById('ov').classList.add('open');
   setTimeout(()=>drawWheel('mwh',a.score||0,90,true),80);
 }
 
@@ -3970,12 +4003,34 @@ function _buildDupeBanner(a) {
     </div>`;
 }
 
-function closeModal(){
-  document.getElementById('ov').classList.remove('open');
-  _currentModalFbId=null;
-  // If the URL is still pointing at an #/app/<id> hash (user clicked the
-  // close button rather than pressing the back button), sync the URL
-  // back to the dashboard so a refresh doesn't re-open the closed modal.
+function closeModal(opts){
+  opts = opts || {};
+  // Two close paths because we now host two independent detail UIs:
+  //   1. Application detail — full-page view (#view-detail). Back =
+  //      navigate to dashboard via the hash router.
+  //   2. Overlay modal — #ov, still used by revealIFCard for the IF
+  //      card quick-reveal flow. Back = just close the overlay.
+  const detailActive = document.getElementById('view-detail')?.classList.contains('active');
+  const overlayOpen = document.getElementById('ov')?.classList.contains('open');
+
+  if (detailActive) {
+    _currentModalFbId = null;
+    // When invoked by the router (e.g., during popstate), the caller is
+    // about to render the next view — don't double-navigate.
+    if (!opts.fromRouter) {
+      showView('dash', document.getElementById('nav-dash'));
+    }
+    return;
+  }
+
+  if (overlayOpen) {
+    document.getElementById('ov').classList.remove('open');
+    _currentModalFbId = null;
+    return;
+  }
+
+  // Fallback — sync URL off a stale #/app/<id> hash.
+  _currentModalFbId = null;
   if (location.hash && location.hash.startsWith('#/app/')) {
     history.pushState(null, '', VIEW_TO_HASH.dash);
   }
@@ -4043,13 +4098,15 @@ document.addEventListener('keydown', (e) => {
   const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
   if (typing && e.key !== 'Escape') return;
 
-  const modalOpen = document.getElementById('ov')?.classList.contains('open');
+  const overlayOpen = document.getElementById('ov')?.classList.contains('open');
+  const detailActive = document.getElementById('view-detail')?.classList.contains('active');
+  const onAppDetail = detailActive && _currentModalFbId;
 
-  // Esc closes the modal.
-  if (e.key === 'Escape' && modalOpen) { closeModal(); e.preventDefault(); return; }
+  // Esc — close the detail page or overlay modal.
+  if (e.key === 'Escape' && (overlayOpen || detailActive)) { closeModal(); e.preventDefault(); return; }
 
-  // In-modal approve/decline.
-  if (modalOpen && _currentModalFbId) {
+  // On the application detail page: approve / decline directly.
+  if (onAppDetail) {
     if (e.key === 'a' || e.key === 'A') {
       e.preventDefault();
       updStatus(_currentModalFbId, 'Approved');
@@ -4062,8 +4119,8 @@ document.addEventListener('keydown', (e) => {
     }
   }
 
-  // On dashboard only (not inside modal).
-  if (!modalOpen) {
+  // On dashboard only (not when the overlay or detail page is active).
+  if (!overlayOpen && !detailActive) {
     const dashActive = document.getElementById('view-dash')?.classList.contains('active');
     if (!dashActive) return;
     if (e.key === 'j' || e.key === 'ArrowDown') { e.preventDefault(); _moveDashCursor(1); return; }
