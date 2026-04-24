@@ -3107,7 +3107,6 @@ ${a.extractedSSN?`<div style="display:flex;align-items:center;justify-content:sp
 </div>
 <div style="display:flex;border-bottom:1px solid var(--border)">
   <button onclick="mTab('report','${fbId}',this)" id="mtab-report-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--green);border-bottom:2px solid var(--green);cursor:pointer;font-family:var(--sans)">Report</button>
-  <button onclick="mTab('v2','${fbId}',this)" id="mtab-v2-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">v2 Engine${a.v2Decision ? ' <span style=&quot;background:#eef9f1;color:#1a6b3c;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:2px&quot;>run</span>' : ''}</button>
   <button onclick="mTab('appdata','${fbId}',this)" id="mtab-appdata-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Application</button>
   <button onclick="mTab('docs','${fbId}',this)" id="mtab-docs-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Documents</button>
   <button onclick="mTab('notes','${fbId}',this)" id="mtab-notes-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Notes</button>
@@ -3121,22 +3120,7 @@ ${(a.fcf!=null||a.monthlyIncome!=null)?`<div class="msummary">
   <div class="msummary-item"><div class="msummary-label">Fintech</div><div class="msummary-value">${a.fintechCount||0}</div></div>
   <div class="msummary-item"><div class="msummary-label">NSFs</div><div class="msummary-value">${a.nsfCount||0}</div></div>
 </div>`:''}
-<div id="mpanel-report-${fbId}"><div class="mrhtml">${
-  a.status==='Processing' || (!a.report && !a.processingComplete) ?
-  `<div style="text-align:center;padding:3rem 2rem">
-    <div style="width:48px;height:48px;border:4px solid var(--green-light);border-top-color:var(--green);border-radius:50%;animation:spin .9s linear infinite;margin:0 auto 20px"></div>
-    <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">Underwriting in Progress</div>
-    <div style="font-size:13px;color:var(--muted)">Claude is analyzing the bank statement.<br>This typically takes 1–3 minutes. Page updates automatically.</div>
-  </div>` :
-  a.status==='Error' ?
-  `<div style="text-align:center;padding:3rem 2rem;color:var(--red)">
-    <div style="font-size:32px;margin-bottom:12px">⚠️</div>
-    <div style="font-size:15px;font-weight:700;margin-bottom:8px">Processing Error</div>
-    <div style="font-size:13px;color:var(--muted)">${a.error||'An error occurred during analysis.'}</div>
-  </div>` :
-  highlightTierBreakdown(stripFences(a.report||''))
-}</div></div>
-<div id="mpanel-v2-${fbId}" style="display:none">${buildV2Panel(a)}</div>
+<div id="mpanel-report-${fbId}">${buildReportPanel(a)}</div>
 <div id="mpanel-appdata-${fbId}" style="display:none">${buildAppDetails(a.applicationData||{})}</div>
 <div id="mpanel-docs-${fbId}" style="display:none">${buildDocsPanel(a)}</div>
 <div id="mpanel-ifcard-${fbId}" style="display:none">${buildIFCardPanel(fbId)}</div>
@@ -3157,7 +3141,7 @@ ${(a.fcf!=null||a.monthlyIncome!=null)?`<div class="msummary">
 }
 
 function mTab(tab, fbId, btn) {
-  const panels = ['report','v2','appdata','docs','notes','ifcard'];
+  const panels = ['report','appdata','docs','notes','ifcard'];
   panels.forEach(p => {
     const el = document.getElementById('mpanel-'+p+'-'+fbId);
     const b = document.getElementById('mtab-'+p+'-'+fbId);
@@ -3509,7 +3493,87 @@ async function updStatusWithAmt(fbId,s){
 function copyModal(fbId){const a=apps.find(x=>x.firebaseId===fbId);if(a){const t=document.createElement('div');t.innerHTML=a.report;navigator.clipboard.writeText(t.textContent).then(()=>toast('Copied ✓','ok'));}}
 
 // ════════════════════════════════════════
-// ENGINE V2 — shadow-mode re-run + side-by-side
+// REPORT PANEL — single tab combining re-run controls + v2 report
+// + (during transition) v1 shadow one-liner for audit comparison.
+// ════════════════════════════════════════
+function buildReportPanel(a) {
+  const fbId = a.firebaseId;
+  const hasRun = a.v2Decision && a.v2Report;
+  const runAt = a.v2RunAt ? new Date(a.v2RunAt).toLocaleString() : '';
+  const canRefresh = !!a.plaidAssetToken;
+  const acctCount = a.connectedAccountCount;
+  const refreshedAt = a.plaidRefreshedAt ? new Date(a.plaidRefreshedAt).toLocaleString() : '';
+
+  // Re-run controls — always available so staff can force a re-evaluation
+  // with stored data or fresh-pulled Plaid data.
+  const rerunHeader = `
+    <div style="padding:10px 12px;background:#f8f8f8;border-radius:8px;margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button onclick="runV2('${fbId}')" id="v2run-${fbId}"
+                style="background:#1a6b3c;color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+          ${hasRun ? 'Re-run with stored data' : 'Run engine'}
+        </button>
+        ${canRefresh ? `
+          <button onclick="refreshFromPlaid('${fbId}')" id="plaidref-${fbId}"
+                  title="Pulls fresh data from Plaid across ALL connected accounts, then re-runs. Use this when you suspect the stored extraction missed an account."
+                  style="background:#fff8e5;color:#6b4d00;border:1px solid #f2d46c;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+            Refresh from Plaid &amp; Re-run
+          </button>
+        ` : ''}
+      </div>
+      <div style="font-size:11px;color:#888;text-align:right">
+        ${hasRun ? `Last run: ${runAt}` : 'Not yet run'}
+        ${refreshedAt ? `<br>Plaid refreshed: ${refreshedAt}` : ''}
+        ${acctCount ? `<br><b>${acctCount} Plaid account${acctCount > 1 ? 's' : ''}</b>` : ''}
+      </div>
+    </div>
+  `;
+
+  // v1 shadow one-liner — only shown during the transition window when
+  // v2 is primary but v1 also ran. When v1 is retired this block becomes
+  // dead/empty. Kept small and audit-oriented.
+  const v2IsPrimary = (a.engineVersionPrimary === 'v2');
+  let v1ShadowLine = '';
+  if (v2IsPrimary && a.v1ShadowDecision) {
+    // Compare first 3 uppercase chars — maps APPROVED/APPROVE → APP,
+    // DECLINED/DECLINE → DEC, REVIEW/REVIEW_REQUIRED → REV.
+    const v1Short = String(a.v1ShadowDecision).toUpperCase().slice(0, 3);
+    const v2Short = String(a.v2Decision || '').toUpperCase().slice(0, 3);
+    const disagree = v1Short && v2Short && v1Short !== v2Short;
+    const amountTxt = (a.v1ShadowAmount && a.v1ShadowAmount !== 'N/A') ? ' · ' + escHtml(String(a.v1ShadowAmount)) : '';
+    v1ShadowLine = `
+      <div style="padding:6px 10px;background:#fafafa;border:1px solid var(--border);border-radius:6px;margin-bottom:12px;font-size:11px;color:#666;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <span style="text-transform:uppercase;letter-spacing:1px;font-weight:700;color:#888">v1 shadow (audit)</span>
+        <span><b>${escHtml(String(a.v1ShadowDecision))}</b>${amountTxt}</span>
+        ${disagree ? '<span style="color:#a15c00;font-weight:700">⚠ engines disagree</span>' : ''}
+      </div>
+    `;
+  }
+
+  // Main report body — Processing/Error/Done states.
+  const body = `<div class="mrhtml">${
+    a.status==='Processing' || (!a.report && !a.processingComplete) ?
+    `<div style="text-align:center;padding:3rem 2rem">
+      <div style="width:48px;height:48px;border:4px solid var(--green-light);border-top-color:var(--green);border-radius:50%;animation:spin .9s linear infinite;margin:0 auto 20px"></div>
+      <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">Underwriting in Progress</div>
+      <div style="font-size:13px;color:var(--muted)">The engine is analyzing the bank statement.<br>This typically takes 1–3 minutes. Page updates automatically.</div>
+    </div>` :
+    a.status==='Error' ?
+    `<div style="text-align:center;padding:3rem 2rem;color:var(--red)">
+      <div style="font-size:32px;margin-bottom:12px">⚠️</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:8px">Processing Error</div>
+      <div style="font-size:13px;color:var(--muted)">${a.error||'An error occurred during analysis.'}</div>
+    </div>` :
+    highlightTierBreakdown(stripFences(a.report||''))
+  }</div>`;
+
+  return rerunHeader + v1ShadowLine + body;
+}
+
+
+// ════════════════════════════════════════
+// ENGINE V2 — shadow-mode re-run + side-by-side (DEPRECATED — kept for
+// reference until we sweep dead code. Replaced by buildReportPanel above.)
 // ════════════════════════════════════════
 function buildV2Panel(a) {
   const hasRun = a.v2Decision && a.v2Report;
@@ -3634,9 +3698,10 @@ async function runV2(fbId) {
       a.v2AutoDecide = !!data.auto_decide_candidate;
       a.v2RunAt = Date.now();
     }
-    // Rerender the v2 panel
-    const panel = document.getElementById('mpanel-v2-'+fbId);
-    if (panel && a) panel.innerHTML = buildV2Panel(a);
+    // Rerender the Report panel (now holds both re-run controls + the v2 report
+    // body; v2 Engine tab was folded into Report).
+    const panel = document.getElementById('mpanel-report-'+fbId);
+    if (panel && a) panel.innerHTML = buildReportPanel(a);
   } catch (e) {
     toast('v2 run error: '+e.message, 'err');
     if (btn) { btn.disabled = false; btn.innerHTML = '🔬 Run with v2'; }
