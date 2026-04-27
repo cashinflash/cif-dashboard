@@ -915,9 +915,9 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
     </div>
     <!-- Saved filter pills: one-click views for the most common queries.
          First row is workflow-state (all / today / pending / decline /
-         approve). Second group is v2 audit lenses (engines disagree,
-         reconciliation failed, low confidence, review required) — the
-         checks we run when tuning or spot-checking the engine. -->
+         approve). Second group is v2 audit lenses (reconciliation failed,
+         low confidence, review required) — the checks we run when tuning
+         or spot-checking the engine. -->
     <div id="quick-filters" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
       <button class="qfp" data-qf="all" onclick="setQuickFilter('all')">All</button>
       <button class="qfp" data-qf="today" onclick="setQuickFilter('today')">Today</button>
@@ -929,7 +929,6 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
       <span style="width:1px;height:20px;background:var(--border);margin:0 4px"></span>
       <button class="qfp" data-qf="review" onclick="setQuickFilter('review')" title="v2 marked this applicant REVIEW_REQUIRED — needs a human before disbursement.">Review required</button>
       <button class="qfp" data-qf="lowconf" onclick="setQuickFilter('lowconf')" title="v2 confidence below the auto-approve floor (0.50). Spot-check the income / classification signals.">Low confidence</button>
-      <button class="qfp" data-qf="disagree" onclick="setQuickFilter('disagree')" title="v1 shadow + v2 primary reached different outcomes. Useful while v1 is still running in shadow.">Engines disagree</button>
       <button class="qfp" data-qf="reconfail" onclick="setQuickFilter('reconfail')" title="Statement transactions don't balance. Likely a wrong is_credit flag or missing txns.">Reconciliation failed</button>
       <button class="qfp" style="margin-left:auto;border-color:var(--green);color:var(--green)" onclick="exportCSV()">Export CSV</button>
     </div>
@@ -940,56 +939,6 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
         <button id="del-selected-btn" class="actbtn btn-gh" onclick="deleteSelected()" style="display:none;color:var(--red);border-color:var(--red-border)">Delete Selected (<span id="sel-count">0</span>)</button>
       </div>
       <div id="dtable"></div>
-    </div>
-  </div>
-</div>
-
-<!-- v2 Compare — divergence view between v1 and v2 decisions -->
-<div id="view-v2compare" class="view">
-  <div class="container">
-    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:12px">
-      <div>
-        <div class="ptitle" style="display:flex;align-items:center;gap:10px"><svg class="icn icn-lg"><use href="#icn-compare"/></svg>v2 Compare</div>
-        <div class="psub" style="margin-bottom:0">Every application where v1 and v2 disagreed — each row is either a v2 bug to fix or evidence v2 caught something v1 missed.</div>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="actbtn btn-gh" onclick="loadReports().then(renderV2Compare)"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Refresh</button>
-        <button class="actbtn btn-ok" onclick="startBulkRerunV2()" style="margin:0"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Run v2 on historical</button>
-      </div>
-    </div>
-
-    <div id="v2-bulk-progress" style="display:none;margin-bottom:16px;padding:14px 18px;background:#eef5ee;border:1px solid #cfe0d0;border-radius:10px">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px">
-        <div style="font-weight:700;font-size:13px" id="v2-bulk-text">Running v2 on 0 of 0…</div>
-        <button class="actbtn btn-gh" onclick="cancelBulkRerunV2()" style="padding:4px 12px;font-size:12px">Cancel</button>
-      </div>
-      <div style="height:8px;background:#d0dbd1;border-radius:6px;overflow:hidden">
-        <div id="v2-bulk-bar" style="height:100%;background:#1a6b3c;width:0%;transition:width 250ms"></div>
-      </div>
-      <div id="v2-bulk-sub" style="font-size:11px;color:#666;margin-top:6px"></div>
-    </div>
-
-    <div class="stats-row" style="margin-bottom:1rem">
-      <div class="sc tot"><div class="slbl">Total compared</div><div class="snum def" id="v2c-total">0</div><div class="spct" id="v2c-total-sub">reports with v2 run</div></div>
-      <div class="sc app"><div class="slbl">Same decision</div><div class="snum grn" id="v2c-agree">0</div><div class="spct" id="v2c-agree-sub">v1 &amp; v2 agree</div></div>
-      <div class="sc dec"><div class="slbl">Disagreed</div><div class="snum red" id="v2c-disagree">0</div><div class="spct" id="v2c-disagree-sub">needs your eye</div></div>
-      <div class="sc pen"><div class="slbl">Amount diff</div><div class="snum gld" id="v2c-amtdiff">0</div><div class="spct" id="v2c-amtdiff-sub">same outcome, different $</div></div>
-      <div class="sc app"><div class="slbl">Auto-decide</div><div class="snum grn" id="v2c-autodecide">0</div><div class="spct" id="v2c-autodecide-sub">engine would 1-click</div></div>
-    </div>
-
-    <div class="tcard">
-      <div class="ttb">
-        <div class="sbox"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7c72" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" placeholder="Search applicants..." oninput="v2CompareSearch=this.value;renderV2Compare()"></div>
-        <select class="fsel" onchange="v2CompareFilter=this.value;renderV2Compare()">
-          <option value="disagree">Disagreements only</option>
-          <option value="v1ok-v2no">v1 approved, v2 declined</option>
-          <option value="v1no-v2ok">v1 declined, v2 approved</option>
-          <option value="amtdiff">Same outcome, different amount</option>
-          <option value="autodecide">Auto-decide candidates</option>
-          <option value="all">All compared</option>
-        </select>
-      </div>
-      <div id="v2c-table"></div>
     </div>
   </div>
 </div>
@@ -1516,7 +1465,6 @@ function _renderView(name, btn) {
   const navBtn = btn || document.getElementById('nav-' + name);
   if (navBtn) navBtn.classList.add('active');
   if (name==='dash') loadReports();
-  if (name==='v2compare') { loadReports().then(renderV2Compare); }
   if (name==='reviewqueue') loadReviewQueue();
   if (name==='if') loadIFSubmissions();
   if (name==='users') loadUsers();
@@ -1983,65 +1931,11 @@ async function saveSingle(status) {
 
 function copyRpt(){const t=document.createElement('div');t.innerHTML=sReport;navigator.clipboard.writeText(t.textContent).then(()=>toast('Copied ✓','ok'));}
 
-// ── Recalculate decision with transaction overrides ──
-window.recalculateDecision = async function(firebaseId) {
-  const overrides = window.__txnOverrides || {};
-  const changes = Object.keys(overrides);
-  if (!changes.length) { toast('No changes to recalculate','warn'); return; }
-
-  // Find the firebase ID — either passed directly or from the currently open modal/report
-  const fbId = firebaseId || sPendingId || (window._currentModalFbId || '');
-  if (!fbId) { toast('No application ID found — save application first','warn'); return; }
-
-  const btn = document.getElementById('recalc-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '↻ Recalculating...'; }
-
-  try {
-    // Build transaction_overrides array from the changes map
-    const txnOverrides = changes.map(idx => ({
-      index: parseInt(idx),
-      category: overrides[idx].category || undefined,
-      counted: overrides[idx].counted !== undefined ? overrides[idx].counted : undefined,
-    }));
-
-    const resp = await fetch('/api/rerun-engine', {
-      method: 'POST',
-      credentials: 'include',
-      headers: {'Content-Type':'application/json', 'X-Session': getToken()},
-      body: JSON.stringify({ firebase_id: fbId, overrides: { transaction_overrides: txnOverrides } })
-    });
-    if (!resp.ok) throw new Error('Rerun failed: ' + resp.status);
-    const data = await resp.json();
-
-    // Update the report display
-    const newHtml = data.report_html || '';
-    const reportEl = document.getElementById('srhtml');
-    if (reportEl && newHtml) reportEl.innerHTML = highlightTierBreakdown(newHtml);
-    // Also update modal report if open
-    const modalEl = document.getElementById('mpanel-report-' + fbId);
-    if (modalEl && newHtml) modalEl.innerHTML = '<div class="mrhtml">' + highlightTierBreakdown(newHtml) + '</div>';
-
-    // Update hero/badge
-    const ok = data.decision === 'APPROVED';
-    const dhero = document.getElementById('dhero');
-    if (dhero) dhero.className = 'dhero ' + (ok ? 'approved' : 'declined');
-    const badge = document.getElementById('dbadge');
-    if (badge) { badge.className = 'dbadge ' + (ok ? 'approved' : 'declined'); badge.textContent = ok ? '✓ Approved' : '✕ Declined'; }
-    const amtIn = document.getElementById('amtin');
-    if (amtIn && ok) amtIn.value = data.amount;
-
-    // Clear overrides
-    window.__txnOverrides = {};
-    toast('Decision recalculated — ' + data.decision + (ok ? ' $' + data.amount : ''), ok ? 'ok' : 'warn');
-
-    // Refresh the app list to pick up updated Firebase data
-    setTimeout(() => loadReports(), 1000);
-  } catch (e) {
-    console.error('Recalculate error:', e);
-    toast('Recalculation failed: ' + e.message, 'err');
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '↻ Recalculate Decision'; }
-  }
+// Per-transaction overrides relied on the v1 engine. v2 reclassifies via
+// the Review Queue (pattern-level overrides in entities_overrides.json),
+// which propagates across applicants instead of one-shot mutations.
+window.recalculateDecision = function() {
+  toast('Per-txn overrides removed. Use the Review Queue to map a merchant pattern, then re-run.', 'warn');
 };
 function resetSingle(){clearSingle();document.getElementById('sresult').style.display='none';sReport='';sName='';sDecision='';sAmount='';sReason='';sScore=0;sPendingId=null;window.scrollTo({top:0,behavior:'smooth'});}
 
@@ -2404,186 +2298,6 @@ function renderDash(){
     }
   },80));
 }
-
-// ════════════════════════════════════════
-// V2 COMPARE — divergence view
-// ════════════════════════════════════════
-let v2CompareFilter = 'disagree';
-let v2CompareSearch = '';
-
-function classifyV2Comparison(a) {
-  // Normalize both sides to one of: approved | declined | pending | review_required
-  const v1 = String(a.claudeDecision || a.status || '').toUpperCase();
-  const v2 = String(a.v2Decision || '').toUpperCase();
-  if (!v2) return 'no-v2';
-  const v1ok = v1 === 'APPROVED';
-  const v2ok = v2 === 'APPROVE' || v2 === 'APPROVED';
-  if (v1ok && !v2ok) return 'v1ok-v2no';
-  if (!v1ok && v2ok) return 'v1no-v2ok';
-  // Both agree on outcome — check amounts
-  const v1Amt = parseInt(String(a.amount || '').replace(/[^0-9]/g, '')) || 0;
-  const v2Amt = parseInt(a.v2TierAmount || 0);
-  if (v1Amt !== v2Amt) return 'amtdiff';
-  return 'agree';
-}
-
-function renderV2Compare() {
-  const comparable = apps.filter(a => a.v2Decision);
-  const buckets = {'agree':0,'v1ok-v2no':0,'v1no-v2ok':0,'amtdiff':0,'no-v2':0};
-  comparable.forEach(a => { buckets[classifyV2Comparison(a)]++; });
-  const disagree = buckets['v1ok-v2no'] + buckets['v1no-v2ok'];
-
-  // Stat cards
-  const autoDecideCount = comparable.filter(a => a.v2AutoDecide).length;
-  document.getElementById('v2c-total').textContent = comparable.length;
-  document.getElementById('v2c-total-sub').textContent = `${apps.length - comparable.length} not yet run`;
-  document.getElementById('v2c-agree').textContent = buckets.agree;
-  document.getElementById('v2c-disagree').textContent = disagree;
-  document.getElementById('v2c-amtdiff').textContent = buckets.amtdiff;
-  const adEl = document.getElementById('v2c-autodecide');
-  if (adEl) adEl.textContent = autoDecideCount;
-
-  // Nav badge: total needing attention (disagreements)
-  const badge = document.getElementById('v2div-count');
-  const badgeMob = document.getElementById('v2div-count-mob');
-  [badge, badgeMob].forEach(b => {
-    if (!b) return;
-    if (disagree > 0) { b.style.display = 'inline-block'; b.textContent = disagree; }
-    else { b.style.display = 'none'; }
-  });
-
-  // Table
-  const filtered = comparable.filter(a => {
-    const cls = classifyV2Comparison(a);
-    if (v2CompareFilter === 'disagree' && cls !== 'v1ok-v2no' && cls !== 'v1no-v2ok') return false;
-    if (v2CompareFilter === 'v1ok-v2no' && cls !== 'v1ok-v2no') return false;
-    if (v2CompareFilter === 'v1no-v2ok' && cls !== 'v1no-v2ok') return false;
-    if (v2CompareFilter === 'amtdiff' && cls !== 'amtdiff') return false;
-    if (v2CompareFilter === 'autodecide' && !a.v2AutoDecide) return false;
-    // 'all' shows everything with v2 data
-    if (v2CompareSearch && !(a.name || '').toLowerCase().includes(v2CompareSearch.toLowerCase())) return false;
-    return true;
-  });
-
-  const c = document.getElementById('v2c-table');
-  if (!filtered.length) {
-    c.innerHTML = `<div class="empty" style="padding:3rem 2rem;text-align:center"><div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-compare"/></svg></div><div class="empty-t">No divergences in this filter</div><div class="empty-s">Try "All compared" to see everything.</div></div>`;
-    return;
-  }
-
-  const rows = filtered.map(a => {
-    const cls = classifyV2Comparison(a);
-    const v1 = String(a.claudeDecision || a.status || '—').toUpperCase();
-    const v2 = String(a.v2Decision || '—').toUpperCase();
-    const v1Amt = a.amount || '—';
-    const v2Amt = a.v2TierAmount ? `$${a.v2TierAmount}` : '—';
-    const v2Max = a.v2MaxAffordable !== undefined ? `$${a.v2MaxAffordable}` : '—';
-    const conf = a.v2Confidence !== undefined ? `${Math.round(a.v2Confidence * 100)}%` : '—';
-    const tag = cls === 'v1ok-v2no'
-      ? '<span style="background:#fff0e6;color:#d97706;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700">v2 stricter</span>'
-      : cls === 'v1no-v2ok'
-      ? '<span style="background:#eef9f1;color:#1a6b3c;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700">v2 approved</span>'
-      : cls === 'amtdiff'
-      ? '<span style="background:#fffbea;color:#b07500;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700">different $</span>'
-      : '<span style="background:#eef5ee;color:#475;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700">agree</span>';
-    const reasons = (() => {
-      try { return JSON.parse(a.v2ReasonsJson || '[]').slice(0,2).join(' · '); }
-      catch { return ''; }
-    })();
-    const autoTag = a.v2AutoDecide
-      ? '<span title="High confidence, no review flags, reconciliation passed — engine would one-click approve" style="background:#e6f4ea;color:#1a6b3c;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:700">✅ auto</span>'
-      : '<span style="color:#bbb;font-size:11px">—</span>';
-    return `<tr style="cursor:pointer" onclick="openModal('${a.firebaseId}')">
-      <td><div class="nbig">${a.name || '—'}</div><div class="nsub" style="font-size:11px">${a.date || ''} ${a.time || ''}</div></td>
-      <td>${tag}</td>
-      <td><div><b>${v1}</b></div><div style="font-size:12px;color:#666">${v1Amt}</div></td>
-      <td><div><b style="color:${v2.startsWith('APPROV')?'#1a6b3c':'#c0392b'}">${v2}</b></div><div style="font-size:12px;color:#666">${v2Amt}<span style="color:#999">&nbsp;·&nbsp;max ${v2Max}</span></div></td>
-      <td style="text-align:center">${conf}</td>
-      <td style="text-align:center">${autoTag}</td>
-      <td style="font-size:11px;color:#555;max-width:320px">${reasons}</td>
-    </tr>`;
-  }).join('');
-
-  c.innerHTML = `<table><thead><tr>
-    <th>Applicant</th><th>Pattern</th><th>v1</th><th>v2</th><th>Conf</th><th>Auto</th><th>v2 top reasons</th>
-  </tr></thead><tbody>${rows}</tbody></table>`;
-}
-
-// ════════════════════════════════════════
-// BULK v2 re-run
-// ════════════════════════════════════════
-let _bulkRerunCancel = false;
-
-async function startBulkRerunV2() {
-  const pending = apps.filter(a => a.extractedData !== null && !a.v2RunAt);
-  // Note: extractedData check may not be accessible on client-side Firebase shape;
-  // we treat 'has not been run' (no v2RunAt) as the signal to try.
-  const eligible = apps.filter(a => !a.v2RunAt);
-  if (!eligible.length) {
-    toast('All reports already have v2 data ✓', 'ok');
-    return;
-  }
-  if (!confirm(`Run v2 on ${eligible.length} historical report${eligible.length===1?'':'s'}?\n\nThis will not affect v1 decisions. Estimated time: ~${Math.ceil(eligible.length * 2)} seconds.`)) return;
-
-  _bulkRerunCancel = false;
-  const bar = document.getElementById('v2-bulk-progress');
-  const barFill = document.getElementById('v2-bulk-bar');
-  const text = document.getElementById('v2-bulk-text');
-  const sub = document.getElementById('v2-bulk-sub');
-  bar.style.display = 'block';
-
-  let done = 0, errored = 0, startAt = Date.now();
-  for (const a of eligible) {
-    if (_bulkRerunCancel) break;
-    try {
-      const resp = await fetch('/api/rerun-v2', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {'Content-Type':'application/json','X-Session':getToken()},
-        body: JSON.stringify({firebase_id: a.firebaseId})
-      });
-      const data = await resp.json();
-      if (resp.ok) {
-        a.v2Decision = (data.decision || '').toUpperCase();
-        a.v2TierAmount = data.tier_amount;
-        a.v2MaxAffordable = data.max_affordable_loan;
-        a.v2Confidence = data.confidence;
-        a.v2Report = data.report_html;
-        a.v2ReasonsJson = JSON.stringify(data.reasons || []);
-        a.v2ReconciliationOk = data.reconciliation_ok;
-        a.v2ReconciliationError = data.reconciliation_error;
-        a.v2AutoDecide = !!data.auto_decide_candidate;
-        a.v2RunAt = Date.now();
-      } else {
-        errored++;
-      }
-    } catch (e) {
-      errored++;
-    }
-    done++;
-    const pct = Math.round((done / eligible.length) * 100);
-    barFill.style.width = pct + '%';
-    text.textContent = `Running v2 on ${done} of ${eligible.length}… (${pct}%)`;
-    const elapsed = (Date.now() - startAt) / 1000;
-    const rate = done > 0 ? elapsed / done : 1;
-    const remain = Math.max(0, Math.round((eligible.length - done) * rate));
-    sub.textContent = `${errored} errored · ~${remain}s remaining`;
-    // Re-render current view if visible
-    if (done % 5 === 0) renderV2Compare();
-    // Small delay so we don't hammer the server
-    await new Promise(r => setTimeout(r, 250));
-  }
-  text.textContent = _bulkRerunCancel
-    ? `Cancelled after ${done} of ${eligible.length}`
-    : `Done: ${done - errored} succeeded, ${errored} errored`;
-  barFill.style.width = '100%';
-  sub.textContent = '';
-  renderV2Compare();
-  setTimeout(() => { bar.style.display = 'none'; }, 4000);
-  toast(_bulkRerunCancel ? 'Cancelled' : `v2 run complete: ${done - errored}/${done}`, errored ? 'err' : 'ok');
-}
-
-function cancelBulkRerunV2() { _bulkRerunCancel = true; }
 
 // ════════════════════════════════════════
 // INSTANT FUNDING — /if card submissions
@@ -3095,15 +2809,6 @@ function applyQuickFilter(list) {
     case 'autodecide':
       return list.filter(a => !!a.v2AutoDecide);
     // v2-era audit filters
-    case 'disagree':
-      // v1 shadow decision differs from v2's — spot-check anywhere the
-      // engines diverge on an application that's already routed to v2.
-      return list.filter(a => {
-        if (a.engineVersionPrimary !== 'v2' || !a.v1ShadowDecision) return false;
-        const v1 = String(a.v1ShadowDecision).toUpperCase().slice(0, 3);
-        const v2 = String(a.v2Decision || '').toUpperCase().slice(0, 3);
-        return v1 && v2 && v1 !== v2;
-      });
     case 'reconfail':
       return list.filter(a => a.v2ReconciliationOk === false);
     case 'lowconf':
@@ -3301,9 +3006,8 @@ ${a.extractedSSN?`<div style="display:flex;align-items:center;justify-content:sp
 </div>
 ${(a.fcf!=null||a.monthlyIncome!=null||a.v2Confidence!=null)?(()=>{
   // 5-second read of the applicant. Sources:
-  //   Income / Obligations / FCF — canonical fields, now v2-sourced when
-  //   engineVersionPrimary=='v2' (see cif-apply/server.py _run_v2_shadow).
-  //   Max offer + Confidence — always sourced from v2's shadow run.
+  //   Income / Obligations / FCF — canonical fields, written by v2.
+  //   Max offer + Confidence — sourced from v2's run.
   const fcf = a.fcf||0;
   // Max offer reads v2TierAmount (the FINAL decision tier after hard-declines
   // have run), NOT v2MaxAffordable (which is the pure FCF math, ignoring
@@ -3756,27 +3460,6 @@ function buildReportPanel(a) {
     </div>
   `;
 
-  // v1 shadow one-liner — only shown during the transition window when
-  // v2 is primary but v1 also ran. When v1 is retired this block becomes
-  // dead/empty. Kept small and audit-oriented.
-  const v2IsPrimary = (a.engineVersionPrimary === 'v2');
-  let v1ShadowLine = '';
-  if (v2IsPrimary && a.v1ShadowDecision) {
-    // Compare first 3 uppercase chars — maps APPROVED/APPROVE → APP,
-    // DECLINED/DECLINE → DEC, REVIEW/REVIEW_REQUIRED → REV.
-    const v1Short = String(a.v1ShadowDecision).toUpperCase().slice(0, 3);
-    const v2Short = String(a.v2Decision || '').toUpperCase().slice(0, 3);
-    const disagree = v1Short && v2Short && v1Short !== v2Short;
-    const amountTxt = (a.v1ShadowAmount && a.v1ShadowAmount !== 'N/A') ? ' · ' + escHtml(String(a.v1ShadowAmount)) : '';
-    v1ShadowLine = `
-      <div style="padding:6px 10px;background:#fafafa;border:1px solid var(--border);border-radius:6px;margin-bottom:12px;font-size:11px;color:#666;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-        <span style="text-transform:uppercase;letter-spacing:1px;font-weight:700;color:#888">v1 shadow (audit)</span>
-        <span><b>${escHtml(String(a.v1ShadowDecision))}</b>${amountTxt}</span>
-        ${disagree ? '<span style="color:#a15c00;font-weight:700">⚠ engines disagree</span>' : ''}
-      </div>
-    `;
-  }
-
   // Main report body — Processing/Error/Done states.
   const body = `<div class="mrhtml">${
     a.status==='Processing' || (!a.report && !a.processingComplete) ?
@@ -3794,105 +3477,10 @@ function buildReportPanel(a) {
     highlightTierBreakdown(stripFences(a.report||''))
   }</div>`;
 
-  return rerunHeader + v1ShadowLine + body;
+  return rerunHeader + body;
 }
 
 
-// ════════════════════════════════════════
-// ENGINE V2 — shadow-mode re-run + side-by-side (DEPRECATED — kept for
-// reference until we sweep dead code. Replaced by buildReportPanel above.)
-// ════════════════════════════════════════
-function buildV2Panel(a) {
-  const hasRun = a.v2Decision && a.v2Report;
-  const runAt = a.v2RunAt ? new Date(a.v2RunAt).toLocaleString() : '';
-  // When v2 is the authoritative engine for this applicant, the "v1" side
-  // of the comparison pulls from the shadow copy that server.py stashed
-  // before promoting v2 into the canonical fields.
-  const v2IsPrimary = (a.engineVersionPrimary === 'v2');
-  const v1Decision = v2IsPrimary
-    ? (a.v1ShadowDecision || '—')
-    : (a.claudeDecision || a.status || '—');
-  const v1Amount = v2IsPrimary
-    ? (a.v1ShadowAmount || 'N/A')
-    : (a.amount || 'N/A');
-
-  const canRefresh = !!a.plaidAssetToken;
-  const acctCount = a.connectedAccountCount;
-  const refreshedAt = a.plaidRefreshedAt ? new Date(a.plaidRefreshedAt).toLocaleString() : '';
-  const runButton = `
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <button onclick="runV2('${a.firebaseId}')" id="v2run-${a.firebaseId}"
-              style="background:#1a6b3c;color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
-        ${hasRun ? 'Re-run with v2 (stored data)' : 'Run with v2'}
-      </button>
-      ${canRefresh ? `
-        <button onclick="refreshFromPlaid('${a.firebaseId}')" id="plaidref-${a.firebaseId}"
-                title="Pulls fresh data from Plaid across ALL connected accounts, then re-runs v2. Use this when you suspect the stored extraction missed an account (e.g., payroll is on Chime but applicant connected a secondary bank too)."
-                style="background:#fff8e5;color:#6b4d00;border:1px solid #f2d46c;padding:10px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
-          Refresh from Plaid &amp; Re-run
-        </button>
-      ` : ''}
-    </div>
-    <div style="font-size:11px;color:#888;margin-top:8px">
-      ${hasRun ? `Last v2 run: ${runAt}` : ''}
-      ${refreshedAt ? ` &nbsp;\u00b7\u00b7\u00b7 Plaid refreshed: ${refreshedAt}` : ''}
-      ${acctCount ? ` &nbsp;\u00b7\u00b7\u00b7 <b>${acctCount} Plaid account${acctCount > 1 ? 's' : ''} connected</b>` : ''}
-    </div>
-  `;
-
-  if (!hasRun) {
-    return `
-      <div style="padding:30px 20px;text-align:center">
-        <div style="font-size:14px;color:#333;font-weight:600;margin-bottom:8px">Engine v2 has not run on this report yet</div>
-        <div style="font-size:12px;color:#666;margin-bottom:20px;max-width:480px;margin-left:auto;margin-right:auto">
-          v2 is the new deterministic underwriting engine running in shadow mode.
-          Re-running will use the stored transaction data and produce a parallel decision
-          with full affordability breakdown. v1's decision is not affected.
-        </div>
-        ${runButton}
-      </div>
-    `;
-  }
-
-  const v2Card = `
-    <div style="padding:10px 12px;background:#fff;border-radius:6px;border-left:3px solid ${a.v2Decision==='APPROVE'?'#1a6b3c':'#c0392b'}">
-      <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px">v2 ${v2IsPrimary ? '(primary)' : '(shadow)'}</div>
-      <div style="font-size:18px;font-weight:700;margin-top:2px;color:${a.v2Decision==='APPROVE'?'#1a6b3c':'#c0392b'}">${a.v2Decision}</div>
-      <div style="font-size:13px;color:#555">$${a.v2TierAmount ?? 0} (max affordable $${a.v2MaxAffordable ?? 0})</div>
-      ${a.v2AutoDecide
-        ? '<div style="display:inline-block;margin-top:6px;padding:2px 8px;border-radius:10px;background:#e6f4ea;color:#1a6b3c;font-size:10px;font-weight:700;letter-spacing:0.3px">✅ AUTO-DECIDE CANDIDATE</div>'
-        : '<div style="display:inline-block;margin-top:6px;padding:2px 8px;border-radius:10px;background:#fff4e0;color:#a15c00;font-size:10px;font-weight:700;letter-spacing:0.3px">👀 REVIEW REQUIRED</div>'
-      }
-    </div>
-  `;
-  const v1Card = `
-    <div style="padding:10px 12px;background:#fff;border-radius:6px;border-left:3px solid #888">
-      <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px">v1 ${v2IsPrimary ? '(shadow)' : '(current)'}</div>
-      <div style="font-size:18px;font-weight:700;margin-top:2px">${v1Decision}</div>
-      <div style="font-size:13px;color:#555">${v1Amount}</div>
-    </div>
-  `;
-  const comparison = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;background:#f8f8f8;border-radius:8px;margin-bottom:14px">
-      ${v2IsPrimary ? v2Card + v1Card : v1Card + v2Card}
-    </div>
-  `;
-
-  const headerTitle = v2IsPrimary ? 'Engine v2 — primary' : 'Engine v2 — shadow comparison';
-  return `
-    <div style="padding:12px 4px 4px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <div>
-          <div style="font-size:15px;font-weight:700">${headerTitle}</div>
-          <div style="font-size:11px;color:#888">Deterministic pipeline; no AI in the decision path</div>
-        </div>
-        ${runButton}
-      </div>
-      ${comparison}
-      <div class="mrhtml">${a.v2Report || ''}</div>
-    </div>
-  `;
-}
 
 async function runV2(fbId) {
   const btn = document.getElementById('v2run-'+fbId);
