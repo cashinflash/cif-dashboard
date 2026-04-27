@@ -3921,7 +3921,17 @@ function highlightTierBreakdown(html) {
 // ══════════════════════════════════════════
 // PLAID CUSTOMERS
 // ══════════════════════════════════════════
+// Customer-keyed view: one row per (phone+email) customer, expandable to
+// show every application that customer has ever submitted with their Plaid
+// status and a working "Re-run Report" button per application. Drops the
+// previous "latest only" dedup so re-applicants don't disappear.
 let allPlaidCustomers = [];
+
+function plaidCustomerKey(phone, email) {
+  const p = (phone || '').replace(/\D/g, '');
+  const e = (email || '').trim().toLowerCase();
+  return (p + '|' + e) || null;
+}
 
 async function loadPlaidCustomers() {
   const list = document.getElementById('plaid-list');
@@ -3930,9 +3940,8 @@ async function loadPlaidCustomers() {
   try {
     const data = await fbGet('reports.json');
     if (!data) { allPlaidCustomers = []; renderPlaidCustomers([]); return; }
-    // Find all unique customers who used Plaid
-    const seen = {};
-    allPlaidCustomers = [];
+    // Group every Plaid-bearing record by (phone+email) customer key.
+    const groups = {};
     Object.entries(data).forEach(([id, r]) => {
       if (!r) return;
       const bankMethod = (r.applicationData?.bankMethod || r.bankMethod || r.filename || '').toLowerCase();
@@ -3941,24 +3950,45 @@ async function loadPlaidCustomers() {
       if (!isPlaid) return;
       const phone = r.applicationData?.phone || '';
       const email = r.applicationData?.email || '';
-      const key = phone + email || r.name || id;
-      if (!seen[key] || r.createdAt > seen[key].createdAt) {
-        seen[key] = {
-          firebaseId: id,
-          name: r.name || `${r.applicationData.firstName||''} ${r.applicationData.lastName||''}`.trim(),
-          phone: r.applicationData.phone || '',
-          email: r.applicationData.email || '',
-          date: r.date || '',
-          lastReport: r.date || '',
-          accessToken: r.plaidAccessToken || r.applicationData?.plaidAccessToken || '',
-          assetToken: r.plaidAssetToken || '',
-          createdAt: r.createdAt || 0,
-          status: r.status || '',
-          amount: r.amount || '',
+      const fallbackName = r.name || `${r.applicationData?.firstName||''} ${r.applicationData?.lastName||''}`.trim();
+      const key = plaidCustomerKey(phone, email) || fallbackName || id;
+      const app = {
+        firebaseId: id,
+        date: r.date || '',
+        time: r.time || '',
+        createdAt: r.createdAt || 0,
+        accessToken: r.plaidAccessToken || r.applicationData?.plaidAccessToken || '',
+        assetToken: r.plaidAssetToken || '',
+        status: r.status || '',
+        amount: r.amount || '',
+        decision: r.claudeDecision || '',
+      };
+      if (!groups[key]) {
+        groups[key] = {
+          key,
+          name: fallbackName,
+          phone,
+          email,
+          applications: [],
         };
       }
+      groups[key].applications.push(app);
+      // Customer-level fields take the latest non-empty value.
+      if (!groups[key].name && fallbackName) groups[key].name = fallbackName;
     });
-    allPlaidCustomers = Object.values(seen).sort((a,b) => b.createdAt - a.createdAt);
+    // Sort applications within each customer newest-first; sort customers
+    // by their latest application date.
+    allPlaidCustomers = Object.values(groups)
+      .map(g => {
+        g.applications.sort((a, b) => (b.createdAt||0) - (a.createdAt||0));
+        const latest = g.applications[0] || {};
+        g.latestStatus = latest.status || '';
+        g.latestDate = latest.date || '';
+        g.latestCreatedAt = latest.createdAt || 0;
+        g.totalApps = g.applications.length;
+        return g;
+      })
+      .sort((a, b) => b.latestCreatedAt - a.latestCreatedAt);
     renderPlaidCustomers(allPlaidCustomers);
   } catch(e) {
     list.innerHTML = `<div class="empty"><div class="empty-t">Error loading</div><div class="empty-s">${e.message}</div></div>`;
@@ -3975,6 +4005,40 @@ function filterPlaidCustomers(q) {
   ));
 }
 
+function _renderPlaidAppRow(app, isMobile) {
+  const pill = `<span class="pill pill-${(app.status||'p').toLowerCase()}">${app.status||'—'}</span>`;
+  const stamp = `${app.date||'—'}${app.time?(' • '+app.time):''}`;
+  const tokenBadge = app.accessToken
+    ? '<span style="font-size:10px;color:#5a7a3a;background:#e8f3d8;padding:2px 6px;border-radius:3px">access_token ✓</span>'
+    : (app.assetToken
+        ? '<span style="font-size:10px;color:#7a6a3a;background:#f5ecd0;padding:2px 6px;border-radius:3px">asset_token only</span>'
+        : '<span style="font-size:10px;color:#a44;background:#fbe6e6;padding:2px 6px;border-radius:3px">no token</span>');
+  const refreshBtn = app.accessToken
+    ? `<button onclick="event.stopPropagation();refreshFromPlaid('${app.firebaseId}')" id="plaidref-${app.firebaseId}" class="actbtn btn-gh" style="font-size:11px;padding:5px 10px">Refresh from Plaid &amp; Re-run</button>`
+    : `<button disabled title="No access_token stored on this record — applicant must reconnect via the application form." class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;opacity:.5;cursor:not-allowed">Refresh (no token)</button>`;
+  if (isMobile) {
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-top:1px solid var(--border);font-size:12px;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1">
+        <div style="display:flex;gap:6px;align-items:center">${pill}<span style="color:var(--muted)">${stamp}</span></div>
+        <div>${tokenBadge}</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button onclick="event.stopPropagation();openModal('${app.firebaseId}')" class="actbtn btn-gh" style="font-size:11px;padding:5px 10px">View</button>
+        ${refreshBtn}
+      </div>
+    </div>`;
+  }
+  return `<tr style="background:var(--bg);font-size:12px">
+    <td style="padding-left:32px;color:var(--muted)">${stamp}</td>
+    <td>${pill}</td>
+    <td>${tokenBadge}</td>
+    <td style="text-align:right">
+      <button onclick="event.stopPropagation();openModal('${app.firebaseId}')" class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;margin-right:4px">View</button>
+      ${refreshBtn}
+    </td>
+  </tr>`;
+}
+
 function renderPlaidCustomers(list) {
   const el = document.getElementById('plaid-list');
   if (!el) return;
@@ -3985,43 +4049,67 @@ function renderPlaidCustomers(list) {
   const isMobile = window.innerWidth <= 768;
   if (isMobile) {
     el.innerHTML = list.map(c => `
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-          <div>
-            <div class="nbig">${c.name||'—'}</div>
-            <div class="nsub" style="font-size:12px">${c.phone||''}</div>
-            <div class="nsub" style="font-size:11px">${c.email||''}</div>
+      <details style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden">
+        <summary style="padding:16px;cursor:pointer;list-style:none">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div style="min-width:0;flex:1">
+              <div class="nbig">${c.name||'—'}</div>
+              <div class="nsub" style="font-size:12px">${c.phone||''}</div>
+              <div class="nsub" style="font-size:11px">${c.email||''}</div>
+            </div>
+            <div style="text-align:right;display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+              <span class="pill pill-${(c.latestStatus||'p').toLowerCase()}">${c.latestStatus||'—'}</span>
+              <span style="font-size:11px;color:var(--muted)">${c.totalApps} app${c.totalApps>1?'s':''}</span>
+            </div>
           </div>
-          <span class="pill pill-${c.status?.toLowerCase()||'p'}">${c.status||'—'}</span>
-        </div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Last report: ${c.lastReport||'—'}</div>
-        <div style="display:flex;gap:8px">
-          <button onclick="openModal('${c.firebaseId}')" class="actbtn btn-gh" style="flex:1;font-size:12px;text-align:center">View</button>
-          <button disabled title="Re-run temporarily disabled — backend handler incomplete. Ask the applicant to reconnect via the application form." class="actbtn btn-gh" style="flex:1;font-size:12px;text-align:center;opacity:.5;cursor:not-allowed">Re-run (unavailable)</button>
-        </div>
-      </div>`).join('');
+          <div style="font-size:11px;color:var(--muted);margin-top:8px">Latest: ${c.latestDate||'—'} • click to expand</div>
+        </summary>
+        ${c.applications.map(a => _renderPlaidAppRow(a, true)).join('')}
+      </details>`).join('');
   } else {
     el.innerHTML = `<table>
     <thead><tr>
+      <th style="width:30px"></th>
       <th>Customer</th>
       <th>Phone</th>
-      <th>Last Report</th>
-      <th>Status</th>
-      <th>Action</th>
+      <th>Latest Report</th>
+      <th>Apps</th>
+      <th>Latest Status</th>
     </tr></thead>
-    <tbody>${list.map(c => `<tr>
-      <td><div class="nbig">${c.name||'—'}</div><div class="nsub">${c.email||''}</div></td>
-      <td style="font-size:13px">${c.phone||'—'}</td>
-      <td style="font-size:12px;color:var(--muted)">${c.lastReport||'—'}</td>
-      <td><span class="pill pill-${c.status?.toLowerCase()||'p'}">${c.status||'—'}</span></td>
-      <td>
-        <button onclick="openModal('${c.firebaseId}')" class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;margin-right:4px">View</button>
-        <button disabled title="Re-run temporarily disabled — backend handler incomplete. Ask the applicant to reconnect via the application form." class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;opacity:.5;cursor:not-allowed">Re-run Report (unavailable)</button>
-      </td>
-    </tr>`).join('')}
+    <tbody>${list.map((c, i) => `
+      <tr style="cursor:pointer" onclick="togglePlaidGroup('${i}')">
+        <td><span id="plaid-chev-${i}" style="display:inline-block;transition:transform .15s">▶</span></td>
+        <td><div class="nbig">${c.name||'—'}</div><div class="nsub">${c.email||''}</div></td>
+        <td style="font-size:13px">${c.phone||'—'}</td>
+        <td style="font-size:12px;color:var(--muted)">${c.latestDate||'—'}</td>
+        <td><span class="pill" style="background:var(--bg);border:1px solid var(--border)">${c.totalApps}</span></td>
+        <td><span class="pill pill-${(c.latestStatus||'p').toLowerCase()}">${c.latestStatus||'—'}</span></td>
+      </tr>
+      <tr id="plaid-apps-${i}" style="display:none">
+        <td colspan="6" style="padding:0">
+          <table style="width:100%;border-top:1px solid var(--border)">
+            <thead><tr style="background:var(--bg);font-size:11px;color:var(--muted)">
+              <th style="text-align:left;padding-left:32px;font-weight:500">When</th>
+              <th style="text-align:left;font-weight:500">Status</th>
+              <th style="text-align:left;font-weight:500">Plaid token</th>
+              <th style="text-align:right;font-weight:500;padding-right:8px">Action</th>
+            </tr></thead>
+            <tbody>${c.applications.map(a => _renderPlaidAppRow(a, false)).join('')}</tbody>
+          </table>
+        </td>
+      </tr>`).join('')}
     </tbody>
   </table>`;
   }
+}
+
+function togglePlaidGroup(i) {
+  const row = document.getElementById('plaid-apps-' + i);
+  const chev = document.getElementById('plaid-chev-' + i);
+  if (!row) return;
+  const open = row.style.display !== 'none';
+  row.style.display = open ? 'none' : '';
+  if (chev) chev.style.transform = open ? '' : 'rotate(90deg)';
 }
 
 async function rerunFromModal(fbId) {
