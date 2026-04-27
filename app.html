@@ -3451,11 +3451,19 @@ function buildReportPanel(a) {
             Refresh from Plaid &amp; Re-run
           </button>
         ` : ''}
+        ${a.bankStatementUrl ? `
+          <button onclick="pushPlaidToVergent('${fbId}')" id="vergentpush-${fbId}"
+                  title="Upload the Plaid asset report PDF to this applicant's Vergent customer record (resolved by SSN + DOB + name). Operator workflow shortcut."
+                  style="background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+            ${a.vergentPushedAt ? '↻ Re-push to Vergent' : '↗ Push to Vergent'}
+          </button>
+        ` : ''}
       </div>
       <div style="font-size:11px;color:#888;text-align:right">
         ${hasRun ? `Last run: ${runAt}` : 'Not yet run'}
         ${refreshedAt ? `<br>Plaid refreshed: ${refreshedAt}` : ''}
         ${acctCount ? `<br><b>${acctCount} Plaid account${acctCount > 1 ? 's' : ''}</b>` : ''}
+        ${a.vergentPushedAt ? `<br><span style="color:#1a4d6b">✓ Vergent pushed ${new Date(a.vergentPushedAt).toLocaleString()}</span>` : ''}
       </div>
     </div>
   `;
@@ -3567,6 +3575,67 @@ async function refreshFromPlaid(fbId) {
   } catch (e) {
     toast('Refresh error: ' + e.message, 'err');
     if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = 'Refresh from Plaid &amp; Re-run'; }
+  }
+}
+
+// Push the Plaid asset report PDF to the applicant's Vergent customer
+// record. Resolves the Vergent customerId via SSN+name+DOB search; if 0
+// matches we suggest creating the customer in Vergent first; if 2+ we
+// surface the candidate list so the operator can pick one to override.
+async function pushPlaidToVergent(fbId, overrideCustomerId) {
+  if (!overrideCustomerId && !confirm(
+    'Push the Plaid asset report PDF to this applicant\'s Vergent customer record?\n\n' +
+    'We\'ll search Vergent by SSN + DOB + name and upload the PDF as a customer document.'
+  )) return;
+  const btn = document.getElementById('vergentpush-' + fbId);
+  if (btn) {
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+    btn.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border:2px solid #1a4d6b;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;margin-right:6px;vertical-align:-2px"></span> Pushing to Vergent...';
+  }
+  try {
+    const body = { firebase_id: fbId };
+    if (overrideCustomerId) body.vergent_customer_id = String(overrideCustomerId);
+    const resp = await fetch('/api/push-plaid-to-vergent', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    if (resp.status === 409 && data.error === 'customer_ambiguous' && Array.isArray(data.candidates)) {
+      // Multiple Vergent customers matched. Let the operator pick.
+      const choice = prompt(
+        'Multiple Vergent customers matched this applicant. Paste the customerId to use:\n\n' +
+        data.candidates.slice(0, 6).map((c, i) =>
+          `  ${i+1}. customerId=${c.customerId||c.CustomerId||'?'}  ${c.firstName||''} ${c.lastName||''}`
+        ).join('\n'),
+        ''
+      );
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = '↗ Push to Vergent'; }
+      if (choice && choice.trim()) return pushPlaidToVergent(fbId, choice.trim());
+      return;
+    }
+    if (resp.status === 404 && data.error === 'customer_not_found_in_vergent') {
+      toast('No Vergent customer matched. Create the customer in Vergent first, then retry.', 'err');
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = '↗ Push to Vergent'; }
+      return;
+    }
+    if (!resp.ok || !data.ok) {
+      toast(data.detail || data.error || 'Vergent push failed', 'err');
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = '↗ Push to Vergent'; }
+      return;
+    }
+    toast(
+      `Pushed to Vergent (customer ${data.vergentCustomerId}, ${(data.pdf_bytes/1024).toFixed(0)} KB).`,
+      'ok'
+    );
+    logAudit('vergent.pushed', fbId, `customer=${data.vergentCustomerId} doc=${data.vergentDocumentId}`);
+    await loadReports();
+    openModal(fbId);
+  } catch (e) {
+    toast('Vergent push error: ' + e.message, 'err');
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = '↗ Push to Vergent'; }
   }
 }
 

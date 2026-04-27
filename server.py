@@ -644,6 +644,29 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        if path == '/api/push-plaid-to-vergent':
+            try:
+                body = json.loads(raw)
+                payload = json.dumps(body).encode()
+                print(f'[VERGENT-PUSH PROXY] Forwarding to cif-apply...', flush=True)
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/push-plaid-to-vergent',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                # 60s — Vergent uploads are usually fast, but leave headroom for
+                # token refresh + retry on the cif-apply side.
+                with ur.urlopen(req, timeout=60) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[VERGENT-PUSH UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[VERGENT-PUSH ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         if path == '/api/rerun-v2':
             try:
                 body = json.loads(raw)
