@@ -297,6 +297,255 @@ def read_file(path):
         return None
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 2: small client-side panel injected into app.html on serve.
+#
+# Watches the dashboard's currently-rendered application (best-effort —
+# detects via several common selectors) and surfaces the `vergentMatch`
+# status that cif-apply now writes after every /submit:
+#
+#   found      — green "✓ Existing customer #12345"
+#   not_found  — orange "✗ Not in Vergent yet" + "Create + Push" button
+#   ambiguous  — yellow "⚠ N matches — pick one" + candidate picker
+#   error      — red error pill
+#
+# The panel calls POST /api/push-to-vergent (which proxies to cif-apply's
+# new multi-doc handler). The legacy POST /api/push-plaid-to-vergent
+# proxy below still works through the cif-apply shim, so the existing
+# button wiring in app.html keeps functioning unchanged.
+#
+# This is an additive overlay — does not modify app.html on disk. When
+# we eventually edit app.html directly to integrate the panel inline,
+# this injection becomes redundant and can be deleted.
+# ─────────────────────────────────────────────────────────────────────────────
+_PHASE2_PANEL_HTML = b"""
+<style>
+  #vergent-phase2-panel {
+    position: fixed; bottom: 16px; right: 16px; z-index: 9999;
+    max-width: 360px; padding: 12px 14px;
+    border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.18);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px; line-height: 1.4;
+    transition: opacity .2s ease;
+  }
+  #vergent-phase2-panel[hidden] { display: none !important; }
+  #vergent-phase2-panel.found    { background: #e8f5ee; border: 1px solid #b2d9c0; color: #0d3a20; }
+  #vergent-phase2-panel.notfound { background: #fff5e6; border: 1px solid #ffd9a3; color: #5a3300; }
+  #vergent-phase2-panel.ambig    { background: #fffbe0; border: 1px solid #f0e070; color: #5a4a00; }
+  #vergent-phase2-panel.err      { background: #fde7e7; border: 1px solid #f0a3a3; color: #5a0d0d; }
+  #vergent-phase2-panel .v2-title { font-weight: 700; margin-bottom: 6px; font-size: 14px; }
+  #vergent-phase2-panel .v2-meta  { font-size: 12px; color: #555; margin-bottom: 8px; }
+  #vergent-phase2-panel button {
+    margin-top: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600;
+    border-radius: 6px; border: none; cursor: pointer;
+    background: #1a6b3c; color: white;
+  }
+  #vergent-phase2-panel button:hover { background: #145a30; }
+  #vergent-phase2-panel button:disabled { opacity: .5; cursor: not-allowed; }
+  #vergent-phase2-panel button.secondary { background: #555; }
+  #vergent-phase2-panel .v2-close {
+    position: absolute; top: 4px; right: 8px; cursor: pointer;
+    color: #888; font-size: 18px; background: none; border: none; padding: 0;
+  }
+  #vergent-phase2-panel label { display: block; margin: 4px 0; cursor: pointer; }
+  #vergent-phase2-panel label input { margin-right: 6px; }
+  #vergent-phase2-panel .v2-result { margin-top: 8px; font-size: 12px; }
+</style>
+<script>
+(function() {
+  // Phase 2 client-side panel (additive, does not touch app.html on disk).
+  // Watches for application detail rendering, finds the firebase id
+  // currently shown, fetches the record's vergentMatch, and renders a
+  // floating panel in the bottom-right with the appropriate state.
+  if (window.__vergentPhase2Init) return;
+  window.__vergentPhase2Init = true;
+
+  function findCurrentFirebaseId() {
+    // Try several common patterns to find which application is on screen.
+    // 1. URL hash like #app-XXX or ?id=XXX
+    var m = window.location.hash.match(/-O[A-Za-z0-9_-]{15,}/);
+    if (m) return m[0];
+    m = window.location.search.match(/[?&]id=(-O[A-Za-z0-9_-]{15,})/);
+    if (m) return m[1];
+    // 2. data-firebase-id attribute on a visible/active element
+    var el = document.querySelector('[data-firebase-id]:not([hidden]):not([style*="display: none"])');
+    if (el) return el.getAttribute('data-firebase-id');
+    // 3. Global variable some dashboards expose
+    if (window.currentFirebaseId) return window.currentFirebaseId;
+    if (window.currentApp && window.currentApp.firebaseId) return window.currentApp.firebaseId;
+    return null;
+  }
+
+  function getOrCreatePanel() {
+    var p = document.getElementById('vergent-phase2-panel');
+    if (p) return p;
+    p = document.createElement('div');
+    p.id = 'vergent-phase2-panel';
+    p.hidden = true;
+    p.innerHTML = '<button class="v2-close" type="button" aria-label="Close">&times;</button>'
+      + '<div class="v2-body"></div>';
+    document.body.appendChild(p);
+    p.querySelector('.v2-close').addEventListener('click', function() {
+      p.hidden = true;
+    });
+    return p;
+  }
+
+  function render(match, fbId) {
+    var panel = getOrCreatePanel();
+    panel.hidden = false;
+    panel.className = '';
+    var body = panel.querySelector('.v2-body');
+    var status = (match && match.status) || 'unknown';
+    if (status === 'found') {
+      panel.classList.add('found');
+      var cid = match.customerId || '';
+      var pushed = match.vergentPushedDocs || {};
+      var pushedDl = pushed.drivers_license ? '✓' : '☐';
+      var pushedBs = pushed.bank_statement  ? '✓' : '☐';
+      body.innerHTML =
+        '<div class="v2-title">Vergent: existing customer #' + cid + '</div>'
+        + '<div class="v2-meta">Push docs to this customer record:</div>'
+        + '<label><input type="checkbox" name="kind" value="bank_statement" checked> '
+        +   pushedBs + ' Bank Statement / Plaid Asset Report</label>'
+        + '<label><input type="checkbox" name="kind" value="drivers_license"> '
+        +   pushedDl + ' Driver\\'s License</label>'
+        + '<button type="button" data-action="push">Push selected</button>'
+        + '<div class="v2-result"></div>';
+    } else if (status === 'not_found') {
+      panel.classList.add('notfound');
+      body.innerHTML =
+        '<div class="v2-title">Vergent: no matching customer</div>'
+        + '<div class="v2-meta">Will create a new Vergent customer and upload Driver\\'s License + Bank Statement.</div>'
+        + '<button type="button" data-action="create-and-push">Create + Push</button>'
+        + '<div class="v2-result"></div>';
+    } else if (status === 'ambiguous') {
+      panel.classList.add('ambig');
+      var cands = (match.candidates || []).slice(0, 5);
+      var rows = cands.map(function(c, i) {
+        var id = c.customerId || c.CustomerId || c.id || '?';
+        var name = (c.firstName || '') + ' ' + (c.lastName || '');
+        var dob = c.birthDate || c.dateOfBirth || '';
+        return '<label><input type="radio" name="vcand" value="' + id + '"' + (i === 0 ? ' checked' : '')
+          + '> #' + id + ' ' + name + ' ' + dob + '</label>';
+      }).join('');
+      body.innerHTML =
+        '<div class="v2-title">Vergent: ' + (match.totalCount || cands.length) + ' matches</div>'
+        + '<div class="v2-meta">Pick the right customer:</div>'
+        + rows
+        + '<button type="button" data-action="push-pick">Use selected + Push Statement</button>'
+        + '<div class="v2-result"></div>';
+    } else if (status === 'error') {
+      panel.classList.add('err');
+      body.innerHTML =
+        '<div class="v2-title">Vergent search failed</div>'
+        + '<div class="v2-meta">' + (match.errorBody || 'Unknown error').slice(0, 200) + '</div>'
+        + '<button type="button" class="secondary" data-action="dismiss">Dismiss</button>';
+    } else {
+      panel.classList.add('notfound');
+      body.innerHTML =
+        '<div class="v2-title">Vergent match: pending</div>'
+        + '<div class="v2-meta">Auto-search hasn\\'t completed yet. Try again in 30s.</div>';
+      return;
+    }
+
+    body.querySelectorAll('button').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var action = btn.getAttribute('data-action');
+        if (action === 'dismiss') { panel.hidden = true; return; }
+        callPush(action, fbId, panel);
+      });
+    });
+  }
+
+  function callPush(action, fbId, panel) {
+    var resultEl = panel.querySelector('.v2-result');
+    resultEl.textContent = 'Pushing…';
+    panel.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
+
+    var body = { firebase_id: fbId };
+    if (action === 'create-and-push') {
+      body.create_if_missing = true;
+      body.doc_kinds = ['drivers_license', 'bank_statement'];
+    } else if (action === 'push-pick') {
+      var picked = panel.querySelector('input[name="vcand"]:checked');
+      body.use_vergent_customer_id = picked ? picked.value : '';
+      body.doc_kinds = ['bank_statement'];
+    } else {  // 'push' (selected checkboxes)
+      var kinds = Array.from(panel.querySelectorAll('input[name="kind"]:checked'))
+        .map(function(c) { return c.value; });
+      body.doc_kinds = kinds.length ? kinds : ['bank_statement'];
+    }
+
+    fetch('/api/push-to-vergent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(body),
+    })
+      .then(function(r) { return r.json().then(function(d) { return { status: r.status, body: d }; }); })
+      .then(function(res) {
+        panel.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
+        if (res.status >= 200 && res.status < 300 && res.body.ok) {
+          var uploads = res.body.uploads || {};
+          var msg = '✓ Pushed customer #' + (res.body.vergentCustomerId || '?');
+          var parts = [];
+          if (uploads.drivers_license) parts.push('DL');
+          if (uploads.bank_statement) parts.push('Statement');
+          if (parts.length) msg += ' (' + parts.join(' + ') + ')';
+          resultEl.style.color = '#1a6b3c';
+          resultEl.textContent = msg;
+        } else {
+          resultEl.style.color = '#5a0d0d';
+          resultEl.textContent = '✗ ' + ((res.body.error || res.body.detail || 'Push failed') + '').slice(0, 240);
+        }
+      })
+      .catch(function(e) {
+        panel.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
+        resultEl.style.color = '#5a0d0d';
+        resultEl.textContent = '✗ Network error: ' + e.message;
+      });
+  }
+
+  function poll() {
+    var fbId = findCurrentFirebaseId();
+    if (!fbId) {
+      var p = document.getElementById('vergent-phase2-panel');
+      if (p) p.hidden = true;
+      return;
+    }
+    if (window.__vergentPhase2LastFbId === fbId) return; // already showing
+    window.__vergentPhase2LastFbId = fbId;
+    fetch('/fb/reports/' + fbId + '/vergentMatch.json', {
+      credentials: 'same-origin',
+    })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(match) {
+        if (match) render(match, fbId);
+      })
+      .catch(function() { /* silent */ });
+  }
+
+  setInterval(poll, 2000);
+  setTimeout(poll, 1000);
+})();
+</script>
+"""
+
+
+def inject_phase2_panel(html_bytes: bytes) -> bytes:
+    """Append the Phase 2 panel script + styles before </body> in the
+    served app.html. Falls back to appending at the end if no </body>
+    sentinel is found (defensive — modern HTML always has one)."""
+    if not html_bytes:
+        return html_bytes
+    closing = b'</body>'
+    idx = html_bytes.rfind(closing)
+    if idx < 0:
+        return html_bytes + _PHASE2_PANEL_HTML
+    return html_bytes[:idx] + _PHASE2_PANEL_HTML + html_bytes[idx:]
+
+
 # CORS: restrict to same-origin. The dashboard is a single app; there's no
 # legitimate cross-origin caller. Keeping the old '*' was a CSRF vector.
 CORS = {
@@ -388,6 +637,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             data = read_file(os.path.join(DIR, 'app.html'))
+            # Phase 2: inject the vergentMatch overlay panel before </body>.
+            # Append-only; never modifies app.html on disk.
+            data = inject_phase2_panel(data) if data else data
             self.send_html(200, data or b'App not found')
             return
 
@@ -667,6 +919,35 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        # Phase 2: multi-doc Vergent push (resolve-or-create + upload). Proxies
+        # to cif-apply's new /api/push-to-vergent route. Body shape:
+        #   { firebase_id, use_vergent_customer_id?, create_if_missing?,
+        #     doc_kinds: [...] }
+        # The injected dashboard panel calls this; the legacy proxy above
+        # remains for any callers still on the old contract.
+        if path == '/api/push-to-vergent':
+            try:
+                body = json.loads(raw)
+                payload = json.dumps(body).encode()
+                print(f'[VERGENT-PUSH-V2 PROXY] Forwarding to cif-apply...', flush=True)
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/push-to-vergent',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                # 90s — multi-doc push (DL + statement) plus optional customer
+                # creation can take longer than the single-doc path.
+                with ur.urlopen(req, timeout=90) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[VERGENT-PUSH-V2 UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[VERGENT-PUSH-V2 ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         if path == '/api/rerun-v2':
             try:
                 body = json.loads(raw)
@@ -769,10 +1050,6 @@ class Handler(BaseHTTPRequestHandler):
                 if not ok_pw:
                     self.send_json(400, {'error': msg}); return
                 existing = get_users(force_reload=True).get(username)
-                # Allow shadowing env-var users so they can be migrated to
-                # Firebase-managed. Firebase entries win over env vars, so
-                # re-adding alex (env-var) as alex (firebase) lets admin
-                # reset/delete them going forward.
                 if existing and existing.get('source') == 'firebase':
                     self.send_json(409, {'error': f'User {username!r} already exists'}); return
                 record = {
@@ -829,7 +1106,6 @@ class Handler(BaseHTTPRequestHandler):
                 if not firebase_delete_user(username):
                     self.send_json(500, {'error': 'Failed to delete user'}); return
                 invalidate_user_cache()
-                # Kill any active sessions for the deleted user.
                 for t, s in list(sessions.items()):
                     if s.get('user') == username:
                         del sessions[t]
@@ -838,20 +1114,17 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path == '/api/users/role':
-                # Change a Firebase user's role. Cannot change your own role
-                # (avoids accidentally demoting the only admin) and cannot
-                # edit env-var users (their role is Render-controlled).
                 new_role = (body.get('role') or '').strip()
                 if new_role not in ('admin', 'user'):
                     self.send_json(400, {'error': "role must be 'admin' or 'user'"}); return
                 if username == actor:
-                    self.send_json(400, {'error': 'Cannot change your own role — ask another admin.'}); return
+                    self.send_json(400, {'error': 'Cannot change your own role - ask another admin.'}); return
                 users_now = get_users(force_reload=True)
                 target = users_now.get(username)
                 if not target:
                     self.send_json(404, {'error': f'User {username!r} not found'}); return
                 if target.get('source') == 'env':
-                    self.send_json(400, {'error': 'Env-var users can\'t change role here. Migrate to Firebase first.'}); return
+                    self.send_json(400, {'error': 'Env-var users cannot change role here. Migrate to Firebase first.'}); return
                 if target.get('role') == new_role:
                     self.send_json(200, {'ok': True, 'username': username, 'role': new_role, 'noop': True})
                     return
@@ -867,8 +1140,6 @@ class Handler(BaseHTTPRequestHandler):
                 if not firebase_put_user(username, record):
                     self.send_json(500, {'error': 'Failed to persist role'}); return
                 invalidate_user_cache()
-                # Update any live sessions for this user so the new role
-                # takes effect on their next request without a logout.
                 for t, s in sessions.items():
                     if s.get('user') == username:
                         s['role'] = new_role
@@ -877,9 +1148,6 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             if path == '/api/users/migrate-from-env':
-                # One-click migration: copy the env-var user's existing hash
-                # to Firebase unchanged. User's current password keeps
-                # working; admin gets Reset/Delete on them going forward.
                 users_now = get_users(force_reload=True)
                 target = users_now.get(username)
                 if not target:
@@ -887,7 +1155,7 @@ class Handler(BaseHTTPRequestHandler):
                 if target.get('source') != 'env':
                     self.send_json(400, {'error': f'User {username!r} is not an env-var user'}); return
                 record = {
-                    'hash': target['hash'],  # preserve existing hash
+                    'hash': target['hash'],
                     'role': target.get('role', 'user'),
                     'created_at': int(time.time()),
                     'created_by': actor,
@@ -901,7 +1169,6 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
         if path == '/api/password':
-            # Self-serve password change — any authenticated user.
             session = sessions.get(token, {})
             actor = session.get('user', '')
             if not actor:
@@ -979,7 +1246,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             body = json.loads(raw)
             username = body.get('username', '').strip()
-            password = body.get('password', '')  # no .strip() — allow trailing space if real
+            password = body.get('password', '')
             user_record = get_users().get(username) or {}
             stored = user_record.get('hash')
             ok = bool(stored) and verify_password(password, stored, who=username)
@@ -987,7 +1254,6 @@ class Handler(BaseHTTPRequestHandler):
             if ok:
                 role = user_record.get('role', 'user')
                 tok = make_session(username, ip, role=role)
-                # Best-effort update of last_login (Firebase-stored users only).
                 if user_record.get('source') == 'firebase':
                     try:
                         fb_rec = dict(user_record)
