@@ -472,10 +472,45 @@ _PHASE2_PANEL_HTML = ("""
     badge.querySelectorAll('button[data-action]').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var act = btn.getAttribute('data-action');
-        if (act === 'recheck') { window.__vergentPhase2LastFetch = 0; poll(); return; }
+        if (act === 'recheck') { callRecheck(fbId, badge); return; }
         callPush(act, fbId, badge);
       });
     });
+  }
+
+  function showBadgeError(badge, msg) {
+    var el = badge.querySelector('.v2b-result') || badge.querySelector('.v2b-meta');
+    if (el) { el.style.color = '#5a0d0d'; el.textContent = msg; }
+  }
+
+  function callRecheck(fbId, badge) {
+    badge.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
+    var meta = badge.querySelector('.v2b-meta');
+    if (meta) meta.textContent = 'Re-checking Vergent...';
+    fetch('/api/vergent-recheck', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ firebase_id: fbId }),
+    })
+      .then(function(r) { return r.json().then(function(d) { return { status: r.status, body: d }; }); })
+      .then(function(res) {
+        if (res.status >= 200 && res.status < 300 && res.body && res.body.vergentMatch) {
+          // Bump the cache so the 2s poll doesn't re-fetch and overwrite
+          // the freshly-rendered match before its TTL is up.
+          window.__vergentPhase2LastFbId = fbId;
+          window.__vergentPhase2LastFetch = Date.now();
+          render(res.body.vergentMatch, fbId);
+        } else {
+          badge.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
+          var rb = res.body || {};
+          showBadgeError(badge, 'Re-check failed: ' + ((rb.error || rb.detail || ('HTTP ' + res.status)) + '').slice(0, 200));
+        }
+      })
+      .catch(function(e) {
+        badge.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
+        showBadgeError(badge, 'Network error: ' + (e && e.message ? e.message : 'unknown'));
+      });
   }
 
   function callPush(action, fbId, badge) {
@@ -940,6 +975,34 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(e.code, err_body)
             except Exception as e:
                 print(f'[VERGENT-PUSH ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
+        # Phase 2: synchronous Vergent re-check. Proxies to cif-apply's
+        # /api/vergent-recheck which calls run_vergent_match server-side
+        # and writes the fresh result back to Firebase. Used by the
+        # "Re-check now" button on the badge — the previous re-poll-only
+        # behavior could never recover from a missing vergentMatch field.
+        if path == '/api/vergent-recheck':
+            try:
+                body = json.loads(raw)
+                payload = json.dumps(body).encode()
+                print(f'[VERGENT-RECHECK PROXY] Forwarding to cif-apply...', flush=True)
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/vergent-recheck',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                # 30s — synchronous Vergent search is usually <5s but
+                # leave headroom for V1 token refresh on a cold cache.
+                with ur.urlopen(req, timeout=30) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[VERGENT-RECHECK UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[VERGENT-RECHECK ERROR] {e}', flush=True)
                 self.send_json(500, {'error': str(e)})
             return
 
