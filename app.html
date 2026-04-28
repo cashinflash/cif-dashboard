@@ -3621,6 +3621,24 @@ async function pushPlaidToVergent(fbId, overrideCustomerId) {
       if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = '↗ Push to Vergent'; }
       return;
     }
+    if (data.error === 'vergent_upload_all_paths_failed' && Array.isArray(data.attempts)) {
+      // Every (host, path) candidate IIS-404'd — Vergent hasn't exposed
+      // the upload endpoint at any URL we know to try. Surface the full
+      // attempt log so the operator can paste it into a Vergent ticket.
+      const lines = data.attempts.map((a, i) =>
+        `  ${i+1}. ${a.url} → HTTP ${a.status}${a.is_iis_404 ? ' (IIS 404)' : ''}`
+      ).join('\n');
+      const summary = 'Vergent has not exposed the document upload endpoint at any URL we know.\n\n' +
+                      'Tried:\n' + lines + '\n\n' +
+                      'Action: open a Vergent support ticket with the URL list above and ' +
+                      'ask for the canonical document-upload endpoint for service-account ' +
+                      'uploads to a customer record (company 386).';
+      console.error('[VERGENT UPLOAD all paths 404]', data.attempts);
+      alert(summary);
+      toast('Vergent upload endpoint not found — see alert for support-ticket details.', 'err');
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = '↗ Push to Vergent'; }
+      return;
+    }
     if (!resp.ok || !data.ok) {
       toast(data.detail || data.error || 'Vergent push failed', 'err');
       if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = '↗ Push to Vergent'; }
