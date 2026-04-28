@@ -325,214 +325,233 @@ def read_file(path):
 # ─────────────────────────────────────────────────────────────────────────────
 _PHASE2_PANEL_HTML = ("""
 <style>
-  #vergent-phase2-panel {
-    position: fixed; bottom: 16px; right: 16px; z-index: 9999;
-    max-width: 360px; padding: 12px 14px;
-    border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.18);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    font-size: 13px; line-height: 1.4;
-    transition: opacity .2s ease;
+  /* Per-applicant Vergent status badges — injected inline next to the
+     existing "Push to Vergent" button in the app detail view.
+     Classes applied to div#vergent-badge-{fbId} based on match status. */
+  .v2badge-found    { background:#e8f5ee; border:1px solid #b2d9c0; color:#0d3a20; }
+  .v2badge-notfound { background:#fff5e6; border:1px solid #ffd9a3; color:#5a3300; }
+  .v2badge-ambig    { background:#fffbe0; border:1px solid #f0e070; color:#5a4a00; }
+  .v2badge-err      { background:#fde7e7; border:1px solid #f0a3a3; color:#5a0d0d; }
+  .v2badge-pending  { background:#f5f5f5; border:1px solid #ccc;    color:#555;    }
+  [class^="v2badge-"] {
+    display:block; margin:8px 0; padding:8px 12px; border-radius:8px;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-size:12px; line-height:1.5; max-width:380px; box-sizing:border-box;
   }
-  #vergent-phase2-panel[hidden] { display: none !important; }
-  #vergent-phase2-panel.found    { background: #e8f5ee; border: 1px solid #b2d9c0; color: #0d3a20; }
-  #vergent-phase2-panel.notfound { background: #fff5e6; border: 1px solid #ffd9a3; color: #5a3300; }
-  #vergent-phase2-panel.ambig    { background: #fffbe0; border: 1px solid #f0e070; color: #5a4a00; }
-  #vergent-phase2-panel.err      { background: #fde7e7; border: 1px solid #f0a3a3; color: #5a0d0d; }
-  #vergent-phase2-panel .v2-title { font-weight: 700; margin-bottom: 6px; font-size: 14px; }
-  #vergent-phase2-panel .v2-meta  { font-size: 12px; color: #555; margin-bottom: 8px; }
-  #vergent-phase2-panel button {
-    margin-top: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600;
-    border-radius: 6px; border: none; cursor: pointer;
-    background: #1a6b3c; color: white;
+  .v2b-title { font-weight:700; font-size:13px; margin-bottom:3px; }
+  .v2b-meta  { font-size:11px; opacity:.75; margin-bottom:5px; }
+  .v2b-btn {
+    display:inline-block; margin:4px 4px 0 0; padding:5px 10px;
+    font-size:11px; font-weight:600; border-radius:5px; border:none;
+    cursor:pointer; background:#1a6b3c; color:white; font-family:inherit;
   }
-  #vergent-phase2-panel button:hover { background: #145a30; }
-  #vergent-phase2-panel button:disabled { opacity: .5; cursor: not-allowed; }
-  #vergent-phase2-panel button.secondary { background: #555; }
-  #vergent-phase2-panel .v2-close {
-    position: absolute; top: 4px; right: 8px; cursor: pointer;
-    color: #888; font-size: 18px; background: none; border: none; padding: 0;
+  .v2b-btn:hover    { background:#145a30; }
+  .v2b-btn:disabled { opacity:.5; cursor:not-allowed; }
+  .v2b-btn.sec      { background:#777; }
+  .v2b-result { margin-top:5px; font-size:11px; }
+  .v2b-input  {
+    padding:4px 6px; border-radius:4px; border:1px solid #ccc;
+    font-size:11px; width:140px; font-family:inherit;
   }
-  #vergent-phase2-panel label { display: block; margin: 4px 0; cursor: pointer; }
-  #vergent-phase2-panel label input { margin-right: 6px; }
-  #vergent-phase2-panel .v2-result { margin-top: 8px; font-size: 12px; }
+  label.v2b-lbl { display:block; margin:3px 0; cursor:pointer; font-size:11px; }
+  label.v2b-lbl input { margin-right:5px; }
 </style>
 <script>
 (function() {
-  // Phase 2 client-side panel (additive, does not touch app.html on disk).
-  // Watches for application detail rendering, finds the firebase id
-  // currently shown, fetches the record's vergentMatch, and renders a
-  // floating panel in the bottom-right with the appropriate state.
+  // Phase 2: inject an inline Vergent status badge into each applicant's
+  // detail view, right after the legacy "Push to Vergent" button.
+  // Polls every 2s; re-fetches from Firebase every 30s for the same fbId
+  // so it picks up the auto-search result written ~15s after submission.
   if (window.__vergentPhase2Init) return;
   window.__vergentPhase2Init = true;
 
   function findCurrentFirebaseId() {
-    // Try several common patterns to find which application is on screen.
-    // 1. URL hash like #app-XXX or ?id=XXX
     var m = window.location.hash.match(/-O[A-Za-z0-9_-]{15,}/);
     if (m) return m[0];
     m = window.location.search.match(/[?&]id=(-O[A-Za-z0-9_-]{15,})/);
     if (m) return m[1];
-    // 2. data-firebase-id attribute on a visible/active element
     var el = document.querySelector('[data-firebase-id]:not([hidden]):not([style*="display: none"])');
     if (el) return el.getAttribute('data-firebase-id');
-    // 3. Global variable some dashboards expose
     if (window.currentFirebaseId) return window.currentFirebaseId;
     if (window.currentApp && window.currentApp.firebaseId) return window.currentApp.firebaseId;
     return null;
   }
 
-  function getOrCreatePanel() {
-    var p = document.getElementById('vergent-phase2-panel');
-    if (p) return p;
-    p = document.createElement('div');
-    p.id = 'vergent-phase2-panel';
-    p.hidden = true;
-    p.innerHTML = '<button class="v2-close" type="button" aria-label="Close">&times;</button>'
-      + '<div class="v2-body"></div>';
-    document.body.appendChild(p);
-    p.querySelector('.v2-close').addEventListener('click', function() {
-      p.hidden = true;
-    });
-    return p;
+  function getOrInsertBadge(fbId) {
+    var id = 'vergent-badge-' + fbId;
+    var badge = document.getElementById(id);
+    if (badge) return badge;
+    badge = document.createElement('div');
+    badge.id = id;
+    // Strategy 1: insert right after the legacy push button
+    var anchor = document.getElementById('vergentpush-' + fbId);
+    if (anchor && anchor.parentNode) {
+      anchor.parentNode.insertBefore(badge, anchor.nextSibling);
+      return badge;
+    }
+    // Strategy 2: inside a data-firebase-id container
+    var container = document.querySelector('[data-firebase-id="' + fbId + '"]');
+    if (container) { container.appendChild(badge); return badge; }
+    // Strategy 3: fixed banner (last resort — anchor not rendered yet)
+    badge.style.cssText = 'position:fixed;top:16px;right:16px;z-index:9999;'
+      + 'max-width:340px;box-shadow:0 4px 16px rgba(0,0,0,.2);';
+    document.body.appendChild(badge);
+    return badge;
   }
 
   function render(match, fbId) {
-    var panel = getOrCreatePanel();
-    panel.hidden = false;
-    panel.className = '';
-    var body = panel.querySelector('.v2-body');
+    var badge = getOrInsertBadge(fbId);
     var status = (match && match.status) || 'unknown';
+    badge.className = '';
+
+    var docsNote = (match && match.searchNotes === 'partial_ssn_name_dob_only')
+      ? '<div class="v2b-meta">Search used name+DOB only (docs form — full SSN not collected)</div>'
+      : '';
+
+    var html = '';
     if (status === 'found') {
-      panel.classList.add('found');
+      badge.classList.add('v2badge-found');
       var cid = match.customerId || '';
       var pushed = match.vergentPushedDocs || {};
-      var pushedDl = pushed.drivers_license ? '✓' : '☐';
-      var pushedBs = pushed.bank_statement  ? '✓' : '☐';
-      body.innerHTML =
-        '<div class="v2-title">Vergent: existing customer #' + cid + '</div>'
-        + '<div class="v2-meta">Push docs to this customer record:</div>'
-        + '<label><input type="checkbox" name="kind" value="bank_statement" checked> '
-        +   pushedBs + ' Bank Statement / Plaid Asset Report</label>'
-        + '<label><input type="checkbox" name="kind" value="drivers_license"> '
-        +   pushedDl + ' Driver\\'s License</label>'
-        + '<button type="button" data-action="push">Push selected</button>'
-        + '<div class="v2-result"></div>';
+      var dlTag = pushed.drivers_license ? ' <span style="color:#1a6b3c">(pushed)</span>' : '';
+      var bsTag = pushed.bank_statement  ? ' <span style="color:#1a6b3c">(pushed)</span>' : '';
+      html = '<div class="v2b-title">Vergent: Existing  #' + cid + '</div>'
+        + docsNote
+        + '<label class="v2b-lbl"><input type="checkbox" name="kind" value="bank_statement" checked>'
+        +   ' Bank Statement' + bsTag + '</label>'
+        + '<label class="v2b-lbl"><input type="checkbox" name="kind" value="drivers_license">'
+        +   " Driver's License" + dlTag + '</label>'
+        + '<button type="button" class="v2b-btn" data-action="push">Push selected</button>'
+        + '<div class="v2b-result"></div>';
+
     } else if (status === 'not_found') {
-      panel.classList.add('notfound');
-      body.innerHTML =
-        '<div class="v2-title">Vergent: no matching customer</div>'
-        + '<div class="v2-meta">Will create a new Vergent customer and upload Driver\\'s License + Bank Statement.</div>'
-        + '<button type="button" data-action="create-and-push">Create + Push</button>'
-        + '<div class="v2-result"></div>';
+      badge.classList.add('v2badge-notfound');
+      html = '<div class="v2b-title">Vergent: New</div>'
+        + docsNote
+        + '<div class="v2b-meta">Will create a new customer and upload DL + Statement.</div>'
+        + '<button type="button" class="v2b-btn" data-action="create-and-push">Create + Push All</button>'
+        + '<div class="v2b-meta" style="margin-top:8px">Already in Vergent? Enter their ID:</div>'
+        + '<div style="display:flex;gap:4px;align-items:center">'
+        + '<input type="text" class="v2b-input" data-manual-id placeholder="Vergent customer ID">'
+        + '<button type="button" class="v2b-btn" data-action="push-manual">Use this ID</button>'
+        + '</div>'
+        + '<br><button type="button" class="v2b-btn sec" style="font-size:10px" data-action="recheck">Re-check Vergent</button>'
+        + '<div class="v2b-result"></div>';
+
     } else if (status === 'ambiguous') {
-      panel.classList.add('ambig');
+      badge.classList.add('v2badge-ambig');
       var cands = (match.candidates || []).slice(0, 5);
       var rows = cands.map(function(c, i) {
-        var id = c.customerId || c.CustomerId || c.id || '?';
-        var name = (c.firstName || '') + ' ' + (c.lastName || '');
+        var cid2 = c.customerId || c.CustomerId || c.id || '?';
+        var nm = ((c.firstName || '') + ' ' + (c.lastName || '')).trim();
         var dob = c.birthDate || c.dateOfBirth || '';
-        return '<label><input type="radio" name="vcand" value="' + id + '"' + (i === 0 ? ' checked' : '')
-          + '> #' + id + ' ' + name + ' ' + dob + '</label>';
+        return '<label class="v2b-lbl"><input type="radio" name="vcand" value="' + cid2 + '"'
+          + (i === 0 ? ' checked' : '') + '> #' + cid2 + ' ' + nm + (dob ? ' (' + dob + ')' : '') + '</label>';
       }).join('');
-      body.innerHTML =
-        '<div class="v2-title">Vergent: ' + (match.totalCount || cands.length) + ' matches</div>'
-        + '<div class="v2-meta">Pick the right customer:</div>'
+      html = '<div class="v2b-title">Vergent: ' + (match.totalCount || cands.length) + ' matches</div>'
+        + docsNote
+        + '<div class="v2b-meta">Pick the right customer:</div>'
         + rows
-        + '<button type="button" data-action="push-pick">Use selected + Push Statement</button>'
-        + '<div class="v2-result"></div>';
+        + '<button type="button" class="v2b-btn" data-action="push-pick">Use selected + Push</button>'
+        + '<div class="v2b-result"></div>';
+
     } else if (status === 'error') {
-      panel.classList.add('err');
-      body.innerHTML =
-        '<div class="v2-title">Vergent search failed</div>'
-        + '<div class="v2-meta">' + (match.errorBody || 'Unknown error').slice(0, 200) + '</div>'
-        + '<button type="button" class="secondary" data-action="dismiss">Dismiss</button>';
+      badge.classList.add('v2badge-err');
+      html = '<div class="v2b-title">Vergent: Search error</div>'
+        + '<div class="v2b-meta">' + (match.errorBody || 'Unknown error').slice(0, 200) + '</div>'
+        + '<button type="button" class="v2b-btn sec" data-action="recheck">Re-check</button>';
+
     } else {
-      panel.classList.add('notfound');
-      body.innerHTML =
-        '<div class="v2-title">Vergent match: pending</div>'
-        + '<div class="v2-meta">Auto-search hasn\\'t completed yet. Try again in 30s.</div>';
-      return;
+      badge.classList.add('v2badge-pending');
+      html = '<div class="v2b-title">Vergent: Pending</div>'
+        + '<div class="v2b-meta">Auto-search in progress — re-check in 30s.</div>'
+        + '<button type="button" class="v2b-btn sec" data-action="recheck">Re-check now</button>';
     }
 
-    body.querySelectorAll('button').forEach(function(btn) {
+    badge.innerHTML = html;
+    badge.querySelectorAll('button[data-action]').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        var action = btn.getAttribute('data-action');
-        if (action === 'dismiss') { panel.hidden = true; return; }
-        callPush(action, fbId, panel);
+        var act = btn.getAttribute('data-action');
+        if (act === 'recheck') { window.__vergentPhase2LastFetch = 0; poll(); return; }
+        callPush(act, fbId, badge);
       });
     });
   }
 
-  function callPush(action, fbId, panel) {
-    var resultEl = panel.querySelector('.v2-result');
-    resultEl.textContent = 'Pushing…';
-    panel.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
+  function callPush(action, fbId, badge) {
+    var resultEl = badge.querySelector('.v2b-result');
+    if (resultEl) resultEl.textContent = 'Pushing...';
+    badge.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
 
-    var body = { firebase_id: fbId };
+    var reqBody = { firebase_id: fbId };
     if (action === 'create-and-push') {
-      body.create_if_missing = true;
-      body.doc_kinds = ['drivers_license', 'bank_statement'];
+      reqBody.create_if_missing = true;
+      reqBody.doc_kinds = ['drivers_license', 'bank_statement'];
     } else if (action === 'push-pick') {
-      var picked = panel.querySelector('input[name="vcand"]:checked');
-      body.use_vergent_customer_id = picked ? picked.value : '';
-      body.doc_kinds = ['bank_statement'];
-    } else {  // 'push' (selected checkboxes)
-      var kinds = Array.from(panel.querySelectorAll('input[name="kind"]:checked'))
+      var picked = badge.querySelector('input[name="vcand"]:checked');
+      reqBody.use_vergent_customer_id = picked ? picked.value : '';
+      reqBody.doc_kinds = ['bank_statement'];
+    } else if (action === 'push-manual') {
+      var inp = badge.querySelector('[data-manual-id]');
+      var mid = inp ? inp.value.trim() : '';
+      if (!mid) {
+        badge.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
+        if (resultEl) { resultEl.style.color = '#5a0d0d'; resultEl.textContent = 'Enter a Vergent customer ID first.'; }
+        return;
+      }
+      reqBody.use_vergent_customer_id = mid;
+      reqBody.doc_kinds = ['bank_statement'];
+    } else {
+      var kinds = Array.from(badge.querySelectorAll('input[name="kind"]:checked'))
         .map(function(c) { return c.value; });
-      body.doc_kinds = kinds.length ? kinds : ['bank_statement'];
+      reqBody.doc_kinds = kinds.length ? kinds : ['bank_statement'];
     }
 
     fetch('/api/push-to-vergent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify(body),
+      body: JSON.stringify(reqBody),
     })
       .then(function(r) { return r.json().then(function(d) { return { status: r.status, body: d }; }); })
       .then(function(res) {
-        panel.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
+        badge.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
+        if (!resultEl) return;
         if (res.status >= 200 && res.status < 300 && res.body.ok) {
-          var uploads = res.body.uploads || {};
-          var msg = '✓ Pushed customer #' + (res.body.vergentCustomerId || '?');
+          var ups = res.body.uploads || {};
+          var msg = 'Pushed to customer #' + (res.body.vergentCustomerId || '?');
           var parts = [];
-          if (uploads.drivers_license) parts.push('DL');
-          if (uploads.bank_statement) parts.push('Statement');
+          if (ups.drivers_license) parts.push('DL');
+          if (ups.bank_statement)  parts.push('Statement');
           if (parts.length) msg += ' (' + parts.join(' + ') + ')';
-          resultEl.style.color = '#1a6b3c';
-          resultEl.textContent = msg;
+          resultEl.style.color = '#1a6b3c'; resultEl.textContent = msg;
         } else {
           resultEl.style.color = '#5a0d0d';
-          resultEl.textContent = '✗ ' + ((res.body.error || res.body.detail || 'Push failed') + '').slice(0, 240);
+          resultEl.textContent = 'Error: ' + ((res.body.error || res.body.detail || 'Push failed') + '').slice(0, 200);
         }
       })
       .catch(function(e) {
-        panel.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
-        resultEl.style.color = '#5a0d0d';
-        resultEl.textContent = '✗ Network error: ' + e.message;
+        badge.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
+        if (resultEl) { resultEl.style.color = '#5a0d0d'; resultEl.textContent = 'Network error: ' + e.message; }
       });
   }
 
   function poll() {
     var fbId = findCurrentFirebaseId();
-    if (!fbId) {
-      var p = document.getElementById('vergent-phase2-panel');
-      if (p) p.hidden = true;
-      return;
-    }
-    if (window.__vergentPhase2LastFbId === fbId) return; // already showing
+    if (!fbId) return;
+    var now = Date.now();
+    if (window.__vergentPhase2LastFbId === fbId
+        && (now - (window.__vergentPhase2LastFetch || 0)) < 30000) return;
     window.__vergentPhase2LastFbId = fbId;
-    fetch('/fb/reports/' + fbId + '/vergentMatch.json', {
-      credentials: 'same-origin',
-    })
+    window.__vergentPhase2LastFetch = now;
+    fetch('/fb/reports/' + fbId + '/vergentMatch.json', { credentials: 'same-origin' })
       .then(function(r) { return r.ok ? r.json() : null; })
-      .then(function(match) {
-        if (match) render(match, fbId);
-      })
-      .catch(function() { /* silent */ });
+      .then(function(match) { render(match || { status: 'unknown' }, fbId); })
+      .catch(function() {});
   }
 
   setInterval(poll, 2000);
-  setTimeout(poll, 1000);
+  setTimeout(poll, 800);
 })();
 </script>
 """).encode("utf-8")
