@@ -317,8 +317,13 @@ def read_file(path):
 # This is an additive overlay — does not modify app.html on disk. When
 # we eventually edit app.html directly to integrate the panel inline,
 # this injection becomes redundant and can be deleted.
+#
+# Stored as `str` and encoded to UTF-8 at module load — Python 3
+# bytes literals (b"""...""") cannot contain non-ASCII characters,
+# and this string contains check marks / em-dashes / ellipsis used
+# by the panel's user-facing copy.
 # ─────────────────────────────────────────────────────────────────────────────
-_PHASE2_PANEL_HTML = b"""
+_PHASE2_PANEL_HTML = ("""
 <style>
   #vergent-phase2-panel {
     position: fixed; bottom: 16px; right: 16px; z-index: 9999;
@@ -530,7 +535,7 @@ _PHASE2_PANEL_HTML = b"""
   setTimeout(poll, 1000);
 })();
 </script>
-"""
+""").encode("utf-8")
 
 
 def inject_phase2_panel(html_bytes: bytes) -> bytes:
