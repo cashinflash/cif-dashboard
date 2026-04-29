@@ -457,24 +457,30 @@ _PHASE2_PANEL_HTML = ("""
         + '<span class="v2b-result"></span>';
 
     } else if (status === 'not_found') {
-      // Same UI for apply AND docs records: DL+Statement checkboxes
-      // drive what gets uploaded, "Create + Push selected" creates
-      // the Vergent customer, manual-ID input is the escape hatch
-      // for customers already in Vergent. Vergent's customer-create
-      // may reject docs records that lack DOB / etc — when it does,
-      // the operator sees Vergent's actual error inline (the docs
-      // form will be extended to capture missing fields based on
-      // what real failures tell us).
-      html = '<span class="v2pill v2pill-notfound">+ Vergent: New</span>'
-        + docsHint
-        + '<label class="v2kind"><input type="checkbox" name="kind" value="bank_statement" checked> Statement</label>'
-        + '<label class="v2kind"><input type="checkbox" name="kind" value="drivers_license" checked> DL</label>'
-        + '<button type="button" class="v2btn" data-action="create-and-push">↗ Create + Push selected</button>'
-        + '<span class="v2b-meta">or use existing ID:</span>'
-        + '<input type="text" class="v2input" data-manual-id placeholder="Vergent customer ID">'
-        + '<button type="button" class="v2btn sec" data-action="push-manual">Use this ID</button>'
-        + '<button type="button" class="v2btn sec" data-action="recheck">↻ Re-check</button>'
-        + '<span class="v2b-result"></span>';
+      // Branch on source. docs.cashinflash.com applicants are
+      // re-applicants — they almost always already exist in Vergent
+      // by virtue of having a prior loan. If our search couldn't
+      // find them anyway (data drift, name change, etc.) the
+      // operator handles it directly inside Vergent — the dashboard
+      // shouldn't try to create or guess. apply.cashinflash.com
+      // applicants ARE often genuinely new customers: keep the
+      // Create + Push affordance.
+      var isDocs = (match && match.source === 'docs');
+      if (isDocs) {
+        html = '<span class="v2pill v2pill-notfound">+ Vergent: New</span>'
+          + docsHint
+          + '<span class="v2b-meta">Not found via auto-search. Locate them in Vergent directly.</span>'
+          + '<button type="button" class="v2btn sec" data-action="recheck">↻ Re-check</button>'
+          + '<span class="v2b-result"></span>';
+      } else {
+        html = '<span class="v2pill v2pill-notfound">+ Vergent: New</span>'
+          + docsHint
+          + '<label class="v2kind"><input type="checkbox" name="kind" value="bank_statement" checked> Statement</label>'
+          + '<label class="v2kind"><input type="checkbox" name="kind" value="drivers_license" checked> DL</label>'
+          + '<button type="button" class="v2btn" data-action="create-and-push">↗ Create + Push selected</button>'
+          + '<button type="button" class="v2btn sec" data-action="recheck">↻ Re-check</button>'
+          + '<span class="v2b-result"></span>';
+      }
 
     } else if (status === 'ambiguous') {
       var cands = (match.candidates || []).slice(0, 5);
@@ -581,15 +587,6 @@ _PHASE2_PANEL_HTML = ("""
     } else if (action === 'push-pick') {
       var picked = badge.querySelector('input[name="vcand"]:checked');
       reqBody.use_vergent_customer_id = picked ? picked.value : '';
-    } else if (action === 'push-manual') {
-      var inp = badge.querySelector('[data-manual-id]');
-      var mid = inp ? inp.value.trim() : '';
-      if (!mid) {
-        badge.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
-        if (resultEl) { resultEl.style.color = '#5a0d0d'; resultEl.textContent = 'Enter a Vergent customer ID first.'; }
-        return;
-      }
-      reqBody.use_vergent_customer_id = mid;
     }
     // 'push' (Existing state) needs no extra fields — doc_kinds already set.
 
@@ -612,8 +609,18 @@ _PHASE2_PANEL_HTML = ("""
           if (parts.length) msg += ' (' + parts.join(' + ') + ')';
           resultEl.style.color = '#1a6b3c'; resultEl.textContent = msg;
         } else {
+          // Surface the actual Vergent response body first — that's what
+          // tells the operator which field was rejected (e.g. "BirthDate
+          // is required"). Fall back to the canonical handler-side
+          // detail / error code only if Vergent didn't say anything.
+          var rb = res.body || {};
+          var status = rb.status ? ' [HTTP ' + rb.status + ']' : '';
+          var errMsg = rb.body || rb.detail || rb.error || 'Push failed';
+          // Log the full response for DevTools inspection — easier to
+          // copy-paste than reading off the badge.
+          console.log('[VERGENT-PUSH] error response', { status: res.status, body: rb });
           resultEl.style.color = '#5a0d0d';
-          resultEl.textContent = 'Error: ' + ((res.body.error || res.body.detail || 'Push failed') + '').slice(0, 200);
+          resultEl.textContent = 'Error' + status + ': ' + (errMsg + '').slice(0, 300);
         }
       })
       .catch(function(e) {
