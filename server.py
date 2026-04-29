@@ -325,36 +325,42 @@ def read_file(path):
 # ─────────────────────────────────────────────────────────────────────────────
 _PHASE2_PANEL_HTML = ("""
 <style>
-  /* Per-applicant Vergent status badges — injected inline next to the
-     existing "Push to Vergent" button in the app detail view.
-     Classes applied to div#vergent-badge-{fbId} based on match status. */
-  .v2badge-found    { background:#e8f5ee; border:1px solid #b2d9c0; color:#0d3a20; }
-  .v2badge-notfound { background:#fff5e6; border:1px solid #ffd9a3; color:#5a3300; }
-  .v2badge-ambig    { background:#fffbe0; border:1px solid #f0e070; color:#5a4a00; }
-  .v2badge-err      { background:#fde7e7; border:1px solid #f0a3a3; color:#5a0d0d; }
-  .v2badge-pending  { background:#f5f5f5; border:1px solid #ccc;    color:#555;    }
+  /* Per-applicant Vergent status badges — injected into the app detail
+     view's sticky header. Inline-style tokens match app.html's existing
+     #vergentpush button so the badge feels like part of the operator
+     action area. Palette pulled from cif-dashboard/CLAUDE.md style
+     language (primary blue, warning orange, error red, neutral gray). */
   [class^="v2badge-"] {
-    display:block; margin:8px 0; padding:8px 12px; border-radius:8px;
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    display:block; margin:8px 0; padding:10px 12px; border-radius:8px;
+    font-family:inherit;
     font-size:12px; line-height:1.5; max-width:380px; box-sizing:border-box;
+    border:1px solid;
   }
-  .v2b-title { font-weight:700; font-size:13px; margin-bottom:3px; }
-  .v2b-meta  { font-size:11px; opacity:.75; margin-bottom:5px; }
+  .v2badge-found    { background:#e8f3f8; border-color:#6cb1e2; color:#1a4d6b; }
+  .v2badge-notfound { background:#fff5e6; border-color:#ffd9a3; color:#5a3300; }
+  .v2badge-ambig    { background:#fff5e6; border-color:#f0c870; color:#5a4a00; }
+  .v2badge-err      { background:#fde7e7; border-color:#f0a3a3; color:#5a0d0d; }
+  .v2badge-pending  { background:#f3f4f6; border-color:#d1d5db; color:#374151; }
+  .v2b-title { font-weight:700; font-size:13px; margin-bottom:4px; }
+  .v2b-meta  { font-size:11px; opacity:.75; margin-bottom:6px; }
   .v2b-btn {
-    display:inline-block; margin:4px 4px 0 0; padding:5px 10px;
-    font-size:11px; font-weight:600; border-radius:5px; border:none;
-    cursor:pointer; background:#1a6b3c; color:white; font-family:inherit;
+    display:inline-block; margin:4px 4px 0 0;
+    background:#e8f3f8; color:#1a4d6b; border:1px solid #6cb1e2;
+    padding:6px 12px; border-radius:8px;
+    font-size:12px; font-weight:700;
+    cursor:pointer; font-family:inherit;
   }
-  .v2b-btn:hover    { background:#145a30; }
+  .v2b-btn:hover    { background:#d4e9f3; }
   .v2b-btn:disabled { opacity:.5; cursor:not-allowed; }
-  .v2b-btn.sec      { background:#777; }
-  .v2b-result { margin-top:5px; font-size:11px; }
+  .v2b-btn.sec      { background:transparent; color:#374151; border-color:#d1d5db; font-weight:700; }
+  .v2b-btn.sec:hover { background:#f3f4f6; }
+  .v2b-result { margin-top:6px; font-size:11px; font-weight:700; }
   .v2b-input  {
-    padding:4px 6px; border-radius:4px; border:1px solid #ccc;
-    font-size:11px; width:140px; font-family:inherit;
+    padding:6px 8px; border-radius:6px; border:1px solid #d1d5db;
+    font-size:12px; width:140px; font-family:inherit;
   }
-  label.v2b-lbl { display:block; margin:3px 0; cursor:pointer; font-size:11px; }
-  label.v2b-lbl input { margin-right:5px; }
+  label.v2b-lbl { display:block; margin:4px 0; cursor:pointer; font-size:12px; }
+  label.v2b-lbl input { margin-right:6px; }
 </style>
 <script>
 (function() {
@@ -383,16 +389,28 @@ _PHASE2_PANEL_HTML = ("""
     if (badge) return badge;
     badge = document.createElement('div');
     badge.id = id;
-    // Strategy 1: insert right after the legacy push button
+    // Strategy 1: insert right after the legacy push button (apply records).
     var anchor = document.getElementById('vergentpush-' + fbId);
     if (anchor && anchor.parentNode) {
       anchor.parentNode.insertBefore(badge, anchor.nextSibling);
       return badge;
     }
-    // Strategy 2: inside a data-firebase-id container
+    // Strategy 2: insert right after the modal's sticky action bar.
+    // .msticky exists in every #detailBody render (apply OR docs) so
+    // docs-record applicants get an inline anchor too. We're called
+    // from poll() only after findCurrentFirebaseId() returns this fbId
+    // — meaning the URL hash already matches — so the .msticky we find
+    // is guaranteed to belong to this applicant.
+    var sticky = document.querySelector('#detailBody .msticky');
+    if (sticky && sticky.parentNode) {
+      sticky.parentNode.insertBefore(badge, sticky.nextSibling);
+      return badge;
+    }
+    // Strategy 3: legacy data-firebase-id container (currently unused
+    // by app.html but harmless to keep for forward-compat).
     var container = document.querySelector('[data-firebase-id="' + fbId + '"]');
     if (container) { container.appendChild(badge); return badge; }
-    // Strategy 3: fixed banner (last resort — anchor not rendered yet)
+    // Strategy 4: fixed banner (last resort — modal not open yet).
     badge.style.cssText = 'position:fixed;top:16px;right:16px;z-index:9999;'
       + 'max-width:340px;box-shadow:0 4px 16px rgba(0,0,0,.2);';
     document.body.appendChild(badge);
@@ -426,16 +444,30 @@ _PHASE2_PANEL_HTML = ("""
 
     } else if (status === 'not_found') {
       badge.classList.add('v2badge-notfound');
+      // Docs records lack the DOB/address/employer/etc that Vergent's
+      // customer-create endpoint requires, so the Create + Push All
+      // path is hidden for them — the operator either finds them by
+      // ID or creates the customer manually in Vergent first.
+      var isDocs = (match && match.source === 'docs');
+      var topMeta = isDocs
+        ? '<div class="v2b-meta">Not found in Vergent. Find them by ID below, or re-check after verifying.</div>'
+        : '<div class="v2b-meta">Will create a new customer and upload DL + Statement.</div>';
+      var createBtn = isDocs
+        ? ''
+        : '<button type="button" class="v2b-btn" data-action="create-and-push">Create + Push All</button>';
+      var idPrompt = isDocs
+        ? '<div class="v2b-meta" style="margin-top:4px">Vergent customer ID:</div>'
+        : '<div class="v2b-meta" style="margin-top:8px">Already in Vergent? Enter their ID:</div>';
       html = '<div class="v2b-title">Vergent: New</div>'
         + docsNote
-        + '<div class="v2b-meta">Will create a new customer and upload DL + Statement.</div>'
-        + '<button type="button" class="v2b-btn" data-action="create-and-push">Create + Push All</button>'
-        + '<div class="v2b-meta" style="margin-top:8px">Already in Vergent? Enter their ID:</div>'
+        + topMeta
+        + createBtn
+        + idPrompt
         + '<div style="display:flex;gap:4px;align-items:center">'
         + '<input type="text" class="v2b-input" data-manual-id placeholder="Vergent customer ID">'
         + '<button type="button" class="v2b-btn" data-action="push-manual">Use this ID</button>'
         + '</div>'
-        + '<br><button type="button" class="v2b-btn sec" style="font-size:10px" data-action="recheck">Re-check Vergent</button>'
+        + '<br><button type="button" class="v2b-btn sec" data-action="recheck">Re-check Vergent</button>'
         + '<div class="v2b-result"></div>';
 
     } else if (status === 'ambiguous') {
