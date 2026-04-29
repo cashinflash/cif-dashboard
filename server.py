@@ -23,11 +23,11 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────
 # Password hashing (scrypt — NIST-approved, stdlib-only so no new dependency)
 #
 # Stored format:  scrypt$<salt-hex>$<hash-hex>
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────
 _SCRYPT_N, _SCRYPT_R, _SCRYPT_P, _SCRYPT_DKLEN = 16384, 8, 1, 32
 
 
@@ -68,9 +68,9 @@ def verify_password(password: str, stored: str, who: str = '?') -> bool:
     return False
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────
 # Sessions + rate limiting (both in-process — OK for single-instance Render app)
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────
 sessions = {}   # token -> {'user', 'created', 'last_active', 'ip'}
 _login_attempts = collections.defaultdict(list)  # ip -> [(ts, success), ...]
 
@@ -161,12 +161,12 @@ def get_token_from_request(handler) -> str:
     return ''
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────
 # User store — Firebase is the primary source of truth, env vars are a
 # bootstrap fallback so an accidentally corrupted Firebase can't lock everyone
 # out. Users added via the dashboard UI persist to /users/<name> in Firebase
 # and show up on the next cache refresh (or immediately via invalidate()).
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────
 
 _USERNAME_RE = __import__('re').compile(r'^[a-z0-9_.-]{2,32}$')
 _USER_CACHE_TTL = 60  # seconds
@@ -297,7 +297,7 @@ def read_file(path):
         return None
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────
 # Phase 2: small client-side panel injected into app.html on serve.
 #
 # Watches the dashboard's currently-rendered application (best-effort —
@@ -322,7 +322,7 @@ def read_file(path):
 # bytes literals (b"""...""") cannot contain non-ASCII characters,
 # and this string contains check marks / em-dashes / ellipsis used
 # by the panel's user-facing copy.
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────
 _PHASE2_PANEL_HTML = ("""
 <style>
   /* Per-applicant Vergent status badges — injected inline next to the
@@ -811,6 +811,43 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(502, {'error': str(e)})
             return
 
+        # ─── Static file serving (Phase 0 of v3) ─────────────────
+        # Serves /static/css/*.css, /static/js/*.js, etc. for files that
+        # got extracted out of app.html in the v3 Phase 0 split. Public
+        # by design — the JS/CSS itself contains no secrets and is
+        # already fetched whenever an authed user loads /app.html.
+        # Path-traversal guarded; only allowlisted extensions served.
+        if path.startswith('/static/'):
+            if '..' in path or '\\' in path:
+                self.send_json(404, {'error': 'not found'}); return
+            rel = path[len('/static/'):]
+            full = os.path.normpath(os.path.join(DIR, 'static', rel))
+            base = os.path.normpath(os.path.join(DIR, 'static'))
+            if not full.startswith(base + os.sep) and full != base:
+                self.send_json(404, {'error': 'not found'}); return
+            ext_to_mime = {
+                '.css': 'text/css; charset=utf-8',
+                '.js': 'application/javascript; charset=utf-8',
+                '.png': 'image/png',
+                '.svg': 'image/svg+xml',
+                '.woff2': 'font/woff2',
+                '.ico': 'image/x-icon',
+            }
+            ext = os.path.splitext(full)[1].lower()
+            mime = ext_to_mime.get(ext)
+            if not mime:
+                self.send_json(404, {'error': 'not found'}); return
+            data = read_file(full)
+            if data is None:
+                self.send_json(404, {'error': 'not found'}); return
+            self.send_response(200)
+            self.send_header('Content-Type', mime)
+            self.send_header('Cache-Control', 'public, max-age=3600')
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
+
         self.send_json(404, {'error': 'not found'})
 
     def do_POST(self):
@@ -1049,9 +1086,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
-        # ──────────────────────────────────────────────────────────────────
+        # ───────────────────────────────────────────────────────────────
         # User management (admin-only except /api/password which is self-serve)
-        # ──────────────────────────────────────────────────────────────────
+        # ───────────────────────────────────────────────────────────────
         if path in ('/api/users/add', '/api/users/reset', '/api/users/delete', '/api/users/migrate-from-env', '/api/users/role'):
             if not is_admin_session(token):
                 self.send_json(403, {'error': 'Admin access required'}); return
@@ -1253,9 +1290,9 @@ class Handler(BaseHTTPRequestHandler):
 
         self.send_json(404, {'error': 'not found'})
 
-    # ──────────────────────────────────────────────────────────────────────
+    # ───────────────────────────────────────────────────────────────
     # Login
-    # ──────────────────────────────────────────────────────────────────────
+    # ───────────────────────────────────────────────────────────────
     def _handle_login(self, raw):
         ip = _client_ip(self)
         allowed, retry_in = check_rate_limit(ip)
