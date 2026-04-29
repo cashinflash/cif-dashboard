@@ -325,42 +325,55 @@ def read_file(path):
 # ─────────────────────────────────────────────────────────────────────────────
 _PHASE2_PANEL_HTML = ("""
 <style>
-  /* Per-applicant Vergent status badges — injected into the app detail
-     view's sticky header. Inline-style tokens match app.html's existing
-     #vergentpush button so the badge feels like part of the operator
-     action area. Palette pulled from cif-dashboard/CLAUDE.md style
-     language (primary blue, warning orange, error red, neutral gray). */
-  [class^="v2badge-"] {
-    display:block; margin:8px 0; padding:10px 12px; border-radius:8px;
-    font-family:inherit;
-    font-size:12px; line-height:1.5; max-width:380px; box-sizing:border-box;
-    border:1px solid;
+  /* Vergent badge — inline-chip layout. Flows alongside the existing
+     "Push to Vergent" button as a single row of (status pill →
+     action buttons / inputs). No bordered card. Tokens match
+     app.html's #vergentpush button verbatim. */
+  .v2chip {
+    display: inline-flex; align-items: center; flex-wrap: wrap;
+    gap: 6px;
+    margin: 4px 0; padding: 0; border: none; background: transparent;
+    font-family: inherit; font-size: 12px; line-height: 1.4;
+    vertical-align: middle;
   }
-  .v2badge-found    { background:#e8f3f8; border-color:#6cb1e2; color:#1a4d6b; }
-  .v2badge-notfound { background:#fff5e6; border-color:#ffd9a3; color:#5a3300; }
-  .v2badge-ambig    { background:#fff5e6; border-color:#f0c870; color:#5a4a00; }
-  .v2badge-err      { background:#fde7e7; border-color:#f0a3a3; color:#5a0d0d; }
-  .v2badge-pending  { background:#f3f4f6; border-color:#d1d5db; color:#374151; }
-  .v2b-title { font-weight:700; font-size:13px; margin-bottom:4px; }
-  .v2b-meta  { font-size:11px; opacity:.75; margin-bottom:6px; }
-  .v2b-btn {
-    display:inline-block; margin:4px 4px 0 0;
+  .v2pill {
+    display: inline-flex; align-items: center;
+    padding: 6px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 700; letter-spacing: .02em;
+    border: 1px solid; white-space: nowrap;
+  }
+  .v2pill-found    { background:#e8f3f8; color:#1a4d6b; border-color:#6cb1e2; }
+  .v2pill-notfound { background:#fff5e6; color:#5a3300; border-color:#ffd9a3; }
+  .v2pill-ambig    { background:#fff5e6; color:#5a4a00; border-color:#f0c870; }
+  .v2pill-err      { background:#fde7e7; color:#5a0d0d; border-color:#f0a3a3; }
+  .v2pill-pending  { background:#f3f4f6; color:#374151; border-color:#d1d5db; }
+  .v2btn {
+    display: inline-flex; align-items: center;
     background:#e8f3f8; color:#1a4d6b; border:1px solid #6cb1e2;
-    padding:6px 12px; border-radius:8px;
+    padding:8px 12px; border-radius:8px;
     font-size:12px; font-weight:700;
     cursor:pointer; font-family:inherit;
+    white-space: nowrap;
   }
-  .v2b-btn:hover    { background:#d4e9f3; }
-  .v2b-btn:disabled { opacity:.5; cursor:not-allowed; }
-  .v2b-btn.sec      { background:transparent; color:#374151; border-color:#d1d5db; font-weight:700; }
-  .v2b-btn.sec:hover { background:#f3f4f6; }
-  .v2b-result { margin-top:6px; font-size:11px; font-weight:700; }
-  .v2b-input  {
-    padding:6px 8px; border-radius:6px; border:1px solid #d1d5db;
-    font-size:12px; width:140px; font-family:inherit;
+  .v2btn:hover    { background:#d4e9f3; }
+  .v2btn:disabled { opacity:.5; cursor:not-allowed; }
+  .v2btn.sec      { background:transparent; color:#374151; border-color:#d1d5db; }
+  .v2btn.sec:hover { background:#f3f4f6; }
+  .v2input {
+    padding:7px 10px; border-radius:8px; border:1px solid #d1d5db;
+    font-size:12px; width:160px; font-family:inherit;
+    box-sizing: border-box;
   }
-  label.v2b-lbl { display:block; margin:4px 0; cursor:pointer; font-size:12px; }
-  label.v2b-lbl input { margin-right:6px; }
+  .v2b-meta {
+    font-size:11px; color:#6b7280; font-style:italic;
+  }
+  .v2b-result { font-size:11px; font-weight:700; }
+  .v2kind, .v2cand {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12px; cursor: pointer;
+    padding: 4px 4px;
+  }
+  .v2kind input, .v2cand input { margin: 0; cursor: pointer; }
 </style>
 <script>
 (function() {
@@ -417,87 +430,80 @@ _PHASE2_PANEL_HTML = ("""
     return badge;
   }
 
+  function escAttr(s) {
+    return String(s == null ? '' : s).replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  }
+
   function render(match, fbId) {
     var badge = getOrInsertBadge(fbId);
     var status = (match && match.status) || 'unknown';
-    badge.className = '';
+    badge.className = 'v2chip';
 
-    var docsNote = (match && match.searchNotes === 'partial_ssn_name_dob_only')
-      ? '<div class="v2b-meta">Search used name+DOB only (docs form — full SSN not collected)</div>'
+    var docsHint = (match && match.searchNotes === 'partial_ssn_name_dob_only')
+      ? '<span class="v2b-meta" title="docs form — full SSN not collected">name+DOB only</span>'
       : '';
 
     var html = '';
     if (status === 'found') {
-      badge.classList.add('v2badge-found');
       var cid = match.customerId || '';
       var pushed = match.vergentPushedDocs || {};
-      var dlTag = pushed.drivers_license ? ' <span style="color:#1a6b3c">(pushed)</span>' : '';
-      var bsTag = pushed.bank_statement  ? ' <span style="color:#1a6b3c">(pushed)</span>' : '';
-      html = '<div class="v2b-title">Vergent: Existing  #' + cid + '</div>'
-        + docsNote
-        + '<label class="v2b-lbl"><input type="checkbox" name="kind" value="bank_statement" checked>'
-        +   ' Bank Statement' + bsTag + '</label>'
-        + '<label class="v2b-lbl"><input type="checkbox" name="kind" value="drivers_license">'
-        +   " Driver's License" + dlTag + '</label>'
-        + '<button type="button" class="v2b-btn" data-action="push">Push selected</button>'
-        + '<div class="v2b-result"></div>';
+      var bsTag = pushed.bank_statement  ? ' ✓' : '';
+      var dlTag = pushed.drivers_license ? ' ✓' : '';
+      html = '<span class="v2pill v2pill-found">✓ Vergent: #' + cid + '</span>'
+        + docsHint
+        + '<label class="v2kind"><input type="checkbox" name="kind" value="bank_statement" checked> Statement' + bsTag + '</label>'
+        + '<label class="v2kind"><input type="checkbox" name="kind" value="drivers_license"> DL' + dlTag + '</label>'
+        + '<button type="button" class="v2btn" data-action="push">↗ Push selected</button>'
+        + '<span class="v2b-result"></span>';
 
     } else if (status === 'not_found') {
-      badge.classList.add('v2badge-notfound');
-      // Docs records lack the DOB/address/employer/etc that Vergent's
-      // customer-create endpoint requires, so the Create + Push All
-      // path is hidden for them — the operator either finds them by
-      // ID or creates the customer manually in Vergent first.
-      var isDocs = (match && match.source === 'docs');
-      var topMeta = isDocs
-        ? '<div class="v2b-meta">Not found in Vergent. Find them by ID below, or re-check after verifying.</div>'
-        : '<div class="v2b-meta">Will create a new customer and upload DL + Statement.</div>';
-      var createBtn = isDocs
-        ? ''
-        : '<button type="button" class="v2b-btn" data-action="create-and-push">Create + Push All</button>';
-      var idPrompt = isDocs
-        ? '<div class="v2b-meta" style="margin-top:4px">Vergent customer ID:</div>'
-        : '<div class="v2b-meta" style="margin-top:8px">Already in Vergent? Enter their ID:</div>';
-      html = '<div class="v2b-title">Vergent: New</div>'
-        + docsNote
-        + topMeta
-        + createBtn
-        + idPrompt
-        + '<div style="display:flex;gap:4px;align-items:center">'
-        + '<input type="text" class="v2b-input" data-manual-id placeholder="Vergent customer ID">'
-        + '<button type="button" class="v2b-btn" data-action="push-manual">Use this ID</button>'
-        + '</div>'
-        + '<br><button type="button" class="v2b-btn sec" data-action="recheck">Re-check Vergent</button>'
-        + '<div class="v2b-result"></div>';
+      // Same UI for apply AND docs records: DL+Statement checkboxes
+      // drive what gets uploaded, "Create + Push selected" creates
+      // the Vergent customer, manual-ID input is the escape hatch
+      // for customers already in Vergent. Vergent's customer-create
+      // may reject docs records that lack DOB / etc — when it does,
+      // the operator sees Vergent's actual error inline (the docs
+      // form will be extended to capture missing fields based on
+      // what real failures tell us).
+      html = '<span class="v2pill v2pill-notfound">+ Vergent: New</span>'
+        + docsHint
+        + '<label class="v2kind"><input type="checkbox" name="kind" value="bank_statement" checked> Statement</label>'
+        + '<label class="v2kind"><input type="checkbox" name="kind" value="drivers_license" checked> DL</label>'
+        + '<button type="button" class="v2btn" data-action="create-and-push">↗ Create + Push selected</button>'
+        + '<span class="v2b-meta">or use existing ID:</span>'
+        + '<input type="text" class="v2input" data-manual-id placeholder="Vergent customer ID">'
+        + '<button type="button" class="v2btn sec" data-action="push-manual">Use this ID</button>'
+        + '<button type="button" class="v2btn sec" data-action="recheck">↻ Re-check</button>'
+        + '<span class="v2b-result"></span>';
 
     } else if (status === 'ambiguous') {
-      badge.classList.add('v2badge-ambig');
       var cands = (match.candidates || []).slice(0, 5);
       var rows = cands.map(function(c, i) {
         var cid2 = c.customerId || c.CustomerId || c.id || '?';
         var nm = ((c.firstName || '') + ' ' + (c.lastName || '')).trim();
-        var dob = c.birthDate || c.dateOfBirth || '';
-        return '<label class="v2b-lbl"><input type="radio" name="vcand" value="' + cid2 + '"'
-          + (i === 0 ? ' checked' : '') + '> #' + cid2 + ' ' + nm + (dob ? ' (' + dob + ')' : '') + '</label>';
+        return '<label class="v2cand"><input type="radio" name="vcand" value="' + escAttr(cid2) + '"'
+          + (i === 0 ? ' checked' : '') + '> #' + escAttr(cid2) + (nm ? ' ' + escAttr(nm) : '') + '</label>';
       }).join('');
-      html = '<div class="v2b-title">Vergent: ' + (match.totalCount || cands.length) + ' matches</div>'
-        + docsNote
-        + '<div class="v2b-meta">Pick the right customer:</div>'
+      html = '<span class="v2pill v2pill-ambig">⚠ Vergent: ' + (match.totalCount || cands.length) + ' matches</span>'
+        + docsHint
         + rows
-        + '<button type="button" class="v2b-btn" data-action="push-pick">Use selected + Push</button>'
-        + '<div class="v2b-result"></div>';
+        + '<label class="v2kind"><input type="checkbox" name="kind" value="bank_statement" checked> Statement</label>'
+        + '<label class="v2kind"><input type="checkbox" name="kind" value="drivers_license"> DL</label>'
+        + '<button type="button" class="v2btn" data-action="push-pick">↗ Use + Push selected</button>'
+        + '<button type="button" class="v2btn sec" data-action="recheck">↻ Re-check</button>'
+        + '<span class="v2b-result"></span>';
 
     } else if (status === 'error') {
-      badge.classList.add('v2badge-err');
-      html = '<div class="v2b-title">Vergent: Search error</div>'
-        + '<div class="v2b-meta">' + (match.errorBody || 'Unknown error').slice(0, 200) + '</div>'
-        + '<button type="button" class="v2b-btn sec" data-action="recheck">Re-check</button>';
+      var errFull = (match && match.errorBody) || 'Unknown error';
+      var errShort = errFull.slice(0, 120);
+      html = '<span class="v2pill v2pill-err">⚠ Vergent: Search error</span>'
+        + '<span class="v2b-meta" title="' + escAttr(errFull) + '">' + escAttr(errShort) + '</span>'
+        + '<button type="button" class="v2btn sec" data-action="recheck">↻ Re-check</button>';
 
     } else {
-      badge.classList.add('v2badge-pending');
-      html = '<div class="v2b-title">Vergent: Pending</div>'
-        + '<div class="v2b-meta">Auto-search in progress — re-check in 30s.</div>'
-        + '<button type="button" class="v2b-btn sec" data-action="recheck">Re-check now</button>';
+      html = '<span class="v2pill v2pill-pending">⏳ Vergent: Pending</span>'
+        + '<button type="button" class="v2btn sec" data-action="recheck">↻ Re-check now</button>'
+        + '<span class="v2b-result"></span>';
     }
 
     badge.innerHTML = html;
@@ -517,16 +523,24 @@ _PHASE2_PANEL_HTML = ("""
 
   function callRecheck(fbId, badge) {
     badge.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
-    var meta = badge.querySelector('.v2b-meta');
-    if (meta) meta.textContent = 'Re-checking Vergent...';
+    console.log('[VERGENT-RECHECK] requesting fbId=' + fbId);
     fetch('/api/vergent-recheck', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
       body: JSON.stringify({ firebase_id: fbId }),
     })
-      .then(function(r) { return r.json().then(function(d) { return { status: r.status, body: d }; }); })
+      // Read body as text first so we can see non-JSON responses
+      // (HTML 404 pages from edges, etc.) instead of failing silently.
+      .then(function(r) {
+        return r.text().then(function(txt) {
+          var parsed = null;
+          try { parsed = JSON.parse(txt); } catch (e) { /* keep raw text */ }
+          return { status: r.status, body: parsed, rawText: txt };
+        });
+      })
       .then(function(res) {
+        console.log('[VERGENT-RECHECK] response', res);
         if (res.status >= 200 && res.status < 300 && res.body && res.body.vergentMatch) {
           // Bump the cache so the 2s poll doesn't re-fetch and overwrite
           // the freshly-rendered match before its TTL is up.
@@ -536,10 +550,14 @@ _PHASE2_PANEL_HTML = ("""
         } else {
           badge.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
           var rb = res.body || {};
-          showBadgeError(badge, 'Re-check failed: ' + ((rb.error || rb.detail || ('HTTP ' + res.status)) + '').slice(0, 200));
+          var detail = rb.error || rb.detail
+            || (res.rawText && res.rawText.slice(0, 200))
+            || ('HTTP ' + res.status);
+          showBadgeError(badge, 'Re-check failed: ' + (detail + '').slice(0, 200));
         }
       })
       .catch(function(e) {
+        console.error('[VERGENT-RECHECK] network error', e);
         badge.querySelectorAll('button').forEach(function(b) { b.disabled = false; });
         showBadgeError(badge, 'Network error: ' + (e && e.message ? e.message : 'unknown'));
       });
@@ -550,14 +568,19 @@ _PHASE2_PANEL_HTML = ("""
     if (resultEl) resultEl.textContent = 'Pushing...';
     badge.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
 
-    var reqBody = { firebase_id: fbId };
+    // All push actions read the kind checkboxes if present, defaulting
+    // to bank_statement only when none are. This keeps the UX uniform
+    // across Existing / New / Ambiguous: same checkboxes everywhere.
+    var checkedKinds = Array.from(badge.querySelectorAll('input[name="kind"]:checked'))
+      .map(function(c) { return c.value; });
+    var docKinds = checkedKinds.length ? checkedKinds : ['bank_statement'];
+
+    var reqBody = { firebase_id: fbId, doc_kinds: docKinds };
     if (action === 'create-and-push') {
       reqBody.create_if_missing = true;
-      reqBody.doc_kinds = ['drivers_license', 'bank_statement'];
     } else if (action === 'push-pick') {
       var picked = badge.querySelector('input[name="vcand"]:checked');
       reqBody.use_vergent_customer_id = picked ? picked.value : '';
-      reqBody.doc_kinds = ['bank_statement'];
     } else if (action === 'push-manual') {
       var inp = badge.querySelector('[data-manual-id]');
       var mid = inp ? inp.value.trim() : '';
@@ -567,12 +590,8 @@ _PHASE2_PANEL_HTML = ("""
         return;
       }
       reqBody.use_vergent_customer_id = mid;
-      reqBody.doc_kinds = ['bank_statement'];
-    } else {
-      var kinds = Array.from(badge.querySelectorAll('input[name="kind"]:checked'))
-        .map(function(c) { return c.value; });
-      reqBody.doc_kinds = kinds.length ? kinds : ['bank_statement'];
     }
+    // 'push' (Existing state) needs no extra fields — doc_kinds already set.
 
     fetch('/api/push-to-vergent', {
       method: 'POST',
