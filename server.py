@@ -457,28 +457,24 @@ _PHASE2_PANEL_HTML = ("""
         + '<span class="v2b-result"></span>';
 
     } else if (status === 'not_found') {
-      // Docs records lack the DOB/address/employer/etc that Vergent's
-      // customer-create endpoint requires, so the Create + Push All
-      // path is hidden for them — the operator either finds them by
-      // ID or creates the customer manually in Vergent first.
-      var isDocs = (match && match.source === 'docs');
-      if (isDocs) {
-        html = '<span class="v2pill v2pill-notfound">Vergent: Not found</span>'
-          + docsHint
-          + '<input type="text" class="v2input" data-manual-id placeholder="Vergent customer ID">'
-          + '<button type="button" class="v2btn" data-action="push-manual">↗ Use this ID</button>'
-          + '<button type="button" class="v2btn sec" data-action="recheck">↻ Re-check</button>'
-          + '<span class="v2b-result"></span>';
-      } else {
-        html = '<span class="v2pill v2pill-notfound">+ Vergent: New</span>'
-          + docsHint
-          + '<button type="button" class="v2btn" data-action="create-and-push">↗ Create + Push All</button>'
-          + '<span class="v2b-meta">or:</span>'
-          + '<input type="text" class="v2input" data-manual-id placeholder="Existing ID">'
-          + '<button type="button" class="v2btn sec" data-action="push-manual">Use this ID</button>'
-          + '<button type="button" class="v2btn sec" data-action="recheck">↻ Re-check</button>'
-          + '<span class="v2b-result"></span>';
-      }
+      // Same UI for apply AND docs records: DL+Statement checkboxes
+      // drive what gets uploaded, "Create + Push selected" creates
+      // the Vergent customer, manual-ID input is the escape hatch
+      // for customers already in Vergent. Vergent's customer-create
+      // may reject docs records that lack DOB / etc — when it does,
+      // the operator sees Vergent's actual error inline (the docs
+      // form will be extended to capture missing fields based on
+      // what real failures tell us).
+      html = '<span class="v2pill v2pill-notfound">+ Vergent: New</span>'
+        + docsHint
+        + '<label class="v2kind"><input type="checkbox" name="kind" value="bank_statement" checked> Statement</label>'
+        + '<label class="v2kind"><input type="checkbox" name="kind" value="drivers_license" checked> DL</label>'
+        + '<button type="button" class="v2btn" data-action="create-and-push">↗ Create + Push selected</button>'
+        + '<span class="v2b-meta">or use existing ID:</span>'
+        + '<input type="text" class="v2input" data-manual-id placeholder="Vergent customer ID">'
+        + '<button type="button" class="v2btn sec" data-action="push-manual">Use this ID</button>'
+        + '<button type="button" class="v2btn sec" data-action="recheck">↻ Re-check</button>'
+        + '<span class="v2b-result"></span>';
 
     } else if (status === 'ambiguous') {
       var cands = (match.candidates || []).slice(0, 5);
@@ -491,7 +487,9 @@ _PHASE2_PANEL_HTML = ("""
       html = '<span class="v2pill v2pill-ambig">⚠ Vergent: ' + (match.totalCount || cands.length) + ' matches</span>'
         + docsHint
         + rows
-        + '<button type="button" class="v2btn" data-action="push-pick">↗ Use + Push</button>'
+        + '<label class="v2kind"><input type="checkbox" name="kind" value="bank_statement" checked> Statement</label>'
+        + '<label class="v2kind"><input type="checkbox" name="kind" value="drivers_license"> DL</label>'
+        + '<button type="button" class="v2btn" data-action="push-pick">↗ Use + Push selected</button>'
         + '<button type="button" class="v2btn sec" data-action="recheck">↻ Re-check</button>'
         + '<span class="v2b-result"></span>';
 
@@ -570,14 +568,19 @@ _PHASE2_PANEL_HTML = ("""
     if (resultEl) resultEl.textContent = 'Pushing...';
     badge.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
 
-    var reqBody = { firebase_id: fbId };
+    // All push actions read the kind checkboxes if present, defaulting
+    // to bank_statement only when none are. This keeps the UX uniform
+    // across Existing / New / Ambiguous: same checkboxes everywhere.
+    var checkedKinds = Array.from(badge.querySelectorAll('input[name="kind"]:checked'))
+      .map(function(c) { return c.value; });
+    var docKinds = checkedKinds.length ? checkedKinds : ['bank_statement'];
+
+    var reqBody = { firebase_id: fbId, doc_kinds: docKinds };
     if (action === 'create-and-push') {
       reqBody.create_if_missing = true;
-      reqBody.doc_kinds = ['drivers_license', 'bank_statement'];
     } else if (action === 'push-pick') {
       var picked = badge.querySelector('input[name="vcand"]:checked');
       reqBody.use_vergent_customer_id = picked ? picked.value : '';
-      reqBody.doc_kinds = ['bank_statement'];
     } else if (action === 'push-manual') {
       var inp = badge.querySelector('[data-manual-id]');
       var mid = inp ? inp.value.trim() : '';
@@ -587,12 +590,8 @@ _PHASE2_PANEL_HTML = ("""
         return;
       }
       reqBody.use_vergent_customer_id = mid;
-      reqBody.doc_kinds = ['bank_statement'];
-    } else {
-      var kinds = Array.from(badge.querySelectorAll('input[name="kind"]:checked'))
-        .map(function(c) { return c.value; });
-      reqBody.doc_kinds = kinds.length ? kinds : ['bank_statement'];
     }
+    // 'push' (Existing state) needs no extra fields — doc_kinds already set.
 
     fetch('/api/push-to-vergent', {
       method: 'POST',
