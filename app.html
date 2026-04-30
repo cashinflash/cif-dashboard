@@ -3439,23 +3439,23 @@ function buildReportPanel(a) {
   // Re-run controls — always available so staff can force a re-evaluation
   // with stored data or fresh-pulled Plaid data.
   const rerunHeader = `
-    <div style="padding:10px 12px;background:#f8f8f8;border-radius:8px;margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <div style="padding:8px 0;margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:space-between;border-bottom:1px solid #eef0ef">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <button onclick="runV2('${fbId}')" id="v2run-${fbId}"
-                style="background:#1a6b3c;color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
-          ${hasRun ? 'Re-run with stored data' : 'Run engine'}
+                style="background:transparent;color:#374151;border:1px solid #d1d5db;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
+          ${hasRun ? '⟳ Re-run with stored data' : '▶ Run engine'}
         </button>
         ${canRefresh ? `
           <button onclick="refreshFromPlaid('${fbId}')" id="plaidref-${fbId}"
                   title="Pulls fresh data from Plaid across ALL connected accounts, then re-runs. Use this when you suspect the stored extraction missed an account."
-                  style="background:#fff8e5;color:#6b4d00;border:1px solid #f2d46c;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
-            Refresh from Plaid &amp; Re-run
+                  style="background:transparent;color:#374151;border:1px solid #d1d5db;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
+            ⟲ Refresh from Plaid
           </button>
         ` : ''}
         ${a.bankStatementUrl ? `
           <button onclick="pushPlaidToVergent('${fbId}')" id="vergentpush-${fbId}"
                   title="Upload the Plaid asset report PDF to this applicant's Vergent customer record (resolved by SSN + DOB + name). Operator workflow shortcut."
-                  style="background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+                  style="background:transparent;color:#374151;border:1px solid #d1d5db;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
             ${a.vergentPushedAt ? '↻ Re-push to Vergent' : '↗ Push to Vergent'}
           </button>
         ` : ''}
