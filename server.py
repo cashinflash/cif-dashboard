@@ -530,20 +530,19 @@ _PHASE2_PANEL_HTML = ("""
       html = '<span class="v2pill v2pill-pending">⏳ Vergent: Pending</span>'
         + '<button type="button" class="v2btn sec" data-action="recheck">↻ Re-check now</button>'
         + '<span class="v2b-result"></span>';
-      // Auto-fire a server-side recheck after a short delay so the
-      // operator never has to click "Re-check now" manually for
-      // records whose intake auto-search didn't fire (Plaid PDF
-      // fetch still in flight, v2 thread killed before the inline
-      // hook ran, etc.). The setTimeout self-cancels if the badge
-      // re-rendered out of Pending state by the time it fires —
-      // so when the intake auto-search DOES write vergentMatch
-      // before 6s elapse, no extra Vergent API call gets made.
+      // Auto-fire a server-side recheck the moment the badge enters
+      // Pending state. setTimeout(0) defers until after this render
+      // completes so the operator sees Pending briefly before the
+      // recheck response (~1-3s) replaces it. Self-cancels if the
+      // badge gets destroyed before the timer fires (e.g. modal
+      // closed). Once vergentMatch is written, the badge won't
+      // re-enter Pending so this fires at most once per applicant.
       setTimeout(function() {
         var stillPending = badge.querySelector('.v2pill-pending');
         if (stillPending && document.body.contains(badge)) {
           callRecheck(fbId, badge);
         }
-      }, 6000);
+      }, 0);
     }
 
     // Wrap the existing per-state HTML in a labeled card: small
