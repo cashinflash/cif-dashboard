@@ -3452,13 +3452,6 @@ function buildReportPanel(a) {
             ⟲ Refresh from Plaid
           </button>
         ` : ''}
-        ${a.bankStatementUrl ? `
-          <button onclick="pushPlaidToVergent('${fbId}')" id="vergentpush-${fbId}"
-                  title="Upload the Plaid asset report PDF to this applicant's Vergent customer record (resolved by SSN + DOB + name). Operator workflow shortcut."
-                  style="background:transparent;color:#374151;border:1px solid #d1d5db;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
-            ${a.vergentPushedAt ? '↻ Re-push to Vergent' : '↗ Push to Vergent'}
-          </button>
-        ` : ''}
       </div>
       <div style="font-size:11px;color:#888;text-align:right">
         ${hasRun ? `Last run: ${runAt}` : 'Not yet run'}
