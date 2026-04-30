@@ -325,16 +325,27 @@ def read_file(path):
 # ─────────────────────────────────────────────────────────────────────────────
 _PHASE2_PANEL_HTML = ("""
 <style>
-  /* Vergent badge — inline-chip layout. Flows alongside the existing
-     "Push to Vergent" button as a single row of (status pill →
-     action buttons / inputs). No bordered card. Tokens match
-     app.html's #vergentpush button verbatim. */
+  /* Vergent panel — labeled card sitting below the analysis-tools
+     toolbar in the Report tab. Card chrome (white bg + thin border +
+     header) gives the operator's primary CRM action a clear visual
+     home; the action buttons / pill / checkboxes inside still use
+     the inline-style tokens that match app.html's design language. */
   .v2chip {
-    display: inline-flex; align-items: center; flex-wrap: wrap;
-    gap: 6px;
-    margin: 4px 0; padding: 0; border: none; background: transparent;
+    display: block;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin: 10px 0;
     font-family: inherit; font-size: 12px; line-height: 1.4;
-    vertical-align: middle;
+  }
+  .v2chip-hdr {
+    color: #6b7280; font-size: 10px; font-weight: 700;
+    letter-spacing: .06em; text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .v2chip-row {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
   }
   .v2pill {
     display: inline-flex; align-items: center;
@@ -402,10 +413,19 @@ _PHASE2_PANEL_HTML = ("""
     if (badge) return badge;
     badge = document.createElement('div');
     badge.id = id;
-    // Strategy 1: insert right after the legacy push button (apply records).
-    var anchor = document.getElementById('vergentpush-' + fbId);
-    if (anchor && anchor.parentNode) {
-      anchor.parentNode.insertBefore(badge, anchor.nextSibling);
+    // Strategy 1: place the card right BELOW the analysis-tools
+    // toolbar in the Report tab. Walk up two levels from any toolbar
+    // button (push / rerun / refresh) to the outer rerunHeader <div>,
+    // then insert the card as its next sibling. Keeps the card from
+    // becoming a flex-item inside the toolbar row.
+    var toolbarBtn = document.getElementById('vergentpush-' + fbId)
+                  || document.getElementById('v2run-' + fbId)
+                  || document.getElementById('plaidref-' + fbId);
+    if (toolbarBtn && toolbarBtn.parentNode
+        && toolbarBtn.parentNode.parentNode
+        && toolbarBtn.parentNode.parentNode.parentNode) {
+      var rerunHeader = toolbarBtn.parentNode.parentNode;
+      rerunHeader.parentNode.insertBefore(badge, rerunHeader.nextSibling);
       return badge;
     }
     // Strategy 2: insert right after the modal's sticky action bar.
@@ -512,7 +532,13 @@ _PHASE2_PANEL_HTML = ("""
         + '<span class="v2b-result"></span>';
     }
 
-    badge.innerHTML = html;
+    // Wrap the existing per-state HTML in a labeled card: small
+     // "VERGENT" header on top, then a flex-wrap row of (pill +
+     // action controls). Keeps the inline-flow row layout that the
+     // checkbox / pill / button selectors all rely on, while giving
+     // the panel a clear visual home in the Report tab.
+    badge.innerHTML = '<div class="v2chip-hdr">Vergent</div>'
+                    + '<div class="v2chip-row">' + html + '</div>';
     badge.querySelectorAll('button[data-action]').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var act = btn.getAttribute('data-action');
