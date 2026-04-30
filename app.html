@@ -3452,6 +3452,14 @@ function buildReportPanel(a) {
             ⟲ Refresh from Plaid
           </button>
         ` : ''}
+        ${(a.vergentMatch && a.vergentMatch.vergentGuid) ? `
+          <a href="https://shared.lms.vergentlms.com/customer/general?action=view&g=${encodeURIComponent(a.vergentMatch.vergentGuid)}"
+             target="_blank" rel="noopener noreferrer"
+             title="Open this customer's page in Vergent (new tab). Requires you to be logged into Vergent."
+             style="background:transparent;color:#374151;border:1px solid #d1d5db;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-flex;align-items:center">
+            ↗ Open in Vergent
+          </a>
+        ` : ''}
       </div>
       <div style="font-size:11px;color:#888;text-align:right">
         ${hasRun ? `Last run: ${runAt}` : 'Not yet run'}
