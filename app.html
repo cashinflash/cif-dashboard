@@ -3522,6 +3522,24 @@ async function runV2(fbId) {
       a.v2ReconciliationError = data.reconciliation_error;
       a.v2AutoDecide = !!data.auto_decide_candidate;
       a.v2RunAt = Date.now();
+      // Canonical fields read by the modal summary cards (Income /
+      // Obligations / FCF strip at the top of the modal). Without these
+      // assignments the cards stayed stale after rerun even though the
+      // affordability section below them updated correctly. Audit
+      // follow-up 2026-05-04. cif-apply's /api/rerun-v2 response now
+      // includes these fields; older deploys won't have them so the
+      // `?? a.monthlyIncome` keeps existing values when missing.
+      if (data.monthly_income != null) a.monthlyIncome = data.monthly_income;
+      if (data.monthly_expenses != null) a.monthlyExpenses = data.monthly_expenses;
+      if (data.fcf != null) a.fcf = data.fcf;
+      if (data.fintech_count != null) a.fintechCount = data.fintech_count;
+      if (data.nsf_count != null) a.nsfCount = data.nsf_count;
+      // Also update the canonical decision/amount the modal header reads.
+      a.claudeDecision = (data.decision||'').toUpperCase() === 'APPROVE' ? 'APPROVED'
+                       : (data.decision||'').toUpperCase() === 'REVIEW_REQUIRED' ? 'REVIEW'
+                       : 'DECLINED';
+      a.amount = (data.tier_amount && (data.decision||'').toUpperCase() === 'APPROVE')
+                 ? '$' + data.tier_amount : 'N/A';
     }
     // Rerender the Report panel (now holds both re-run controls + the v2 report
     // body; v2 Engine tab was folded into Report).
