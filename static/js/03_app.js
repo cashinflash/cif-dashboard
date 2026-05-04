@@ -557,8 +557,14 @@ function buildReportPanel(a) {
   const hasRun = a.v2Decision && a.v2Report;
   const runAt = a.v2RunAt ? new Date(a.v2RunAt).toLocaleString() : '';
   const canRefresh = !!a.plaidAssetToken;
+  // PDF re-extraction is the recovery path for non-Plaid applicants whose
+  // original Claude extraction had errors (duplicate transactions, miscounts).
+  // /api/rerun-v2 only re-runs the engines on stored extractedData; this
+  // button re-downloads the originally uploaded PDF and re-extracts.
+  const canReExtractPdf = !!a.bankStatementUrl && !a.plaidAssetToken;
   const acctCount = a.connectedAccountCount;
   const refreshedAt = a.plaidRefreshedAt ? new Date(a.plaidRefreshedAt).toLocaleString() : '';
+  const reExtractedAt = a.pdfReExtractedAt ? new Date(a.pdfReExtractedAt).toLocaleString() : '';
 
   // Re-run controls — always available so staff can force a re-evaluation
   // with stored data or fresh-pulled Plaid data.
@@ -576,6 +582,13 @@ function buildReportPanel(a) {
             Refresh from Plaid &amp; Re-run
           </button>
         ` : ''}
+        ${canReExtractPdf ? `
+          <button onclick="reExtractPdf('${fbId}')" id="pdfreext-${fbId}"
+                  title="Re-downloads the originally uploaded PDF and re-runs Claude extraction with the latest prompt. Use this when the original extraction had errors (duplicate transactions, miscounts). Takes ~30-60 seconds."
+                  style="background:#fff8e5;color:#6b4d00;border:1px solid #f2d46c;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+            Re-extract PDF &amp; Re-run
+          </button>
+        ` : ''}
         ${a.bankStatementUrl ? `
           <button onclick="pushPlaidToVergent('${fbId}')" id="vergentpush-${fbId}"
                   title="Upload the Plaid asset report PDF to this applicant's Vergent customer record (resolved by SSN + DOB + name). Operator workflow shortcut."
@@ -587,6 +600,7 @@ function buildReportPanel(a) {
       <div style="font-size:11px;color:#888;text-align:right">
         ${hasRun ? `Last run: ${runAt}` : 'Not yet run'}
         ${refreshedAt ? `<br>Plaid refreshed: ${refreshedAt}` : ''}
+        ${reExtractedAt ? `<br>PDF re-extracted: ${reExtractedAt}` : ''}
         ${acctCount ? `<br><b>${acctCount} Plaid account${acctCount > 1 ? 's' : ''}</b>` : ''}
         ${a.vergentPushedAt ? `<br><span style="color:#1a4d6b">✓ Vergent pushed ${new Date(a.vergentPushedAt).toLocaleString()}</span>` : ''}
       </div>
@@ -700,6 +714,53 @@ async function refreshFromPlaid(fbId) {
   } catch (e) {
     toast('Refresh error: ' + e.message, 'err');
     if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = 'Refresh from Plaid &amp; Re-run'; }
+  }
+}
+
+// Re-extract a PDF-uploaded applicant's data from the originally uploaded
+// statement. Counterpart to refreshFromPlaid for the PDF submission path.
+// Used when the original Claude extraction had errors (duplicates, miscounts)
+// — /api/rerun-v2 only re-runs the engines on already-broken extractedData,
+// so that path can't recover. This re-runs call_claude_extract from scratch.
+async function reExtractPdf(fbId) {
+  if (!confirm(
+    'Re-extract this applicant\'s data from the original PDF?\n\n' +
+    'Useful when the original extraction had errors (duplicate transactions, ' +
+    'miscounts). Re-runs Claude extraction with the latest prompt, then re-runs ' +
+    'the engine. Takes ~30-60 seconds.'
+  )) return;
+
+  const btn = document.getElementById('pdfreext-'+fbId);
+  if (btn) {
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+    btn.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border:2px solid #6b4d00;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;margin-right:6px;vertical-align:-2px"></span> Re-extracting from PDF...';
+  }
+  try {
+    const resp = await fetch('/api/re-extract-pdf', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ firebase_id: fbId }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) {
+      toast(data.error || 'Re-extraction failed', 'err');
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = 'Re-extract PDF &amp; Re-run'; }
+      return;
+    }
+    const income = (data.v2_verified_income_monthly || 0).toFixed(0);
+    toast(
+      `PDF re-extracted: ${data.transaction_count} txns. ` +
+      `v2 says ${String(data.v2_decision || '').toUpperCase()} — verified income $${income}/mo.`,
+      'ok'
+    );
+    logAudit('pdf.re_extracted', fbId, `${data.transaction_count} txns, v2 ${data.v2_decision}`);
+    await loadReports();
+    openModal(fbId);
+  } catch (e) {
+    toast('Re-extraction error: ' + e.message, 'err');
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = 'Re-extract PDF &amp; Re-run'; }
   }
 }
 
