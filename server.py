@@ -1052,6 +1052,35 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        # PDF re-extraction recovery path. Counterpart to /api/refresh-from-plaid
+        # for non-Plaid applicants whose original Claude extraction had errors
+        # (duplicate transactions, miscounts). cif-apply re-downloads the
+        # originally uploaded PDF, re-runs call_claude_extract with the latest
+        # prompt, then re-runs the engines.
+        if path == '/api/re-extract-pdf':
+            try:
+                body = json.loads(raw)
+                payload = json.dumps(body).encode()
+                print(f'[RE-EXTRACT-PDF PROXY] Forwarding to cif-apply...', flush=True)
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/re-extract-pdf',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                # 90s — Claude extraction is usually 20-40s for a Chime PDF,
+                # but leave headroom for batched chunking on huge statements
+                # plus the engine run.
+                with ur.urlopen(req, timeout=90) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[RE-EXTRACT-PDF UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[RE-EXTRACT-PDF ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         if path == '/api/push-plaid-to-vergent':
             try:
                 body = json.loads(raw)
