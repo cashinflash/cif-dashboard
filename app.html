@@ -2997,6 +2997,34 @@ ${a.extractedSSN?`<div style="display:flex;align-items:center;justify-content:sp
     <button class="mact-secondary" onclick="delApp('${fbId}')" style="color:var(--red);border-color:var(--red-border)">🗑</button>
   </div>
 </div>
+${(cdec === 'REVIEW' && (a.status === 'Pending' || a.status === 'Review' || a.processingComplete)) ? (() => {
+  // Engine returned review_required. Surface the engine's review_flags
+  // and suggested tier so the operator has the context to override
+  // (Approve / Decline buttons above are the override action).
+  // 2026-05-04 audit work: makes the engine's "I can't decide, you
+  // decide" recommendation explicit instead of looking identical to
+  // a generic Pending status.
+  const flags = (() => { try { return JSON.parse(a.v2ReviewFlagsJson || '[]'); } catch(e) { return []; } })();
+  const flagsHtml = flags.length
+    ? flags.map(f => `<span style="display:inline-block;background:#fff5e6;color:#5a3300;border:1px solid #f0d8a8;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;margin-right:4px;margin-bottom:3px;font-family:inherit">${f}</span>`).join('')
+    : '<span style="color:var(--muted);font-size:11px;font-style:italic">no specific flags — engine confidence below auto-approve floor</span>';
+  const suggested = (typeof a.v2TierAmount === 'number' && a.v2TierAmount > 0)
+    ? `<b>$${a.v2TierAmount}</b> if approved`
+    : '<b>$0</b> (engine cannot recommend a positive tier)';
+  return `<div style="background:#fff8eb;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:10px 14px;font-family:inherit">
+  <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">
+    <div style="flex:1;min-width:240px">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#5a3300;margin-bottom:4px">📋 Engine recommends REVIEW</div>
+      <div style="font-size:12px;color:#5a3300;line-height:1.4;margin-bottom:6px">
+        Suggested tier: ${suggested}. Use the
+        <span style="color:var(--green);font-weight:700">Approve</span> or
+        <span style="color:var(--red);font-weight:700">Decline</span>
+        buttons above to override — the action will be audit-logged as an operator override.
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:3px">${flagsHtml}</div>
+    </div>
+  </div>
+</div>` })() : ''}
 <div style="display:flex;border-bottom:1px solid var(--border)">
   <button onclick="mTab('report','${fbId}',this)" id="mtab-report-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--green);border-bottom:2px solid var(--green);cursor:pointer;font-family:var(--sans)">Report</button>
   <button onclick="mTab('appdata','${fbId}',this)" id="mtab-appdata-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Application</button>
@@ -3407,10 +3435,34 @@ async function addThreadedNote(fbId) {
 
 // Legacy single-blob save path kept for any lingering callers.
 async function saveModalNotes(fbId){const ta=document.getElementById('mnt'+fbId);if(!ta)return;await updateReport(fbId,{notes:ta.value});toast('Notes saved','ok');}
+// Compute whether an operator's chosen status is an OVERRIDE of the
+// engine's recommendation. Pure helper; used by updStatus and
+// updStatusWithAmt to enrich audit logs and persist a flag on the
+// report so audit reviews can filter by "where the human disagreed
+// with the engine".
+function _isOperatorOverride(engineDecision, operatorStatus) {
+  const eng = String(engineDecision || '').toUpperCase();
+  const op = String(operatorStatus || '');
+  if (op === 'Approved' && (eng === 'DECLINED' || eng === 'REVIEW')) return 'approve_over_' + eng.toLowerCase();
+  if (op === 'Declined' && (eng === 'APPROVED' || eng === 'REVIEW')) return 'decline_over_' + eng.toLowerCase();
+  return '';
+}
+
 async function updStatus(fbId,s){
   const a = apps.find(x => x.firebaseId === fbId);
-  await updateReport(fbId,{status:s});
-  logAudit(`decision.${s.toLowerCase()}`, a?.name || fbId, `amount=${a?.amount || '-'}`);
+  const overrideKind = _isOperatorOverride(a?.claudeDecision, s);
+  const patch = {status:s};
+  if (overrideKind) {
+    patch.operatorOverride = {
+      kind: overrideKind,
+      at: Date.now(),
+      engineDecision: a?.claudeDecision || '',
+      engineSuggestedTier: a?.v2TierAmount ?? null,
+    };
+  }
+  await updateReport(fbId, patch);
+  const action = overrideKind ? `decision.${s.toLowerCase()}.override` : `decision.${s.toLowerCase()}`;
+  logAudit(action, a?.name || fbId, `amount=${a?.amount || '-'}${overrideKind ? '; engine='+a?.claudeDecision : ''}`);
   await loadReports();openModal(fbId);toast('Updated to '+s,'ok');
 }
 async function updStatusWithAmt(fbId,s){
@@ -3418,8 +3470,20 @@ async function updStatusWithAmt(fbId,s){
   const amt=inp?inp.value.trim():'';
   const final=amt?'$'+amt.replace('$',''):'N/A';
   const a = apps.find(x => x.firebaseId === fbId);
-  await updateReport(fbId,{status:s,amount:final});
-  logAudit(`decision.${s.toLowerCase()}`, a?.name || fbId, `amount=${final}`);
+  const overrideKind = _isOperatorOverride(a?.claudeDecision, s);
+  const patch = {status:s, amount:final};
+  if (overrideKind) {
+    patch.operatorOverride = {
+      kind: overrideKind,
+      at: Date.now(),
+      engineDecision: a?.claudeDecision || '',
+      engineSuggestedTier: a?.v2TierAmount ?? null,
+      operatorAmount: final,
+    };
+  }
+  await updateReport(fbId, patch);
+  const action = overrideKind ? `decision.${s.toLowerCase()}.override` : `decision.${s.toLowerCase()}`;
+  logAudit(action, a?.name || fbId, `amount=${final}${overrideKind ? '; engine='+a?.claudeDecision : ''}`);
   await loadReports();openModal(fbId);toast('Updated to '+s,'ok');
 }
 function copyModal(fbId){const a=apps.find(x=>x.firebaseId===fbId);if(a){const t=document.createElement('div');t.innerHTML=a.report;navigator.clipboard.writeText(t.textContent).then(()=>toast('Copied ✓','ok'));}}
