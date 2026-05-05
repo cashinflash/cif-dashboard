@@ -66,12 +66,9 @@ header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8
   .sbar input{width:100%!important}
   /* Filter pills wrap */
   .frow{flex-wrap:wrap!important;gap:6px!important}
-  /* Hide Plaid Customers + Portal Bank Links from desktop nav on mobile */
-  #nav-plaid{display:none!important}
-  #nav-portal-plaid{display:none!important}
+  /* Connections dropdown handles desktop visibility for the two Plaid tabs */
 }
 /* Show Plaid Customers in desktop nav */
-@media(min-width:769px){#nav-plaid{display:inline-block!important}#nav-portal-plaid{display:inline-block!important}}
 @media(min-width:769px) and (max-width:1024px){
   .container{padding:1.5rem 1.25rem}
   .stats-row{grid-template-columns:repeat(4,1fr)!important}
@@ -435,8 +432,8 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
     <button class="nb" onclick="showView('dash',this);toggleMobMenu()"><svg class="icn"><use href="#icn-dashboard"/></svg>Dashboard</button>
     <button class="nb" onclick="showView('single',document.getElementById('nav-single'));toggleMobMenu()"><svg class="icn"><use href="#icn-file"/></svg>New Analysis</button>
     <button class="nb" onclick="showView('batch',document.getElementById('nav-batch'));toggleMobMenu()"><svg class="icn"><use href="#icn-layers"/></svg>Batch Analysis</button>
-    <button class="nb" onclick="showView('plaid',this);toggleMobMenu()"><svg class="icn"><use href="#icn-bank"/></svg>Plaid Customers</button>
-    <button class="nb" onclick="showView('portal-plaid',this);toggleMobMenu()"><svg class="icn"><use href="#icn-bank"/></svg>Portal Bank Links</button>
+    <button class="nb" onclick="showView('plaid',this);toggleMobMenu()"><svg class="icn"><use href="#icn-bank"/></svg>App Links</button>
+    <button class="nb" onclick="showView('portal-plaid',this);toggleMobMenu()"><svg class="icn"><use href="#icn-bank"/></svg>Portal Links</button>
     <button class="nb" onclick="showView('if',this);toggleMobMenu()"><svg class="icn"><use href="#icn-file"/></svg>Instant Funding <span id="ifcount-mob" style="display:none;background:#0E8741;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px"></span></button>
     <button class="nb admin-only" onclick="showView('users',this);toggleMobMenu()" style="display:none"><svg class="icn"><use href="#icn-users"/></svg>Users</button>
     <button class="nb admin-only" onclick="showView('audit',this);toggleMobMenu()" style="display:none"><svg class="icn"><use href="#icn-file"/></svg>Audit log</button>
@@ -455,8 +452,15 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
     </div>
     <button class="nb" id="nav-single" style="display:none"></button>
     <button class="nb" id="nav-batch" style="display:none"></button>
-    <button class="nb" id="nav-plaid" onclick="showView('plaid',this)"><svg class="icn"><use href="#icn-bank"/></svg>Plaid Customers</button>
-    <button class="nb" id="nav-portal-plaid" onclick="showView('portal-plaid',this)"><svg class="icn"><use href="#icn-bank"/></svg>Portal Bank Links</button>
+    <div style="position:relative" id="connections-dd-wrap">
+      <button class="nb" id="nav-connections" onclick="toggleConnectionsDD()">
+        <svg class="icn"><use href="#icn-bank"/></svg>Connections <span style="font-size:10px;opacity:.6;margin-left:2px">▾</span>
+      </button>
+      <div id="connections-dd" style="display:none;position:absolute;top:calc(100% + 8px);left:0;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-lg);min-width:180px;overflow:hidden;z-index:300">
+        <div onclick="showView('plaid',document.getElementById('nav-connections'));toggleConnectionsDD()" style="padding:11px 16px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:8px" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''"><svg class="icn"><use href="#icn-bank"/></svg>App Links</div>
+        <div onclick="showView('portal-plaid',document.getElementById('nav-connections'));toggleConnectionsDD()" style="padding:11px 16px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:8px;border-top:1px solid var(--border)" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''"><svg class="icn"><use href="#icn-bank"/></svg>Portal Links</div>
+      </div>
+    </div>
     <button class="nb" id="nav-if" onclick="showView('if',this)"><svg class="icn"><use href="#icn-file"/></svg>Instant Funding<span id="ifcount" style="display:none;background:#0E8741;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px">0</span></button>
     <button class="nb admin-only" id="nav-users" onclick="showView('users',this)" style="display:none"><svg class="icn"><use href="#icn-users"/></svg>Users</button>
     <button class="nb admin-only" id="nav-audit" onclick="showView('audit',this)" style="display:none"><svg class="icn"><use href="#icn-file"/></svg>Audit log</button>
@@ -836,7 +840,7 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
 <!-- PLAID CUSTOMERS VIEW -->
 <div id="view-plaid" class="view">
   <div class="phead">
-    <div><div class="ptitle" style="display:flex;align-items:center;gap:10px"><svg class="icn icn-lg"><use href="#icn-bank"/></svg>Plaid Customers</div><div class="psub">Customers who connected via Plaid — rerun reports anytime</div></div>
+    <div><div class="ptitle" style="display:flex;align-items:center;gap:10px"><svg class="icn icn-lg"><use href="#icn-bank"/></svg>App Links</div><div class="psub">Plaid connections from cif-apply applications — rerun reports anytime</div></div>
     <button class="actbtn btn-gh" onclick="loadPlaidCustomers()"><svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Refresh</button>
   </div>
   <div style="margin-bottom:16px">
@@ -858,9 +862,9 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
     <div class="phead">
       <div>
         <div class="ptitle" style="display:flex;align-items:center;gap:10px">
-          <svg class="icn icn-lg"><use href="#icn-bank"/></svg>Portal Bank Links
+          <svg class="icn icn-lg"><use href="#icn-bank"/></svg>Portal Links
         </div>
-        <div class="psub">Every customer with an active Plaid token — both from cif-apply and the customer portal. Re-pull data any time.</div>
+        <div class="psub">Plaid connections from the customer portal — re-pull data any time</div>
       </div>
       <button class="actbtn btn-gh" onclick="loadPortalPlaid()">
         <svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Refresh
@@ -4392,10 +4396,9 @@ async function loadPortalPlaid(){
   const setStatus = (msg) => { list.innerHTML = `<div class="empty"><div class="empty-t">${msg}</div></div>`; };
   setStatus('Loading…');
 
-  // Both sources fire in parallel. Whichever returns first
-  // gets folded into the table; the second is appended on
-  // arrival. No more "wait 27 seconds before anything shows".
-  const portalP = _withTimeout(
+  // Portal Links is portal-only. Application Plaid customers
+  // live on the App Links tab via loadPlaidCustomers (Firebase).
+  const portalRace = await _withTimeout(
     fetch('/api/portal-plaid/customers', { credentials: 'include' })
       .then(async r => {
         const text = await r.text();
@@ -4405,17 +4408,9 @@ async function loadPortalPlaid(){
       }),
     15000, 'portal'
   );
-  const fbP = (typeof fbGet === 'function')
-    ? _withTimeout(fbGet('reports.json'), 25000, 'firebase')
-    : Promise.resolve({ ok: false, value: null, err: 'fbGet helper missing' });
 
-  let portalRows = [];
-  let appRows = [];
   let portalErr = null;
-  let fbErr = null;
-
-  // Source 1 — portal (DDB-backed via cif-portal admin).
-  const portalRace = await portalP;
+  let portalRows = [];
   if (portalRace.ok && portalRace.value) {
     const v = portalRace.value;
     if (v.ok === false || v.status >= 400) {
@@ -4441,82 +4436,16 @@ async function loadPortalPlaid(){
     portalErr = portalRace.err || 'unknown';
   }
 
-  // Render whatever we have so far so the user sees movement.
-  allPortalPlaid = portalRows.slice();
-  if (allPortalPlaid.length || portalErr) {
-    setStatus(`Portal loaded (${portalRows.length}) · loading applications…`);
-    if (allPortalPlaid.length) renderPortalPlaid(allPortalPlaid);
-  } else {
-    setStatus('Loading applications…');
-  }
-
-  // Source 2 — cif-apply Firebase (slower, can be 10MB+).
-  const fbRace = await fbP;
-  if (fbRace.ok) {
-    const fbData = fbRace.value;
-    if (fbData && typeof fbData === 'object') {
-      const groups = {};
-      Object.entries(fbData).forEach(([id, r]) => {
-        if (!r) return;
-        const bankMethod = ((r.applicationData && r.applicationData.bankMethod) || r.bankMethod || r.filename || '').toLowerCase();
-        const hasPlaidToken = !!(r.plaidAssetToken || r.plaidAccessToken);
-        if (!(bankMethod.includes('plaid') || hasPlaidToken)) return;
-        const phone = (r.applicationData && r.applicationData.phone) || '';
-        const email = (r.applicationData && r.applicationData.email) || '';
-        const fallbackName = r.name || `${(r.applicationData && r.applicationData.firstName)||''} ${(r.applicationData && r.applicationData.lastName)||''}`.trim();
-        const keyP = phone.replace(/\D/g, '');
-        const keyE = email.trim().toLowerCase();
-        const key = (keyP + '|' + keyE) || fallbackName || id;
-        if (!groups[key]) {
-          groups[key] = {
-            source: 'Application',
-            sourceLabel: 'Application',
-            customerId: '',
-            name: fallbackName || '(unknown)',
-            email,
-            phone,
-            phoneLast4: keyP.slice(-4),
-            institutionName: 'Plaid',
-            accountMask: '',
-            accountSubtype: '',
-            linkedAt: '',
-            firebaseId: id,
-          };
-        }
-        const dateStr = r.createdAt || (r.date ? new Date(r.date + ' ' + (r.time||'00:00')).toISOString() : '');
-        if (!groups[key].linkedAt || (dateStr && dateStr > groups[key].linkedAt)) {
-          groups[key].linkedAt = dateStr || groups[key].linkedAt;
-          groups[key].firebaseId = id;
-        }
-        if (!groups[key].name && fallbackName) groups[key].name = fallbackName;
-      });
-      appRows = Object.values(groups);
-    }
-  } else {
-    fbErr = fbRace.err;
-  }
-
-  allPortalPlaid = [...portalRows, ...appRows];
-
+  allPortalPlaid = portalRows;
   if (allPortalPlaid.length === 0) {
-    const lines = [];
-    if (portalErr) lines.push(`Portal source failed: ${_esc(portalErr)}`);
-    if (fbErr)     lines.push(`Application source failed: ${_esc(fbErr)}`);
-    if (!lines.length) lines.push('No Plaid customers yet.');
-    list.innerHTML = `<div class="empty"><div class="empty-t">No data</div><div class="empty-s">${lines.join('<br>')}</div></div>`;
+    if (portalErr) {
+      list.innerHTML = `<div class="empty"><div class="empty-t">Couldn't load Portal Links</div><div class="empty-s">${_esc(portalErr)}<br>Check that PORTAL_ADMIN_SVC_* env vars are set in Render and provision-admin-group.yml has been re-run.</div></div>`;
+    } else {
+      list.innerHTML = '<div class="empty"><div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-bank"/></svg></div><div class="empty-t">No portal connections yet</div><div class="empty-s">Customers who tap Connect your bank in the customer portal will appear here</div></div>';
+    }
     return;
   }
-
   renderPortalPlaid(allPortalPlaid);
-  if (portalErr || fbErr) {
-    const banner = document.createElement('div');
-    banner.style.cssText = 'background:#fff5e6;border:1px solid #f0c890;color:#5a3300;padding:10px 14px;border-radius:8px;margin-bottom:10px;font-size:12px';
-    const parts = [];
-    if (portalErr) parts.push(`Portal source unavailable (${_esc(portalErr)})`);
-    if (fbErr)     parts.push(`Application source unavailable (${_esc(fbErr)})`);
-    banner.innerHTML = parts.join(' · ');
-    list.insertBefore(banner, list.firstChild);
-  }
 }
 
 function filterPortalPlaid(q){
@@ -5220,9 +5149,16 @@ function toggleAnalysisDD(){
   const dd = document.getElementById('analysis-dd');
   dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
 }
+function toggleConnectionsDD(){
+  const dd = document.getElementById('connections-dd');
+  if (dd) dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+}
 document.addEventListener('click', e => {
   const wrap = document.getElementById('analysis-dd-wrap');
   if (wrap && !wrap.contains(e.target)) document.getElementById('analysis-dd').style.display = 'none';
+  const cwrap = document.getElementById('connections-dd-wrap');
+  const cdd = document.getElementById('connections-dd');
+  if (cwrap && cdd && !cwrap.contains(e.target)) cdd.style.display = 'none';
 });
 
 function toggleMobMenu(){
