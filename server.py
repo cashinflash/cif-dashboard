@@ -96,17 +96,24 @@ def _get_portal_admin_token():
         # (e.g. "com.amazonaws.cognitoidp#NotAuthorizedException")
         # — strip everything up to the last '#' or '.'.
         err_type = ''
+        err_msg = ''
         try:
             parsed = json.loads(body) if body else {}
             err_type = (parsed.get('__type') or '').strip()
+            err_msg = (parsed.get('message') or parsed.get('Message') or '').strip()
             for sep in ('#', '.'):
                 if sep in err_type:
                     err_type = err_type.rsplit(sep, 1)[-1]
         except Exception:
             pass
+        # Bake the Cognito message into the error code (truncated)
+        # so the dashboard surfaces it directly without log-digging.
+        # NotAuthorizedException covers both "wrong password" and
+        # "flow not enabled" — only the message disambiguates.
+        suffix = f': {err_msg[:140]}' if err_msg else ''
         if err_type:
-            return '', f'cognito_{err_type}'
-        return '', f'cognito_http_{e.code}'
+            return '', f'cognito_{err_type}{suffix}'
+        return '', f'cognito_http_{e.code}{suffix}'
     except Exception as e:
         print(f'[portal-admin-auth] failed: {type(e).__name__}: {e}')
         return '', 'cognito_network'
