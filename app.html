@@ -64,11 +64,12 @@ header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8
   .sbar input{width:100%!important}
   /* Filter pills wrap */
   .frow{flex-wrap:wrap!important;gap:6px!important}
-  /* Hide Plaid Customers from desktop nav on mobile */
+  /* Hide Plaid Customers + Portal Bank Links from desktop nav on mobile */
   #nav-plaid{display:none!important}
+  #nav-portal-plaid{display:none!important}
 }
 /* Show Plaid Customers in desktop nav */
-@media(min-width:769px){#nav-plaid{display:inline-block!important}}
+@media(min-width:769px){#nav-plaid{display:inline-block!important}#nav-portal-plaid{display:inline-block!important}}
 @media(min-width:769px) and (max-width:1024px){
   .container{padding:1.5rem 1.25rem}
   .stats-row{grid-template-columns:repeat(4,1fr)!important}
@@ -433,6 +434,7 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
     <button class="nb" onclick="showView('single',document.getElementById('nav-single'));toggleMobMenu()"><svg class="icn"><use href="#icn-file"/></svg>New Analysis</button>
     <button class="nb" onclick="showView('batch',document.getElementById('nav-batch'));toggleMobMenu()"><svg class="icn"><use href="#icn-layers"/></svg>Batch Analysis</button>
     <button class="nb" onclick="showView('plaid',this);toggleMobMenu()"><svg class="icn"><use href="#icn-bank"/></svg>Plaid Customers</button>
+    <button class="nb" onclick="showView('portal-plaid',this);toggleMobMenu()"><svg class="icn"><use href="#icn-bank"/></svg>Portal Bank Links</button>
     <button class="nb" onclick="showView('if',this);toggleMobMenu()"><svg class="icn"><use href="#icn-file"/></svg>Instant Funding <span id="ifcount-mob" style="display:none;background:#0E8741;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px"></span></button>
     <button class="nb admin-only" onclick="showView('users',this);toggleMobMenu()" style="display:none"><svg class="icn"><use href="#icn-users"/></svg>Users</button>
     <button class="nb admin-only" onclick="showView('audit',this);toggleMobMenu()" style="display:none"><svg class="icn"><use href="#icn-file"/></svg>Audit log</button>
@@ -452,6 +454,7 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
     <button class="nb" id="nav-single" style="display:none"></button>
     <button class="nb" id="nav-batch" style="display:none"></button>
     <button class="nb" id="nav-plaid" onclick="showView('plaid',this)"><svg class="icn"><use href="#icn-bank"/></svg>Plaid Customers</button>
+    <button class="nb" id="nav-portal-plaid" onclick="showView('portal-plaid',this)"><svg class="icn"><use href="#icn-bank"/></svg>Portal Bank Links</button>
     <button class="nb" id="nav-if" onclick="showView('if',this)"><svg class="icn"><use href="#icn-file"/></svg>Instant Funding<span id="ifcount" style="display:none;background:#0E8741;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px">0</span></button>
     <button class="nb admin-only" id="nav-users" onclick="showView('users',this)" style="display:none"><svg class="icn"><use href="#icn-users"/></svg>Users</button>
     <button class="nb admin-only" id="nav-audit" onclick="showView('audit',this)" style="display:none"><svg class="icn"><use href="#icn-file"/></svg>Audit log</button>
@@ -841,6 +844,50 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
   </div>
   <div id="plaid-list">
     <div class="empty"><div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-bank"/></svg></div><div class="empty-t">No Plaid customers yet</div><div class="empty-s">Customers who connect via Plaid will appear here</div></div>
+  </div>
+</div>
+
+<!-- PORTAL BANK LINKS VIEW (Phase U.2) -->
+<!-- Customers who linked a bank from cif-portal (apply.cashinflash.com
+     ⇄ portal — different surface from cif-apply Plaid). Token is
+     stored server-side; admins can re-pull data later (Phase U.3). -->
+<div id="view-portal-plaid" class="view">
+  <div class="phead">
+    <div>
+      <div class="ptitle" style="display:flex;align-items:center;gap:10px">
+        <svg class="icn icn-lg"><use href="#icn-bank"/></svg>Portal Bank Links
+      </div>
+      <div class="psub">Customers who connected a bank inside the customer portal — re-pull data any time</div>
+    </div>
+    <button class="actbtn btn-gh" onclick="loadPortalPlaid()">
+      <svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Refresh
+    </button>
+  </div>
+  <div style="margin-bottom:16px">
+    <input type="text" id="portal-plaid-search" placeholder="Search by name, email, customer id, or bank…"
+      oninput="filterPortalPlaid(this.value)"
+      style="width:100%;border:1.5px solid var(--border2);border-radius:10px;padding:10px 14px;font-size:14px;font-family:var(--sans)">
+  </div>
+  <div id="portal-plaid-list">
+    <div class="empty">
+      <div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-bank"/></svg></div>
+      <div class="empty-t">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Detail drawer for one customer's portal Plaid Items. -->
+<div id="portal-plaid-drawer" style="display:none;position:fixed;inset:0;z-index:9999">
+  <div onclick="closePortalPlaidDrawer()" style="position:absolute;inset:0;background:rgba(0,0,0,.45)"></div>
+  <div style="position:absolute;right:0;top:0;bottom:0;width:min(640px,100%);background:#fff;box-shadow:-12px 0 30px rgba(0,0,0,.18);overflow-y:auto;padding:24px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px">
+      <div>
+        <div id="ppl-drawer-name" style="font-size:18px;font-weight:700;color:var(--text)"></div>
+        <div id="ppl-drawer-meta" style="font-size:13px;color:var(--muted);margin-top:4px"></div>
+      </div>
+      <button onclick="closePortalPlaidDrawer()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted)">×</button>
+    </div>
+    <div id="ppl-drawer-body"><div class="empty"><div class="empty-t">Loading…</div></div></div>
   </div>
 </div>
 
@@ -1458,6 +1505,7 @@ function parseRoute() {
 // go through showView() instead.
 function _renderView(name, btn) {
   if (name==='plaid') loadPlaidCustomers();
+  if (name==='portal-plaid') loadPortalPlaid();
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
   const el = document.getElementById('view-'+name);
@@ -4295,6 +4343,135 @@ function filterPlaidCustomers(q) {
     (c.phone||'').includes(lq) ||
     (c.email||'').toLowerCase().includes(lq)
   ));
+}
+
+// ─────────────────────────────────────────
+// Portal Bank Links (Phase U.2)
+// ─────────────────────────────────────────
+let allPortalPlaid = [];
+
+function _esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+function _fmtDate(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+
+async function loadPortalPlaid(){
+  const list = document.getElementById('portal-plaid-list');
+  if(!list) return;
+  list.innerHTML = '<div class="empty"><div class="empty-t">Loading…</div></div>';
+  try{
+    const r = await fetch('/api/portal-plaid/customers',{credentials:'include'});
+    if(!r.ok){
+      list.innerHTML = `<div class="empty"><div class="empty-t">Couldn't load (HTTP ${r.status})</div><div class="empty-s">If this persists, check that PORTAL_ADMIN_SVC_* env vars are set in Render.</div></div>`;
+      return;
+    }
+    const data = await r.json();
+    allPortalPlaid = (data && data.customers) || [];
+    renderPortalPlaid(allPortalPlaid);
+  }catch(e){
+    list.innerHTML = `<div class="empty"><div class="empty-t">Network error</div><div class="empty-s">${_esc(e.message||e)}</div></div>`;
+  }
+}
+
+function filterPortalPlaid(q){
+  if(!q){ renderPortalPlaid(allPortalPlaid); return; }
+  const lq = q.toLowerCase();
+  renderPortalPlaid(allPortalPlaid.filter(c =>
+    (c.customerName||'').toLowerCase().includes(lq) ||
+    (c.customerEmail||'').toLowerCase().includes(lq) ||
+    (c.customerId||'').toLowerCase().includes(lq) ||
+    (c.institutionName||'').toLowerCase().includes(lq)
+  ));
+}
+
+function renderPortalPlaid(rows){
+  const list = document.getElementById('portal-plaid-list');
+  if(!list) return;
+  if(!rows || !rows.length){
+    list.innerHTML = '<div class="empty"><div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-bank"/></svg></div><div class="empty-t">No portal bank links yet</div><div class="empty-s">Customers who tap Connect your bank in the portal will appear here</div></div>';
+    return;
+  }
+  list.innerHTML = rows.map(r => {
+    const sub = r.accountSubtype ? r.accountSubtype.charAt(0).toUpperCase()+r.accountSubtype.slice(1) : '';
+    const mask = r.accountMask ? '···'+r.accountMask : '';
+    const bank = [sub, mask].filter(Boolean).join(' · ');
+    const phone = r.customerPhoneLast4 ? '···'+r.customerPhoneLast4 : '';
+    const meta = [r.customerEmail, phone].filter(Boolean).join(' · ');
+    return `
+      <div class="ppl-row" onclick="openPortalPlaidDrawer('${_esc(r.customerId)}')" style="cursor:pointer;display:grid;grid-template-columns:1fr max-content;gap:14px;padding:14px 16px;border:1px solid var(--border);border-radius:10px;margin-bottom:10px;background:#fff;transition:background .12s ease" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='#fff'">
+        <div style="min-width:0">
+          <div style="font-weight:600;color:var(--text);font-size:14px;margin-bottom:2px">${_esc(r.customerName || r.customerId)}</div>
+          <div style="font-size:12px;color:var(--muted)">${_esc(meta || '—')}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${_esc(r.institutionName)} ${_esc(bank ? '· '+bank : '')}</div>
+        </div>
+        <div style="text-align:right;font-size:11px;color:var(--muted);align-self:center;white-space:nowrap">${_esc(_fmtDate(r.linkedAt) || '')}</div>
+      </div>`;
+  }).join('');
+}
+
+async function openPortalPlaidDrawer(cid){
+  const drawer = document.getElementById('portal-plaid-drawer');
+  const body = document.getElementById('ppl-drawer-body');
+  const nameEl = document.getElementById('ppl-drawer-name');
+  const metaEl = document.getElementById('ppl-drawer-meta');
+  if(!drawer || !body) return;
+  drawer.style.display = 'block';
+  body.innerHTML = '<div class="empty"><div class="empty-t">Loading…</div></div>';
+  nameEl.textContent = 'Loading…';
+  metaEl.textContent = '';
+  try{
+    const r = await fetch('/api/portal-plaid/customer/'+encodeURIComponent(cid),{credentials:'include'});
+    if(!r.ok){
+      body.innerHTML = `<div class="empty"><div class="empty-t">Couldn't load (HTTP ${r.status})</div></div>`;
+      return;
+    }
+    const d = await r.json();
+    nameEl.textContent = d.customerName || d.customerId;
+    metaEl.textContent = [d.customerEmail, d.customerPhoneLast4 ? '···'+d.customerPhoneLast4 : '', 'cid '+d.customerId].filter(Boolean).join(' · ');
+    const items = d.items || [];
+    if(!items.length){
+      body.innerHTML = '<div class="empty"><div class="empty-t">No connections</div></div>';
+      return;
+    }
+    body.innerHTML = items.map(it => {
+      const accountsHtml = (it.accounts || []).length
+        ? `<table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:8px">
+             <thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--border)">
+               <th style="padding:6px 8px">Account</th><th style="padding:6px 8px">Type</th><th style="padding:6px 8px;text-align:right">Current</th><th style="padding:6px 8px;text-align:right">Available</th>
+             </tr></thead>
+             <tbody>${(it.accounts||[]).map(a => `
+               <tr style="border-bottom:1px solid var(--border)">
+                 <td style="padding:6px 8px">${_esc(a.officialName || a.name || '—')}${a.mask?` <span style="color:var(--muted)">···${_esc(a.mask)}</span>`:''}</td>
+                 <td style="padding:6px 8px;color:var(--muted)">${_esc((a.subtype||a.type||'—'))}</td>
+                 <td style="padding:6px 8px;text-align:right">${a.currentBalance!=null?'$'+Number(a.currentBalance).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'}</td>
+                 <td style="padding:6px 8px;text-align:right">${a.availableBalance!=null?'$'+Number(a.availableBalance).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'}</td>
+               </tr>`).join('')}</tbody>
+           </table>`
+        : '<div style="font-size:12px;color:var(--muted);margin-top:8px">No account detail returned by Plaid.</div>';
+      return `
+        <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px;background:#fff">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+            <div style="font-weight:600;color:var(--text)">${_esc(it.institutionName || 'Bank')}</div>
+            <div style="font-size:11px;color:var(--muted)">Linked ${_esc(_fmtDate(it.linkedAt) || '')}</div>
+          </div>
+          ${accountsHtml}
+          <div style="margin-top:10px;display:flex;justify-content:flex-end">
+            <button class="actbtn btn-gh" disabled title="Re-run report ships in Phase U.3" style="font-size:11px;padding:5px 10px;opacity:.5;cursor:not-allowed">Re-run report (coming soon)</button>
+          </div>
+        </div>`;
+    }).join('');
+  }catch(e){
+    body.innerHTML = `<div class="empty"><div class="empty-t">Network error</div><div class="empty-s">${_esc(e.message||e)}</div></div>`;
+  }
+}
+
+function closePortalPlaidDrawer(){
+  const drawer = document.getElementById('portal-plaid-drawer');
+  if(drawer) drawer.style.display = 'none';
 }
 
 function _renderPlaidAppRow(app, isMobile) {

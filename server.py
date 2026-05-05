@@ -17,6 +17,122 @@ IF_API_BASE = os.environ.get(
 ).rstrip('/')
 IF_VIEW_SECRET = os.environ.get('IF_VIEW_SECRET', '')
 
+# Portal admin proxy (Phase U.2 — Plaid bank links from cif-portal).
+# Auth flow: cif-dashboard backend authenticates as a Cognito
+# service user that's a member of the cif-admin group, then signs
+# requests to cif-portal /api/admin/* with the resulting ID token.
+# Per-admin attribution is preserved via cif-dashboard's own
+# session log (same pattern as /api/if/* above).
+#
+# Set these in Render env vars after running cif-portal's
+# provision-admin-group.yml workflow (it prints them to the
+# workflow summary one-time).
+PORTAL_ADMIN_SVC_EMAIL = os.environ.get('PORTAL_ADMIN_SVC_EMAIL', '')
+PORTAL_ADMIN_SVC_PASSWORD = os.environ.get('PORTAL_ADMIN_SVC_PASSWORD', '')
+PORTAL_COGNITO_USER_POOL_ID = os.environ.get(
+    'PORTAL_COGNITO_USER_POOL_ID', 'us-east-1_U508xOs95'
+)
+PORTAL_COGNITO_APP_CLIENT_ID = os.environ.get(
+    'PORTAL_COGNITO_APP_CLIENT_ID', '1mddi61n19hftaldt9t3r622b'
+)
+PORTAL_API_BASE = os.environ.get('PORTAL_API_BASE', IF_API_BASE).rstrip('/')
+
+# Module-level cache for the service user's Cognito ID token.
+# Refreshed on TTL expiry or on a 401 from the portal.
+_portal_admin_token = {'value': '', 'expires_at': 0.0}
+
+
+def _get_portal_admin_token() -> str:
+    """Fetch + cache a Cognito ID token for the service user.
+    Returns '' if creds are missing or auth fails."""
+    now = time.time()
+    cached = _portal_admin_token
+    if cached['value'] and now < cached['expires_at']:
+        return cached['value']
+    if not (PORTAL_ADMIN_SVC_EMAIL and PORTAL_ADMIN_SVC_PASSWORD):
+        return ''
+    # Region = first segment of the user pool id ("us-east-1_xxx").
+    region = (PORTAL_COGNITO_USER_POOL_ID.split('_') or ['us-east-1'])[0]
+    payload = {
+        'AuthFlow': 'USER_PASSWORD_AUTH',
+        'ClientId': PORTAL_COGNITO_APP_CLIENT_ID,
+        'AuthParameters': {
+            'USERNAME': PORTAL_ADMIN_SVC_EMAIL,
+            'PASSWORD': PORTAL_ADMIN_SVC_PASSWORD,
+        },
+    }
+    req = urllib.request.Request(
+        f'https://cognito-idp.{region}.amazonaws.com/',
+        data=json.dumps(payload).encode('utf-8'),
+        method='POST',
+        headers={
+            'Content-Type': 'application/x-amz-json-1.1',
+            'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth',
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=8) as r:
+            data = json.loads(r.read() or b'{}')
+    except urllib.error.HTTPError as e:
+        body = ''
+        try:
+            body = (e.read() or b'').decode('utf-8', 'replace')[:200]
+        except Exception:
+            pass
+        print(f'[portal-admin-auth] HTTP {e.code}: {body}')
+        return ''
+    except Exception as e:
+        print(f'[portal-admin-auth] failed: {type(e).__name__}: {e}')
+        return ''
+    auth = (data or {}).get('AuthenticationResult') or {}
+    tok = auth.get('IdToken') or ''
+    ttl = int(auth.get('ExpiresIn') or 0)
+    if tok and ttl:
+        _portal_admin_token['value'] = tok
+        # Refresh 60s before actual expiry to avoid races.
+        _portal_admin_token['expires_at'] = now + max(60, ttl - 60)
+    return tok
+
+
+def _call_portal_admin(method: str, path: str, body=None):
+    """Proxy to /api/admin/* on cif-portal with the cached service
+    JWT. Auto-refreshes on 401. Returns (status_code, body_bytes)."""
+    for attempt in range(2):
+        tok = _get_portal_admin_token()
+        if not tok:
+            return 0, b'{"error":"portal_admin_auth_unavailable"}'
+        headers = {
+            'Authorization': f'Bearer {tok}',
+            'Accept': 'application/json',
+        }
+        data = None
+        if body is not None:
+            headers['Content-Type'] = 'application/json'
+            data = json.dumps(body).encode('utf-8')
+        req = urllib.request.Request(
+            f'{PORTAL_API_BASE}{path}',
+            method=method, headers=headers, data=data,
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                return r.getcode(), r.read()
+        except urllib.error.HTTPError as e:
+            raw = b''
+            try:
+                raw = e.read() or b''
+            except Exception:
+                pass
+            if e.code == 401 and attempt == 0:
+                # Token expired or rotated → drop cache + retry once.
+                _portal_admin_token['value'] = ''
+                _portal_admin_token['expires_at'] = 0.0
+                continue
+            return e.code, raw
+        except Exception as e:
+            print(f'[portal-admin-call] {method} {path} failed: {type(e).__name__}: {e}')
+            return 0, b''
+    return 0, b''
+
 # Admin password is required — no hardcoded default. If ADMIN_PASSWORD is not
 # set in the environment, the admin account is disabled.
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
@@ -941,6 +1057,57 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(e.code, {'error': f'upstream {e.code}'})
             except Exception as e:
                 self.send_json(502, {'error': str(e)})
+            return
+
+        # ─────────────────────────────────────────
+        # Portal Bank Links — Phase U.2 admin proxy.
+        # cif-portal stores Plaid items keyed by Vergent customerId
+        # in DynamoDB. We surface them in the dashboard's "Portal
+        # Bank Links" tab so admins can search a customer and
+        # (Phase U.3) re-pull asset reports any time.
+        # ─────────────────────────────────────────
+
+        # JSON: list of all customers who've linked a bank via the portal.
+        # Optional ?search=… filter on name / email / customerId / institution.
+        if path == '/api/portal-plaid/customers':
+            if not valid_session(token):
+                self.send_json(401, {'error': 'Unauthorized'}); return
+            qs = ''
+            if '?' in self.path:
+                qs = '?' + self.path.split('?', 1)[1]
+            code, raw = _call_portal_admin(
+                'GET', f'/api/admin/plaid/customers{qs}',
+            )
+            self.send_response(code or 502)
+            for k, v in CORS.items(): self.send_header(k, v)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw or b'{}')
+            return
+
+        # JSON: full detail for one customer (Vergent profile +
+        # every Plaid Item + a fresh /accounts/get pull per Item).
+        if path.startswith('/api/portal-plaid/customer/'):
+            if not valid_session(token):
+                self.send_json(401, {'error': 'Unauthorized'}); return
+            cid = path[len('/api/portal-plaid/customer/'):]
+            if not cid:
+                self.send_json(400, {'error': 'missing cid'}); return
+            code, raw = _call_portal_admin(
+                'GET', f'/api/admin/plaid/customer/{cid}',
+            )
+            _audit('portal_plaid_view',
+                   user=sessions.get(token, {}).get('user', '?'),
+                   ip=_client_ip(self), customer_id=cid)
+            self.send_response(code or 502)
+            for k, v in CORS.items(): self.send_header(k, v)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw or b'{}')
             return
 
         self.send_json(404, {'error': 'not found'})
