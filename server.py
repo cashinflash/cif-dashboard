@@ -42,15 +42,25 @@ PORTAL_API_BASE = os.environ.get('PORTAL_API_BASE', IF_API_BASE).rstrip('/')
 _portal_admin_token = {'value': '', 'expires_at': 0.0}
 
 
-def _get_portal_admin_token() -> str:
+def _get_portal_admin_token():
     """Fetch + cache a Cognito ID token for the service user.
-    Returns '' if creds are missing or auth fails."""
+
+    Returns a tuple (token, error_code). On success: (token, '').
+    On failure: ('', '<code>') where code is one of:
+      env_vars_missing       — PORTAL_ADMIN_SVC_EMAIL/PASSWORD unset
+      cognito_<TypeName>     — Cognito __type from error body
+                               (e.g. cognito_NotAuthorizedException,
+                               cognito_UserNotFoundException)
+      cognito_http_<code>    — HTTPError without parseable __type
+      cognito_network        — urllib failed (timeout, DNS, etc.)
+      cognito_no_token       — 200 OK but AuthenticationResult missing
+    """
     now = time.time()
     cached = _portal_admin_token
     if cached['value'] and now < cached['expires_at']:
-        return cached['value']
+        return cached['value'], ''
     if not (PORTAL_ADMIN_SVC_EMAIL and PORTAL_ADMIN_SVC_PASSWORD):
-        return ''
+        return '', 'env_vars_missing'
     # Region = first segment of the user pool id ("us-east-1_xxx").
     region = (PORTAL_COGNITO_USER_POOL_ID.split('_') or ['us-east-1'])[0]
     payload = {
@@ -76,14 +86,30 @@ def _get_portal_admin_token() -> str:
     except urllib.error.HTTPError as e:
         body = ''
         try:
-            body = (e.read() or b'').decode('utf-8', 'replace')[:200]
+            body = (e.read() or b'').decode('utf-8', 'replace')[:500]
         except Exception:
             pass
         print(f'[portal-admin-auth] HTTP {e.code}: {body}')
-        return ''
+        # Cognito error bodies are JSON with shape:
+        # {"__type":"NotAuthorizedException","message":"..."}
+        # Some responses prefix the type with a module path
+        # (e.g. "com.amazonaws.cognitoidp#NotAuthorizedException")
+        # — strip everything up to the last '#' or '.'.
+        err_type = ''
+        try:
+            parsed = json.loads(body) if body else {}
+            err_type = (parsed.get('__type') or '').strip()
+            for sep in ('#', '.'):
+                if sep in err_type:
+                    err_type = err_type.rsplit(sep, 1)[-1]
+        except Exception:
+            pass
+        if err_type:
+            return '', f'cognito_{err_type}'
+        return '', f'cognito_http_{e.code}'
     except Exception as e:
         print(f'[portal-admin-auth] failed: {type(e).__name__}: {e}')
-        return ''
+        return '', 'cognito_network'
     auth = (data or {}).get('AuthenticationResult') or {}
     tok = auth.get('IdToken') or ''
     ttl = int(auth.get('ExpiresIn') or 0)
@@ -91,16 +117,19 @@ def _get_portal_admin_token() -> str:
         _portal_admin_token['value'] = tok
         # Refresh 60s before actual expiry to avoid races.
         _portal_admin_token['expires_at'] = now + max(60, ttl - 60)
-    return tok
+        return tok, ''
+    return '', 'cognito_no_token'
 
 
 def _call_portal_admin(method: str, path: str, body=None):
     """Proxy to /api/admin/* on cif-portal with the cached service
     JWT. Auto-refreshes on 401. Returns (status_code, body_bytes)."""
     for attempt in range(2):
-        tok = _get_portal_admin_token()
+        tok, err = _get_portal_admin_token()
         if not tok:
-            return 0, b'{"error":"portal_admin_auth_unavailable"}'
+            return 0, json.dumps(
+                {'error': err or 'portal_admin_auth_unavailable'}
+            ).encode('utf-8')
         headers = {
             'Authorization': f'Bearer {tok}',
             'Accept': 'application/json',
