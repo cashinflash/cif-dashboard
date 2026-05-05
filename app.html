@@ -5,7 +5,9 @@
 <link rel="icon" type="image/png" href="/favicon.png">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>Cash in Flash — Internal Portal</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
   --green:#1a6b3c;--green-mid:#1e7d46;--green-dark:#144f2c;
@@ -17,7 +19,7 @@
   --bg:#f0f4f1;--surface:#fff;--surface2:#f8faf8;
   --border:#dde5df;--border2:#ccd6ce;
   --text:#0e1a12;--text2:#2d4235;--muted:#6b7c72;--muted2:#8fa197;
-  --sans:'Poppins',sans-serif;--mono:'DM Mono',monospace;
+  --sans:'Inter',-apple-system,'SF Pro Text','Segoe UI',Roboto,Arial,sans-serif;--mono:'DM Mono',monospace;
   --shadow-sm:0 1px 3px rgba(0,0,0,.06);
   --shadow-md:0 4px 12px rgba(0,0,0,.08);
   --shadow-lg:0 12px 32px rgba(0,0,0,.1);
@@ -852,26 +854,28 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
      ⇄ portal — different surface from cif-apply Plaid). Token is
      stored server-side; admins can re-pull data later (Phase U.3). -->
 <div id="view-portal-plaid" class="view">
-  <div class="phead">
-    <div>
-      <div class="ptitle" style="display:flex;align-items:center;gap:10px">
-        <svg class="icn icn-lg"><use href="#icn-bank"/></svg>Portal Bank Links
+  <div class="container">
+    <div class="phead">
+      <div>
+        <div class="ptitle" style="display:flex;align-items:center;gap:10px">
+          <svg class="icn icn-lg"><use href="#icn-bank"/></svg>Portal Bank Links
+        </div>
+        <div class="psub">Every customer with an active Plaid token — both from cif-apply and the customer portal. Re-pull data any time.</div>
       </div>
-      <div class="psub">Customers who connected a bank inside the customer portal — re-pull data any time</div>
+      <button class="actbtn btn-gh" onclick="loadPortalPlaid()">
+        <svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Refresh
+      </button>
     </div>
-    <button class="actbtn btn-gh" onclick="loadPortalPlaid()">
-      <svg class="icn icn-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icn-refresh"/></svg>Refresh
-    </button>
-  </div>
-  <div style="margin-bottom:16px">
-    <input type="text" id="portal-plaid-search" placeholder="Search by name, email, customer id, or bank…"
-      oninput="filterPortalPlaid(this.value)"
-      style="width:100%;border:1.5px solid var(--border2);border-radius:10px;padding:10px 14px;font-size:14px;font-family:var(--sans)">
-  </div>
-  <div id="portal-plaid-list">
-    <div class="empty">
-      <div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-bank"/></svg></div>
-      <div class="empty-t">Loading…</div>
+    <div style="margin-bottom:16px">
+      <input type="text" id="portal-plaid-search" placeholder="Search by name, email, customer id, bank, or source…"
+        oninput="filterPortalPlaid(this.value)"
+        style="width:100%;border:1.5px solid var(--border2);border-radius:10px;padding:10px 14px;font-size:14px;font-family:var(--sans)">
+    </div>
+    <div id="portal-plaid-list">
+      <div class="empty">
+        <div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-bank"/></svg></div>
+        <div class="empty-t">Loading…</div>
+      </div>
     </div>
   </div>
 </div>
@@ -4363,28 +4367,111 @@ async function loadPortalPlaid(){
   const list = document.getElementById('portal-plaid-list');
   if(!list) return;
   list.innerHTML = '<div class="empty"><div class="empty-t">Loading…</div></div>';
-  try{
-    const r = await fetch('/api/portal-plaid/customers',{credentials:'include'});
-    if(!r.ok){
-      list.innerHTML = `<div class="empty"><div class="empty-t">Couldn't load (HTTP ${r.status})</div><div class="empty-s">If this persists, check that PORTAL_ADMIN_SVC_* env vars are set in Render.</div></div>`;
-      return;
+
+  // Pull both sources in parallel:
+  //   - cif-apply Plaid customers from Firebase (via fbGet)
+  //   - cif-portal Plaid customers from /api/portal-plaid/customers
+  // Merge into a unified table with a Source column. Either source
+  // failing isn't fatal — we render whichever side returned data.
+  const portalP = fetch('/api/portal-plaid/customers',{credentials:'include'})
+    .then(r => r.ok ? r.json() : null)
+    .catch(() => null);
+
+  // fbGet is the existing helper used by loadPlaidCustomers — same
+  // Firebase reports.json node, same /fb/<path> passthrough auth.
+  const fbP = (typeof fbGet === 'function')
+    ? fbGet('reports.json').catch(() => null)
+    : Promise.resolve(null);
+
+  let portalRows = [];
+  let appRows = [];
+  let portalErr = null;
+
+  try {
+    const portalRes = await portalP;
+    if (portalRes && portalRes.customers) {
+      portalRows = portalRes.customers.map(c => ({
+        source: 'Portal',
+        sourceLabel: 'Portal',
+        customerId: c.customerId || '',
+        name: c.customerName || '',
+        email: c.customerEmail || '',
+        phoneLast4: c.customerPhoneLast4 || '',
+        institutionName: c.institutionName || 'Bank',
+        accountMask: c.accountMask || '',
+        accountSubtype: c.accountSubtype || '',
+        linkedAt: c.linkedAt || '',
+        portalItemId: c.itemId || '',
+      }));
+    } else if (portalRes === null) {
+      portalErr = 'portal_unavailable';
     }
-    const data = await r.json();
-    allPortalPlaid = (data && data.customers) || [];
-    renderPortalPlaid(allPortalPlaid);
-  }catch(e){
-    list.innerHTML = `<div class="empty"><div class="empty-t">Network error</div><div class="empty-s">${_esc(e.message||e)}</div></div>`;
+  } catch (e) {
+    portalErr = e.message || String(e);
   }
+
+  try {
+    const fbData = await fbP;
+    if (fbData && typeof fbData === 'object') {
+      // Group by phone+email key, same shape loadPlaidCustomers
+      // produces — pick the latest application per customer to use
+      // as the row's representative bank metadata.
+      const groups = {};
+      Object.entries(fbData).forEach(([id, r]) => {
+        if (!r) return;
+        const bankMethod = ((r.applicationData && r.applicationData.bankMethod) || r.bankMethod || r.filename || '').toLowerCase();
+        const hasPlaidToken = !!(r.plaidAssetToken || r.plaidAccessToken);
+        if (!(bankMethod.includes('plaid') || hasPlaidToken)) return;
+        const phone = (r.applicationData && r.applicationData.phone) || '';
+        const email = (r.applicationData && r.applicationData.email) || '';
+        const fallbackName = r.name || `${(r.applicationData && r.applicationData.firstName)||''} ${(r.applicationData && r.applicationData.lastName)||''}`.trim();
+        const keyP = phone.replace(/\D/g, '');
+        const keyE = email.trim().toLowerCase();
+        const key = (keyP + '|' + keyE) || fallbackName || id;
+        if (!groups[key]) {
+          groups[key] = {
+            source: 'Application',
+            sourceLabel: 'Application',
+            customerId: '',
+            name: fallbackName || '(unknown)',
+            email,
+            phone,
+            phoneLast4: keyP.slice(-4),
+            institutionName: 'Plaid',
+            accountMask: '',
+            accountSubtype: '',
+            linkedAt: '',
+            firebaseId: id,
+          };
+        }
+        const dateStr = r.createdAt || (r.date ? new Date(r.date + ' ' + (r.time||'00:00')).toISOString() : '');
+        if (!groups[key].linkedAt || (dateStr && dateStr > groups[key].linkedAt)) {
+          groups[key].linkedAt = dateStr || groups[key].linkedAt;
+          groups[key].firebaseId = id;
+        }
+        if (!groups[key].name && fallbackName) groups[key].name = fallbackName;
+      });
+      appRows = Object.values(groups);
+    }
+  } catch (e) { /* silent — Firebase failures shouldn't kill the page */ }
+
+  allPortalPlaid = [...portalRows, ...appRows];
+  if (allPortalPlaid.length === 0 && portalErr) {
+    list.innerHTML = `<div class="empty"><div class="empty-t">Couldn't load Portal source</div><div class="empty-s">If this persists, check that PORTAL_ADMIN_SVC_* env vars are set in Render. (${_esc(portalErr)})</div></div>`;
+    return;
+  }
+  renderPortalPlaid(allPortalPlaid);
 }
 
 function filterPortalPlaid(q){
   if(!q){ renderPortalPlaid(allPortalPlaid); return; }
   const lq = q.toLowerCase();
   renderPortalPlaid(allPortalPlaid.filter(c =>
-    (c.customerName||'').toLowerCase().includes(lq) ||
-    (c.customerEmail||'').toLowerCase().includes(lq) ||
+    (c.name||'').toLowerCase().includes(lq) ||
+    (c.email||'').toLowerCase().includes(lq) ||
     (c.customerId||'').toLowerCase().includes(lq) ||
-    (c.institutionName||'').toLowerCase().includes(lq)
+    (c.institutionName||'').toLowerCase().includes(lq) ||
+    (c.source||'').toLowerCase().includes(lq)
   ));
 }
 
@@ -4392,19 +4479,31 @@ function renderPortalPlaid(rows){
   const list = document.getElementById('portal-plaid-list');
   if(!list) return;
   if(!rows || !rows.length){
-    list.innerHTML = '<div class="empty"><div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-bank"/></svg></div><div class="empty-t">No portal bank links yet</div><div class="empty-s">Customers who tap Connect your bank in the portal will appear here</div></div>';
+    list.innerHTML = '<div class="empty"><div class="empty-ic"><svg class="icn icn-lg" style="width:36px;height:36px;color:var(--muted2)"><use href="#icn-bank"/></svg></div><div class="empty-t">No Plaid customers yet</div><div class="empty-s">Customers who connect via Plaid (application or portal) will appear here</div></div>';
     return;
   }
-  list.innerHTML = rows.map(r => {
+  // Sort newest-first by linkedAt; rows without a date sink to the bottom.
+  const sorted = rows.slice().sort((a,b) => (b.linkedAt||'').localeCompare(a.linkedAt||''));
+  list.innerHTML = sorted.map(r => {
     const sub = r.accountSubtype ? r.accountSubtype.charAt(0).toUpperCase()+r.accountSubtype.slice(1) : '';
     const mask = r.accountMask ? '···'+r.accountMask : '';
     const bank = [sub, mask].filter(Boolean).join(' · ');
-    const phone = r.customerPhoneLast4 ? '···'+r.customerPhoneLast4 : '';
-    const meta = [r.customerEmail, phone].filter(Boolean).join(' · ');
+    const phone = r.phoneLast4 ? '···'+r.phoneLast4 : '';
+    const meta = [r.email, phone].filter(Boolean).join(' · ');
+    const isPortal = r.source === 'Portal';
+    const sourcePill = isPortal
+      ? '<span style="display:inline-block;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;margin-left:8px">PORTAL</span>'
+      : '<span style="display:inline-block;background:#e8f5ee;color:#1a6b3c;border:1px solid #88c4a0;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;margin-left:8px">APPLICATION</span>';
+    const onClick = isPortal && r.customerId
+      ? `openPortalPlaidDrawer('${_esc(r.customerId)}')`
+      : `void 0`;
+    const cursor = isPortal && r.customerId ? 'pointer' : 'default';
     return `
-      <div class="ppl-row" onclick="openPortalPlaidDrawer('${_esc(r.customerId)}')" style="cursor:pointer;display:grid;grid-template-columns:1fr max-content;gap:14px;padding:14px 16px;border:1px solid var(--border);border-radius:10px;margin-bottom:10px;background:#fff;transition:background .12s ease" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='#fff'">
+      <div class="ppl-row" onclick="${onClick}" style="cursor:${cursor};display:grid;grid-template-columns:1fr max-content;gap:14px;padding:14px 16px;border:1px solid var(--border);border-radius:10px;margin-bottom:10px;background:#fff;transition:background .12s ease" ${isPortal && r.customerId ? `onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='#fff'"` : ''}>
         <div style="min-width:0">
-          <div style="font-weight:600;color:var(--text);font-size:14px;margin-bottom:2px">${_esc(r.customerName || r.customerId)}</div>
+          <div style="font-weight:600;color:var(--text);font-size:14px;margin-bottom:2px">
+            ${_esc(r.name || r.customerId || '(unknown)')}${sourcePill}
+          </div>
           <div style="font-size:12px;color:var(--muted)">${_esc(meta || '—')}</div>
           <div style="font-size:12px;color:var(--muted);margin-top:2px">${_esc(r.institutionName)} ${_esc(bank ? '· '+bank : '')}</div>
         </div>
