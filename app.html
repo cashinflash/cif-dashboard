@@ -4363,55 +4363,79 @@ function _fmtDate(iso){
   return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 }
 
+// Helper: race a promise against a timeout. Resolves to {ok, value, err}.
+function _withTimeout(p, ms, label){
+  return new Promise(resolve => {
+    let done = false;
+    const t = setTimeout(() => {
+      if (done) return;
+      done = true;
+      resolve({ok:false, value:null, err:`${label} timed out after ${ms}ms`});
+    }, ms);
+    p.then(v => {
+      if (done) return;
+      done = true;
+      clearTimeout(t);
+      resolve({ok:true, value:v, err:null});
+    }).catch(e => {
+      if (done) return;
+      done = true;
+      clearTimeout(t);
+      resolve({ok:false, value:null, err:(e && e.message) || String(e)});
+    });
+  });
+}
+
 async function loadPortalPlaid(){
   const list = document.getElementById('portal-plaid-list');
   if(!list) return;
-  list.innerHTML = '<div class="empty"><div class="empty-t">Loading…</div></div>';
-
-  // Pull both sources in parallel:
-  //   - cif-apply Plaid customers from Firebase (via fbGet)
-  //   - cif-portal Plaid customers from /api/portal-plaid/customers
-  // Merge into a unified table with a Source column. Either source
-  // failing isn't fatal — we render whichever side returned data.
-  const portalP = fetch('/api/portal-plaid/customers',{credentials:'include'})
-    .then(r => r.ok ? r.json() : null)
-    .catch(() => null);
-
-  // fbGet is the existing helper used by loadPlaidCustomers — same
-  // Firebase reports.json node, same /fb/<path> passthrough auth.
-  const fbP = (typeof fbGet === 'function')
-    ? fbGet('reports.json').catch(() => null)
-    : Promise.resolve(null);
+  const setStatus = (msg) => { list.innerHTML = `<div class="empty"><div class="empty-t">${msg}</div></div>`; };
+  setStatus('Loading…');
 
   let portalRows = [];
   let appRows = [];
   let portalErr = null;
+  let fbErr = null;
 
-  try {
-    const portalRes = await portalP;
-    if (portalRes && portalRes.customers) {
-      portalRows = portalRes.customers.map(c => ({
-        source: 'Portal',
-        sourceLabel: 'Portal',
-        customerId: c.customerId || '',
-        name: c.customerName || '',
-        email: c.customerEmail || '',
-        phoneLast4: c.customerPhoneLast4 || '',
-        institutionName: c.institutionName || 'Bank',
-        accountMask: c.accountMask || '',
-        accountSubtype: c.accountSubtype || '',
-        linkedAt: c.linkedAt || '',
-        portalItemId: c.itemId || '',
-      }));
-    } else if (portalRes === null) {
-      portalErr = 'portal_unavailable';
-    }
-  } catch (e) {
-    portalErr = e.message || String(e);
+  // Source 1 — cif-portal admin endpoint (DynamoDB-backed). 12s timeout.
+  setStatus('Loading portal connections…');
+  const portalRace = await _withTimeout(
+    fetch('/api/portal-plaid/customers',{credentials:'include'}).then(async r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    }),
+    12000, 'portal'
+  );
+  if (portalRace.ok && portalRace.value && portalRace.value.customers) {
+    portalRows = portalRace.value.customers.map(c => ({
+      source: 'Portal',
+      sourceLabel: 'Portal',
+      customerId: c.customerId || '',
+      name: c.customerName || '',
+      email: c.customerEmail || '',
+      phoneLast4: c.customerPhoneLast4 || '',
+      institutionName: c.institutionName || 'Bank',
+      accountMask: c.accountMask || '',
+      accountSubtype: c.accountSubtype || '',
+      linkedAt: c.linkedAt || '',
+      portalItemId: c.itemId || '',
+    }));
+  } else {
+    portalErr = portalRace.err || 'unknown';
+  }
+
+  // Source 2 — cif-apply Firebase reports.json (existing path). 15s timeout.
+  setStatus(`Loading applications… (portal: ${portalRows.length})`);
+  let fbData = null;
+  if (typeof fbGet === 'function') {
+    const fbRace = await _withTimeout(fbGet('reports.json'), 15000, 'firebase');
+    if (fbRace.ok) fbData = fbRace.value;
+    else fbErr = fbRace.err;
+  } else {
+    fbErr = 'fbGet helper missing';
   }
 
   try {
-    const fbData = await fbP;
     if (fbData && typeof fbData === 'object') {
       // Group by phone+email key, same shape loadPlaidCustomers
       // produces — pick the latest application per customer to use
@@ -4453,14 +4477,29 @@ async function loadPortalPlaid(){
       });
       appRows = Object.values(groups);
     }
-  } catch (e) { /* silent — Firebase failures shouldn't kill the page */ }
+  } catch (e) { fbErr = (e && e.message) || String(e); }
 
   allPortalPlaid = [...portalRows, ...appRows];
-  if (allPortalPlaid.length === 0 && portalErr) {
-    list.innerHTML = `<div class="empty"><div class="empty-t">Couldn't load Portal source</div><div class="empty-s">If this persists, check that PORTAL_ADMIN_SVC_* env vars are set in Render. (${_esc(portalErr)})</div></div>`;
+  // Surface a small status banner above the list if either source had
+  // an issue, so admins know when one of the two sources is degraded.
+  if (allPortalPlaid.length === 0) {
+    const lines = [];
+    if (portalErr) lines.push(`Portal source failed: ${_esc(portalErr)}`);
+    if (fbErr)     lines.push(`Application source failed: ${_esc(fbErr)}`);
+    if (!lines.length) lines.push('No Plaid customers yet.');
+    list.innerHTML = `<div class="empty"><div class="empty-t">No data</div><div class="empty-s">${lines.join('<br>')}</div></div>`;
     return;
   }
   renderPortalPlaid(allPortalPlaid);
+  if (portalErr || fbErr) {
+    const banner = document.createElement('div');
+    banner.style.cssText = 'background:#fff5e6;border:1px solid #f0c890;color:#5a3300;padding:10px 14px;border-radius:8px;margin-bottom:10px;font-size:12px';
+    const parts = [];
+    if (portalErr) parts.push(`Portal source unavailable (${_esc(portalErr)})`);
+    if (fbErr)     parts.push(`Application source unavailable (${_esc(fbErr)})`);
+    banner.innerHTML = parts.join(' · ');
+    list.insertBefore(banner, list.firstChild);
+  }
 }
 
 function filterPortalPlaid(q){
