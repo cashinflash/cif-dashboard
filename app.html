@@ -3681,20 +3681,32 @@ async function refreshFromPlaid(fbId) {
 // Used when the original Claude extraction had errors (duplicates, miscounts)
 // — /api/rerun-v2 only re-runs the engines on already-broken extractedData,
 // so that path can't recover. This re-runs call_claude_extract from scratch.
+//
+// Async pattern: cif-apply returns 202 immediately and runs the slow
+// extract+engine work on a daemon thread (Render's gateway timeout is 60s
+// and Christine's 200+ txn PDF takes longer than that). We poll Firebase
+// for `reExtractStatus` to know when the background job finishes.
 async function reExtractPdf(fbId) {
   if (!confirm(
     'Re-extract this applicant\'s data from the original PDF?\n\n' +
     'Useful when the original extraction had errors (duplicate transactions, ' +
     'miscounts). Re-runs Claude extraction with the latest prompt, then re-runs ' +
-    'the engine. Takes ~30-60 seconds.'
+    'the engine. Runs in background — usually 30-90 seconds.'
   )) return;
 
   const btn = document.getElementById('pdfreext-'+fbId);
+  const resetBtn = () => {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = '⟲ Re-extract PDF'; }
+  };
   if (btn) {
     btn.disabled = true;
     btn.style.opacity = '0.7';
-    btn.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border:2px solid #374151;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;margin-right:6px;vertical-align:-2px"></span> Re-extracting from PDF...';
+    btn.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border:2px solid #374151;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;margin-right:6px;vertical-align:-2px"></span> Re-extracting (background)...';
   }
+
+  // Step 1: kick off the async job. cif-apply validates inputs + downloads
+  // the PDF synchronously (~1-2s), then returns 202 with status='running'.
+  let started_at;
   try {
     const resp = await fetch('/api/re-extract-pdf', {
       method: 'POST',
@@ -3704,23 +3716,71 @@ async function reExtractPdf(fbId) {
     });
     const data = await resp.json();
     if (!resp.ok || !data.ok) {
-      toast(data.error || 'Re-extraction failed', 'err');
-      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = '⟲ Re-extract PDF'; }
+      toast(data.error || 'Re-extraction failed to start', 'err');
+      resetBtn();
       return;
     }
-    const income = (data.v2_verified_income_monthly || 0).toFixed(0);
-    toast(
-      `PDF re-extracted: ${data.transaction_count} txns. ` +
-      `v2 says ${String(data.v2_decision || '').toUpperCase()} — verified income $${income}/mo.`,
-      'ok'
-    );
-    logAudit('pdf.re_extracted', fbId, `${data.transaction_count} txns, v2 ${data.v2_decision}`);
-    await loadReports();
-    openModal(fbId);
+    started_at = data.started_at;
+    toast('Re-extraction running in background — this can take up to 2 minutes. The page will refresh automatically when done.', 'ok');
   } catch (e) {
-    toast('Re-extraction error: ' + e.message, 'err');
-    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = '⟲ Re-extract PDF'; }
+    toast('Re-extraction kickoff error: ' + e.message, 'err');
+    resetBtn();
+    return;
   }
+
+  // Step 2: poll Firebase for reExtractStatus every 5s until done/error
+  // or we hit the 3-minute hard timeout. fbGet uses the existing /fb/
+  // proxy that's already hooked up for the Vergent badge poller.
+  const POLL_INTERVAL_MS = 5000;
+  const MAX_POLL_MS = 180000;  // 3 minutes hard cap
+  const t0 = Date.now();
+  while (Date.now() - t0 < MAX_POLL_MS) {
+    await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+    let status = '';
+    let record = null;
+    try {
+      record = await fbGet(`reports/${fbId}.json`);
+      status = (record && record.reExtractStatus) || '';
+    } catch (e) {
+      // Network blip — keep polling, the daemon thread is still working
+      continue;
+    }
+    // Guard against reading a stale 'done' from a previous re-extraction.
+    // Only accept a terminal state if it transitioned AFTER our started_at.
+    const finishedAt = (record && record.reExtractFinishedAt) || 0;
+    if (started_at && finishedAt && finishedAt < started_at) {
+      continue;
+    }
+
+    if (status === 'done') {
+      const txnCount = (record && record.reExtractTransactionCount) || 0;
+      const v2Decision = (record && record.reExtractV2Decision) || '?';
+      const v2Tier = (record && record.reExtractV2TierAmount) || 0;
+      toast(
+        `PDF re-extracted: ${txnCount} txns. v2 says ${String(v2Decision).toUpperCase()} — tier $${v2Tier}.`,
+        'ok'
+      );
+      logAudit('pdf.re_extracted', fbId, `${txnCount} txns, v2 ${v2Decision}`);
+      await loadReports();
+      openModal(fbId);
+      return;
+    }
+    if (status === 'error') {
+      const errMsg = (record && record.reExtractError) || 'Unknown error';
+      toast('Re-extraction failed: ' + errMsg, 'err');
+      resetBtn();
+      return;
+    }
+    // status === 'running' — keep polling
+  }
+
+  // Hard timeout. The daemon thread may still be working; tell the
+  // operator to check back rather than presuming failure.
+  toast(
+    'Re-extraction is still running after 3 minutes. Refresh the page in a minute to see results.',
+    'err'
+  );
+  resetBtn();
 }
 
 // Push the Plaid asset report PDF to the applicant's Vergent customer

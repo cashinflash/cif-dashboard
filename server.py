@@ -1054,9 +1054,12 @@ class Handler(BaseHTTPRequestHandler):
 
         # PDF re-extraction recovery path. Counterpart to /api/refresh-from-plaid
         # for non-Plaid applicants whose original Claude extraction had errors
-        # (duplicate transactions, miscounts). cif-apply re-downloads the
-        # originally uploaded PDF, re-runs call_claude_extract with the latest
-        # prompt, then re-runs the engines.
+        # (duplicate transactions, miscounts). cif-apply runs the slow
+        # extract+engine work on a daemon thread and returns 202 Accepted
+        # immediately (~1-2s for the synchronous PDF download). The dashboard
+        # JS then polls /fb/reports/{id}/reExtractStatus.json until the
+        # background job finishes. Short proxy timeout because the upstream
+        # response is fast — long Claude calls don't block this connection.
         if path == '/api/re-extract-pdf':
             try:
                 body = json.loads(raw)
@@ -1065,12 +1068,16 @@ class Handler(BaseHTTPRequestHandler):
                 import urllib.request as ur
                 req = ur.Request('https://cif-apply.onrender.com/api/re-extract-pdf',
                     data=payload, headers={'Content-Type': 'application/json'}, method='POST')
-                # 90s — Claude extraction is usually 20-40s for a Chime PDF,
-                # but leave headroom for batched chunking on huge statements
-                # plus the engine run.
-                with ur.urlopen(req, timeout=90) as r:
+                # 15s — upstream now returns 202 immediately after PDF download.
+                # If we ever wait this long it means the synchronous download
+                # itself stalled, in which case the operator deserves a fast
+                # error rather than a hung request.
+                with ur.urlopen(req, timeout=15) as r:
+                    upstream_status = r.status
                     result = json.loads(r.read().decode())
-                self.send_json(200, result)
+                # Preserve 202 Accepted vs 200 so the dashboard JS sees the
+                # correct status and triggers the polling path.
+                self.send_json(upstream_status, result)
             except urllib.error.HTTPError as e:
                 try: err_body = json.loads(e.read().decode())
                 except Exception: err_body = {'error': str(e)}
