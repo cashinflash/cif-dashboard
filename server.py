@@ -537,6 +537,15 @@ _PHASE2_PANEL_HTML = ("""
     padding: 4px 4px;
   }
   .v2kind input, .v2cand input { margin: 0; cursor: pointer; }
+  .v2note {
+    flex: 1 1 200px; min-width: 160px;
+    font-family: inherit; font-size: 12px;
+    padding: 6px 8px;
+    border: 1px solid #d1d5db; border-radius: 6px;
+    background: white; color: #111827;
+  }
+  .v2note:focus { outline: 2px solid #6cb1e2; outline-offset: -1px; }
+  .v2populated { font-size:11px; color:#374151; margin-top:4px; line-height:1.4; }
 </style>
 <script>
 (function() {
@@ -649,6 +658,7 @@ _PHASE2_PANEL_HTML = ("""
           + docsHint
           + '<label class="v2kind"><input type="checkbox" name="kind" value="bank_statement" checked> Statement</label>'
           + '<label class="v2kind"><input type="checkbox" name="kind" value="drivers_license" checked> DL</label>'
+          + '<input type="text" class="v2note" data-action="note-input" placeholder="Note for Vergent (optional, e.g. Approved $100)" maxlength="200">'
           + '<button type="button" class="v2btn" data-action="create-and-push">↗ Create + Push selected</button>'
           + '<button type="button" class="v2btn sec" data-action="recheck">↻ Re-check</button>'
           + '<span class="v2b-result"></span>';
@@ -775,6 +785,11 @@ _PHASE2_PANEL_HTML = ("""
     var reqBody = { firebase_id: fbId, doc_kinds: docKinds };
     if (action === 'create-and-push') {
       reqBody.create_if_missing = true;
+      // Optional free-text note for the new Vergent customer (e.g.
+      // "Approved $100"). Only present in the 'not_found' state.
+      var noteEl = badge.querySelector('[data-action="note-input"]');
+      var note = noteEl ? noteEl.value.trim() : '';
+      if (note) reqBody.note = note;
     } else if (action === 'push-pick') {
       var picked = badge.querySelector('input[name="vcand"]:checked');
       reqBody.use_vergent_customer_id = picked ? picked.value : '';
@@ -799,6 +814,28 @@ _PHASE2_PANEL_HTML = ("""
           if (ups.bank_statement)  parts.push('Statement');
           if (parts.length) msg += ' (' + parts.join(' + ') + ')';
           resultEl.style.color = '#1a6b3c'; resultEl.textContent = msg;
+          // For create-and-push, surface per-entity backfill outcomes
+          // so the operator immediately sees which child fields landed.
+          var pop = res.body.populated;
+          if (pop && typeof pop === 'object') {
+            var existing = badge.querySelector('.v2populated');
+            if (existing) existing.parentNode.removeChild(existing);
+            var labels = { phone: 'Phone', address: 'Address',
+                           employer: 'Employer', bank: 'Bank',
+                           note: 'Note' };
+            var bits = [];
+            ['phone', 'address', 'employer', 'bank', 'note'].forEach(function(k) {
+              var p = pop[k] || {};
+              if (p.ok)                 bits.push(labels[k] + ' ✓');
+              else if (p.detail && /no .* provided/i.test(p.detail))
+                                        bits.push(labels[k] + ' —');
+              else                      bits.push(labels[k] + ' ✗');
+            });
+            var sum = document.createElement('div');
+            sum.className = 'v2populated';
+            sum.textContent = bits.join(' · ');
+            resultEl.parentNode.insertBefore(sum, resultEl.nextSibling);
+          }
         } else {
           // Surface the actual Vergent response body first — that's what
           // tells the operator which field was rejected (e.g. "BirthDate
