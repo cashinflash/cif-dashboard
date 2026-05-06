@@ -901,6 +901,22 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
   </div>
 </div>
 
+<!-- Detail drawer for one customer's App Links applications. Mirrors the
+     Portal Links drawer pattern so both Connections sub-tabs share UX. -->
+<div id="app-links-drawer" style="display:none;position:fixed;inset:0;z-index:9999">
+  <div onclick="closeAppLinksDrawer()" style="position:absolute;inset:0;background:rgba(0,0,0,.45)"></div>
+  <div style="position:absolute;right:0;top:0;bottom:0;width:min(640px,100%);background:#fff;box-shadow:-12px 0 30px rgba(0,0,0,.18);overflow-y:auto;padding:24px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px">
+      <div>
+        <div id="al-drawer-name" style="font-size:18px;font-weight:700;color:var(--text)"></div>
+        <div id="al-drawer-meta" style="font-size:13px;color:var(--muted);margin-top:4px"></div>
+      </div>
+      <button onclick="closeAppLinksDrawer()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted)">×</button>
+    </div>
+    <div id="al-drawer-body"><div class="empty"><div class="empty-t">Loading…</div></div></div>
+  </div>
+</div>
+
 <div id="view-if" class="view">
   <div class="container">
     <div class="phead">
@@ -4836,7 +4852,11 @@ function _renderPlaidAppRow(app, isMobile) {
   </tr>`;
 }
 
+// Tracks the most-recently-rendered App Links customer list so the
+// drawer-open index resolves correctly even when a filter is active.
+window._alLastList = null;
 function renderPlaidCustomers(list) {
+  window._alLastList = list;
   const el = document.getElementById('plaid-list');
   if (!el) return;
   if (!list.length) {
@@ -4845,28 +4865,24 @@ function renderPlaidCustomers(list) {
   }
   const isMobile = window.innerWidth <= 768;
   if (isMobile) {
-    el.innerHTML = list.map(c => `
-      <details style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden">
-        <summary style="padding:16px;cursor:pointer;list-style:none">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div style="min-width:0;flex:1">
-              <div class="nbig">${c.name||'—'}</div>
-              <div class="nsub" style="font-size:12px">${c.phone||''}</div>
-              <div class="nsub" style="font-size:11px">${c.email||''}</div>
-            </div>
-            <div style="text-align:right;display:flex;flex-direction:column;gap:4px;align-items:flex-end">
-              <span class="pill pill-${(c.latestStatus||'p').toLowerCase()}">${c.latestStatus||'—'}</span>
-              <span style="font-size:11px;color:var(--muted)">${c.totalApps} app${c.totalApps>1?'s':''}</span>
-            </div>
+    el.innerHTML = list.map((c, i) => `
+      <div onclick="openAppLinksDrawer(${i})" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden;padding:16px;cursor:pointer">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div style="min-width:0;flex:1">
+            <div class="nbig">${c.name||'—'}</div>
+            <div class="nsub" style="font-size:12px">${c.phone||''}</div>
+            <div class="nsub" style="font-size:11px">${c.email||''}</div>
           </div>
-          <div style="font-size:11px;color:var(--muted);margin-top:8px">Latest: ${c.latestDate||'—'} • click to expand</div>
-        </summary>
-        ${c.applications.map(a => _renderPlaidAppRow(a, true)).join('')}
-      </details>`).join('');
+          <div style="text-align:right;display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+            <span class="pill pill-${(c.latestStatus||'p').toLowerCase()}">${c.latestStatus||'—'}</span>
+            <span style="font-size:11px;color:var(--muted)">${c.totalApps} app${c.totalApps>1?'s':''}</span>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px">Latest: ${c.latestDate||'—'} • tap to view</div>
+      </div>`).join('');
   } else {
     el.innerHTML = `<table>
     <thead><tr>
-      <th style="width:30px"></th>
       <th>Customer</th>
       <th>Phone</th>
       <th>Latest Report</th>
@@ -4874,39 +4890,74 @@ function renderPlaidCustomers(list) {
       <th>Latest Status</th>
     </tr></thead>
     <tbody>${list.map((c, i) => `
-      <tr style="cursor:pointer" onclick="togglePlaidGroup('${i}')">
-        <td><span id="plaid-chev-${i}" style="display:inline-block;transition:transform .15s">▶</span></td>
+      <tr style="cursor:pointer" onclick="openAppLinksDrawer(${i})">
         <td><div class="nbig">${c.name||'—'}</div><div class="nsub">${c.email||''}</div></td>
         <td style="font-size:13px">${c.phone||'—'}</td>
         <td style="font-size:12px;color:var(--muted)">${c.latestDate||'—'}</td>
         <td><span class="pill" style="background:var(--bg);border:1px solid var(--border)">${c.totalApps}</span></td>
         <td><span class="pill pill-${(c.latestStatus||'p').toLowerCase()}">${c.latestStatus||'—'}</span></td>
-      </tr>
-      <tr id="plaid-apps-${i}" style="display:none">
-        <td colspan="6" style="padding:0">
-          <table style="width:100%;border-top:1px solid var(--border)">
-            <thead><tr style="background:var(--bg);font-size:11px;color:var(--muted)">
-              <th style="text-align:left;padding-left:32px;font-weight:500">When</th>
-              <th style="text-align:left;font-weight:500">Status</th>
-              <th style="text-align:left;font-weight:500">Plaid token</th>
-              <th style="text-align:right;font-weight:500;padding-right:8px">Action</th>
-            </tr></thead>
-            <tbody>${c.applications.map(a => _renderPlaidAppRow(a, false)).join('')}</tbody>
-          </table>
-        </td>
       </tr>`).join('')}
     </tbody>
   </table>`;
   }
 }
 
-function togglePlaidGroup(i) {
-  const row = document.getElementById('plaid-apps-' + i);
-  const chev = document.getElementById('plaid-chev-' + i);
-  if (!row) return;
-  const open = row.style.display !== 'none';
-  row.style.display = open ? 'none' : '';
-  if (chev) chev.style.transform = open ? '' : 'rotate(90deg)';
+// Open the App Links drawer for one customer. Mirrors openPortalPlaidDrawer's
+// pattern: customer name + meta in the header, each application rendered as
+// a card in the body with View + ↻ Re-run report buttons + an inline status
+// line. Index references allPlaidCustomers[i] (kept stable across filters
+// by always passing the index from the rendered list).
+function openAppLinksDrawer(idx) {
+  const drawer = document.getElementById('app-links-drawer');
+  const body = document.getElementById('al-drawer-body');
+  const nameEl = document.getElementById('al-drawer-name');
+  const metaEl = document.getElementById('al-drawer-meta');
+  if (!drawer || !body) return;
+  const list = window._alLastList || allPlaidCustomers;
+  const c = list[idx];
+  if (!c) return;
+  drawer.style.display = 'block';
+  nameEl.textContent = c.name || '—';
+  metaEl.textContent = [c.phone, c.email,
+                        `${c.totalApps} application${c.totalApps>1?'s':''}`,
+                        c.latestDate ? `latest ${c.latestDate}` : '']
+                       .filter(Boolean).join(' · ');
+  if (!c.applications || !c.applications.length) {
+    body.innerHTML = '<div class="empty"><div class="empty-t">No applications</div></div>';
+    return;
+  }
+  // Each application = a card with timestamp + status + token state +
+  // View + Re-run buttons. Mirrors the Portal Links connection-card layout.
+  body.innerHTML = c.applications.map(a => {
+    const stamp = `${a.date||'—'}${a.time?(' • '+a.time):''}`;
+    const tokenBadge = a.accessToken
+      ? '<span style="font-size:10px;color:#5a7a3a;background:#e8f3d8;padding:2px 6px;border-radius:3px">access_token ✓</span>'
+      : (a.assetToken
+          ? '<span style="font-size:10px;color:#7a6a3a;background:#f5ecd0;padding:2px 6px;border-radius:3px">asset_token only</span>'
+          : '<span style="font-size:10px;color:#a44;background:#fbe6e6;padding:2px 6px;border-radius:3px">no token</span>');
+    const refreshBtn = a.accessToken
+      ? `<button onclick="refreshFromPlaid('${a.firebaseId}')" id="plaidref-${a.firebaseId}" class="actbtn btn-gh" style="font-size:11px;padding:5px 10px">↻ Re-run report</button>`
+      : `<button disabled title="No access_token stored on this record — applicant must reconnect via the application form." class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;opacity:.5;cursor:not-allowed">Re-run (no token)</button>`;
+    return `
+      <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px;background:#fff">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="font-weight:600;color:var(--text)">${stamp}</div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <span class="pill pill-${(a.status||'p').toLowerCase()}">${a.status||'—'}</span>
+            ${tokenBadge}
+          </div>
+        </div>
+        <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap">
+          <button onclick="closeAppLinksDrawer();openModal('${a.firebaseId}')" class="actbtn btn-gh" style="font-size:11px;padding:5px 10px">↗ Open report</button>
+          ${refreshBtn}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function closeAppLinksDrawer() {
+  const drawer = document.getElementById('app-links-drawer');
+  if (drawer) drawer.style.display = 'none';
 }
 
 async function rerunFromModal(fbId) {
