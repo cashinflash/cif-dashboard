@@ -1379,6 +1379,32 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        # Push a single free-text note to a Vergent customer. Used by the
+        # Notes tab on the dashboard — every operator-posted note also
+        # lands in Vergent (with the Must-Read flag so it surfaces on the
+        # customer's main page, not just the Notes tab). Body:
+        #   { firebase_id, text }
+        if path == '/api/vergent-add-note':
+            try:
+                body = json.loads(raw)
+                payload = json.dumps(body).encode()
+                print(f'[VERGENT-ADD-NOTE PROXY] Forwarding to cif-apply...', flush=True)
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/vergent-add-note',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=30) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[VERGENT-ADD-NOTE UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[VERGENT-ADD-NOTE ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         # Phase 2: multi-doc Vergent push (resolve-or-create + upload). Proxies
         # to cif-apply's new /api/push-to-vergent route. Body shape:
         #   { firebase_id, use_vergent_customer_id?, create_if_missing?,

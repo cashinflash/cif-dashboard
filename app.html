@@ -3324,16 +3324,31 @@ function buildAppDetails(d) {
 
 function buildDocsPanel(a) {
   let html = '<div style="display:flex;flex-direction:column;gap:16px;padding:4px 0">';
+  const fbId = a && a.firebaseId ? a.firebaseId : '';
+
+  // Map title -> doc_kind for the Push button. Only sections whose
+  // doc_kind is set get a Push button — pay stub etc. are not yet
+  // supported by the Phase 2 enrichment helpers.
+  const PUSH_KINDS = {
+    'Government ID': 'drivers_license',
+    'Plaid Asset Report / Bank Statement': 'bank_statement',
+    'Bank Statement': 'bank_statement',
+    'Proof of Income / Pay Stubs': 'pay_stub',
+    'Pay Stubs': 'pay_stub',
+  };
 
   function urlSection(title, url, icon) {
     if (!url) return '';
     const isPdf = url.includes('.pdf') || url.includes('asset_report') || url.includes('bank_statement') || url.includes('paystub');
+    const kind = PUSH_KINDS[title] || '';
+    const pushBtn = (fbId && kind) ? `<button onclick="pushDocFromTab('${fbId}','${kind}',this)" style="background:#1a4d6b;color:white;border:1px solid #6cb1e2;border-radius:7px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans)">↗ Push to Vergent</button>` : '';
     return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;overflow:hidden">
-      <div style="padding:12px 16px;background:var(--green-light);border-bottom:1px solid var(--green-border);display:flex;align-items:center;justify-content:space-between">
+      <div style="padding:12px 16px;background:var(--green-light);border-bottom:1px solid var(--green-border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
         <div style="font-size:13px;font-weight:700;color:var(--green-dark)">${icon} ${title}</div>
-        <div style="display:flex;gap:6px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
           <a href="${url}" target="_blank" rel="noopener" style="background:var(--green);color:white;border:none;border-radius:7px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans);text-decoration:none">👁 View</a>
           <button onclick="downloadDoc('${url}','${title.replace(/'/g,'\'')}')" style="background:white;color:var(--green);border:1.5px solid var(--green-border);border-radius:7px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans)">⬇ Download</button>
+          ${pushBtn}
         </div>
       </div>
       <div style="padding:14px 16px;text-align:center">
@@ -3382,6 +3397,56 @@ function buildDocsPanel(a) {
 
   html += '</div>';
   return html;
+}
+
+// Push a single doc from the Documents tab. Mirrors the badge's
+// "Push selected" / "Create + Push" UX but scoped to one doc kind.
+// Resolves customer via cached vergentMatch on the backend; if missing
+// AND create_if_missing=true, creates the customer too. We pass true
+// to match the badge's UX so operators don't have to round-trip
+// through the Report page first.
+function pushDocFromTab(fbId, kind, btn) {
+  if (!btn) return;
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Pushing…';
+  fetch('/api/push-to-vergent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ firebase_id: fbId, doc_kinds: [kind], create_if_missing: true }),
+  })
+    .then(r => r.json().then(d => ({ status: r.status, body: d })))
+    .then(res => {
+      btn.disabled = false;
+      const ok = res.status >= 200 && res.status < 300 && res.body && res.body.ok;
+      if (ok) {
+        const cid = res.body.vergentCustomerId || '?';
+        btn.textContent = '✓ Pushed to #' + cid;
+        btn.style.background = '#1a6b3c';
+        btn.style.borderColor = '#1a6b3c';
+        toast('Pushed to Vergent #' + cid, 'ok');
+      } else {
+        const rb = res.body || {};
+        const msg = rb.body || rb.detail || rb.error || ('HTTP ' + res.status);
+        btn.textContent = '✗ Failed';
+        btn.style.background = '#5a0d0d';
+        btn.style.borderColor = '#5a0d0d';
+        toast('Vergent push failed: ' + String(msg).slice(0, 200), 'err');
+        console.log('[VERGENT-DOCS-PUSH] error', { status: res.status, body: rb });
+        setTimeout(() => {
+          btn.textContent = orig;
+          btn.style.background = '#1a4d6b';
+          btn.style.borderColor = '#6cb1e2';
+        }, 6000);
+      }
+    })
+    .catch(e => {
+      btn.disabled = false;
+      btn.textContent = '✗ Network';
+      toast('Network error: ' + e.message, 'err');
+      setTimeout(() => { btn.textContent = orig; }, 6000);
+    });
 }
 
 function viewDoc(b64, mimeType) {
@@ -3489,6 +3554,34 @@ async function addThreadedNote(fbId) {
   if (container) container.innerHTML = renderNotesThread(a);
   logAudit('note.added', a.name || fbId, text.slice(0, 80));
   toast('Note posted', 'ok');
+  // Best-effort: also push the note to Vergent so it surfaces on the
+  // customer's main page (the must-read flag is set server-side in
+  // post_customer_note). Skips silently if the applicant hasn't been
+  // pushed to Vergent yet — the operator gets a non-blocking toast.
+  pushNoteToVergent(fbId, text).catch(() => {});
+}
+
+async function pushNoteToVergent(fbId, text) {
+  try {
+    const r = await fetch('/api/vergent-add-note', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ firebase_id: fbId, text }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.ok) {
+      toast('Note also pushed to Vergent #' + (d.vergentCustomerId || '?'), 'ok');
+    } else if (d.error === 'no_vergent_customer_id') {
+      toast('Note saved (Vergent skipped — push customer first)', '');
+    } else {
+      const msg = d.detail || d.error || ('HTTP ' + r.status);
+      toast('Vergent note failed: ' + String(msg).slice(0, 160), 'err');
+      console.log('[VERGENT-NOTE] error', { status: r.status, body: d });
+    }
+  } catch (e) {
+    toast('Vergent note network error', 'err');
+  }
 }
 
 // Legacy single-blob save path kept for any lingering callers.
