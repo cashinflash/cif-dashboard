@@ -3787,16 +3787,17 @@ async function runV2(fbId) {
 // second Plaid-connected account that the old extractor discarded).
 async function refreshFromPlaid(fbId) {
   if (!confirm(
-    'Refresh this applicant\'s data from Plaid?\n\n' +
-    'This pulls a fresh asset report across ALL connected accounts and re-runs v2. ' +
-    'Takes up to ~2 minutes. v1 decision is not changed automatically.'
+    'Re-run this applicant\'s decision report?\n\n' +
+    'Pulls a fresh asset report from Plaid across ALL connected accounts ' +
+    'and runs them through the v3 engine. Takes up to ~2 minutes. ' +
+    'v1 decision is not changed automatically.'
   )) return;
 
   const btn = document.getElementById('plaidref-'+fbId);
   if (btn) {
     btn.disabled = true;
     btn.style.opacity = '0.7';
-    btn.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border:2px solid #6b4d00;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;margin-right:6px;vertical-align:-2px"></span> Fetching from Plaid...';
+    btn.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border:2px solid #6b4d00;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;margin-right:6px;vertical-align:-2px"></span> Running v3 engine...';
   }
   try {
     const resp = await fetch('/api/refresh-from-plaid', {
@@ -3808,22 +3809,22 @@ async function refreshFromPlaid(fbId) {
     const data = await resp.json();
     if (!resp.ok || !data.ok) {
       toast(data.error || 'Refresh failed', 'err');
-      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = 'Refresh from Plaid &amp; Re-run'; }
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = '↻ Re-run report'; }
       return;
     }
     const n = data.connected_account_count || 1;
     const income = (data.v2_verified_income_monthly || 0).toFixed(0);
     toast(
-      `Plaid refreshed: ${n} account${n>1?'s':''}, ${data.transaction_count} txns. ` +
-      `v2 says ${String(data.v2_decision || '').toUpperCase()} — verified income $${income}/mo.`,
+      `Report ready: ${n} account${n>1?'s':''}, ${data.transaction_count} txns. ` +
+      `Engine says ${String(data.v2_decision || '').toUpperCase()} — verified income $${income}/mo.`,
       'ok'
     );
-    logAudit('plaid.refreshed', fbId, `${n} accounts, v2 ${data.v2_decision}`);
+    logAudit('plaid.refreshed', fbId, `${n} accounts, ${data.v2_decision}`);
     await loadReports();
     openModal(fbId);
   } catch (e) {
-    toast('Refresh error: ' + e.message, 'err');
-    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = 'Refresh from Plaid &amp; Re-run'; }
+    toast('Re-run error: ' + e.message, 'err');
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = '↻ Re-run report'; }
   }
 }
 
@@ -4810,8 +4811,8 @@ function _renderPlaidAppRow(app, isMobile) {
         ? '<span style="font-size:10px;color:#7a6a3a;background:#f5ecd0;padding:2px 6px;border-radius:3px">asset_token only</span>'
         : '<span style="font-size:10px;color:#a44;background:#fbe6e6;padding:2px 6px;border-radius:3px">no token</span>');
   const refreshBtn = app.accessToken
-    ? `<button onclick="event.stopPropagation();refreshFromPlaid('${app.firebaseId}')" id="plaidref-${app.firebaseId}" class="actbtn btn-gh" style="font-size:11px;padding:5px 10px">Refresh from Plaid &amp; Re-run</button>`
-    : `<button disabled title="No access_token stored on this record — applicant must reconnect via the application form." class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;opacity:.5;cursor:not-allowed">Refresh (no token)</button>`;
+    ? `<button onclick="event.stopPropagation();refreshFromPlaid('${app.firebaseId}')" id="plaidref-${app.firebaseId}" class="actbtn btn-gh" style="font-size:11px;padding:5px 10px">↻ Re-run report</button>`
+    : `<button disabled title="No access_token stored on this record — applicant must reconnect via the application form." class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;opacity:.5;cursor:not-allowed">Re-run (no token)</button>`;
   if (isMobile) {
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-top:1px solid var(--border);font-size:12px;gap:8px;flex-wrap:wrap">
       <div style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1">
