@@ -4632,20 +4632,102 @@ async function openPortalPlaidDrawer(cid){
            </table>`
         : '<div style="font-size:12px;color:var(--muted);margin-top:8px">No account detail returned by Plaid.</div>';
       return `
-        <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px;background:#fff">
+        <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px;background:#fff" data-asset-card="${_esc(it.itemId || '')}">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
             <div style="font-weight:600;color:var(--text)">${_esc(it.institutionName || 'Bank')}</div>
             <div style="font-size:11px;color:var(--muted)">Linked ${_esc(_fmtDate(it.linkedAt) || '')}</div>
           </div>
           ${accountsHtml}
-          <div style="margin-top:10px;display:flex;justify-content:flex-end">
-            <button class="actbtn btn-gh" disabled title="Re-run report ships in Phase U.3" style="font-size:11px;padding:5px 10px;opacity:.5;cursor:not-allowed">Re-run report (coming soon)</button>
+          <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:6px" data-asset-actions="${_esc(it.itemId || '')}">
+            <button class="actbtn btn-gh" onclick="rerunAssetReport('${_esc(it.itemId || '')}', this)" style="font-size:11px;padding:5px 10px">↻ Re-run report</button>
           </div>
+          <div data-asset-status="${_esc(it.itemId || '')}" style="margin-top:6px;font-size:11px;color:var(--muted);text-align:right"></div>
         </div>`;
     }).join('');
   }catch(e){
     body.innerHTML = `<div class="empty"><div class="empty-t">Network error</div><div class="empty-s">${_esc(e.message||e)}</div></div>`;
   }
+}
+
+// Phase U.3: trigger a fresh Plaid asset report for one connection.
+// Pulls customer's transactions / balances at request time (~$5 cost
+// per click). Polls until ready, then swaps in a Download PDF button.
+async function rerunAssetReport(itemId, btn) {
+  if (!itemId) return;
+  if (!confirm('This will pull a fresh asset report from Plaid (~$5 cost) for this connection. Continue?')) return;
+  const card = document.querySelector(`[data-asset-card="${itemId}"]`);
+  const actions = card ? card.querySelector(`[data-asset-actions="${itemId}"]`) : null;
+  const status = card ? card.querySelector(`[data-asset-status="${itemId}"]`) : null;
+  const setStatus = (msg, color) => { if (status) { status.textContent = msg; status.style.color = color || 'var(--muted)'; } };
+  if (btn) { btn.disabled = true; btn.textContent = 'Triggering…'; }
+  let token = '';
+  try {
+    const res = await fetch(`/api/portal-plaid/asset-report/${encodeURIComponent(itemId)}`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      const code = data.errorCode || data.error || ('HTTP ' + res.status);
+      const hint = code === 'ITEM_LOGIN_REQUIRED'
+        ? ' This connection has expired — ask the customer to reconnect from the portal Profile page.'
+        : '';
+      if (btn) { btn.disabled = false; btn.textContent = '↻ Re-run report'; }
+      setStatus('Failed: ' + code + hint, '#5a0d0d');
+      return;
+    }
+    token = data.assetReportToken || '';
+    if (!token) {
+      if (btn) { btn.disabled = false; btn.textContent = '↻ Re-run report'; }
+      setStatus('Failed: no token returned', '#5a0d0d');
+      return;
+    }
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Re-run report'; }
+    setStatus('Network error: ' + (e.message || e), '#5a0d0d');
+    return;
+  }
+  if (btn) btn.textContent = 'Generating…';
+  setStatus('Generating asset report — Plaid typically takes 30s-2min…', 'var(--muted)');
+
+  // Poll up to 4 minutes (48 attempts × 5s).
+  const maxAttempts = 48;
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(r => setTimeout(r, 5000));
+    let pollData;
+    try {
+      const pollRes = await fetch(`/api/portal-plaid/asset-report/${encodeURIComponent(token)}`, { credentials: 'include' });
+      pollData = await pollRes.json().catch(() => ({}));
+    } catch (e) {
+      setStatus('Network error while polling — retrying…', 'var(--muted)');
+      continue;
+    }
+    if (pollData.ready === false) {
+      setStatus(`Generating asset report… (${(i + 1) * 5}s)`, 'var(--muted)');
+      continue;
+    }
+    if (pollData.ready === true) {
+      // Swap actions: hide the trigger button, show Download PDF link.
+      if (actions) {
+        actions.innerHTML = `
+          <a href="/api/portal-plaid/asset-report/${encodeURIComponent(token)}/pdf" download class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;text-decoration:none">⬇ Download PDF</a>
+          <button class="actbtn btn-gh" onclick="rerunAssetReport('${itemId}', this)" style="font-size:11px;padding:5px 10px">↻ Re-run again</button>`;
+      }
+      const acctCount = ((pollData.report || {}).items || [])
+        .reduce((sum, it) => sum + ((it.accounts || []).length), 0);
+      setStatus(`Report ready — ${acctCount} accounts, ${((pollData.report || {}).days_requested || 90)}-day window`, '#1a6b3c');
+      return;
+    }
+    if (pollData.error || pollData.ok === false) {
+      const code = pollData.errorCode || pollData.error || 'unknown';
+      if (btn) { btn.disabled = false; btn.textContent = '↻ Re-run report'; }
+      setStatus('Failed: ' + code, '#5a0d0d');
+      return;
+    }
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '↻ Re-run report'; }
+  setStatus('Timed out after 4 minutes — Plaid usually takes ≤2 min. Try again or check Plaid dashboard.', '#5a3300');
 }
 
 function closePortalPlaidDrawer(){

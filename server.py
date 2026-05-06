@@ -169,6 +169,48 @@ def _call_portal_admin(method: str, path: str, body=None):
             return 0, b''
     return 0, b''
 
+def _call_portal_admin_pdf(path: str):
+    """Variant of _call_portal_admin for binary PDF responses. Returns
+    (status_code, body_bytes, content_type). Forwards the upstream
+    Content-Type so the dashboard can hand the bytes off to the
+    browser correctly."""
+    for attempt in range(2):
+        tok, err = _get_portal_admin_token()
+        if not tok:
+            return 0, json.dumps(
+                {'error': err or 'portal_admin_auth_unavailable'}
+            ).encode('utf-8'), 'application/json'
+        req = urllib.request.Request(
+            f'{PORTAL_API_BASE}{path}',
+            method='GET',
+            headers={
+                'Authorization': f'Bearer {tok}',
+                'Accept': 'application/pdf,application/json',
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                ctype = r.headers.get('Content-Type', 'application/pdf')
+                return r.getcode(), r.read(), ctype
+        except urllib.error.HTTPError as e:
+            raw = b''
+            try: raw = e.read() or b''
+            except Exception: pass
+            ctype = (
+                e.headers.get('Content-Type', 'application/json')
+                if hasattr(e, 'headers') and e.headers else 'application/json'
+            )
+            if e.code == 401 and attempt == 0:
+                _portal_admin_token['value'] = ''
+                _portal_admin_token['expires_at'] = 0.0
+                continue
+            return e.code, raw, ctype
+        except Exception as e:
+            print(f'[portal-admin-pdf] {path} failed: {type(e).__name__}: {e}')
+            return 0, b'', 'application/json'
+    return 0, b'', 'application/json'
+
+
 # Admin password is required — no hardcoded default. If ADMIN_PASSWORD is not
 # set in the environment, the admin account is disabled.
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
@@ -1183,6 +1225,49 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(raw or b'{}')
             return
 
+        # Phase U.3: poll a Plaid asset report. Path:
+        # /api/portal-plaid/asset-report/{token}        → JSON (poll)
+        # /api/portal-plaid/asset-report/{token}/pdf    → binary PDF
+        if path.startswith('/api/portal-plaid/asset-report/'):
+            if not valid_session(token):
+                self.send_json(401, {'error': 'Unauthorized'}); return
+            tail = path[len('/api/portal-plaid/asset-report/'):]
+            if tail.endswith('/pdf'):
+                # PDF binary path — forward Content-Type + bytes raw.
+                tok = tail[:-len('/pdf')]
+                if not tok:
+                    self.send_json(400, {'error': 'missing token'}); return
+                code, body, ctype = _call_portal_admin_pdf(
+                    f'/api/admin/plaid/asset-report/{tok}/pdf',
+                )
+                self.send_response(code or 502)
+                for k, v in CORS.items(): self.send_header(k, v)
+                self.send_header('Content-Type', ctype or 'application/pdf')
+                self.send_header(
+                    'Content-Disposition',
+                    f'attachment; filename="asset-report-{tok[:12]}.pdf"',
+                )
+                self.send_header('Cache-Control', 'no-store')
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body or b'')
+                return
+            # JSON poll
+            tok = tail
+            if not tok:
+                self.send_json(400, {'error': 'missing token'}); return
+            code, raw = _call_portal_admin(
+                'GET', f'/api/admin/plaid/asset-report/{tok}',
+            )
+            self.send_response(code or 502)
+            for k, v in CORS.items(): self.send_header(k, v)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw or b'{}')
+            return
+
         self.send_json(404, {'error': 'not found'})
 
     def do_POST(self):
@@ -1432,6 +1517,33 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 print(f'[VERGENT-PUSH-V2 ERROR] {e}', flush=True)
                 self.send_json(500, {'error': str(e)})
+            return
+
+        # Phase U.3: trigger a Plaid asset report. Path:
+        # /api/portal-plaid/asset-report/{itemId}
+        # Posts to cif-portal's admin endpoint via the service-user proxy
+        # to mint a fresh asset_report_token. The dashboard then polls
+        # GET /api/portal-plaid/asset-report/{token} until ready.
+        if path.startswith('/api/portal-plaid/asset-report/'):
+            if not valid_session(token):
+                self.send_json(401, {'error': 'Unauthorized'}); return
+            item_id = path[len('/api/portal-plaid/asset-report/'):]
+            if not item_id:
+                self.send_json(400, {'error': 'missing itemId'}); return
+            code, raw_body = _call_portal_admin(
+                'POST', f'/api/admin/plaid/asset-report/{item_id}',
+                body={},
+            )
+            _audit('portal_plaid_asset_report_trigger',
+                   user=sessions.get(token, {}).get('user', '?'),
+                   ip=_client_ip(self), item_id=item_id)
+            self.send_response(code or 502)
+            for k, v in CORS.items(): self.send_header(k, v)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', str(len(raw_body)))
+            self.end_headers()
+            self.wfile.write(raw_body or b'{}')
             return
 
         if path == '/api/rerun-v2':
