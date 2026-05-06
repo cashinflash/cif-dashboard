@@ -1357,6 +1357,9 @@ window.onload = async () => {
   pollTimer = setInterval(loadReports, 8000);
   // Silent bg fetch to prime the IF badge count
   if (typeof loadIFSubmissions === 'function') loadIFSubmissions();
+  // Background poll for new Portal Links connections — toasts + nav
+  // badge fire when a portal customer connects a new bank.
+  if (typeof startPortalPlaidNotifyPoll === 'function') startPortalPlaidNotifyPoll();
 };
 
 
@@ -4502,7 +4505,121 @@ function _withTimeout(p, ms, label){
   });
 }
 
+// ─────────────────────────────────────────────
+// Portal Links — real-time new-connection notifications
+// ─────────────────────────────────────────────
+// Background poller while the dashboard is open. Compares the current
+// /api/portal-plaid/customers list against the last seen newest-linkedAt
+// timestamp; for any newer rows fires a toast + bumps a count badge on
+// the Connections nav button. If the operator has granted browser
+// notification permission, also fires an OS-level notification when
+// the tab is in the background.
+let _portalPlaidLastSeenAt = 0;       // ms epoch; 0 = uninitialized (baseline pass)
+let _portalPlaidUnseenCount = 0;
+let _portalPlaidPollTimer = null;
+
+function _ppToMs(iso) {
+  if (!iso) return 0;
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? 0 : d.getTime();
+}
+
+async function _pollPortalPlaidNotify() {
+  try {
+    const r = await fetch('/api/portal-plaid/customers', { credentials: 'include' });
+    if (!r.ok) return;
+    const d = await r.json().catch(() => null);
+    const customers = (d && Array.isArray(d.customers)) ? d.customers : [];
+    if (!customers.length) return;
+
+    if (_portalPlaidLastSeenAt === 0) {
+      // Baseline pass — record the newest linkedAt without toasting.
+      // Notifications start firing on the NEXT poll for genuinely new entries.
+      _portalPlaidLastSeenAt = customers.reduce(
+        (m, c) => Math.max(m, _ppToMs(c.linkedAt)), 0,
+      );
+      return;
+    }
+
+    const newOnes = customers.filter(c => _ppToMs(c.linkedAt) > _portalPlaidLastSeenAt);
+    if (!newOnes.length) return;
+
+    _portalPlaidLastSeenAt = newOnes.reduce(
+      (m, c) => Math.max(m, _ppToMs(c.linkedAt)), _portalPlaidLastSeenAt,
+    );
+
+    // Toast each new connection (cap at 5 to avoid spam).
+    const shown = newOnes.slice(0, 5);
+    shown.forEach(c => {
+      const name = c.customerName || ('cid ' + (c.customerId || '?'));
+      const inst = c.institutionName || 'a bank';
+      toast(`🔔 New Portal Links: ${name} linked ${inst}`, 'ok');
+    });
+    if (newOnes.length > shown.length) {
+      toast(`+${newOnes.length - shown.length} more new connections`, 'ok');
+    }
+
+    _portalPlaidUnseenCount += newOnes.length;
+    _renderPortalPlaidBadge();
+
+    // OS-level notification when tab is hidden (best-effort, only if granted).
+    if (typeof Notification !== 'undefined'
+        && Notification.permission === 'granted'
+        && document.visibilityState !== 'visible') {
+      try {
+        const body = newOnes.length === 1
+          ? `${shown[0].customerName || 'Customer'} linked ${shown[0].institutionName || 'a bank'}`
+          : `${newOnes.length} new bank connections`;
+        const n = new Notification('CIF Dashboard — Portal Links', {
+          body, icon: '/favicon.ico', tag: 'portal-plaid-' + Date.now(),
+        });
+        n.onclick = function() { window.focus(); n.close(); };
+      } catch (e) { /* ignore */ }
+    }
+  } catch (e) { /* best-effort polling — never throw */ }
+}
+
+function _renderPortalPlaidBadge() {
+  const trigger = document.getElementById('nav-connections');
+  if (!trigger) return;
+  let badge = trigger.querySelector('.nav-badge-count');
+  if (_portalPlaidUnseenCount > 0) {
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'nav-badge-count';
+      badge.style.cssText = 'display:inline-block;background:#e74c3c;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;line-height:1.4;vertical-align:middle';
+      trigger.appendChild(badge);
+    }
+    badge.textContent = _portalPlaidUnseenCount > 99 ? '99+' : String(_portalPlaidUnseenCount);
+  } else if (badge) {
+    badge.parentNode.removeChild(badge);
+  }
+}
+
+function startPortalPlaidNotifyPoll() {
+  if (_portalPlaidPollTimer) return;     // idempotent
+  _pollPortalPlaidNotify();              // baseline pass (no toasts)
+  _portalPlaidPollTimer = setInterval(_pollPortalPlaidNotify, 30000);  // every 30s
+  // Quietly request OS notification permission once (operator can deny).
+  if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+    setTimeout(() => {
+      try { Notification.requestPermission().catch(() => {}); }
+      catch (e) { /* ignore */ }
+    }, 5000);
+  }
+}
+
+// Reset the unseen badge whenever the operator actually visits Portal Links.
+function _clearPortalPlaidUnseen() {
+  if (_portalPlaidUnseenCount > 0) {
+    _portalPlaidUnseenCount = 0;
+    _renderPortalPlaidBadge();
+  }
+}
+
 async function loadPortalPlaid(){
+  // Operator is actually looking at Portal Links — clear the unseen badge.
+  _clearPortalPlaidUnseen();
   const list = document.getElementById('portal-plaid-list');
   if(!list) return;
   const setStatus = (msg) => { list.innerHTML = `<div class="empty"><div class="empty-t">${msg}</div></div>`; };
