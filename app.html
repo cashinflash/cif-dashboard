@@ -4639,7 +4639,7 @@ async function openPortalPlaidDrawer(cid){
           </div>
           ${accountsHtml}
           <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:6px" data-asset-actions="${_esc(it.itemId || '')}">
-            <button class="actbtn btn-gh" onclick="rerunAssetReport('${_esc(it.itemId || '')}', this)" style="font-size:11px;padding:5px 10px">↻ Re-run report</button>
+            <button class="actbtn btn-gh" onclick="rerunAssetReport('${_esc(it.itemId || '')}', '${_esc(d.customerId || '')}', '${_esc((it.institutionName || '').replace(/'/g, '&#39;'))}', this)" style="font-size:11px;padding:5px 10px">↻ Re-run report</button>
           </div>
           <div data-asset-status="${_esc(it.itemId || '')}" style="margin-top:6px;font-size:11px;color:var(--muted);text-align:right"></div>
         </div>`;
@@ -4649,17 +4649,24 @@ async function openPortalPlaidDrawer(cid){
   }
 }
 
-// Phase U.3: trigger a fresh Plaid asset report for one connection.
-// Pulls customer's transactions / balances at request time (~$5 cost
-// per click). Polls until ready, then swaps in a Download PDF button.
-async function rerunAssetReport(itemId, btn) {
+// Phase U.3: full re-run pipeline for a portal-linked connection.
+// 1. Trigger /asset_report/create on Plaid (~$5 cost, prompts confirm).
+// 2. Poll until Plaid finishes generating (~30s-2min typical).
+// 3. Send the report to cif-apply's /api/portal-engine-v3 endpoint —
+//    runs through engine_v3 with a synthetic applicationData built
+//    from the customer's Vergent profile, persists a new Firebase
+//    /reports/{portal_<cid>_<ts>} record.
+// 4. Open the new record in the standard dashboard Report modal.
+async function rerunAssetReport(itemId, customerId, institutionName, btn) {
   if (!itemId) return;
-  if (!confirm('This will pull a fresh asset report from Plaid (~$5 cost) for this connection. Continue?')) return;
+  if (!confirm('This pulls a fresh Plaid asset report (~$5 cost) and runs the customer through engine_v3. Continue?')) return;
   const card = document.querySelector(`[data-asset-card="${itemId}"]`);
   const actions = card ? card.querySelector(`[data-asset-actions="${itemId}"]`) : null;
   const status = card ? card.querySelector(`[data-asset-status="${itemId}"]`) : null;
   const setStatus = (msg, color) => { if (status) { status.textContent = msg; status.style.color = color || 'var(--muted)'; } };
   if (btn) { btn.disabled = true; btn.textContent = 'Triggering…'; }
+
+  // ── Phase 1: trigger Plaid asset report ──
   let token = '';
   try {
     const res = await fetch(`/api/portal-plaid/asset-report/${encodeURIComponent(itemId)}`, {
@@ -4691,8 +4698,9 @@ async function rerunAssetReport(itemId, btn) {
   if (btn) btn.textContent = 'Generating…';
   setStatus('Generating asset report — Plaid typically takes 30s-2min…', 'var(--muted)');
 
-  // Poll up to 4 minutes (48 attempts × 5s).
-  const maxAttempts = 48;
+  // ── Phase 2: poll Plaid until report is ready ──
+  let plaidReport = null;
+  const maxAttempts = 48;  // 4 min total
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise(r => setTimeout(r, 5000));
     let pollData;
@@ -4708,16 +4716,11 @@ async function rerunAssetReport(itemId, btn) {
       continue;
     }
     if (pollData.ready === true) {
-      // Swap actions: hide the trigger button, show Download PDF link.
-      if (actions) {
-        actions.innerHTML = `
-          <a href="/api/portal-plaid/asset-report/${encodeURIComponent(token)}/pdf" download class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;text-decoration:none">⬇ Download PDF</a>
-          <button class="actbtn btn-gh" onclick="rerunAssetReport('${itemId}', this)" style="font-size:11px;padding:5px 10px">↻ Re-run again</button>`;
-      }
-      const acctCount = ((pollData.report || {}).items || [])
+      plaidReport = pollData.report || {};
+      const acctCount = (plaidReport.items || [])
         .reduce((sum, it) => sum + ((it.accounts || []).length), 0);
-      setStatus(`Report ready — ${acctCount} accounts, ${((pollData.report || {}).days_requested || 90)}-day window`, '#1a6b3c');
-      return;
+      setStatus(`Plaid report ready (${acctCount} accounts) — running v3 engine…`, 'var(--muted)');
+      break;
     }
     if (pollData.error || pollData.ok === false) {
       const code = pollData.errorCode || pollData.error || 'unknown';
@@ -4726,8 +4729,71 @@ async function rerunAssetReport(itemId, btn) {
       return;
     }
   }
-  if (btn) { btn.disabled = false; btn.textContent = '↻ Re-run report'; }
-  setStatus('Timed out after 4 minutes — Plaid usually takes ≤2 min. Try again or check Plaid dashboard.', '#5a3300');
+  if (!plaidReport) {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Re-run report'; }
+    setStatus('Timed out after 4 minutes — Plaid usually takes ≤2 min. Try again.', '#5a3300');
+    return;
+  }
+
+  // ── Phase 3: hand off to cif-apply's engine_v3 pipeline ──
+  if (btn) btn.textContent = 'Running v3…';
+  let engineResult;
+  try {
+    const engineRes = await fetch('/api/portal-engine-v3', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        vergent_customer_id: customerId,
+        plaid_report: plaidReport,
+        institution_name: institutionName || '',
+      }),
+    });
+    engineResult = await engineRes.json().catch(() => ({}));
+    if (!engineRes.ok || !engineResult.ok || !engineResult.firebase_id) {
+      const code = engineResult.error || ('HTTP ' + engineRes.status);
+      if (btn) { btn.disabled = false; btn.textContent = '↻ Re-run report'; }
+      setStatus('Engine v3 failed: ' + code + (engineResult.detail ? ' — ' + engineResult.detail : ''), '#5a0d0d');
+      return;
+    }
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Re-run report'; }
+    setStatus('Engine v3 network error: ' + (e.message || e), '#5a0d0d');
+    return;
+  }
+
+  // ── Phase 4: open the new Firebase record in the standard Report modal ──
+  const fbId = engineResult.firebase_id;
+  setStatus(`Decision: ${engineResult.decision || '?'} — opening report…`, '#1a6b3c');
+  if (actions) {
+    actions.innerHTML = `
+      <a href="/api/portal-plaid/asset-report/${encodeURIComponent(token)}/pdf" download class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;text-decoration:none">⬇ Download PDF</a>
+      <button class="actbtn btn-gh" onclick="openPortalRerunReport('${_esc(fbId)}')" style="font-size:11px;padding:5px 10px">↗ Open report</button>
+      <button class="actbtn btn-gh" onclick="rerunAssetReport('${_esc(itemId)}','${_esc(customerId)}','${_esc((institutionName || '').replace(/'/g, '&#39;'))}',this)" style="font-size:11px;padding:5px 10px">↻ Re-run again</button>`;
+  }
+  // Auto-navigate now that the record exists.
+  await openPortalRerunReport(fbId);
+}
+
+// Open a portal-rerun record (or any other Firebase report) in the
+// standard Report modal. Fetches the record fresh, slots it into the
+// `apps` array (so openModal() can find it), then triggers the modal.
+async function openPortalRerunReport(fbId) {
+  if (!fbId) return;
+  try {
+    const rec = await fbGet(`reports/${fbId}.json`);
+    if (!rec || rec.error) {
+      toast('Couldn\'t load fresh report', 'err');
+      return;
+    }
+    const idx = apps.findIndex(a => a.firebaseId === fbId);
+    const merged = { ...rec, firebaseId: fbId };
+    if (idx >= 0) apps[idx] = merged;
+    else apps.unshift(merged);
+    closePortalPlaidDrawer();
+    openModal(fbId);
+  } catch (e) {
+    toast('Open report failed: ' + (e.message || e), 'err');
+  }
 }
 
 function closePortalPlaidDrawer(){

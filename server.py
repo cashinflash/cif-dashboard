@@ -1377,6 +1377,36 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        # Phase U.3: Portal-rerun engine pipeline. Dashboard hands off the
+        # Plaid asset report it just polled (cif-portal admin endpoint) to
+        # cif-apply, which converts → extracted_data, synthesizes
+        # applicationData from Vergent, runs engine_v3, persists to
+        # /reports/{portal_<cid>_<ts>}, returns the synthetic firebase_id.
+        # Dashboard then opens that record in the standard Report modal.
+        if path == '/api/portal-engine-v3':
+            try:
+                body = json.loads(raw)
+                payload = json.dumps(body).encode()
+                print(f'[PORTAL-ENGINE-V3 PROXY] Forwarding to cif-apply '
+                      f'cid={body.get("vergent_customer_id")}...', flush=True)
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/portal-engine-v3',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                # 180s — engine_v3 LLM classifier takes ~30-60s for
+                # typical applicants; large transaction sets up to ~2 min.
+                with ur.urlopen(req, timeout=180) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[PORTAL-ENGINE-V3 UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[PORTAL-ENGINE-V3 ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         # PDF re-extraction recovery path. Counterpart to /api/refresh-from-plaid
         # for non-Plaid applicants whose original Claude extraction had errors
         # (duplicate transactions, miscounts). cif-apply runs the slow
