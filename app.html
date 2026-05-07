@@ -169,6 +169,17 @@ header{background:linear-gradient(180deg,var(--green-dark),var(--green));height:
   /* Back-button bar above the card needs its own little side padding so the
      button isn't glued to the bezel */
   #view-detail .container > div:first-child{padding:0 8px!important}
+
+  /* === Dashboard page goes truly edge-to-edge on mobile ===
+     Same treatment as #view-detail. Container padding goes to 0; the
+     table card, stats row, filter pills, and sync indicator all fill
+     the full viewport width. The page-header div (title +
+     Refresh / New Analysis buttons) keeps a small 8px side padding so
+     the buttons don't glue to the bezel. */
+  #view-dash .container{padding-left:0!important;padding-right:0!important}
+  #view-dash .tcard{margin-left:0!important;margin-right:0!important}
+  #view-dash .container > div:first-child{padding:0 8px!important}
+  #view-dash #sync-status{padding:0 8px!important}
 }
 /* Show Plaid Customers in desktop nav */
 @media(min-width:769px) and (max-width:1024px){
