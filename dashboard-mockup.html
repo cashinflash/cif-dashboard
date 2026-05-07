@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Dashboard Mockup — Cash in Flash</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --green:#1a6b3c;--green-mid:#1e7d46;--green-dark:#144f2c;
+  --green-light:#eaf5ef;--green-border:#b2d9c0;
+  --gold:#c9a84c;--gold-dark:#a8852e;--gold-light:#fdf8ec;--gold-border:#e8d48e;
+  --red:#c0392b;--red-light:#fdf2f2;--red-border:#f5b8b0;
+  --amber:#d97706;--amber-light:#fffbeb;--amber-border:#fcd34d;
+  --blue:#1d4ed8;--blue-light:#eff6ff;--blue-border:#bfdbfe;
+  --bg:#f0f4f1;--surface:#fff;--surface2:#f8faf8;
+  --border:#dde5df;--border2:#ccd6ce;
+  --text:#0e1a12;--text2:#2d4235;--muted:#6b7c72;--muted2:#8fa197;
+  --sans:'Inter',-apple-system,'SF Pro Text','Segoe UI',Roboto,Arial,sans-serif;--mono:'DM Mono',monospace;
+  --shadow-sm:0 1px 3px rgba(0,0,0,.06);
+  --shadow-md:0 4px 12px rgba(0,0,0,.08);
+  --shadow-lg:0 12px 32px rgba(0,0,0,.1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);font-family:var(--sans);color:var(--text);font-size:15px;line-height:1.6;overflow-x:hidden}
+
+/* === HEADER — refreshed: calmer gradient, lighter shadow, subtle bottom border === */
+header{
+  background:linear-gradient(180deg,var(--green-dark),var(--green));
+  height:66px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 1.5rem;
+  position:sticky;
+  top:0;
+  z-index:100;
+  box-shadow:0 1px 0 rgba(0,0,0,.08);
+  border-bottom:1px solid rgba(255,255,255,.06);
+  flex-wrap:wrap;
+  gap:4px;
+}
+.logo{height:36px;object-fit:contain;border-radius:6px}
+.logo-fb{color:white;font-size:17px;font-weight:700}
+.hdiv{width:1px;height:26px;background:rgba(255,255,255,.2)}
+.hsub{font-size:11px;font-weight:500;color:rgba(255,255,255,.6);letter-spacing:.1em;text-transform:uppercase}
+.hnav{display:flex;gap:2px}
+.nb{padding:8px 16px;border-radius:9px;border:none;font-family:var(--sans);font-size:13px;font-weight:500;cursor:pointer;color:rgba(255,255,255,.7);background:transparent;transition:all .18s;display:inline-flex;align-items:center;gap:6px}
+.nb:hover{background:rgba(255,255,255,.12);color:white}
+.nb.active{background:rgba(255,255,255,.2);color:white;font-weight:600}
+.nb .icn{opacity:.85}
+.nb.active .icn,.nb:hover .icn{opacity:1}
+.hright{display:flex;align-items:center;gap:10px}
+.ibadge{background:var(--gold);color:white;font-size:10px;font-weight:700;padding:4px 10px;border-radius:20px;letter-spacing:.08em;text-transform:uppercase}
+.sbtn{width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.8);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.sbtn:hover{background:rgba(255,255,255,.2);color:white}
+
+/* === CONTAINER — wider for modern monitors === */
+.container{max-width:1320px;margin:0 auto;padding:2rem 2.5rem}
+
+/* === PAGE HEADER === */
+.ptitle{font-size:26px;font-weight:700;color:var(--text);letter-spacing:-.02em;margin-bottom:4px}
+.psub{font-size:14px;color:var(--muted)}
+
+/* === SYNC BAR — small live indicator above stats === */
+.sync-bar{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-bottom:1rem;padding:4px 2px;font-weight:500}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;flex-shrink:0}
+.sync-bar .sep{opacity:.4}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* === STAT CARDS — neutral surface + colored accent strip === */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:1.5rem}
+.sc{
+  position:relative;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:20px 22px 20px 26px;
+  box-shadow:var(--shadow-sm);
+  overflow:hidden;
+  min-width:0;
+  transition:transform .15s,box-shadow .15s;
+  cursor:default;
+}
+.sc:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+.sc::before{
+  content:'';
+  position:absolute;
+  left:0;top:0;bottom:0;
+  width:4px;
+  border-radius:16px 0 0 16px;
+}
+.sc.tot::before{background:var(--muted2)}
+.sc.pen::before{background:var(--gold)}
+.sc.app::before{background:var(--green)}
+.sc.dec::before{background:var(--red)}
+
+.slbl{
+  font-size:11px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.1em;
+  color:var(--muted);
+  margin-bottom:8px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.slbl .icn{width:13px;height:13px}
+.sc.tot .slbl .icn{color:var(--muted2)}
+.sc.pen .slbl .icn{color:var(--gold-dark)}
+.sc.app .slbl .icn{color:var(--green)}
+.sc.dec .slbl .icn{color:var(--red)}
+
+.snum{font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1;margin-bottom:4px}
+.snum.def{color:var(--text)}
+.snum.gld{color:#d97706}
+.snum.grn{color:var(--green)}
+.snum.red{color:var(--red)}
+.spct{font-size:11px;font-weight:600;color:var(--muted);margin-top:4px}
+
+/* Mocked donut placeholders (the real app draws into <canvas>) */
+.donut{
+  flex-shrink:0;
+  width:56px;height:56px;
+  border-radius:50%;
+  position:relative;
+  opacity:.85;
+}
+.donut.tot{background:conic-gradient(var(--muted2) 0 100%,transparent 0);mask:radial-gradient(circle,transparent 55%,#000 56%);-webkit-mask:radial-gradient(circle,transparent 55%,#000 56%)}
+.donut.pen{background:conic-gradient(var(--gold) 0 56deg,#f0e4c4 56deg 360deg);mask:radial-gradient(circle,transparent 55%,#000 56%);-webkit-mask:radial-gradient(circle,transparent 55%,#000 56%)}
+.donut.app{background:conic-gradient(var(--green) 0 207deg,#cfe6d8 207deg 360deg);mask:radial-gradient(circle,transparent 55%,#000 56%);-webkit-mask:radial-gradient(circle,transparent 55%,#000 56%)}
+.donut.dec{background:conic-gradient(var(--red) 0 97deg,#f0d3cf 97deg 360deg);mask:radial-gradient(circle,transparent 55%,#000 56%);-webkit-mask:radial-gradient(circle,transparent 55%,#000 56%)}
+
+/* === BUTTONS === */
+.actbtn{padding:10px 18px;border-radius:9px;font-size:13px;font-weight:600;font-family:var(--sans);cursor:pointer;border:1.5px solid transparent;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn-ok{background:var(--green);color:white;border-color:var(--green)}
+.btn-ok:hover{background:var(--green-mid)}
+.btn-gh{background:white;color:var(--text2);border-color:var(--border2)}
+.btn-gh:hover{background:var(--bg)}
+
+/* === QUICK FILTER PILLS — slightly larger + group labels === */
+.qfp{padding:7px 14px;border-radius:999px;border:1px solid var(--border);background:#fff;font-size:12.5px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--sans);transition:all .15s}
+.qfp:hover{border-color:var(--green);color:var(--green)}
+.qfp.active{background:var(--green);border-color:var(--green);color:#fff}
+.qf-group{
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.12em;
+  color:var(--muted);
+  padding:0 6px 0 2px;
+  text-transform:uppercase;
+}
+
+/* === TABLE CARD — tighter density, sticky thead === */
+.tcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-md);margin-top:.5rem}
+.ttb{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--surface2)}
+.sbox{display:flex;align-items:center;gap:8px;border:1px solid var(--border2);border-radius:9px;padding:9px 14px;background:white;flex:1;max-width:340px}
+.sbox input{border:none;background:none;font-size:14px;color:var(--text);outline:none;width:100%;font-family:var(--sans)}
+.fsel{border:1px solid var(--border2);border-radius:9px;padding:8px 12px;font-size:14px;background:white;color:var(--text);font-family:var(--sans);cursor:pointer}
+
+table{width:100%;border-collapse:collapse;font-size:14px}
+thead{background:var(--surface2);position:sticky;top:0;z-index:5}
+th{text-align:left;padding:11px 18px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);background:var(--surface2)}
+td{padding:13px 18px;border-bottom:1px solid #edf1ee;vertical-align:middle}
+tbody tr{transition:background .12s;cursor:pointer}
+tbody tr:hover td{background:#f5f9f6}
+tbody tr:last-child td{border-bottom:none}
+.nbig{font-weight:700;color:var(--text);font-size:14px}
+.nsub{font-size:11px;color:var(--muted);margin-top:2px;font-family:var(--mono)}
+.abig{font-family:var(--mono);font-weight:600;color:var(--green);font-size:14px}
+.adim{color:var(--muted)}
+
+/* === STATUS PILLS === */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;line-height:1}
+.pill::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.8}
+.pill-a{background:var(--green-light);color:var(--green);border:1px solid var(--green-border)}
+.pill-d{background:var(--red-light);color:var(--red);border:1px solid var(--red-border)}
+.pill-p{background:var(--gold-light);color:var(--gold-dark);border:1px solid var(--gold-border)}
+
+/* Inline action buttons in the table */
+.tact{padding:6px 11px;border-radius:7px;font-size:12px;font-weight:600;border:1px solid var(--border2);background:white;color:var(--text2);cursor:pointer;font-family:var(--sans)}
+.tact:hover{background:var(--bg);border-color:var(--muted2)}
+
+/* === ICON UTILITY === */
+.icn{width:16px;height:16px;flex-shrink:0;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke:currentColor}
+.icn-sm{width:13px;height:13px}
+
+/* === FOOTER NOTE (mockup-only) === */
+.mockup-note{
+  max-width:1320px;
+  margin:2rem auto;
+  padding:14px 20px;
+  background:var(--amber-light);
+  border:1px solid var(--amber-border);
+  border-radius:12px;
+  font-size:13px;
+  color:#7a5c00;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+/* === RESPONSIVE === */
+@media(max-width:1024px){
+  .container{padding:1.5rem 1.25rem}
+}
+@media(max-width:768px){
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+  .hnav{display:none}
+  .hsub,.hdiv{display:none}
+  table th:nth-child(4),table td:nth-child(4),
+  table th:nth-child(5),table td:nth-child(5){display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- Icon sprite — only the icons used by the dashboard view -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="icn-dashboard" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></symbol>
+    <symbol id="icn-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></symbol>
+    <symbol id="icn-bank" viewBox="0 0 24 24"><line x1="3" y1="21" x2="21" y2="21"/><path d="M3 10l9-7 9 7"/><line x1="5" y1="10" x2="5" y2="21"/><line x1="9" y1="10" x2="9" y2="21"/><line x1="15" y1="10" x2="15" y2="21"/><line x1="19" y1="10" x2="19" y2="21"/></symbol>
+    <symbol id="icn-refresh" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/><path d="M20.49 15A9 9 0 0 1 5.64 18.36L1 14"/></symbol>
+    <symbol id="icn-check" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></symbol>
+    <symbol id="icn-x-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></symbol>
+    <symbol id="icn-inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+    <symbol id="icn-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></symbol>
+    <symbol id="icn-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+    <symbol id="icn-key" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></symbol>
+    <!-- NEW: clock icon for Pending stat card -->
+    <symbol id="icn-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+  </defs>
+</svg>
+
+<!-- HEADER -->
+<header>
+  <div style="display:flex;align-items:center;gap:14px">
+    <div class="logo-fb">Cash in Flash</div>
+    <div class="hdiv"></div>
+    <div class="hsub">Underwriting Portal</div>
+  </div>
+  <div class="hnav">
+    <button class="nb active"><svg class="icn"><use href="#icn-dashboard"/></svg>Dashboard</button>
+    <button class="nb"><svg class="icn"><use href="#icn-file"/></svg>Analysis <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="opacity:.7"><polyline points="6 9 12 15 18 9"/></svg></button>
+    <button class="nb"><svg class="icn"><use href="#icn-bank"/></svg>Connections <span style="font-size:10px;opacity:.6;margin-left:2px">▾</span></button>
+    <button class="nb"><svg class="icn"><use href="#icn-file"/></svg>Instant Funding</button>
+  </div>
+  <div class="hright">
+    <div class="ibadge">Internal Only</div>
+    <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:9px;padding:5px 12px">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span style="font-size:12px;font-weight:600;color:rgba(255,255,255,.85)">underwriter@cashinflash.com</span>
+    </div>
+    <button class="sbtn" title="Keyboard shortcuts (?)" style="font-size:13px;font-weight:700">?</button>
+    <button class="sbtn" title="Change my password"><svg class="icn icn-sm"><use href="#icn-key"/></svg></button>
+    <button class="sbtn" title="Sign Out"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+  </div>
+</header>
+
+<!-- DASHBOARD VIEW -->
+<div class="container">
+
+  <!-- Page header -->
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:12px">
+    <div>
+      <div class="ptitle">Applications Dashboard</div>
+      <div class="psub">All decisions — synced across all devices</div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="actbtn btn-gh"><svg class="icn icn-sm"><use href="#icn-refresh"/></svg>Refresh</button>
+      <button class="actbtn btn-ok"><svg class="icn icn-sm"><use href="#icn-plus"/></svg>New Analysis</button>
+    </div>
+  </div>
+
+  <!-- Sync indicator (uses #sync-status slot) -->
+  <div class="sync-bar">
+    <span class="sync-dot"></span>
+    <span>Synced just now</span>
+    <span class="sep">•</span>
+    <span>Live updates active</span>
+  </div>
+
+  <!-- Stat cards -->
+  <div class="stats-row">
+    <div class="sc tot">
+      <div class="slbl"><svg class="icn icn-sm"><use href="#icn-inbox"/></svg>Total</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div class="snum def">247</div>
+          <div class="spct">All applications</div>
+        </div>
+        <div class="donut tot"></div>
+      </div>
+    </div>
+    <div class="sc pen">
+      <div class="slbl"><svg class="icn icn-sm"><use href="#icn-clock"/></svg>Pending</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div class="snum gld">38</div>
+          <div class="spct">Awaiting review</div>
+        </div>
+        <div class="donut pen"></div>
+      </div>
+    </div>
+    <div class="sc app">
+      <div class="slbl"><svg class="icn icn-sm"><use href="#icn-check"/></svg>Approved</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div class="snum grn">142</div>
+          <div class="spct">57.5% approval rate</div>
+        </div>
+        <div class="donut app"></div>
+      </div>
+    </div>
+    <div class="sc dec">
+      <div class="slbl"><svg class="icn icn-sm"><use href="#icn-x-circle"/></svg>Declined</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div class="snum red">67</div>
+          <div class="spct">27.1% decline rate</div>
+        </div>
+        <div class="donut dec"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick filter pills -->
+  <div id="quick-filters" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+    <span class="qf-group">View</span>
+    <button class="qfp active">All</button>
+    <button class="qfp">Today</button>
+    <button class="qfp">Pending</button>
+    <button class="qfp">Pending &gt; 24h</button>
+    <button class="qfp">Declined</button>
+    <button class="qfp">Approved</button>
+    <button class="qfp">Auto-decide candidates</button>
+    <span class="qf-group" style="margin-left:8px">Audit</span>
+    <button class="qfp">Review required</button>
+    <button class="qfp">Low confidence</button>
+    <button class="qfp">Reconciliation failed</button>
+    <button class="qfp" style="margin-left:auto;border-color:var(--green);color:var(--green)">Export CSV</button>
+  </div>
+
+  <!-- Table card -->
+  <div class="tcard">
+    <div class="ttb">
+      <div class="sbox">
+        <svg class="icn icn-sm" style="color:var(--muted)"><use href="#icn-search"/></svg>
+        <input type="text" placeholder="Search applicants... (press / to focus)">
+      </div>
+      <select class="fsel">
+        <option>All statuses</option>
+        <option>Approved</option>
+        <option>Declined</option>
+        <option>Pending</option>
+      </select>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:32px"><input type="checkbox" style="cursor:pointer"></th>
+          <th>Applicant</th>
+          <th>Status</th>
+          <th>Amount</th>
+          <th>Income</th>
+          <th>Submitted</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="checkbox" style="cursor:pointer"></td>
+          <td>
+            <div class="nbig">Jordan Carrillo</div>
+            <div class="nsub">jordan.c@gmail.com · 555-0142</div>
+          </td>
+          <td><span class="pill pill-a">Approved</span></td>
+          <td><span class="abig">$2,400</span></td>
+          <td><span class="abig adim">$5,820/mo</span></td>
+          <td><span class="nsub" style="margin:0">2 min ago</span></td>
+          <td style="text-align:right"><button class="tact">View</button></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" style="cursor:pointer"></td>
+          <td>
+            <div class="nbig">Priya Mehta</div>
+            <div class="nsub">priya.mehta@outlook.com · 555-0288</div>
+          </td>
+          <td><span class="pill pill-p">Pending</span></td>
+          <td><span class="abig">$1,800</span></td>
+          <td><span class="abig adim">$4,310/mo</span></td>
+          <td><span class="nsub" style="margin:0">14 min ago</span></td>
+          <td style="text-align:right"><button class="tact">View</button></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" style="cursor:pointer"></td>
+          <td>
+            <div class="nbig">Marcus Whitfield</div>
+            <div class="nsub">m.whitfield@yahoo.com · 555-0317</div>
+          </td>
+          <td><span class="pill pill-d">Declined</span></td>
+          <td><span class="abig adim">—</span></td>
+          <td><span class="abig adim">$2,140/mo</span></td>
+          <td><span class="nsub" style="margin:0">42 min ago</span></td>
+          <td style="text-align:right"><button class="tact">View</button></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" style="cursor:pointer"></td>
+          <td>
+            <div class="nbig">Sofia Andersson</div>
+            <div class="nsub">sofia.a.92@gmail.com · 555-0451</div>
+          </td>
+          <td><span class="pill pill-a">Approved</span></td>
+          <td><span class="abig">$3,200</span></td>
+          <td><span class="abig adim">$7,490/mo</span></td>
+          <td><span class="nsub" style="margin:0">1 hr ago</span></td>
+          <td style="text-align:right"><button class="tact">View</button></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" style="cursor:pointer"></td>
+          <td>
+            <div class="nbig">Devonte Brooks</div>
+            <div class="nsub">devonte.b@hotmail.com · 555-0629</div>
+          </td>
+          <td><span class="pill pill-p">Pending</span></td>
+          <td><span class="abig">$2,100</span></td>
+          <td><span class="abig adim">$5,025/mo</span></td>
+          <td><span class="nsub" style="margin:0">2 hr ago</span></td>
+          <td style="text-align:right"><button class="tact">View</button></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" style="cursor:pointer"></td>
+          <td>
+            <div class="nbig">Aisha Rahman</div>
+            <div class="nsub">aisha.r@protonmail.com · 555-0773</div>
+          </td>
+          <td><span class="pill pill-a">Approved</span></td>
+          <td><span class="abig">$1,500</span></td>
+          <td><span class="abig adim">$3,890/mo</span></td>
+          <td><span class="nsub" style="margin:0">3 hr ago</span></td>
+          <td style="text-align:right"><button class="tact">View</button></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" style="cursor:pointer"></td>
+          <td>
+            <div class="nbig">Tomás Vargas</div>
+            <div class="nsub">tomas.v.dev@gmail.com · 555-0894</div>
+          </td>
+          <td><span class="pill pill-d">Declined</span></td>
+          <td><span class="abig adim">—</span></td>
+          <td><span class="abig adim">$1,820/mo</span></td>
+          <td><span class="nsub" style="margin:0">5 hr ago</span></td>
+          <td style="text-align:right"><button class="tact">View</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- Footer mockup note -->
+<div class="mockup-note">
+  <svg class="icn" style="color:#a07820"><use href="#icn-file"/></svg>
+  <div>
+    <strong>Mockup preview</strong> — open this file directly in a browser. Not connected to any backend; numbers and applicants are sample data. Resize the window to test responsive behaviour.
+  </div>
+</div>
+
+</body>
+</html>
