@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Application Detail Mockup — Cash in Flash</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --green:#1a6b3c;--green-mid:#1e7d46;--green-dark:#144f2c;--green-deep:#0f4425;
+  --green-light:#eaf5ef;--green-border:#b2d9c0;
+  --gold:#c9a84c;--gold-dark:#a8852e;--gold-light:#fdf8ec;--gold-border:#e8d48e;
+  --red:#c0392b;--red-dark:#7a1a14;--red-light:#fdf2f2;--red-border:#f5b8b0;
+  --amber:#d97706;--amber-light:#fffbeb;--amber-border:#fcd34d;
+  --blue:#1d4ed8;--blue-light:#eff6ff;--blue-border:#bfdbfe;
+  --bg:#f0f4f1;--surface:#fff;--surface2:#f8faf8;
+  --border:#dde5df;--border2:#ccd6ce;
+  --text:#0e1a12;--text2:#2d4235;--muted:#6b7c72;--muted2:#8fa197;
+  --sans:'Inter',-apple-system,'SF Pro Text','Segoe UI',Roboto,Arial,sans-serif;--mono:'DM Mono',monospace;
+  --shadow-sm:0 1px 3px rgba(0,0,0,.06);
+  --shadow-md:0 4px 12px rgba(0,0,0,.08);
+  --shadow-lg:0 12px 32px rgba(0,0,0,.1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);font-family:var(--sans);color:var(--text);font-size:15px;line-height:1.6;overflow-x:hidden}
+
+/* === HEADER (same as dashboard) === */
+header{background:linear-gradient(180deg,var(--green-dark),var(--green));height:66px;display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;position:sticky;top:0;z-index:100;box-shadow:0 1px 0 rgba(0,0,0,.08);border-bottom:1px solid rgba(255,255,255,.06)}
+.logo-fb{color:white;font-size:17px;font-weight:700}
+.hdiv{width:1px;height:26px;background:rgba(255,255,255,.2)}
+.hsub{font-size:11px;font-weight:500;color:rgba(255,255,255,.6);letter-spacing:.1em;text-transform:uppercase}
+.hnav{display:flex;gap:2px}
+.nb{padding:8px 16px;border-radius:9px;border:none;font-family:var(--sans);font-size:13px;font-weight:500;cursor:pointer;color:rgba(255,255,255,.7);background:transparent;transition:all .18s;display:inline-flex;align-items:center;gap:6px}
+.nb:hover{background:rgba(255,255,255,.12);color:white}
+.nb.active{background:rgba(255,255,255,.2);color:white;font-weight:600}
+.hright{display:flex;align-items:center;gap:10px}
+.ibadge{background:var(--gold);color:white;font-size:10px;font-weight:700;padding:4px 10px;border-radius:20px;letter-spacing:.08em;text-transform:uppercase}
+.sbtn{width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.8);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.sbtn:hover{background:rgba(255,255,255,.2);color:white}
+
+/* === DETAIL CONTAINER === */
+.dwrap{max-width:1400px;margin:0 auto;padding:1rem 2.5rem 3rem}
+@media(max-width:1024px){.dwrap{padding:1rem 1.25rem 2rem}}
+
+/* === BACK BAR === */
+.dbackbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding:6px 0}
+.dback{
+  background:var(--surface);
+  border:1px solid var(--border);
+  padding:8px 14px 8px 12px;
+  border-radius:10px;
+  cursor:pointer;
+  font-size:13px;
+  font-weight:600;
+  color:var(--text);
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  font-family:var(--sans);
+  transition:all .15s;
+}
+.dback:hover{background:var(--bg);border-color:var(--muted2)}
+.dactions{display:flex;gap:8px;flex-wrap:wrap}
+
+/* === DETAIL CARD === */
+.dcard{
+  background:var(--surface);
+  border-radius:18px;
+  box-shadow:var(--shadow-lg);
+  overflow:hidden;
+  border:1px solid var(--border);
+}
+
+/* === DETAIL HEAD (small title bar above hero) === */
+.dchead{padding:14px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--surface)}
+.dchead-title{font-size:14px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:8px}
+.dchead-title strong{color:var(--text);font-weight:700}
+.dchead-meta{font-size:12px;color:var(--muted);font-family:var(--mono)}
+
+/* === HERO === */
+.dhero{
+  position:relative;
+  padding:28px 32px 24px;
+  color:white;
+  overflow:hidden;
+}
+.dhero.ok{background:linear-gradient(160deg,var(--green-deep),var(--green) 90%)}
+.dhero.no{background:linear-gradient(160deg,var(--red-dark),var(--red) 90%)}
+.dhero.pending{background:linear-gradient(160deg,#7a6000,#b8860b 90%)}
+.dhero-inner{display:flex;align-items:flex-start;gap:24px;flex-wrap:wrap}
+.dhero-left{flex:1;min-width:280px}
+.dhero-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  background:rgba(255,255,255,.18);
+  border:1px solid rgba(255,255,255,.3);
+  border-radius:999px;
+  padding:5px 12px 5px 10px;
+  font-size:11.5px;
+  font-weight:700;
+  color:white;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  margin-bottom:12px;
+}
+.dhero-badge .icn{width:13px;height:13px;stroke-width:2.5}
+.dhero-name{font-size:28px;font-weight:800;color:white;letter-spacing:-.025em;line-height:1.1;margin-bottom:6px}
+.dhero-sub{font-size:13px;color:rgba(255,255,255,.75);font-family:var(--mono);margin-bottom:14px}
+.dhero-amount{font-size:36px;font-weight:800;color:white;letter-spacing:-.02em;line-height:1;margin-bottom:14px}
+.dhero-amount .currency{font-size:22px;font-weight:700;color:rgba(255,255,255,.75);margin-right:2px;vertical-align:6px}
+.dhero-reason{
+  background:rgba(0,0,0,.18);
+  border:1px solid rgba(255,255,255,.15);
+  border-radius:10px;
+  padding:10px 14px;
+  font-size:13px;
+  color:rgba(255,255,255,.92);
+  line-height:1.55;
+  font-weight:500;
+  max-width:560px;
+}
+.dhero-reason-label{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;opacity:.75;display:block;margin-bottom:4px;color:white}
+
+/* Score wheel ring */
+.dhero-right{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:8px}
+.score-ring{
+  position:relative;
+  width:104px;height:104px;
+  border-radius:50%;
+  background:conic-gradient(rgba(255,255,255,.95) 0 281deg,rgba(255,255,255,.18) 281deg 360deg);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 0 1px rgba(255,255,255,.1);
+}
+.score-ring::after{
+  content:'';position:absolute;inset:8px;background:transparent;border-radius:50%;
+  /* Hollow inner — uses the hero gradient via inheritance is hard; cheat with backdrop on inner */
+}
+.score-inner{
+  position:absolute;inset:8px;
+  background:rgba(0,0,0,.18);
+  backdrop-filter:blur(4px);
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;
+}
+.score-num{font-size:28px;font-weight:800;color:white;letter-spacing:-.02em;line-height:1}
+.score-cap{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.7);margin-top:1px}
+.dhero-rightlabel{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+
+/* Hero footer stat strip */
+.dhero-stats{
+  display:flex;
+  background:rgba(0,0,0,.22);
+  border-top:1px solid rgba(255,255,255,.08);
+  margin:24px -32px -24px;
+  padding:0;
+}
+.dhero-stat{flex:1;text-align:center;padding:12px 8px;border-right:1px solid rgba(255,255,255,.1)}
+.dhero-stat:last-child{border-right:none}
+.dhero-stat-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;opacity:.7;color:white}
+.dhero-stat-value{font-size:15px;font-weight:800;color:white;margin-top:3px;letter-spacing:-.01em}
+
+/* === ACTION BAR === */
+.dactbar{
+  padding:14px 22px;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  position:sticky;
+  top:66px;
+  z-index:10;
+}
+.dactbar-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1}
+.dactbar-right{display:flex;gap:8px;margin-left:auto}
+
+/* Approve cluster: input + button, clean and adjacent */
+.approve-group{display:flex;align-items:stretch;border:1.5px solid var(--green);border-radius:10px;overflow:hidden;background:white}
+.approve-group .currency{padding:0 10px;display:flex;align-items:center;font-weight:700;color:var(--green);background:var(--green-light);border-right:1.5px solid var(--green)}
+.approve-input{
+  border:none;
+  background:transparent;
+  font-size:16px;
+  font-weight:800;
+  color:var(--green);
+  outline:none;
+  width:80px;
+  padding:8px 6px;
+  font-family:var(--sans);
+  text-align:center;
+}
+.approve-btn{
+  background:var(--green);
+  color:white;
+  border:none;
+  padding:0 18px;
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+  font-family:var(--sans);
+  display:flex;align-items:center;gap:6px;
+  transition:background .15s;
+}
+.approve-btn:hover{background:var(--green-mid)}
+.approve-btn .icn{width:14px;height:14px;stroke-width:2.5}
+
+.dbtn{
+  padding:9px 16px;
+  border-radius:10px;
+  font-size:13px;
+  font-weight:600;
+  border:1.5px solid;
+  cursor:pointer;
+  font-family:var(--sans);
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  transition:all .15s;
+}
+.dbtn .icn{width:14px;height:14px;stroke-width:2.5}
+.dbtn-decline{background:white;color:var(--red);border-color:var(--red-border)}
+.dbtn-decline:hover{background:var(--red-light)}
+.dbtn-denial{background:white;color:#c2410c;border-color:#fdba74}
+.dbtn-denial:hover{background:#fff7ed}
+.dbtn-ghost{background:white;color:var(--text2);border-color:var(--border2);padding:9px 14px}
+.dbtn-ghost:hover{background:var(--bg)}
+.dbtn-icon{padding:9px 11px}
+.dbtn-icon .icn{margin:0}
+
+/* === TABS === */
+.dtabs{
+  display:flex;
+  border-bottom:1px solid var(--border);
+  background:var(--surface);
+  padding:0 14px;
+  overflow-x:auto;
+}
+.dtab{
+  padding:14px 18px;
+  border:none;
+  background:none;
+  font-size:13.5px;
+  font-weight:600;
+  color:var(--muted);
+  cursor:pointer;
+  font-family:var(--sans);
+  border-bottom:2px solid transparent;
+  margin-bottom:-1px;
+  transition:all .15s;
+  display:inline-flex;align-items:center;gap:6px;
+  white-space:nowrap;
+}
+.dtab:hover{color:var(--text2)}
+.dtab.active{color:var(--green);border-bottom-color:var(--green);font-weight:700}
+.dtab .icn{width:14px;height:14px}
+.dtab-count{
+  background:var(--bg);
+  color:var(--muted);
+  border:1px solid var(--border);
+  border-radius:999px;
+  padding:1px 7px;
+  font-size:10.5px;
+  font-weight:700;
+  margin-left:2px;
+}
+.dtab.active .dtab-count{background:var(--green-light);color:var(--green);border-color:var(--green-border)}
+
+/* === SUMMARY STRIP (5 metrics) === */
+.dsummary{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:1px;
+  background:var(--border);
+  border-bottom:1px solid var(--border);
+}
+.dsm{
+  background:var(--surface);
+  padding:18px 20px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  position:relative;
+}
+.dsm-label{
+  font-size:10.5px;
+  font-weight:700;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--muted);
+  display:flex;align-items:center;gap:5px;
+}
+.dsm-label .icn{width:11px;height:11px;opacity:.7}
+.dsm-value{
+  font-size:24px;
+  font-weight:800;
+  letter-spacing:-.02em;
+  line-height:1.1;
+  font-family:var(--sans);
+}
+.dsm-value .unit{font-size:14px;font-weight:700;color:var(--muted);margin-left:2px}
+.dsm-sub{font-size:11px;color:var(--muted);font-weight:500}
+.dsm.green .dsm-value{color:var(--green)}
+.dsm.red .dsm-value{color:var(--red)}
+.dsm.gold .dsm-value{color:var(--amber)}
+.dsm.muted .dsm-value{color:var(--text2)}
+
+/* === REPORT PANEL === */
+.dpanel{padding:24px 28px 32px;background:var(--surface)}
+.dpanel-header{
+  padding:10px 0 14px;
+  margin-bottom:16px;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.dpanel-tools{display:flex;gap:6px;flex-wrap:wrap}
+.dpanel-meta{font-size:11.5px;color:var(--muted);text-align:right;line-height:1.6}
+.dpanel-meta b{color:var(--text2)}
+.dpanel-meta .vergent-pushed{color:var(--blue);font-weight:600;display:inline-flex;align-items:center;gap:4px}
+
+.runbtn{
+  background:white;
+  color:var(--text2);
+  border:1px solid var(--border2);
+  padding:7px 13px;
+  border-radius:8px;
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+  font-family:var(--sans);
+  display:inline-flex;align-items:center;gap:6px;
+  text-decoration:none;
+  transition:all .15s;
+}
+.runbtn:hover{background:var(--bg);border-color:var(--muted2)}
+.runbtn .icn{width:13px;height:13px}
+.runbtn.primary{background:var(--green);color:white;border-color:var(--green)}
+.runbtn.primary:hover{background:var(--green-mid)}
+
+/* === REPORT CONTENT (.mrhtml refresh) === */
+.mrhtml{
+  background:transparent;
+  border:none;
+  padding:0;
+  font-size:14.5px;
+  line-height:1.85;
+  color:var(--text2);
+}
+.mrhtml h1{
+  font-size:20px;
+  font-weight:800;
+  color:var(--green-dark);
+  margin-bottom:18px;
+  padding-bottom:14px;
+  border-bottom:2px solid var(--green-border);
+  letter-spacing:-.01em;
+}
+.mrhtml h2{
+  font-size:12px;
+  font-weight:800;
+  color:var(--green);
+  margin:24px 0 12px;
+  text-transform:uppercase;
+  letter-spacing:.1em;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:0;
+  background:transparent;
+  border:none;
+  border-radius:0;
+}
+.mrhtml h2::before{
+  content:'';
+  width:18px;
+  height:2px;
+  background:var(--green);
+  border-radius:1px;
+}
+.mrhtml h2::after{content:'';flex:1;height:1px;background:var(--border);margin-left:6px}
+
+.mrhtml p{margin-bottom:10px;font-size:14px}
+.mrhtml p b{color:var(--text);font-weight:700}
+.mrhtml ul{margin:6px 0 14px 24px}
+.mrhtml ul li{margin-bottom:6px;font-size:14px}
+.mrhtml table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:13px;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.mrhtml table th{background:var(--green-light);color:var(--green-dark);font-weight:700;padding:9px 12px;border:none;border-bottom:1px solid var(--green-border);font-size:11px;text-transform:uppercase;letter-spacing:.06em;text-align:left}
+.mrhtml table td{padding:9px 12px;border:none;border-bottom:1px solid var(--border);font-size:13.5px;vertical-align:top}
+.mrhtml table tr:last-child td{border-bottom:none}
+.mrhtml table tr:nth-child(even) td{background:var(--surface2)}
+
+.mrhtml .tier-breakdown{
+  background:linear-gradient(135deg,rgba(26,107,60,.06),rgba(26,107,60,.02));
+  border:1.5px solid var(--green-border);
+  border-radius:12px;
+  padding:16px 18px;
+  margin:12px 0 18px;
+}
+.mrhtml .tier-breakdown p{margin-bottom:7px;font-size:14px}
+.mrhtml .tier-breakdown p:last-child{
+  margin-bottom:0;
+  font-weight:800;
+  color:var(--green);
+  font-size:15.5px;
+  border-top:1px solid var(--green-border);
+  padding-top:9px;
+  margin-top:9px;
+}
+
+/* === FOOTER NOTE (mockup-only) === */
+.mockup-note{max-width:1400px;margin:1.25rem auto 2rem;padding:14px 20px;background:var(--amber-light);border:1px solid var(--amber-border);border-radius:12px;font-size:13px;color:#7a5c00;display:flex;align-items:center;gap:10px}
+
+/* === ICONS === */
+.icn{width:16px;height:16px;flex-shrink:0;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke:currentColor}
+
+/* === RESPONSIVE === */
+@media(max-width:768px){
+  .hnav{display:none}
+  .hsub,.hdiv{display:none}
+  .dhero{padding:22px 18px 18px}
+  .dhero-name{font-size:22px}
+  .dhero-amount{font-size:28px}
+  .dhero-stats{margin-left:-18px;margin-right:-18px}
+  .dactbar{padding:12px 14px}
+  .dpanel{padding:18px}
+  .dsummary{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="icn-dashboard" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></symbol>
+    <symbol id="icn-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></symbol>
+    <symbol id="icn-bank" viewBox="0 0 24 24"><line x1="3" y1="21" x2="21" y2="21"/><path d="M3 10l9-7 9 7"/><line x1="5" y1="10" x2="5" y2="21"/><line x1="9" y1="10" x2="9" y2="21"/><line x1="15" y1="10" x2="15" y2="21"/><line x1="19" y1="10" x2="19" y2="21"/></symbol>
+    <symbol id="icn-refresh" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/><path d="M20.49 15A9 9 0 0 1 5.64 18.36L1 14"/></symbol>
+    <symbol id="icn-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+    <symbol id="icn-check-circle" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></symbol>
+    <symbol id="icn-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+    <symbol id="icn-x-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></symbol>
+    <symbol id="icn-mail" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></symbol>
+    <symbol id="icn-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+    <symbol id="icn-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></symbol>
+    <symbol id="icn-back" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></symbol>
+    <symbol id="icn-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+    <symbol id="icn-trending-up" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></symbol>
+    <symbol id="icn-trending-down" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></symbol>
+    <symbol id="icn-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+    <symbol id="icn-zap" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
+    <symbol id="icn-arrow-up-right" viewBox="0 0 24 24"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></symbol>
+    <symbol id="icn-play" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></symbol>
+    <symbol id="icn-send" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></symbol>
+    <symbol id="icn-key" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></symbol>
+    <symbol id="icn-message" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+    <symbol id="icn-card" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></symbol>
+    <symbol id="icn-folder" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></symbol>
+  </defs>
+</svg>
+
+<!-- HEADER -->
+<header>
+  <div style="display:flex;align-items:center;gap:14px">
+    <div class="logo-fb">Cash in Flash</div>
+    <div class="hdiv"></div>
+    <div class="hsub">Underwriting Portal</div>
+  </div>
+  <div class="hnav">
+    <button class="nb"><svg class="icn"><use href="#icn-dashboard"/></svg>Dashboard</button>
+    <button class="nb"><svg class="icn"><use href="#icn-file"/></svg>Analysis</button>
+    <button class="nb"><svg class="icn"><use href="#icn-bank"/></svg>Connections</button>
+    <button class="nb"><svg class="icn"><use href="#icn-file"/></svg>Instant Funding</button>
+  </div>
+  <div class="hright">
+    <div class="ibadge">Internal Only</div>
+    <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:9px;padding:5px 12px">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span style="font-size:12px;font-weight:600;color:rgba(255,255,255,.85)">underwriter@cashinflash.com</span>
+    </div>
+    <button class="sbtn" style="font-size:13px;font-weight:700">?</button>
+    <button class="sbtn"><svg class="icn" style="width:13px;height:13px"><use href="#icn-key"/></svg></button>
+  </div>
+</header>
+
+<!-- DETAIL VIEW -->
+<div class="dwrap">
+
+  <!-- Back bar + page-level actions -->
+  <div class="dbackbar">
+    <button class="dback">
+      <svg class="icn" style="width:14px;height:14px"><use href="#icn-back"/></svg>
+      Back to Dashboard
+    </button>
+    <div class="dactions">
+      <button class="dbtn dbtn-ghost"><svg class="icn"><use href="#icn-send"/></svg>Push to Vergent</button>
+      <button class="dbtn dbtn-ghost"><svg class="icn"><use href="#icn-arrow-up-right"/></svg>Open in Vergent</button>
+    </div>
+  </div>
+
+  <!-- The detail card -->
+  <div class="dcard">
+
+    <!-- Card title bar -->
+    <div class="dchead">
+      <div class="dchead-title">
+        <svg class="icn" style="color:var(--muted)"><use href="#icn-file"/></svg>
+        Application detail · <strong>Jordan Carrillo</strong>
+      </div>
+      <div class="dchead-meta">fb_a8f3c92e · submitted 2h ago</div>
+    </div>
+
+    <!-- HERO -->
+    <div class="dhero ok">
+      <div class="dhero-inner">
+
+        <div class="dhero-left">
+          <div class="dhero-badge">
+            <svg class="icn"><use href="#icn-check"/></svg>
+            Approved
+          </div>
+          <div class="dhero-name">Jordan Carrillo</div>
+          <div class="dhero-sub">jordan.carrillo@gmail.com · (555) 014-2871 · DOB 1991-04-17</div>
+          <div class="dhero-amount"><span class="currency">$</span>2,400</div>
+          <div class="dhero-reason">
+            <span class="dhero-reason-label">Approval reason</span>
+            Strong income consistency over 90 days ($5,820/mo verified). FCF of $2,610/mo comfortably supports a $2,400 loan at the requested term. No NSFs, no fintech stacking signals, low risk-flag count.
+          </div>
+        </div>
+
+        <div class="dhero-right">
+          <div class="score-ring">
+            <div class="score-inner">
+              <div class="score-num">78</div>
+              <div class="score-cap">Score</div>
+            </div>
+          </div>
+          <div class="dhero-rightlabel">Risk · 78 / 100</div>
+        </div>
+      </div>
+
+      <div class="dhero-stats">
+        <div class="dhero-stat"><div class="dhero-stat-label">Status</div><div class="dhero-stat-value">Approved</div></div>
+        <div class="dhero-stat"><div class="dhero-stat-label">Loan Amount</div><div class="dhero-stat-value">$2,400</div></div>
+        <div class="dhero-stat"><div class="dhero-stat-label">Risk Score</div><div class="dhero-stat-value">78<span style="font-size:10px;opacity:.6;margin-left:1px">/100</span></div></div>
+      </div>
+    </div>
+
+    <!-- ACTION BAR (sticky) -->
+    <div class="dactbar">
+      <div class="dactbar-left">
+        <div class="approve-group">
+          <span class="currency">$</span>
+          <input class="approve-input" type="text" value="2400">
+          <button class="approve-btn"><svg class="icn"><use href="#icn-check"/></svg>Approve</button>
+        </div>
+        <button class="dbtn dbtn-decline"><svg class="icn"><use href="#icn-x"/></svg>Decline</button>
+      </div>
+      <div class="dactbar-right">
+        <button class="dbtn dbtn-ghost"><svg class="icn"><use href="#icn-copy"/></svg>Copy</button>
+        <button class="dbtn dbtn-icon" style="color:var(--red);border-color:var(--red-border);background:white"><svg class="icn"><use href="#icn-trash"/></svg></button>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="dtabs">
+      <button class="dtab active"><svg class="icn"><use href="#icn-file"/></svg>Report</button>
+      <button class="dtab"><svg class="icn"><use href="#icn-folder"/></svg>Application</button>
+      <button class="dtab"><svg class="icn"><use href="#icn-folder"/></svg>Documents <span class="dtab-count">3</span></button>
+      <button class="dtab"><svg class="icn"><use href="#icn-message"/></svg>Notes <span class="dtab-count">2</span></button>
+      <button class="dtab"><svg class="icn"><use href="#icn-card"/></svg>Debit Card <span class="dtab-count" style="background:var(--green-light);color:var(--green);border-color:var(--green-border)">on file</span></button>
+    </div>
+
+    <!-- SUMMARY STRIP (5 metrics) -->
+    <div class="dsummary">
+      <div class="dsm green">
+        <div class="dsm-label"><svg class="icn"><use href="#icn-trending-up"/></svg>Verified income</div>
+        <div class="dsm-value">$5,820<span class="unit">/mo</span></div>
+        <div class="dsm-sub">90-day average · Plaid verified</div>
+      </div>
+      <div class="dsm red">
+        <div class="dsm-label"><svg class="icn"><use href="#icn-trending-down"/></svg>Obligations</div>
+        <div class="dsm-value">$3,210<span class="unit">/mo</span></div>
+        <div class="dsm-sub">recurring & committed</div>
+      </div>
+      <div class="dsm green">
+        <div class="dsm-label"><svg class="icn"><use href="#icn-zap"/></svg>Free cash flow</div>
+        <div class="dsm-value">$2,610<span class="unit">/mo</span></div>
+        <div class="dsm-sub">income − obligations</div>
+      </div>
+      <div class="dsm muted">
+        <div class="dsm-label"><svg class="icn"><use href="#icn-check-circle"/></svg>Max offer</div>
+        <div class="dsm-value" style="color:var(--green)">$300</div>
+        <div class="dsm-sub">v2 engine recommendation</div>
+      </div>
+      <div class="dsm green">
+        <div class="dsm-label"><svg class="icn"><use href="#icn-shield"/></svg>Confidence</div>
+        <div class="dsm-value">84%</div>
+        <div class="dsm-sub">above auto-approve floor</div>
+      </div>
+    </div>
+
+    <!-- REPORT PANEL -->
+    <div class="dpanel">
+
+      <div class="dpanel-header">
+        <div class="dpanel-tools">
+          <button class="runbtn"><svg class="icn"><use href="#icn-refresh"/></svg>Re-run with stored data</button>
+          <button class="runbtn"><svg class="icn"><use href="#icn-refresh"/></svg>Refresh from Plaid</button>
+          <a class="runbtn" href="#"><svg class="icn"><use href="#icn-arrow-up-right"/></svg>Open in Vergent</a>
+        </div>
+        <div class="dpanel-meta">
+          Last run: <b>May 7, 2026 · 2:14 PM</b><br>
+          Plaid refreshed: <b>May 7, 2026 · 2:11 PM</b><br>
+          <b>2 Plaid accounts</b>
+          <span class="vergent-pushed"><svg class="icn" style="width:11px;height:11px"><use href="#icn-check"/></svg> Vergent pushed May 7, 2:18 PM</span>
+        </div>
+      </div>
+
+      <!-- Sample report content -->
+      <div class="mrhtml">
+        <h1>Application Decision Report</h1>
+
+        <p><b>Decision:</b> Approved for <b>$2,400</b> · Risk score <b>78</b> · v2 confidence <b>84%</b></p>
+        <p>This applicant met all hard-decline thresholds and clears the auto-approve floor on the Standard profile. Income is verified across two Plaid-connected accounts; cash-flow analysis shows ample headroom to support the requested loan.</p>
+
+        <h2>Income Analysis</h2>
+        <table>
+          <thead><tr><th>Source</th><th>Frequency</th><th>Avg / mo</th><th>Confidence</th></tr></thead>
+          <tbody>
+            <tr><td>Acme Logistics — payroll</td><td>Bi-weekly</td><td>$4,920</td><td>High</td></tr>
+            <tr><td>Side income — Uber</td><td>Weekly</td><td>$680</td><td>Medium</td></tr>
+            <tr><td>Government benefits</td><td>Monthly</td><td>$220</td><td>High</td></tr>
+            <tr><td><b>Total verified</b></td><td>—</td><td><b>$5,820</b></td><td>—</td></tr>
+          </tbody>
+        </table>
+
+        <h2>Tier Breakdown</h2>
+        <div class="tier-breakdown">
+          <p><b>Tier 1</b> ($100): FCF threshold met (need $400, have $2,610) ✓</p>
+          <p><b>Tier 2</b> ($150): FCF threshold met (need $600, have $2,610) ✓</p>
+          <p><b>Tier 3</b> ($200): FCF threshold met (need $800, have $2,610) ✓</p>
+          <p><b>Final approved tier: $300</b> — caps at v2 engine recommendation</p>
+        </div>
+
+        <h2>Free Cash Flow</h2>
+        <table>
+          <thead><tr><th>Category</th><th>Avg / mo</th></tr></thead>
+          <tbody>
+            <tr><td>Verified income</td><td style="color:var(--green);font-weight:700">+$5,820</td></tr>
+            <tr><td>Rent / housing</td><td>−$1,450</td></tr>
+            <tr><td>Auto loan</td><td>−$485</td></tr>
+            <tr><td>Insurance & utilities</td><td>−$610</td></tr>
+            <tr><td>Subscriptions (4)</td><td>−$92</td></tr>
+            <tr><td>Other recurring</td><td>−$573</td></tr>
+            <tr><td><b>Free cash flow</b></td><td style="color:var(--green);font-weight:800">+$2,610</td></tr>
+          </tbody>
+        </table>
+
+        <h2>Risk Signals</h2>
+        <ul>
+          <li><b>NSF / overdraft events:</b> 0 in last 90 days ✓</li>
+          <li><b>Fintech stacking:</b> No competing short-term lenders detected ✓</li>
+          <li><b>Speculative spending:</b> 1.4% of income (below 5% threshold) ✓</li>
+          <li><b>P2P sent:</b> $340/mo recurring — within normal range</li>
+          <li><b>Account age:</b> 4+ years on primary checking</li>
+        </ul>
+
+        <h2>Decision Rationale</h2>
+        <p>Applicant presents a clean cash-flow profile with verified, multi-source income and no hard-decline triggers. FCF of $2,610/mo provides comfortable coverage for the requested $2,400 loan. Recommended for approval at the v2-suggested tier of $300 base offer.</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Footer mockup note -->
+<div class="mockup-note">
+  <svg class="icn" style="color:#a07820"><use href="#icn-file"/></svg>
+  <div>
+    <strong>Mockup preview</strong> — open this file directly in a browser. Sample applicant data; not connected to a backend. Resize the window down to test responsive behaviour.
+  </div>
+</div>
+
+</body>
+</html>
