@@ -340,11 +340,12 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .mdh.ok{background:linear-gradient(160deg,#0f4425,#1a6b3c 90%)}
 .mdh.no{background:linear-gradient(160deg,#7a1a14,#c0392b 90%)}
 .mdh.pending{background:linear-gradient(160deg,#7a6000,#b8860b 90%)}
-.mdh-inner{padding:22px 24px;display:flex;align-items:center;gap:18px}
-.mdh-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;color:white;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}
-.mdn{font-size:22px;font-weight:800;color:white;letter-spacing:-.02em;margin-bottom:4px}
-.mda{font-size:32px;font-weight:800;color:rgba(255,255,255,.95);letter-spacing:-.02em}
-.mdr{background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 14px;margin-top:10px;font-size:13px;color:rgba(255,255,255,.9);line-height:1.6;font-weight:500}
+.mdh-inner{padding:28px 32px 24px;display:flex;align-items:flex-start;gap:24px;flex-wrap:wrap}
+.mdh-badge{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:5px 12px 5px 10px;font-size:11.5px;font-weight:700;color:white;letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px}
+.mdh-badge .icn{width:13px;height:13px;stroke-width:2.5}
+.mdn{font-size:28px;font-weight:800;color:white;letter-spacing:-.025em;margin-bottom:6px;line-height:1.1}
+.mda{font-size:36px;font-weight:800;color:white;letter-spacing:-.02em;line-height:1;margin-bottom:14px}
+.mdr{background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:11px 14px;margin-top:0;font-size:13px;color:rgba(255,255,255,.92);line-height:1.55;font-weight:500;max-width:560px}
 /* Stats cards */
 .mmeta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
 .mmi{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;transition:box-shadow .15s}
@@ -367,6 +368,13 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .mdh-stat-value{font-size:15px;font-weight:800;color:white;margin-top:2px}
 .mact-primary{padding:10px 20px;border-radius:10px;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
 .mact-secondary{padding:8px 14px;border-radius:9px;font-size:12px;font-weight:600;font-family:var(--sans);cursor:pointer;border:1.5px solid var(--border2);background:white;color:var(--text2);transition:all .15s;display:inline-flex;align-items:center;gap:5px}
+/* Cleaner approve cluster: bordered white box w/ green button, replaces the green-gradient pill */
+.approve-group{display:inline-flex;align-items:stretch;border:1.5px solid var(--green);border-radius:10px;overflow:hidden;background:white;line-height:1}
+.approve-currency{padding:0 10px;display:flex;align-items:center;font-weight:800;font-size:14px;color:var(--green);background:var(--green-light);border-right:1.5px solid var(--green)}
+.approve-input{border:none;background:transparent;font-size:16px;font-weight:800;color:var(--green);outline:none;width:80px;padding:9px 6px;font-family:var(--sans);text-align:center}
+.approve-btn{background:var(--green);color:white;border:none;padding:0 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);display:inline-flex;align-items:center;gap:6px;transition:background .15s}
+.approve-btn:hover{background:var(--green-mid)}
+.approve-btn .icn{width:13px;height:13px;stroke-width:2.5}
 .mact-secondary:hover{background:var(--bg);border-color:var(--muted)}
 .msec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:8px}
 .msec::after{content:'';flex:1;height:1px;background:var(--border)}
@@ -3110,7 +3118,7 @@ ${dupeBannerHtml}
 <div class="mdh ${dc||'pending'}">
   <div class="mdh-inner" style="flex:1">
     <div style="flex:1">
-      <div class="mdh-badge">${ok?'✓ Approved':isDeclined?'✕ Declined':isProcessing?'⏳ Processing...':isPendingReview?'📋 Pending Review':'⏳ '+a.status}</div>
+      <div class="mdh-badge">${ok?'<svg class="icn"><use href="#icn-check-simple"/></svg>Approved':isDeclined?'<svg class="icn"><use href="#icn-x-simple"/></svg>Declined':isProcessing?'<svg class="icn"><use href="#icn-clock"/></svg>Processing...':isPendingReview?'<svg class="icn"><use href="#icn-clock"/></svg>Pending Review':'<svg class="icn"><use href="#icn-clock"/></svg>'+a.status}</div>
       <div class="mdn">${a.name||'—'}</div>
       ${ok?`<div class="mda">${a.amount||''}</div>
         ${a.approvalReason?`<div class="mdr" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.25)"><span style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.9;display:block;margin-bottom:4px">✓ Approval Reason</span>${a.approvalReason}</div>`:`<div style="font-size:13px;color:rgba(255,255,255,.75);margin-top:6px;font-style:italic">✓ Approved for disbursement</div>`}
@@ -3137,8 +3145,8 @@ ${a.extractedSSN?`<div style="display:flex;align-items:center;justify-content:sp
 <div class="msticky">
 <div class="mact-bar">
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1">
-    ${a.status!=='Approved'?`<div style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,var(--green-dark),var(--green));border-radius:10px;padding:6px 8px 6px 14px"><span style="font-size:13px;font-weight:700;color:white">$</span><input id="modal-approve-amt" type="text" placeholder="255" value="${a.amount&&a.amount!=='N/A'?a.amount.replace('$',''):''}" style="width:60px;border:none;background:transparent;font-size:15px;font-weight:800;color:white;outline:none;font-family:var(--sans)" oninput="const b=document.getElementById('approve-btn-${fbId}');if(b)b.textContent='✓ Approve $'+this.value"><button class="mact-primary" onclick="updStatusWithAmt('${fbId}','Approved')" style="background:rgba(255,255,255,.25);color:white;border:1px solid rgba(255,255,255,.3)" id="approve-btn-${fbId}">✓ Approve${a.amount&&a.amount!=='N/A'?' '+a.amount:''}</button></div>`:'<span style="background:var(--green-light);color:var(--green);border:1px solid var(--green-border);border-radius:9px;padding:7px 16px;font-size:13px;font-weight:700">✓ Approved</span>'}
-    ${a.status!=='Declined'?`<button class="mact-primary" onclick="updStatus('${fbId}','Declined')" style="background:var(--red);color:white">✕ Decline</button>`:'<span style="background:var(--red-light);color:var(--red);border:1px solid var(--red-border);border-radius:9px;padding:7px 16px;font-size:13px;font-weight:700">✕ Declined</span>'}
+    ${a.status!=='Approved'?`<div class="approve-group"><span class="approve-currency">$</span><input id="modal-approve-amt" type="text" placeholder="255" value="${a.amount&&a.amount!=='N/A'?a.amount.replace('$',''):''}" class="approve-input" oninput="const b=document.getElementById('approve-btn-${fbId}');if(b)b.textContent='Approve $'+this.value"><button class="approve-btn" onclick="updStatusWithAmt('${fbId}','Approved')" id="approve-btn-${fbId}">Approve${a.amount&&a.amount!=='N/A'?' '+a.amount:''}</button></div>`:'<span style="background:var(--green-light);color:var(--green);border:1px solid var(--green-border);border-radius:9px;padding:7px 16px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px"><svg class="icn icn-sm" style="color:var(--green)"><use href="#icn-check"/></svg>Approved</span>'}
+    ${a.status!=='Declined'?`<button class="mact-primary" onclick="updStatus('${fbId}','Declined')" style="background:white;color:var(--red);border:1.5px solid var(--red-border);padding:8.5px 18px">Decline</button>`:'<span style="background:var(--red-light);color:var(--red);border:1px solid var(--red-border);border-radius:9px;padding:7px 16px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px"><svg class="icn icn-sm" style="color:var(--red)"><use href="#icn-x-circle"/></svg>Declined</span>'}
     ${(isDeclined||a.status==='Declined')?`<button class="mact-primary" onclick="openDenialModal('${fbId}')" style="background:#e8650a;color:white">📧 Denial Email</button>`:''}
 <!-- Retry button disabled: /api/rerun-plaid currently creates an orphan Processing record. Will re-enable when the backend handler is finished. -->
     ${''}
@@ -3176,12 +3184,12 @@ ${(cdec === 'REVIEW' && (a.status === 'Pending' || a.status === 'Review' || a.pr
     </div>
   </div>
 </div>` })() : ''}
-<div style="display:flex;border-bottom:1px solid var(--border)">
-  <button onclick="mTab('report','${fbId}',this)" id="mtab-report-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--green);border-bottom:2px solid var(--green);cursor:pointer;font-family:var(--sans)">Report</button>
-  <button onclick="mTab('appdata','${fbId}',this)" id="mtab-appdata-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Application</button>
-  <button onclick="mTab('docs','${fbId}',this)" id="mtab-docs-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Documents</button>
-  <button onclick="mTab('notes','${fbId}',this)" id="mtab-notes-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Notes</button>
-  <button onclick="mTab('ifcard','${fbId}',this)" id="mtab-ifcard-${fbId}" style="padding:10px 16px;border:none;background:none;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans)">Debit Card${ (a.applicationData && a.applicationData.debitCard) ? ' <span style=&quot;background:#e6f4ea;color:#0a5d2e;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:2px&quot;>on file</span>' : '' }</button>
+<div style="display:flex;border-bottom:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch">
+  <button onclick="mTab('report','${fbId}',this)" id="mtab-report-${fbId}" style="padding:13px 18px;border:none;background:none;font-size:13.5px;font-weight:700;color:var(--green);border-bottom:2px solid var(--green);cursor:pointer;font-family:var(--sans);white-space:nowrap;display:inline-flex;align-items:center;gap:7px"><svg class="icn icn-sm"><use href="#icn-file"/></svg>Report</button>
+  <button onclick="mTab('appdata','${fbId}',this)" id="mtab-appdata-${fbId}" style="padding:13px 18px;border:none;background:none;font-size:13.5px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans);white-space:nowrap;display:inline-flex;align-items:center;gap:7px"><svg class="icn icn-sm"><use href="#icn-layers"/></svg>Application</button>
+  <button onclick="mTab('docs','${fbId}',this)" id="mtab-docs-${fbId}" style="padding:13px 18px;border:none;background:none;font-size:13.5px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans);white-space:nowrap;display:inline-flex;align-items:center;gap:7px"><svg class="icn icn-sm"><use href="#icn-folder"/></svg>Documents</button>
+  <button onclick="mTab('notes','${fbId}',this)" id="mtab-notes-${fbId}" style="padding:13px 18px;border:none;background:none;font-size:13.5px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans);white-space:nowrap;display:inline-flex;align-items:center;gap:7px"><svg class="icn icn-sm"><use href="#icn-message"/></svg>Notes</button>
+  <button onclick="mTab('ifcard','${fbId}',this)" id="mtab-ifcard-${fbId}" style="padding:13px 18px;border:none;background:none;font-size:13.5px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;font-family:var(--sans);white-space:nowrap;display:inline-flex;align-items:center;gap:7px"><svg class="icn icn-sm"><use href="#icn-card"/></svg>Debit Card${ (a.applicationData && a.applicationData.debitCard) ? ' <span style=&quot;background:#e6f4ea;color:#0a5d2e;padding:2px 7px;border-radius:8px;font-size:10px;margin-left:4px;font-weight:700&quot;>on file</span>' : '' }</button>
 </div>
 </div>
 ${(a.fcf!=null||a.monthlyIncome!=null||a.v2Confidence!=null)?(()=>{
@@ -3257,7 +3265,7 @@ function mTab(tab, fbId, btn) {
     const el = document.getElementById('mpanel-'+p+'-'+fbId);
     const b = document.getElementById('mtab-'+p+'-'+fbId);
     if (el) el.style.display = p===tab ? 'block' : 'none';
-    if (b) { b.style.color = p===tab ? 'var(--green)' : 'var(--muted)'; b.style.borderBottomColor = p===tab ? 'var(--green)' : 'transparent'; }
+    if (b) { b.style.color = p===tab ? 'var(--green)' : 'var(--muted)'; b.style.borderBottomColor = p===tab ? 'var(--green)' : 'transparent'; b.style.fontWeight = p===tab ? '700' : '600'; }
   });
 }
 
