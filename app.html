@@ -152,6 +152,23 @@ header{background:linear-gradient(180deg,var(--green-dark),var(--green));height:
   .mrhtml{background:transparent!important;border:none!important;border-radius:0!important;padding:0!important;margin-bottom:8px!important}
   /* Restore reasonable padding for the rerun-controls header above the report */
   #view-detail .mb > div[style*="padding:8px 0"]{padding:6px 4px 10px!important}
+
+  /* === Detail page goes truly edge-to-edge on mobile ===
+     Dashboard keeps its 0.5rem container padding (looks better there).
+     The application detail page drops all horizontal padding so the
+     report uses every pixel — hero, action bar, tabs, summary, and
+     report content all bleed to the screen edges. */
+  #view-detail .container{padding-left:0!important;padding-right:0!important}
+  #view-detail .detail-card{margin-left:0!important;margin-right:0!important}
+  #view-detail .mb{padding:8px!important}
+  #view-detail .mh{padding:12px 10px!important}
+  /* Hero / hero stats / sticky action bar all bleed to the absolute screen edges */
+  #view-detail .mdh{margin-left:-8px!important;margin-right:-8px!important}
+  #view-detail .mdh-stats{margin-left:0!important;margin-right:0!important}
+  #view-detail .msticky{margin-left:-8px!important;margin-right:-8px!important;padding-left:8px!important;padding-right:8px!important}
+  /* Back-button bar above the card needs its own little side padding so the
+     button isn't glued to the bezel */
+  #view-detail .container > div:first-child{padding:0 8px!important}
 }
 /* Show Plaid Customers in desktop nav */
 @media(min-width:769px) and (max-width:1024px){
