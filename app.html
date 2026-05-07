@@ -132,6 +132,26 @@ header{background:linear-gradient(180deg,var(--green-dark),var(--green));height:
   #quick-filters{padding:0 2px}
   /* Sync bar above stats */
   .sync-bar{padding:4px 2px;margin-bottom:.6rem}
+
+  /* === Full-width cards on mobile ===
+     Cards (the dashboard table, the upload card, the rules sections, and
+     the application detail card) extend edge-to-edge so content uses the
+     entire screen. Negative margin -8px exactly cancels the .container's
+     0.5rem horizontal padding. The container padding stays so non-card
+     content (page headers, back button, action buttons) keep a small
+     breathing margin from the screen edge. */
+  .tcard,.card,.rules-section,.detail-card{margin-left:-8px!important;margin-right:-8px!important;border-radius:0!important;border-left:none!important;border-right:none!important}
+  .detail-card{box-shadow:none!important}
+  /* Detail hero bleeds to the card edges (so the green/red/gold gradient
+     reaches the screen edges). Margin -10 cancels the .mb padding 10. */
+  .mdh{margin-left:-10px!important;margin-right:-10px!important;border-radius:0!important;margin-bottom:10px!important}
+  /* Title bar above the hero in the detail card */
+  .mh{padding:12px 14px!important}
+  /* Report content goes flush — drop the card-within-a-card chrome so the
+     full width of the detail card is available for reading the report. */
+  .mrhtml{background:transparent!important;border:none!important;border-radius:0!important;padding:0!important;margin-bottom:8px!important}
+  /* Restore reasonable padding for the rerun-controls header above the report */
+  #view-detail .mb > div[style*="padding:8px 0"]{padding:6px 4px 10px!important}
 }
 /* Show Plaid Customers in desktop nav */
 @media(min-width:769px) and (max-width:1024px){
@@ -1203,7 +1223,7 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
       </button>
       <div id="detailActions" style="display:flex;gap:8px;flex-wrap:wrap"></div>
     </div>
-    <div style="background:var(--surface);border-radius:18px;box-shadow:var(--shadow-lg);overflow:hidden">
+    <div class="detail-card" style="background:var(--surface);border-radius:18px;box-shadow:var(--shadow-lg);overflow:hidden">
       <div class="mh"><div class="mt" id="detailTitle">Application</div></div>
       <div class="mb" id="detailBody"></div>
     </div>
