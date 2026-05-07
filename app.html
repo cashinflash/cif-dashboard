@@ -26,7 +26,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);font-family:var(--sans);color:var(--text);font-size:15px;line-height:1.6;overflow-x:hidden}
-header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8a52);height:66px;display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;position:sticky;top:0;z-index:100;box-shadow:0 2px 20px rgba(0,0,0,.2);flex-wrap:wrap;gap:4px}
+header{background:linear-gradient(180deg,var(--green-dark),var(--green));height:66px;display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;position:sticky;top:0;z-index:100;box-shadow:0 1px 0 rgba(0,0,0,.08);border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap;gap:4px}
 @media(max-width:768px){
   header{height:auto;padding:.75rem 1rem;gap:8px;overflow:hidden}
   .hnav{display:none}
@@ -67,6 +67,55 @@ header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8
   /* Filter pills wrap */
   .frow{flex-wrap:wrap!important;gap:6px!important}
   /* Connections dropdown handles desktop visibility for the two Plaid tabs */
+
+  /* === Mobile additions for the visual refresh === */
+  /* Stat cards: tighter padding so the accent strip stays clean on phones */
+  .sc{padding:16px 18px 16px 22px}
+  .snum{font-size:30px}
+  .spct{font-size:10px}
+  /* Quick-filter pills + group labels readable but compact */
+  .qfp{padding:6px 12px;font-size:12px}
+  .qf-group{font-size:9.5px;letter-spacing:.1em;padding:0 4px}
+  #quick-filters{gap:5px!important}
+  /* Detail hero stacks vertically; score wheel sits below name+amount */
+  .mdh-inner{flex-direction:column!important;align-items:flex-start!important;gap:14px!important}
+  .mdh-inner canvas{align-self:flex-start}
+  .mdn{font-size:20px!important}
+  .mda{font-size:26px!important}
+  .mdh-badge{font-size:11px}
+  /* Detail summary strip: 2-col on phones, slightly smaller numbers */
+  .msummary{grid-template-columns:repeat(2,1fr)!important;gap:8px!important}
+  .msummary-item{padding:11px 13px}
+  .msummary-value{font-size:18px}
+  .msummary-label{font-size:10px}
+  .msummary-sub{font-size:10.5px}
+  /* Modal/detail meta cards 2-col, not 3 */
+  .mmeta{grid-template-columns:repeat(2,1fr)!important;gap:8px!important}
+  .mmv{font-size:15px}
+  /* Detail tabs scroll horizontally instead of wrapping */
+  #view-detail .mb > div[style*="border-bottom"]{overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;flex-wrap:nowrap!important;scrollbar-width:none}
+  #view-detail .mb > div[style*="border-bottom"]::-webkit-scrollbar{display:none}
+  /* Larger tap targets for action buttons inside the detail */
+  .mact-primary{min-height:38px}
+  .mact-secondary{min-height:36px}
+  /* Detail body padding tighter */
+  #view-detail .mb{padding:16px}
+  #view-detail .container{padding-top:12px;padding-bottom:24px}
+  /* Sticky modal header back-button: ensure tap target */
+  .dback,.dchead-meta{font-size:12px}
+  /* Section headers inside the report */
+  .mrhtml h1{font-size:17px!important;padding-bottom:10px!important;margin-bottom:14px!important}
+  .mrhtml h2{font-size:11px!important;margin:18px 0 9px!important}
+  .mrhtml table{font-size:12px}
+  .mrhtml table th,.mrhtml table td{padding:7px 9px}
+  /* Hero gradient at smaller scale (less heavy in narrow container) */
+  .mdh-inner{padding:18px 16px!important}
+  .mdh-stats{margin-left:-16px!important;margin-right:-16px!important}
+  /* Cards: reduce inner padding */
+  .card-body{padding:18px}
+  .card-hdr{padding:12px 16px}
+  /* Page header on dashboard already collapses; tighten gap */
+  .stats-row{margin-bottom:1rem!important}
 }
 /* Show Plaid Customers in desktop nav */
 @media(min-width:769px) and (max-width:1024px){
@@ -96,12 +145,12 @@ header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8
 .ssave{background:var(--green);color:white;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans)}
 .kstat{font-size:12px;display:flex;align-items:center;gap:5px}
 .kstat.ok{color:var(--green)}.kstat.miss{color:var(--amber)}
-.container{max-width:1100px;margin:0 auto;padding:2rem 2.5rem}
+.container{max-width:1320px;margin:0 auto;padding:2rem 2.5rem}
 .view{display:none}.view.active{display:block}
 .ptitle{font-size:26px;font-weight:700;color:var(--text);letter-spacing:-.02em;margin-bottom:4px}
 .psub{font-size:14px;color:var(--muted);margin-bottom:2rem}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:1.25rem;box-shadow:var(--shadow-sm)}
-.card-hdr{background:linear-gradient(135deg,var(--green-dark),var(--green));padding:14px 20px;display:flex;align-items:center;gap:10px}
+.card-hdr{background:linear-gradient(180deg,var(--green-dark),var(--green));padding:14px 20px;display:flex;align-items:center;gap:10px}
 .card-hdr-title{font-size:14px;font-weight:600;color:white}
 .card-hdr-sub{font-size:12px;color:rgba(255,255,255,.65);margin-left:auto}
 .card-body{padding:24px}
@@ -229,26 +278,32 @@ header{background:linear-gradient(135deg,var(--green-dark),var(--green) 60%,#2a8
 .rsb-text{font-size:13px;color:var(--text2);font-weight:500}
 .rsb-text span{font-weight:700;color:var(--green)}
 .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:1.5rem}
-.sc{border-radius:16px;padding:20px 22px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden;min-width:0;transition:transform .15s,box-shadow .15s;cursor:default}
+.sc{border-radius:16px;padding:20px 22px 20px 26px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden;min-width:0;transition:transform .15s,box-shadow .15s;cursor:default;background:var(--surface);border:1px solid var(--border)}
 .sc:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
-.sc.tot{background:white;border:1.5px solid var(--border)}
-.sc.pen{background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1.5px solid #fde68a}
-.sc.app{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1.5px solid #bbf7d0}
-.sc.dec{background:linear-gradient(135deg,#fff5f5,#fee2e2);border:1.5px solid #fecaca}
+.sc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:16px 0 0 16px}
+.sc.tot::before{background:var(--muted2)}
+.sc.pen::before{background:var(--gold)}
+.sc.app::before{background:var(--green)}
+.sc.dec::before{background:var(--red)}
+.sc .slbl .icn{width:13px;height:13px}
+.sc.tot .slbl .icn{color:var(--muted2)}
+.sc.pen .slbl .icn{color:var(--gold-dark)}
+.sc.app .slbl .icn{color:var(--green)}
+.sc.dec .slbl .icn{color:var(--red)}
 /* stat donuts rendered via canvas */
 .slbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;gap:6px}
 .snum{font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1;margin-bottom:4px}
 .snum.def{color:var(--text)}.snum.gld{color:#d97706}.snum.grn{color:var(--green)}.snum.red{color:var(--red)}
 .spct{font-size:11px;font-weight:600;color:var(--muted);margin-top:4px}
-.tcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-sm);margin-top:.5rem}
-.ttb{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--surface2)}
+.tcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-md);margin-top:.5rem}
+.ttb{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--surface2)}
 .sbox{display:flex;align-items:center;gap:8px;border:1px solid var(--border2);border-radius:9px;padding:9px 14px;background:white;flex:1;max-width:320px}
 .sbox input{border:none;background:none;font-size:14px;color:var(--text);outline:none;width:100%;font-family:var(--sans)}
 .fsel{border:1px solid var(--border2);border-radius:9px;padding:8px 12px;font-size:14px;background:white;color:var(--text);font-family:var(--sans);cursor:pointer}
 table{width:100%;border-collapse:collapse;font-size:14px}
 thead{background:var(--surface2)}
-th{text-align:left;padding:13px 20px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border)}
-td{padding:16px 20px;border-bottom:1px solid #edf1ee;vertical-align:middle}
+th{text-align:left;padding:11px 18px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);background:var(--surface2)}
+td{padding:13px 18px;border-bottom:1px solid #edf1ee;vertical-align:middle}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:#f5f9f6;cursor:pointer}
 .nbig{font-weight:700;color:var(--text);font-size:14px}
@@ -282,9 +337,9 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .mb{padding:24px}
 /* Modal hero */
 .mdh{border-radius:14px;overflow:hidden;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,.07)}
-.mdh.ok{background:linear-gradient(135deg,#0f4425,#1a6b3c)}
-.mdh.no{background:linear-gradient(135deg,#7a1a14,#c0392b)}
-.mdh.pending{background:linear-gradient(135deg,#7a6000,#b8860b)}
+.mdh.ok{background:linear-gradient(160deg,#0f4425,#1a6b3c 90%)}
+.mdh.no{background:linear-gradient(160deg,#7a1a14,#c0392b 90%)}
+.mdh.pending{background:linear-gradient(160deg,#7a6000,#b8860b 90%)}
 .mdh-inner{padding:22px 24px;display:flex;align-items:center;gap:18px}
 .mdh-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;color:white;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}
 .mdn{font-size:22px;font-weight:800;color:white;letter-spacing:-.02em;margin-bottom:4px}
@@ -294,16 +349,17 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .mmeta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
 .mmi{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;transition:box-shadow .15s}
 .mmi:hover{box-shadow:0 2px 8px rgba(0,0,0,.08)}
-.mml{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
-.mmv{font-size:16px;font-weight:700;color:var(--text)}
+.mml{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+.mmv{font-size:18px;font-weight:800;color:var(--text);letter-spacing:-.01em}
 /* Action bar */
 .mact-bar{display:flex;gap:8px;padding:14px 0;flex-wrap:wrap;align-items:center}
 .msticky{position:sticky;top:57px;background:var(--surface);z-index:2;margin:0 -24px;padding:0 24px;border-bottom:1px solid var(--border)}
-.msummary{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:12px 0}
-.msummary-item{text-align:center;padding:10px 4px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px}
-.msummary-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
-.msummary-value{font-size:14px;font-weight:800;color:var(--text);margin-top:2px}
-.msummary-sub{font-size:9px;color:var(--muted2);margin-top:3px;font-weight:500}
+.msummary{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;padding:14px 0 4px}
+.msummary-item{text-align:left;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;gap:5px;transition:box-shadow .15s,transform .15s}
+.msummary-item:hover{box-shadow:var(--shadow-sm);transform:translateY(-1px)}
+.msummary-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);line-height:1.3}
+.msummary-value{font-size:22px;font-weight:800;color:var(--text);margin-top:0;letter-spacing:-.02em;line-height:1.1}
+.msummary-sub{font-size:11px;color:var(--muted);margin-top:0;font-weight:500;line-height:1.3}
 .mdh-stats{display:flex;gap:0;background:rgba(0,0,0,.15);border-top:1px solid rgba(255,255,255,.1)}
 .mdh-stat{flex:1;text-align:center;padding:10px 8px;border-right:1px solid rgba(255,255,255,.1)}
 .mdh-stat:last-child{border-right:none}
@@ -318,7 +374,9 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .mrhtml h1{font-size:19px;font-weight:700;color:var(--green-dark);margin-bottom:18px;padding-bottom:12px;border-bottom:2px solid var(--green-border)}
 .mrhtml .report-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px}
 .mrhtml .report-card h2{margin-top:0}
-.mrhtml h2{font-size:13px;font-weight:700;color:var(--green);margin:18px 0 10px;text-transform:uppercase;letter-spacing:.05em;background:var(--green-light);padding:8px 12px;border-radius:6px;border-left:3px solid var(--green)}
+.mrhtml h2{font-size:12px;font-weight:800;color:var(--green);margin:24px 0 12px;text-transform:uppercase;letter-spacing:.1em;background:transparent;padding:0;border-radius:0;border-left:none;display:flex;align-items:center;gap:10px}
+.mrhtml h2::before{content:'';width:18px;height:2px;background:var(--green);border-radius:1px}
+.mrhtml h2::after{content:'';flex:1;height:1px;background:var(--border);margin-left:6px}
 .mrhtml hr{display:none}
 .mrhtml table{width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:13px;table-layout:fixed}
 .mrhtml table th{background:var(--green-light);color:var(--green-dark);font-weight:700;padding:7px 10px;border:1px solid var(--green-border);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
@@ -377,9 +435,10 @@ table tbody tr.kbd-focus td{background:#e6f4ea !important;box-shadow:inset 3px 0
 /* Inline keyboard-key styling for the shortcut help panel */
 kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;background:var(--surface2);color:var(--text);text-align:center;min-width:22px}
 /* Quick-filter pills */
-.qfp{padding:5px 12px;border-radius:999px;border:1px solid var(--border);background:#fff;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--sans);transition:all .15s}
+.qfp{padding:7px 14px;border-radius:999px;border:1px solid var(--border);background:#fff;font-size:12.5px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--sans);transition:all .15s}
 .qfp:hover{border-color:var(--green);color:var(--green)}
 .qfp.active{background:var(--green);border-color:var(--green);color:#fff}
+.qf-group{font-size:10px;font-weight:700;letter-spacing:.12em;color:var(--muted);padding:0 6px 0 2px;text-transform:uppercase;display:inline-flex;align-items:center}
 /* Status pill — shape + color + text (not color-only). */
 .pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;line-height:1}
 .pill-ok{background:#e6f4ea;color:#106c3a;border:1px solid #b5dcbf}
@@ -416,6 +475,20 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
     <symbol id="icn-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
     <symbol id="icn-key" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></symbol>
     <symbol id="icn-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+    <symbol id="icn-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+    <symbol id="icn-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+    <symbol id="icn-zap" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
+    <symbol id="icn-trending-up" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></symbol>
+    <symbol id="icn-trending-down" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></symbol>
+    <symbol id="icn-arrow-up-right" viewBox="0 0 24 24"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></symbol>
+    <symbol id="icn-send" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></symbol>
+    <symbol id="icn-mail" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></symbol>
+    <symbol id="icn-message" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+    <symbol id="icn-card" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></symbol>
+    <symbol id="icn-folder" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></symbol>
+    <symbol id="icn-back" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></symbol>
+    <symbol id="icn-check-simple" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+    <symbol id="icn-x-simple" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
   </defs>
 </svg>
 
@@ -958,28 +1031,28 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
     <div id="sync-status"></div>
     <div class="stats-row">
       <div class="sc tot">
-        <div class="slbl">Total</div>
+        <div class="slbl"><svg class="icn icn-sm"><use href="#icn-inbox"/></svg>Total</div>
         <div style="display:flex;align-items:center;gap:10px">
           <div style="flex:1"><div class="snum def" id="st">0</div><div class="spct" id="st-sub">All applications</div></div>
           <canvas id="sc-tot-c" width="56" height="56" style="flex-shrink:0;opacity:.8"></canvas>
         </div>
       </div>
       <div class="sc pen">
-        <div class="slbl">⏳ Pending</div>
+        <div class="slbl"><svg class="icn icn-sm"><use href="#icn-clock"/></svg>Pending</div>
         <div style="display:flex;align-items:center;gap:10px">
           <div style="flex:1"><div class="snum gld" id="sp2">0</div><div class="spct" id="sp-sub">Awaiting review</div></div>
           <canvas id="sc-pen-c" width="56" height="56" style="flex-shrink:0;opacity:.85"></canvas>
         </div>
       </div>
       <div class="sc app">
-        <div class="slbl">✓ Approved</div>
+        <div class="slbl"><svg class="icn icn-sm"><use href="#icn-check"/></svg>Approved</div>
         <div style="display:flex;align-items:center;gap:10px">
           <div style="flex:1"><div class="snum grn" id="sa">0</div><div class="spct" id="sa-sub">Approval rate</div></div>
           <canvas id="sc-app-c" width="56" height="56" style="flex-shrink:0;opacity:.85"></canvas>
         </div>
       </div>
       <div class="sc dec">
-        <div class="slbl">✕ Declined</div>
+        <div class="slbl"><svg class="icn icn-sm"><use href="#icn-x-circle"/></svg>Declined</div>
         <div style="display:flex;align-items:center;gap:10px">
           <div style="flex:1"><div class="snum red" id="sd">0</div><div class="spct" id="sd-sub">Decline rate</div></div>
           <canvas id="sc-dec-c" width="56" height="56" style="flex-shrink:0;opacity:.85"></canvas>
@@ -992,6 +1065,7 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
          low confidence, review required) — the checks we run when tuning
          or spot-checking the engine. -->
     <div id="quick-filters" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+      <span class="qf-group">View</span>
       <button class="qfp" data-qf="all" onclick="setQuickFilter('all')">All</button>
       <button class="qfp" data-qf="today" onclick="setQuickFilter('today')">Today</button>
       <button class="qfp" data-qf="pending" onclick="setQuickFilter('pending')">Pending</button>
@@ -999,7 +1073,7 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
       <button class="qfp" data-qf="declined" onclick="setQuickFilter('declined')">Declined</button>
       <button class="qfp" data-qf="approved" onclick="setQuickFilter('approved')">Approved</button>
       <button class="qfp" data-qf="autodecide" onclick="setQuickFilter('autodecide')">Auto-decide candidates</button>
-      <span style="width:1px;height:20px;background:var(--border);margin:0 4px"></span>
+      <span class="qf-group" style="margin-left:6px">Audit</span>
       <button class="qfp" data-qf="review" onclick="setQuickFilter('review')" title="v2 marked this applicant REVIEW_REQUIRED — needs a human before disbursement.">Review required</button>
       <button class="qfp" data-qf="lowconf" onclick="setQuickFilter('lowconf')" title="v2 confidence below the auto-approve floor (0.50). Spot-check the income / classification signals.">Low confidence</button>
       <button class="qfp" data-qf="reconfail" onclick="setQuickFilter('reconfail')" title="Statement transactions don't balance. Likely a wrong is_credit flag or missing txns.">Reconciliation failed</button>
