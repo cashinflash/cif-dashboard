@@ -461,6 +461,7 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
         <div onclick="showView('portal-plaid',document.getElementById('nav-connections'));toggleConnectionsDD()" style="padding:11px 16px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:8px;border-top:1px solid var(--border)" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''"><svg class="icn"><use href="#icn-bank"/></svg>Portal Links</div>
       </div>
     </div>
+    <button class="nb" id="nav-messages" onclick="showView('messages',this)"><svg class="icn"><use href="#icn-inbox"/></svg>Messages</button>
     <button class="nb" id="nav-if" onclick="showView('if',this)"><svg class="icn"><use href="#icn-file"/></svg>Instant Funding<span id="ifcount" style="display:none;background:#0E8741;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px">0</span></button>
     <button class="nb admin-only" id="nav-users" onclick="showView('users',this)" style="display:none"><svg class="icn"><use href="#icn-users"/></svg>Users</button>
     <button class="nb admin-only" id="nav-audit" onclick="showView('audit',this)" style="display:none"><svg class="icn"><use href="#icn-file"/></svg>Audit log</button>
@@ -1519,6 +1520,7 @@ const VIEW_TO_HASH = {
   if: '#/instant-funding',
   users: '#/users',
   audit: '#/audit',
+  messages: '#/messages',
 };
 const HASH_TO_VIEW = Object.fromEntries(Object.entries(VIEW_TO_HASH).map(([k, v]) => [v, k]));
 
