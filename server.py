@@ -1024,9 +1024,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             data = read_file(os.path.join(DIR, 'app.html'))
-            # Phase 2: inject the vergentMatch overlay panel before </body>.
-            # Append-only; never modifies app.html on disk.
-            data = inject_phase2_panel(data) if data else data
+            # NOTE: Phase 2 inject is intentionally NOT applied to the new /app.
+            # The Concept-8 detail view renders its own inline Vergent card in
+            # the right rail (#vg-card / vergentPush / vergentRecheck). The
+            # legacy /app/legacy below still receives the inject so the badge
+            # keeps working there.
             self.send_html(200, data or b'App not found')
             return
 

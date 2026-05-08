@@ -251,7 +251,8 @@ button,input,select{font-family:inherit}
 .qi-tip-text b{font-weight:700;display:block;margin-bottom:2px}
 
 /* DETAIL */
-.dv-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:10px;flex-wrap:wrap}
+.dv-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:10px;flex-wrap:wrap;position:sticky;top:var(--topnav-h);z-index:50;background:var(--bg);padding:8px 0}
+.dv-bar-sep{width:1px;height:22px;background:var(--border);margin:0 4px;flex-shrink:0}
 .dv-back{background:none;border:none;cursor:pointer;color:var(--text2);font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;padding:6px 4px;font-family:inherit}
 .dv-back:hover{color:var(--green-dark)}
 .dv-back .icn{width:14px;height:14px}
@@ -434,6 +435,58 @@ button,input,select{font-family:inherit}
 .notes-edit{width:100%;min-height:140px;border:1.5px solid var(--border2);border-radius:10px;padding:12px 14px;font-size:13.5px;font-family:inherit;color:var(--text);background:white;resize:vertical;line-height:1.6;outline:none}
 .notes-edit:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--green-100)}
 
+/* Vergent right-rail card */
+.vg-status{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.vg-status.found{background:var(--green-50);color:var(--green-dark);border-color:var(--green-200)}
+.vg-status.new{background:var(--amber-50);color:var(--amber-700);border-color:var(--amber-200)}
+.vg-status.amb{background:var(--blue-50);color:var(--blue-700);border-color:var(--blue-100)}
+.vg-status.err{background:var(--red-50);color:var(--red);border-color:var(--red-200)}
+.vg-card{background:white;border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.vg-pending{padding:10px;color:var(--muted);font-size:12px;text-align:center}
+.vg-headline{font-size:13px;font-weight:700;color:var(--text);line-height:1.35}
+.vg-headline a{color:var(--green-dark);text-decoration:none;font-weight:800}
+.vg-meta{font-size:11.5px;color:var(--muted);font-weight:500;line-height:1.45}
+.vg-checks{display:flex;flex-wrap:wrap;gap:6px}
+.vg-check{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--text2);padding:5px 9px;border:1px solid var(--border);border-radius:7px;cursor:pointer;background:white;user-select:none}
+.vg-check input{margin:0;width:12px;height:12px;accent-color:var(--green);cursor:pointer}
+.vg-check.has{border-color:var(--green-200);background:var(--green-50);color:var(--green-dark)}
+.vg-note-input{width:100%;border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:12px;font-family:inherit;color:var(--text);outline:none}
+.vg-note-input:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--green-100)}
+.vg-actions{display:flex;flex-wrap:wrap;gap:6px}
+.vg-btn{padding:7px 11px;border-radius:7px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;border:1px solid;display:inline-flex;align-items:center;gap:5px;line-height:1;flex:1;justify-content:center;transition:all .12s}
+.vg-btn-primary{background:var(--green);color:white;border-color:var(--green)}
+.vg-btn-primary:hover{background:var(--green-dark);border-color:var(--green-dark)}
+.vg-btn-ghost{background:white;color:var(--text2);border-color:var(--border)}
+.vg-btn-ghost:hover{background:var(--surface2)}
+.vg-btn:disabled{opacity:.5;cursor:not-allowed}
+.vg-id-row{display:flex;gap:5px}
+.vg-id-input{flex:1;border:1px solid var(--border);border-radius:7px;padding:6px 9px;font-size:11.5px;font-family:inherit;outline:none}
+.vg-id-input:focus{border-color:var(--green)}
+.vg-result{padding:8px 10px;border-radius:7px;font-size:11.5px;font-weight:600;line-height:1.4;display:none}
+.vg-result.show{display:block}
+.vg-result.ok{background:var(--green-50);color:var(--green-dark);border:1px solid var(--green-200)}
+.vg-result.err{background:var(--red-50);color:var(--red-700);border:1px solid var(--red-200)}
+
+/* Suppress the legacy Phase 2 fixed-position injection — we render natively now */
+#vergent-phase2-banner,#vergent-phase2-banner *{display:none !important}
+
+/* Search dropdown */
+.search-wrap{position:relative}
+.search-dd{position:absolute;top:calc(100% + 6px);left:0;right:0;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:6px;display:none;z-index:300;max-height:380px;overflow-y:auto}
+.search-dd.open{display:block}
+.search-dd-empty{padding:14px 12px;color:var(--muted);font-size:12.5px;text-align:center}
+.search-dd-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;cursor:pointer;text-decoration:none;color:var(--text)}
+.search-dd-item:hover,.search-dd-item.kbd{background:var(--surface2)}
+.search-dd-av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#34d399,#16a34a);color:white;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.search-dd-text{flex:1;min-width:0}
+.search-dd-name{font-size:12.5px;font-weight:700;color:var(--text);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search-dd-meta{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search-dd-status{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:6px;flex-shrink:0}
+.search-dd-status.approved{background:var(--green-50);color:var(--green-dark)}
+.search-dd-status.declined{background:var(--red-50);color:var(--red)}
+.search-dd-status.pending{background:var(--amber-50);color:var(--amber-700)}
+.search-dd-foot{padding:8px 10px;font-size:11px;color:var(--muted);border-top:1px solid var(--border-soft);margin-top:4px;text-align:center}
+
 .icn{flex-shrink:0;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke:currentColor}
 .view{display:none}.view.active{display:block}
 
@@ -528,9 +581,12 @@ button,input,select{font-family:inherit}
     <a class="tnt" href="/app/legacy#connections"><svg class="icn"><use href="#i-bank"/></svg>Connections<svg class="caret"><use href="#i-caret"/></svg></a>
   </nav>
   <div class="topnav-spacer"></div>
-  <div class="topnav-search">
-    <svg class="icn"><use href="#i-search"/></svg>
-    <input type="text" id="search-input" placeholder="Search applicants...">
+  <div class="search-wrap">
+    <div class="topnav-search">
+      <svg class="icn"><use href="#i-search"/></svg>
+      <input type="text" id="search-input" placeholder="Search applicants..." autocomplete="off">
+    </div>
+    <div class="search-dd" id="search-dropdown"></div>
   </div>
   <div class="sync-chip" id="sync-chip"><span class="sync-chip-dot"></span>Live</div>
   <button class="tnav-icon-btn" title="Notifications"><svg class="icn"><use href="#i-bell"/></svg></button>
@@ -748,6 +804,14 @@ button,input,select{font-family:inherit}
       <div class="dv-bar-actions">
         <button class="btn btn-ghost" id="dv-rerun-btn" title="Re-run the engine using stored data — no new Plaid pull"><svg class="icn"><use href="#i-refresh"/></svg>Re-Run Report</button>
         <button class="btn btn-ghost" id="dv-refresh-plaid-btn" title="Pull a fresh Plaid asset report and re-run"><svg class="icn"><use href="#i-refresh"/></svg>Refresh from Plaid</button>
+        <span class="dv-bar-sep"></span>
+        <button class="btn btn-danger" id="dv-decline-btn"><svg class="icn"><use href="#i-x"/></svg>Decline</button>
+        <div class="offer-input-group">
+          <span class="ccy">$</span>
+          <input class="offer-input" type="text" id="dv-offer-input" value="" placeholder="0">
+          <span class="offer-lbl">Offer</span>
+        </div>
+        <button class="btn-approve" id="dv-approve-btn"><svg class="icn"><use href="#i-check"/></svg>Approve</button>
       </div>
     </div>
     <div class="detail-card">
@@ -835,6 +899,10 @@ button,input,select{font-family:inherit}
 
         <aside class="dv-rail">
           <div class="dv-rail-section">
+            <div class="dv-rail-title">Vergent <span class="vg-status" id="vg-status">Pending</span></div>
+            <div class="vg-card" id="vg-card"><div class="vg-pending">Checking Vergent…</div></div>
+          </div>
+          <div class="dv-rail-section">
             <div class="dv-rail-title">Decision Checks</div>
             <div id="dv-checks"></div>
           </div>
@@ -845,18 +913,6 @@ button,input,select{font-family:inherit}
         </aside>
       </div>
 
-      <!-- ACTION BAR -->
-      <div class="action-bar">
-        <button class="btn btn-danger" id="dv-decline-btn"><svg class="icn"><use href="#i-x"/></svg>Decline</button>
-        <button class="btn btn-ghost" id="dv-vergent-btn"><svg class="icn"><use href="#i-external"/></svg>Push to Vergent</button>
-        <div class="action-spacer"></div>
-        <div class="offer-input-group">
-          <span class="ccy">$</span>
-          <input class="offer-input" type="text" id="dv-offer-input" value="">
-          <span class="offer-lbl">Offer</span>
-        </div>
-        <button class="btn-approve" id="dv-approve-btn"><svg class="icn"><use href="#i-check"/></svg>Approve</button>
-      </div>
     </div>
   </div>
 </div>
@@ -874,6 +930,8 @@ let currentSearch = '';
 let _currentUser = '';
 let _currentRole = 'user';
 let pollTimer = null;
+let _lastDetailFbId = null;
+let _vergentMatchCache = {};
 
 // ───────── Helpers ─────────
 function authHeaders(extra) { return Object.assign({'Content-Type':'application/json'}, extra||{}); }
@@ -1109,7 +1167,7 @@ function avgScore() {
 // ───────── Queue ─────────
 function filteredApps() {
   const q = currentSearch.trim().toLowerCase();
-  return apps.filter(a => {
+  return dedupedApps().filter(a => {
     if (currentFilter !== 'all' && bucketStatus(a) !== currentFilter.toLowerCase()) return false;
     if (q) {
       const hay = `${a.name||''} ${a.email||''} ${a.phone||''} ${a.firebaseId||''}`.toLowerCase();
@@ -1145,6 +1203,10 @@ function renderQueue() {
   document.getElementById('queue-sub').innerHTML = `<b>${c.total}</b> applications · <b>${c.pending}</b> pending · live-synced`;
 
   const list = filteredApps();
+  const dupCount = apps.length - dedupedApps().length;
+  if (dupCount > 0) {
+    document.getElementById('queue-sub').innerHTML = `<b>${c.total}</b> applications · <b>${c.pending}</b> pending · live-synced · <b>${dupCount}</b> repeat submission${dupCount === 1 ? '' : 's'} hidden (see History tab)`;
+  }
   const tbody = document.getElementById('queue-tbody');
   if (list.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" class="tbl-empty">No applications match.</td></tr>`;
@@ -1289,7 +1351,7 @@ function renderDetail(fbId) {
   // Documents tab — preview cards (iframe / img)
   document.getElementById('dv-docs-grid').innerHTML = buildDocsPanel(a);
 
-  // History tab
+  // History tab — current activity + previous applications from same customer
   const histEl = document.getElementById('dv-history');
   const events = [];
   if (a.createdAt) events.push({ when: a.createdAt, label: `<b>Application created</b> · ${escapeHtml(a.source || 'unknown source')}` });
@@ -1299,8 +1361,25 @@ function renderDetail(fbId) {
   if (a.vergentGuid) events.push({ when: a.vergentPushedAt || a.updatedAt || a.createdAt, label: `<b>Pushed to Vergent</b> · ${escapeHtml(a.vergentGuid)}` });
   if (a.notes) events.push({ when: a.notesUpdatedAt || a.updatedAt || a.createdAt, label: `<b>Note added</b>` });
   events.sort((x, y) => (y.when || 0) - (x.when || 0));
-  histEl.innerHTML = events.length === 0 ? '<div class="dv-report-empty">No activity recorded.</div>' :
+  let histHtml = events.length === 0 ? '<div class="dv-report-empty">No activity recorded.</div>' :
     events.map(ev => `<div class="hist-row"><span class="hist-dot${ev.when ? '' : ' dim'}"></span><div class="hist-text">${ev.label}</div><div class="hist-time">${fmtTimeAgo(ev.when)}</div></div>`).join('');
+
+  // Previous applications from same customer
+  const prior = customerHistory(fbId);
+  if (prior.length > 0) {
+    histHtml += `<div class="sec-h" style="margin-top:24px">Previous Applications <span style="font-size:11px;color:var(--muted);font-weight:600;text-transform:none;letter-spacing:0">(same customer)</span></div>`;
+    histHtml += '<div class="docs-grid" style="grid-template-columns:1fr">' + prior.map(p => {
+      const pb = bucketStatus(p);
+      const pAmt = parseAmount(p.amount);
+      const pSub = `${escapeHtml(p.date || '')} ${escapeHtml(p.time || '')}${p.score != null ? ' · score ' + p.score : ''}${pAmt ? ' · $' + pAmt.toLocaleString() : ''}`;
+      return `<a class="doc-card" data-fb="${escapeHtml(p.firebaseId)}" style="cursor:pointer">
+        <div class="doc-card-icn"><svg class="icn"><use href="#i-history"/></svg></div>
+        <div class="doc-card-text"><div class="doc-card-name">${escapeHtml(p.name || 'Unnamed')} · <span class="status ${pb}" style="font-size:10px">${escapeHtml(p.status || 'Pending')}</span></div><div class="doc-card-meta">${pSub}</div></div>
+        <div class="doc-card-arrow"><svg class="icn"><use href="#i-arrow-right"/></svg></div>
+      </a>`;
+    }).join('') + '</div>';
+  }
+  histEl.innerHTML = histHtml;
 
   // Notes tab
   const notesText = document.getElementById('dv-notes-text');
@@ -1318,8 +1397,15 @@ function renderDetail(fbId) {
   const amtNum = parseAmount(a.amount);
   document.getElementById('dv-offer-input').value = amtNum != null ? amtNum.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '';
 
-  // Reset to overview tab on entry
-  switchDetailTab('overview');
+  // Vergent panel — render from cache, then refresh in background
+  renderVergentPanel(fbId);
+  if (fbId !== _lastDetailFbId) loadVergentMatch(fbId);
+
+  // Reset to overview tab only when opening a NEW applicant
+  if (fbId !== _lastDetailFbId) {
+    switchDetailTab('overview');
+    _lastDetailFbId = fbId;
+  }
 }
 
 // Build the structured Application tab — ported from classic buildAppDetails
@@ -1507,6 +1593,283 @@ function parseAmount(v) {
   return isNaN(n) ? null : n;
 }
 
+// ───────── Customer dedup ─────────
+// Groups applications by customer fingerprint (email > phone > fbId).
+// Queue / dashboard counts show only the LATEST per customer; the Detail
+// view's History tab surfaces the rest as "Previous applications".
+function customerKey(a) {
+  const ad = a.applicationData || {};
+  const email = (ad.email || a.email || '').toLowerCase().trim();
+  const phone = String(ad.phone || a.phone || '').replace(/\D/g, '');
+  if (email && email.includes('@')) return 'em:' + email;
+  if (phone && phone.length >= 10) return 'ph:' + phone.slice(-10);
+  return 'fb:' + a.firebaseId;
+}
+function dedupedApps() {
+  const byKey = new Map();
+  for (const a of apps) {
+    const k = customerKey(a);
+    const prev = byKey.get(k);
+    if (!prev || (a.createdAt || 0) > (prev.createdAt || 0)) byKey.set(k, a);
+  }
+  return Array.from(byKey.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+function customerHistory(fbId) {
+  const a = apps.find(x => x.firebaseId === fbId);
+  if (!a) return [];
+  const k = customerKey(a);
+  return apps.filter(x => x.firebaseId !== fbId && customerKey(x) === k)
+    .sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
+}
+
+// ───────── Vergent panel ─────────
+async function loadVergentMatch(fbId) {
+  try {
+    const m = await fbGet(`reports/${fbId}/vergentMatch.json`);
+    _vergentMatchCache[fbId] = m && typeof m === 'object' && !m.error ? m : null;
+  } catch (e) {
+    _vergentMatchCache[fbId] = null;
+  }
+  if (document.body.dataset.firebaseId === fbId) renderVergentPanel(fbId);
+}
+
+function renderVergentPanel(fbId) {
+  const card = document.getElementById('vg-card');
+  const statusPill = document.getElementById('vg-status');
+  if (!card || !statusPill) return;
+  const m = _vergentMatchCache[fbId];
+  if (!m) {
+    statusPill.textContent = 'Pending';
+    statusPill.className = 'vg-status';
+    card.innerHTML = `<div class="vg-pending">No Vergent match data yet.</div>
+      <div class="vg-actions"><button class="vg-btn vg-btn-ghost" onclick="vergentRecheck('${fbId}')">↻ Re-check now</button></div>
+      <div class="vg-result" id="vg-result"></div>`;
+    return;
+  }
+  const status = (m.status || 'unknown').toLowerCase();
+
+  const checkboxes = `
+    <div class="vg-checks">
+      <label class="vg-check has"><input type="checkbox" id="vg-push-statement" checked> Statement</label>
+      <label class="vg-check has"><input type="checkbox" id="vg-push-dl" checked> DL</label>
+    </div>
+    <input class="vg-note-input" id="vg-note" placeholder="Note for Vergent (optional, e.g. Approved $100)">
+  `;
+
+  if (status === 'found') {
+    statusPill.textContent = 'Existing #' + (m.customerId || '?');
+    statusPill.className = 'vg-status found';
+    card.innerHTML = `
+      <div class="vg-headline">${escapeHtml(m.customerName || 'Existing customer')}</div>
+      <div class="vg-meta">Vergent #${escapeHtml(String(m.customerId || ''))}${m.dob ? ' · DOB ' + escapeHtml(m.dob) : ''}${m.phone ? ' · ' + escapeHtml(m.phone) : ''}</div>
+      ${checkboxes}
+      <div class="vg-actions">
+        <button class="vg-btn vg-btn-primary" onclick="vergentPush('${fbId}', false)">↗ Push selected</button>
+        <button class="vg-btn vg-btn-ghost" onclick="vergentRecheck('${fbId}')">↻ Re-check</button>
+      </div>
+      <div class="vg-result" id="vg-result"></div>`;
+  } else if (status === 'not_found' || status === 'new') {
+    statusPill.textContent = 'New';
+    statusPill.className = 'vg-status new';
+    card.innerHTML = `
+      <div class="vg-headline">No matching customer</div>
+      <div class="vg-meta">Will create a new Vergent record and push the selected documents.</div>
+      ${checkboxes}
+      <div class="vg-actions">
+        <button class="vg-btn vg-btn-primary" onclick="vergentPush('${fbId}', true)">+ Create + Push</button>
+      </div>
+      <div class="vg-id-row"><input class="vg-id-input" id="vg-manual-id" placeholder="…or use existing Vergent ID"><button class="vg-btn vg-btn-ghost" style="flex:0 0 auto" onclick="vergentUseManualId('${fbId}')">Use ID</button></div>
+      <div class="vg-actions"><button class="vg-btn vg-btn-ghost" onclick="vergentRecheck('${fbId}')">↻ Re-check</button></div>
+      <div class="vg-result" id="vg-result"></div>`;
+  } else if (status === 'ambiguous' && Array.isArray(m.matches)) {
+    statusPill.textContent = m.matches.length + ' matches';
+    statusPill.className = 'vg-status amb';
+    const opts = m.matches.slice(0, 5).map((x, i) => `<label class="vg-check"><input type="radio" name="vg-pick" value="${escapeHtml(String(x.customerId))}" ${i === 0 ? 'checked' : ''}> #${escapeHtml(String(x.customerId))} · ${escapeHtml(x.customerName || '')}</label>`).join('');
+    card.innerHTML = `
+      <div class="vg-headline">${m.matches.length} possible matches</div>
+      <div class="vg-meta">Pick the right customer:</div>
+      ${opts}
+      ${checkboxes}
+      <div class="vg-actions">
+        <button class="vg-btn vg-btn-primary" onclick="vergentPushAmbiguous('${fbId}')">↗ Use selected + Push</button>
+        <button class="vg-btn vg-btn-ghost" onclick="vergentRecheck('${fbId}')">↻ Re-check</button>
+      </div>
+      <div class="vg-result" id="vg-result"></div>`;
+  } else if (status === 'error') {
+    statusPill.textContent = 'Error';
+    statusPill.className = 'vg-status err';
+    card.innerHTML = `
+      <div class="vg-headline">Vergent search failed</div>
+      <div class="vg-meta">${escapeHtml(m.error || 'Unknown error.')}</div>
+      <div class="vg-actions"><button class="vg-btn vg-btn-ghost" onclick="vergentRecheck('${fbId}')">↻ Re-check</button></div>
+      <div class="vg-result" id="vg-result"></div>`;
+  } else {
+    statusPill.textContent = 'Pending';
+    statusPill.className = 'vg-status';
+    card.innerHTML = `<div class="vg-pending">Waiting for Vergent search to complete…</div>
+      <div class="vg-actions"><button class="vg-btn vg-btn-ghost" onclick="vergentRecheck('${fbId}')">↻ Re-check now</button></div>
+      <div class="vg-result" id="vg-result"></div>`;
+  }
+}
+
+function _vgGetSelected() {
+  const stmt = document.getElementById('vg-push-statement');
+  const dl = document.getElementById('vg-push-dl');
+  const note = document.getElementById('vg-note');
+  return {
+    push_statement: stmt ? stmt.checked : true,
+    push_dl: dl ? dl.checked : true,
+    note: note ? note.value : ''
+  };
+}
+
+function _vgShow(kind, msg) {
+  const r = document.getElementById('vg-result');
+  if (!r) return;
+  r.className = 'vg-result show ' + kind;
+  r.textContent = msg;
+  if (kind === 'ok') setTimeout(() => { r.classList.remove('show'); }, 5000);
+}
+
+async function vergentPush(fbId, createIfMissing) {
+  const card = document.getElementById('vg-card');
+  if (!card) return;
+  const sel = _vgGetSelected();
+  card.querySelectorAll('button').forEach(b => b.disabled = true);
+  try {
+    const r = await fetch('/api/push-to-vergent', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firebase_id: fbId, create_if_missing: !!createIfMissing, ...sel })
+    });
+    const d = await r.json();
+    if (d && d.success) _vgShow('ok', `✓ Pushed to Vergent #${d.customerId || ''}`);
+    else _vgShow('err', d && d.error ? d.error : 'Push failed');
+  } catch (e) {
+    _vgShow('err', 'Push failed: ' + e.message);
+  }
+  card.querySelectorAll('button').forEach(b => b.disabled = false);
+  await loadVergentMatch(fbId);
+  await loadReports();
+}
+
+async function vergentUseManualId(fbId) {
+  const inp = document.getElementById('vg-manual-id');
+  const id = inp ? inp.value.trim() : '';
+  if (!id) { _vgShow('err', 'Enter a Vergent customer ID first.'); return; }
+  const card = document.getElementById('vg-card');
+  card.querySelectorAll('button').forEach(b => b.disabled = true);
+  try {
+    const sel = _vgGetSelected();
+    const r = await fetch('/api/push-to-vergent', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firebase_id: fbId, vergent_id: id, ...sel })
+    });
+    const d = await r.json();
+    if (d && d.success) _vgShow('ok', `✓ Pushed to Vergent #${id}`);
+    else _vgShow('err', d && d.error ? d.error : 'Push failed');
+  } catch (e) {
+    _vgShow('err', 'Push failed: ' + e.message);
+  }
+  card.querySelectorAll('button').forEach(b => b.disabled = false);
+  await loadVergentMatch(fbId);
+  await loadReports();
+}
+
+async function vergentPushAmbiguous(fbId) {
+  const radio = document.querySelector('input[name="vg-pick"]:checked');
+  if (!radio) { _vgShow('err', 'Pick a customer first.'); return; }
+  const id = radio.value;
+  const card = document.getElementById('vg-card');
+  card.querySelectorAll('button').forEach(b => b.disabled = true);
+  try {
+    const sel = _vgGetSelected();
+    const r = await fetch('/api/push-to-vergent', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firebase_id: fbId, vergent_id: id, ...sel })
+    });
+    const d = await r.json();
+    if (d && d.success) _vgShow('ok', `✓ Pushed to Vergent #${id}`);
+    else _vgShow('err', d && d.error ? d.error : 'Push failed');
+  } catch (e) {
+    _vgShow('err', 'Push failed: ' + e.message);
+  }
+  card.querySelectorAll('button').forEach(b => b.disabled = false);
+  await loadVergentMatch(fbId);
+  await loadReports();
+}
+
+async function vergentRecheck(fbId) {
+  const card = document.getElementById('vg-card');
+  if (card) card.querySelectorAll('button').forEach(b => b.disabled = true);
+  try {
+    // Try the dedicated re-check endpoint first; if missing, just refetch.
+    const r = await fetch('/api/vergent-recheck', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firebase_id: fbId })
+    });
+    if (r.ok) {
+      const d = await r.json();
+      if (d && d.vergentMatch) _vergentMatchCache[fbId] = d.vergentMatch;
+    }
+  } catch (e) { /* fall through to refetch */ }
+  await loadVergentMatch(fbId);
+}
+
+// ───────── Search dropdown ─────────
+let _searchKbdIdx = -1;
+
+function renderSearchDropdown(query) {
+  const dd = document.getElementById('search-dropdown');
+  const q = (query || '').trim().toLowerCase();
+  if (!q) { dd.classList.remove('open'); dd.innerHTML = ''; return; }
+  const list = dedupedApps().filter(a => {
+    const ad = a.applicationData || {};
+    const hay = `${a.name||''} ${ad.email||a.email||''} ${ad.phone||a.phone||''} ${a.firebaseId||''} ${a.submissionId||''}`.toLowerCase();
+    return hay.includes(q);
+  }).slice(0, 8);
+  if (list.length === 0) {
+    dd.innerHTML = `<div class="search-dd-empty">No applicants match "${escapeHtml(query)}"</div>`;
+    dd.classList.add('open');
+    return;
+  }
+  dd.innerHTML = list.map((a, i) => {
+    const b = bucketStatus(a);
+    const ad = a.applicationData || {};
+    const meta = (ad.email || a.email || '') || (ad.phone || a.phone || '') || (a.submissionId || a.firebaseId || '').slice(-8);
+    return `<a class="search-dd-item${i === 0 ? ' kbd' : ''}" data-fb="${escapeHtml(a.firebaseId)}" data-idx="${i}">
+      <div class="search-dd-av">${escapeHtml(initials(a.name))}</div>
+      <div class="search-dd-text"><div class="search-dd-name">${escapeHtml(a.name || 'Unnamed')}</div><div class="search-dd-meta">${escapeHtml(meta)}</div></div>
+      <span class="search-dd-status ${b}">${escapeHtml(a.status || 'Pending')}</span>
+    </a>`;
+  }).join('') + `<div class="search-dd-foot">${list.length} match${list.length === 1 ? '' : 'es'} — ↑↓ to navigate · Enter to open</div>`;
+  dd.classList.add('open');
+  _searchKbdIdx = 0;
+}
+
+function _searchPickKbd(delta) {
+  const items = document.querySelectorAll('#search-dropdown .search-dd-item');
+  if (items.length === 0) return;
+  items[_searchKbdIdx]?.classList.remove('kbd');
+  _searchKbdIdx = (_searchKbdIdx + delta + items.length) % items.length;
+  items[_searchKbdIdx].classList.add('kbd');
+  items[_searchKbdIdx].scrollIntoView({ block: 'nearest' });
+}
+
+function _searchOpenKbd() {
+  const items = document.querySelectorAll('#search-dropdown .search-dd-item');
+  if (items.length === 0) return;
+  const fbId = items[_searchKbdIdx].getAttribute('data-fb');
+  if (fbId) {
+    document.getElementById('search-input').value = '';
+    document.getElementById('search-dropdown').classList.remove('open');
+    setRoute('detail', fbId);
+  }
+}
+
 function switchDetailTab(name) {
   document.querySelectorAll('.dv-tab').forEach(t => t.classList.toggle('active', t.getAttribute('data-tab') === name));
   document.querySelectorAll('.dv-panel').forEach(p => p.classList.toggle('active', p.id === 'dv-panel-' + name));
@@ -1663,7 +2026,6 @@ document.getElementById('dv-approve-btn').addEventListener('click', async () => 
 });
 document.getElementById('dv-rerun-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) rerunEngine(id); });
 document.getElementById('dv-refresh-plaid-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) refreshFromPlaid(id); });
-document.getElementById('dv-vergent-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) pushToVergent(id); });
 document.getElementById('dv-notes-save').addEventListener('click', () => { const id = _activeFbId(); if (id) saveNotes(id); });
 document.getElementById('dv-offer-input').addEventListener('blur', () => { const id = _activeFbId(); if (id) saveOffer(id); });
 
@@ -1683,6 +2045,32 @@ document.getElementById('queue-chips').addEventListener('click', (e) => {
 document.getElementById('search-input').addEventListener('input', (e) => {
   currentSearch = e.target.value || '';
   renderQueue();
+  renderSearchDropdown(currentSearch);
+});
+document.getElementById('search-input').addEventListener('focus', () => {
+  if (currentSearch) renderSearchDropdown(currentSearch);
+});
+document.getElementById('search-input').addEventListener('keydown', (e) => {
+  const dd = document.getElementById('search-dropdown');
+  if (!dd.classList.contains('open')) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); _searchPickKbd(1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); _searchPickKbd(-1); }
+  else if (e.key === 'Enter') { e.preventDefault(); _searchOpenKbd(); }
+  else if (e.key === 'Escape') { dd.classList.remove('open'); }
+});
+document.getElementById('search-dropdown').addEventListener('click', (e) => {
+  const item = e.target.closest('.search-dd-item[data-fb]');
+  if (!item) return;
+  e.preventDefault();
+  const fbId = item.getAttribute('data-fb');
+  document.getElementById('search-input').value = '';
+  currentSearch = '';
+  renderQueue();
+  document.getElementById('search-dropdown').classList.remove('open');
+  setRoute('detail', fbId);
+});
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.search-wrap')) document.getElementById('search-dropdown').classList.remove('open');
 });
 
 document.getElementById('user-button').addEventListener('click', (e) => {
