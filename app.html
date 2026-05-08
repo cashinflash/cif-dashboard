@@ -2012,12 +2012,40 @@ async function saveNotes(fbId) {
   const a = apps.find(x => x.firebaseId === fbId);
   if (!a) return;
   const notes = document.getElementById('dv-notes-edit').value;
+  const trimmed = (notes || '').trim();
   toast('Saving note…');
   await fbPatchReport(fbId, { notes, notesUpdatedAt: Date.now() });
   a.notes = notes;
   a.notesUpdatedAt = Date.now();
   toast('Note saved', 'ok');
   renderDetail(fbId);
+  // Best-effort: also push the note to Vergent so it surfaces on the
+  // customer's main page. Skips silently if the applicant hasn't been
+  // pushed to Vergent yet — operator gets a non-blocking toast.
+  if (trimmed) pushNoteToVergent(fbId, trimmed).catch(() => {});
+}
+
+async function pushNoteToVergent(fbId, text) {
+  try {
+    const r = await fetch('/api/vergent-add-note', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ firebase_id: fbId, text })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.ok) {
+      toast('Note also pushed to Vergent #' + (d.vergentCustomerId || '?'), 'ok');
+    } else if (d.error === 'no_vergent_customer_id') {
+      toast('Note saved (Vergent skipped — push customer first)');
+    } else {
+      const msg = d.detail || d.error || ('HTTP ' + r.status);
+      toast('Vergent note failed: ' + String(msg).slice(0, 160), 'err');
+      console.warn('[VERGENT-NOTE] error', { status: r.status, body: d });
+    }
+  } catch (e) {
+    toast('Vergent note network error', 'err');
+  }
 }
 
 async function rerunEngine(fbId) {
