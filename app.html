@@ -1194,15 +1194,15 @@ function renderDetail(fbId) {
   ];
   checks.innerHTML = cks.map(c => `<div class="check-row"><span class="check-name">${escapeHtml(c.name)}</span><span class="check-tag ${c.state}"><svg class="icn"><use href="#i-${c.state==='ok'?'check':c.state==='warn'?'warning':c.state==='no'?'x':'clock'}"/></svg>${escapeHtml(c.tag)}</span></div>`).join('');
 
-  // Documents
+  // Documents (right rail — short list)
   const docs = document.getElementById('dv-docs');
-  const docList = [];
-  if (a.filename) docList.push({ name: a.filename, meta: 'Bank Statement' });
-  if (ad.bankStatementUrl) docList.push({ name: 'Bank Statement', meta: 'Linked' });
-  if (ad.driverLicenseUrl || ad.dlUrl) docList.push({ name: 'Driver License', meta: 'Linked' });
-  if (a.applicationData) docList.push({ name: 'Application', meta: 'On file' });
-  if (docList.length === 0) docs.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0">No documents on file.</div>';
-  else docs.innerHTML = docList.map(d => `<div class="check-row"><span class="check-name">${escapeHtml(d.name)}</span><span class="check-tag ok">${escapeHtml(d.meta)}</span></div>`).join('');
+  const railDocs = [];
+  if (a.filename) railDocs.push({ name: a.filename, meta: 'Bank Statement' });
+  if (ad.bankStatementUrl) railDocs.push({ name: 'Bank Statement', meta: 'Linked' });
+  if (ad.driverLicenseUrl || ad.dlUrl) railDocs.push({ name: 'Driver License', meta: 'Linked' });
+  if (a.applicationData) railDocs.push({ name: 'Application', meta: 'On file' });
+  if (railDocs.length === 0) docs.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0">No documents on file.</div>';
+  else docs.innerHTML = railDocs.map(d => `<div class="check-row"><span class="check-name">${escapeHtml(d.name)}</span><span class="check-tag ok">${escapeHtml(d.meta)}</span></div>`).join('');
 
   // Engine report (Analysis tab)
   const reportEl = document.getElementById('dv-report-html');
