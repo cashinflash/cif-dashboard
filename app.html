@@ -2213,6 +2213,12 @@ function renderProfileLoans(fbId) {
       const stCls = loanStatusClass(l.status, l.days_late, l.balance, l.is_outstanding);
       const stTxt = (l.status || '—').toUpperCase();
       const dl = Number(l.days_late || 0);
+      // Prefer Vergent's verbatim label (e.g. "Not Late", "5", "30").
+      // Falls through to the numeric value when the backend didn't see a
+      // string, "—" when there's nothing meaningful to show.
+      const dlLabel = (l.days_late_label && l.days_late_label.trim())
+        ? l.days_late_label
+        : (dl > 0 ? String(dl) : '—');
       const dlCls = dl > 0 ? 'loan-late-pos' : 'loan-late-zero';
       return `<tr>
         <td>${escapeHtml(date)}</td>
@@ -2220,7 +2226,7 @@ function renderProfileLoans(fbId) {
         <td class="num">${escapeHtml(amt)}</td>
         <td class="num">${escapeHtml(bal)}</td>
         <td><span class="loan-status ${stCls}">${escapeHtml(stTxt)}</span></td>
-        <td class="${dlCls}">${dl}</td>
+        <td class="${dlCls}">${escapeHtml(dlLabel)}</td>
       </tr>`;
     }).join('')}</tbody>
   </table></div>`;
