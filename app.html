@@ -32,8 +32,9 @@ button,input,select{font-family:inherit}
 
 /* TOP NAV */
 .topnav{position:fixed;top:0;left:0;right:0;z-index:200;height:var(--topnav-h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 22px;gap:18px}
-.brand{display:flex;align-items:center;gap:9px;flex-shrink:0;cursor:pointer;text-decoration:none}
-.brand-mark{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--green),var(--green-dark));color:white;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 5px rgba(22,163,74,.3)}
+.brand{display:flex;align-items:center;gap:10px;flex-shrink:0;cursor:pointer;text-decoration:none}
+.brand-img{width:32px;height:32px;border-radius:8px;object-fit:cover;flex-shrink:0;box-shadow:0 2px 5px rgba(22,163,74,.18)}
+.brand-mark{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--green),var(--green-dark));color:white;display:none;align-items:center;justify-content:center;box-shadow:0 2px 5px rgba(22,163,74,.3)}
 .brand-mark svg{width:17px;height:17px;fill:currentColor}
 .brand-name{font-size:15px;font-weight:800;letter-spacing:-.015em;color:var(--green-dark)}
 .topnav-tabs{display:flex;align-items:center;gap:2px;margin-left:14px}
@@ -326,11 +327,67 @@ button,input,select{font-family:inherit}
 .check-tag .icn{width:13px;height:13px;stroke-width:2.5}
 .check-tag.ok{color:var(--green)}.check-tag.warn{color:var(--amber-700)}.check-tag.no{color:var(--red)}.check-tag.dim{color:var(--muted)}
 
-.action-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 22px;background:var(--surface);border-top:1px solid var(--border)}
+.action-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 22px;background:var(--surface);border-top:1px solid var(--border);position:sticky;bottom:0;z-index:10}
 .action-spacer{flex:1}
-.legacy-link-block{padding:14px 22px;background:var(--blue-50);border-top:1px solid var(--blue-100);display:flex;gap:11px;align-items:center;font-size:12.5px;color:var(--blue-700)}
-.legacy-link-block .icn{width:14px;height:14px;flex-shrink:0}
-.legacy-link-block a{color:var(--blue);font-weight:700;text-decoration:underline;margin-left:auto}
+.offer-input-group{display:flex;align-items:stretch;border:1.5px solid var(--border2);border-radius:9px;overflow:hidden;background:white}
+.offer-input-group .ccy{padding:0 11px;display:flex;align-items:center;font-size:13px;font-weight:700;color:var(--text2);background:var(--surface2);border-right:1.5px solid var(--border2)}
+.offer-input{border:none;outline:none;font-size:14px;font-weight:700;font-family:inherit;color:var(--text);padding:8px 6px;width:96px;text-align:center}
+.offer-lbl{padding:0 12px;display:flex;align-items:center;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;background:white}
+.btn-approve{background:var(--green);color:white;border:none;cursor:pointer;padding:9px 22px;border-radius:9px;font-size:13px;font-weight:700;font-family:inherit;display:inline-flex;align-items:center;gap:7px}
+.btn-approve:hover{background:var(--green-dark)}
+.btn-approve:disabled{opacity:.5;cursor:not-allowed}
+.btn-approve .icn{width:14px;height:14px;stroke-width:2.5}
+
+/* Tab panels */
+.dv-panel{display:none}
+.dv-panel.active{display:block}
+
+/* Engine report HTML rendering */
+.dv-report-html{font-size:14px;line-height:1.75;color:var(--text2);max-height:none}
+.dv-report-html h1{font-size:18px;font-weight:800;color:var(--green-dark);margin:0 0 16px;padding-bottom:12px;border-bottom:2px solid var(--green-200);letter-spacing:-.015em}
+.dv-report-html h2{font-size:13px;font-weight:700;color:var(--green);margin:20px 0 11px;text-transform:uppercase;letter-spacing:.07em;display:flex;align-items:center;gap:8px}
+.dv-report-html h2::after{content:'';flex:1;height:1px;background:var(--green-200);margin-left:6px}
+.dv-report-html h3{font-size:13px;font-weight:700;color:var(--text);margin:14px 0 8px}
+.dv-report-html p{margin-bottom:10px}
+.dv-report-html p b,.dv-report-html p strong{color:var(--text);font-weight:700}
+.dv-report-html ul,.dv-report-html ol{margin:8px 0 12px 22px}
+.dv-report-html ul li,.dv-report-html ol li{margin-bottom:6px}
+.dv-report-html hr{border:none;border-top:1px solid var(--border);margin:18px 0}
+.dv-report-html table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:13px}
+.dv-report-html table th{background:var(--green-50);color:var(--green-dark);font-weight:700;padding:9px 12px;border:1px solid var(--green-200);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;text-align:left}
+.dv-report-html table td{padding:9px 12px;border:1px solid var(--border);background:white;vertical-align:top}
+.dv-report-html table tr:nth-child(even) td{background:var(--surface2)}
+.dv-report-html .tier-breakdown{background:linear-gradient(135deg,rgba(22,163,74,.06),rgba(22,163,74,.02));border:1.5px solid var(--green-200);border-radius:10px;padding:14px 16px;margin:10px 0 16px}
+.dv-report-html .tier-breakdown p{margin-bottom:5px;font-size:13px}
+.dv-report-html .tier-breakdown p:last-child{margin-bottom:0;font-weight:700;color:var(--green);border-top:1px solid var(--green-200);padding-top:7px;margin-top:7px}
+.dv-report-empty{padding:30px 20px;text-align:center;color:var(--muted);font-size:13px}
+
+/* Documents grid */
+.docs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.doc-card{display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--radius);background:white;text-decoration:none;color:var(--text);transition:all .12s}
+.doc-card:hover{border-color:var(--green);background:var(--green-50)}
+.doc-card-icn{width:40px;height:40px;border-radius:9px;background:var(--green-50);color:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid var(--green-100)}
+.doc-card-icn .icn{width:18px;height:18px}
+.doc-card-text{flex:1;min-width:0}
+.doc-card-name{font-size:13px;font-weight:700;color:var(--text);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.doc-card-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.doc-card-arrow{color:var(--muted)}
+.doc-card-arrow .icn{width:14px;height:14px}
+
+/* History list */
+.hist-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border-soft);font-size:13px}
+.hist-row:last-child{border-bottom:none}
+.hist-dot{width:9px;height:9px;border-radius:50%;background:var(--green);flex-shrink:0}
+.hist-dot.dim{background:var(--muted2)}
+.hist-text{flex:1;color:var(--text2)}
+.hist-text b{color:var(--text);font-weight:700}
+.hist-time{font-size:11.5px;color:var(--muted);font-weight:500}
+
+/* Notes editor */
+.notes-text{font-size:13.5px;line-height:1.6;color:var(--text2);padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;min-height:80px;white-space:pre-wrap;margin-bottom:12px}
+.notes-text.empty{color:var(--muted);font-style:italic}
+.notes-edit{width:100%;min-height:140px;border:1.5px solid var(--border2);border-radius:10px;padding:12px 14px;font-size:13.5px;font-family:inherit;color:var(--text);background:white;resize:vertical;line-height:1.6;outline:none}
+.notes-edit:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--green-100)}
 
 .icn{flex-shrink:0;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke:currentColor}
 .view{display:none}.view.active{display:block}
@@ -415,6 +472,7 @@ button,input,select{font-family:inherit}
 <!-- TOP NAV -->
 <header class="topnav">
   <a class="brand" href="#dashboard">
+    <img class="brand-img" src="/favicon.png" alt="Cash in Flash" onerror="this.style.display='none';document.querySelector('.brand-mark').style.display='flex'">
     <div class="brand-mark"><svg viewBox="0 0 24 24"><use href="#i-bolt"/></svg></div>
     <div class="brand-name">Cash in Flash</div>
   </a>
@@ -643,7 +701,8 @@ button,input,select{font-family:inherit}
     <div class="dv-bar">
       <button class="dv-back" data-route="queue"><svg class="icn"><use href="#i-arrow-left"/></svg>Back to Queue</button>
       <div class="dv-bar-actions">
-        <a class="btn btn-ghost" id="open-classic" href="/app/legacy"><svg class="icn"><use href="#i-external"/></svg>Open in Classic</a>
+        <button class="btn btn-ghost" id="dv-rerun-btn"><svg class="icn"><use href="#i-refresh"/></svg>Re-run</button>
+        <button class="btn btn-ghost" id="dv-refresh-plaid-btn"><svg class="icn"><use href="#i-refresh"/></svg>Refresh from Plaid</button>
       </div>
     </div>
     <div class="detail-card">
@@ -664,38 +723,66 @@ button,input,select{font-family:inherit}
 
       <div class="dv-body">
         <div class="dv-tabs">
-          <button class="dv-tab active"><svg class="icn"><use href="#i-overview"/></svg>Overview</button>
-          <button class="dv-tab" id="tab-classic-docs"><svg class="icn"><use href="#i-doc"/></svg>Documents</button>
-          <button class="dv-tab" id="tab-classic-analysis"><svg class="icn"><use href="#i-chart"/></svg>Analysis</button>
-          <button class="dv-tab" id="tab-classic-history"><svg class="icn"><use href="#i-history"/></svg>History</button>
-          <button class="dv-tab" id="tab-classic-notes"><svg class="icn"><use href="#i-message"/></svg>Notes &amp; Alerts</button>
+          <button class="dv-tab active" data-tab="overview"><svg class="icn"><use href="#i-overview"/></svg>Overview</button>
+          <button class="dv-tab" data-tab="documents"><svg class="icn"><use href="#i-doc"/></svg>Documents</button>
+          <button class="dv-tab" data-tab="analysis"><svg class="icn"><use href="#i-chart"/></svg>Analysis</button>
+          <button class="dv-tab" data-tab="history"><svg class="icn"><use href="#i-history"/></svg>History</button>
+          <button class="dv-tab" data-tab="notes"><svg class="icn"><use href="#i-message"/></svg>Notes &amp; Alerts</button>
         </div>
 
         <div class="dv-main">
-          <div class="dv-recommended" id="dv-recommended">
-            <div>
-              <div class="dv-rec-label">Recommended Decision</div>
-              <div class="dv-rec-value" id="dv-rec-value">—</div>
+
+          <!-- OVERVIEW PANEL -->
+          <div class="dv-panel active" id="dv-panel-overview">
+            <div class="dv-recommended" id="dv-recommended">
+              <div>
+                <div class="dv-rec-label">Recommended Decision</div>
+                <div class="dv-rec-value" id="dv-rec-value">—</div>
+              </div>
+              <div class="dv-rec-right">
+                <div class="dv-rec-right-lbl">Engine Reason</div>
+                <div class="dv-rec-right-val" id="dv-rec-reason" style="font-size:13px;font-weight:600;text-align:right;max-width:340px">—</div>
+              </div>
             </div>
-            <div class="dv-rec-right">
-              <div class="dv-rec-right-lbl">Engine Reason</div>
-              <div class="dv-rec-right-val" id="dv-rec-reason" style="font-size:13px;font-weight:600;text-align:right;max-width:340px">—</div>
+
+            <div class="dv-alert" id="dv-alert" style="display:none">
+              <div class="dv-alert-icn"><svg class="icn"><use href="#i-warning"/></svg></div>
+              <div class="dv-alert-text">
+                <div class="dv-alert-title" id="dv-alert-title">Heads up</div>
+                <div class="dv-alert-body" id="dv-alert-body">—</div>
+              </div>
             </div>
+
+            <div class="sec-h">Application Snapshot</div>
+            <div class="snap-grid" id="dv-snap"></div>
           </div>
 
-          <div class="dv-alert" id="dv-alert" style="display:none">
-            <div class="dv-alert-icn"><svg class="icn"><use href="#i-warning"/></svg></div>
-            <div class="dv-alert-text">
-              <div class="dv-alert-title" id="dv-alert-title">Heads up</div>
-              <div class="dv-alert-body" id="dv-alert-body">—</div>
-            </div>
+          <!-- DOCUMENTS PANEL -->
+          <div class="dv-panel" id="dv-panel-documents">
+            <div class="sec-h">Documents on file</div>
+            <div class="docs-grid" id="dv-docs-grid"></div>
           </div>
 
-          <div class="sec-h">Application Snapshot</div>
-          <div class="snap-grid" id="dv-snap"></div>
+          <!-- ANALYSIS PANEL -->
+          <div class="dv-panel" id="dv-panel-analysis">
+            <div class="sec-h">Engine Report</div>
+            <div class="dv-report-html" id="dv-report-html"></div>
+          </div>
 
-          <div class="sec-h">Engine Report</div>
-          <div id="dv-report" style="font-size:13.5px;line-height:1.7;color:var(--text2)">Engine report renders in the classic view. <a href="#" id="dv-report-classic" style="color:var(--green-dark);font-weight:700">Open full report →</a></div>
+          <!-- HISTORY PANEL -->
+          <div class="dv-panel" id="dv-panel-history">
+            <div class="sec-h">Activity</div>
+            <div id="dv-history"></div>
+          </div>
+
+          <!-- NOTES PANEL -->
+          <div class="dv-panel" id="dv-panel-notes">
+            <div class="sec-h">Notes &amp; Alerts</div>
+            <div class="notes-text empty" id="dv-notes-text">No notes yet.</div>
+            <textarea class="notes-edit" id="dv-notes-edit" placeholder="Add a note for the next operator..."></textarea>
+            <div style="margin-top:10px;display:flex;gap:8px"><button class="btn btn-primary" id="dv-notes-save"><svg class="icn"><use href="#i-check"/></svg>Save Note</button></div>
+          </div>
+
         </div>
 
         <aside class="dv-rail">
@@ -710,10 +797,17 @@ button,input,select{font-family:inherit}
         </aside>
       </div>
 
-      <div class="legacy-link-block">
-        <svg class="icn"><use href="#i-info"/></svg>
-        <div>Advanced actions (Re-run, Refresh from Plaid, Push to Vergent, Approve/Decline, Operator Override, Notes) are available in the classic view while we finish wiring them into the new design.</div>
-        <a id="dv-legacy-link" href="/app/legacy">Open in Classic →</a>
+      <!-- ACTION BAR -->
+      <div class="action-bar">
+        <button class="btn btn-danger" id="dv-decline-btn"><svg class="icn"><use href="#i-x"/></svg>Decline</button>
+        <button class="btn btn-ghost" id="dv-vergent-btn"><svg class="icn"><use href="#i-external"/></svg>Push to Vergent</button>
+        <div class="action-spacer"></div>
+        <div class="offer-input-group">
+          <span class="ccy">$</span>
+          <input class="offer-input" type="text" id="dv-offer-input" value="">
+          <span class="offer-lbl">Offer</span>
+        </div>
+        <button class="btn-approve" id="dv-approve-btn"><svg class="icn"><use href="#i-check"/></svg>Approve</button>
       </div>
     </div>
   </div>
@@ -1110,15 +1204,188 @@ function renderDetail(fbId) {
   if (docList.length === 0) docs.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0">No documents on file.</div>';
   else docs.innerHTML = docList.map(d => `<div class="check-row"><span class="check-name">${escapeHtml(d.name)}</span><span class="check-tag ok">${escapeHtml(d.meta)}</span></div>`).join('');
 
-  // Legacy link
-  const legacy = `/app/legacy#fb=${encodeURIComponent(fbId)}`;
-  document.getElementById('dv-legacy-link').href = legacy;
-  document.getElementById('open-classic').href = legacy;
-  document.getElementById('dv-report-classic').href = legacy;
-  document.getElementById('tab-classic-docs').onclick = () => location.href = legacy;
-  document.getElementById('tab-classic-analysis').onclick = () => location.href = legacy;
-  document.getElementById('tab-classic-history').onclick = () => location.href = legacy;
-  document.getElementById('tab-classic-notes').onclick = () => location.href = legacy;
+  // Engine report (Analysis tab)
+  const reportEl = document.getElementById('dv-report-html');
+  if (a.report && String(a.report).trim()) {
+    reportEl.innerHTML = a.report;
+    reportEl.classList.remove('dv-report-empty');
+  } else {
+    reportEl.innerHTML = 'No engine report on file. Run the engine to generate one.';
+    reportEl.className = 'dv-report-html dv-report-empty';
+  }
+
+  // Documents tab — full grid
+  const docsGrid = document.getElementById('dv-docs-grid');
+  const docList = collectDocuments(a);
+  if (docList.length === 0) {
+    docsGrid.innerHTML = '<div class="dv-report-empty">No documents on file for this applicant.</div>';
+  } else {
+    docsGrid.innerHTML = docList.map(d => {
+      const href = d.url ? `href="${escapeHtml(d.url)}" target="_blank" rel="noopener"` : '';
+      const tag = d.url ? 'a' : 'div';
+      return `<${tag} class="doc-card" ${href}>
+        <div class="doc-card-icn"><svg class="icn"><use href="#i-doc"/></svg></div>
+        <div class="doc-card-text"><div class="doc-card-name">${escapeHtml(d.name)}</div><div class="doc-card-meta">${escapeHtml(d.meta)}</div></div>
+        ${d.url ? '<div class="doc-card-arrow"><svg class="icn"><use href="#i-external"/></svg></div>' : ''}
+      </${tag}>`;
+    }).join('');
+  }
+
+  // History tab
+  const histEl = document.getElementById('dv-history');
+  const events = [];
+  if (a.createdAt) events.push({ when: a.createdAt, label: `<b>Application created</b> · ${escapeHtml(a.source || 'unknown source')}` });
+  if (a.claudeDecision) events.push({ when: a.updatedAt || a.createdAt, label: `<b>Engine decision:</b> ${escapeHtml(a.claudeDecision)} · ${escapeHtml(a.reason || '')}` });
+  if (a.v2Decision) events.push({ when: a.v2DecisionAt || a.updatedAt || a.createdAt, label: `<b>v2 engine:</b> ${escapeHtml(a.v2Decision)} · $${escapeHtml(String(a.v2TierAmount || 0))}${a.v2AutoDecide ? ' · auto-decide' : ''}` });
+  if (a.status && a.status !== 'Pending') events.push({ when: a.statusUpdatedAt || a.updatedAt || a.createdAt, label: `<b>Status:</b> ${escapeHtml(a.status)}` });
+  if (a.vergentGuid) events.push({ when: a.vergentPushedAt || a.updatedAt || a.createdAt, label: `<b>Pushed to Vergent</b> · ${escapeHtml(a.vergentGuid)}` });
+  if (a.notes) events.push({ when: a.notesUpdatedAt || a.updatedAt || a.createdAt, label: `<b>Note added</b>` });
+  events.sort((x, y) => (y.when || 0) - (x.when || 0));
+  histEl.innerHTML = events.length === 0 ? '<div class="dv-report-empty">No activity recorded.</div>' :
+    events.map(ev => `<div class="hist-row"><span class="hist-dot${ev.when ? '' : ' dim'}"></span><div class="hist-text">${ev.label}</div><div class="hist-time">${fmtTimeAgo(ev.when)}</div></div>`).join('');
+
+  // Notes tab
+  const notesText = document.getElementById('dv-notes-text');
+  const notesEdit = document.getElementById('dv-notes-edit');
+  if (a.notes && String(a.notes).trim()) {
+    notesText.textContent = a.notes;
+    notesText.classList.remove('empty');
+  } else {
+    notesText.textContent = 'No notes yet.';
+    notesText.classList.add('empty');
+  }
+  notesEdit.value = a.notes || '';
+
+  // Action bar — pre-fill offer with current amount
+  const amtNum = parseAmount(a.amount);
+  document.getElementById('dv-offer-input').value = amtNum != null ? amtNum.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '';
+
+  // Reset to overview tab on entry
+  switchDetailTab('overview');
+}
+
+function collectDocuments(a) {
+  const docs = [];
+  const ad = a.applicationData || {};
+  if (a.filename) docs.push({ name: a.filename, meta: 'Uploaded document', url: '' });
+  if (ad.bankStatementUrl) docs.push({ name: 'Bank Statement', meta: 'From application', url: ad.bankStatementUrl });
+  if (ad.driverLicenseUrl) docs.push({ name: 'Driver License', meta: 'From application', url: ad.driverLicenseUrl });
+  if (ad.dlUrl && !ad.driverLicenseUrl) docs.push({ name: 'Driver License', meta: 'From application', url: ad.dlUrl });
+  if (ad.idDocumentUrl) docs.push({ name: 'ID Document', meta: 'From application', url: ad.idDocumentUrl });
+  if (ad.paystubUrl) docs.push({ name: 'Pay Stub', meta: 'From application', url: ad.paystubUrl });
+  if (ad.assetReportUrl) docs.push({ name: 'Plaid Asset Report', meta: 'Plaid', url: ad.assetReportUrl });
+  if (a.applicationData) docs.push({ name: 'Application Data', meta: 'JSON record on file', url: '' });
+  return docs;
+}
+
+function parseAmount(v) {
+  if (v == null || v === '' || v === 'N/A') return null;
+  const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[^0-9.-]/g, ''));
+  return isNaN(n) ? null : n;
+}
+
+function switchDetailTab(name) {
+  document.querySelectorAll('.dv-tab').forEach(t => t.classList.toggle('active', t.getAttribute('data-tab') === name));
+  document.querySelectorAll('.dv-panel').forEach(p => p.classList.toggle('active', p.id === 'dv-panel-' + name));
+}
+
+async function fbPatchReport(fbId, data) {
+  const r = await fetch(`${FB}/reports/${fbId}.json`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', 'X-Method': 'PATCH' },
+    body: JSON.stringify({ ...data, updatedAt: Date.now() })
+  });
+  if (r.status === 401) { window.location.replace('/'); return null; }
+  return r.json();
+}
+
+async function setStatus(fbId, status) {
+  const a = apps.find(x => x.firebaseId === fbId);
+  if (!a) return;
+  if (!confirm(`${status} ${a.name || 'this applicant'}?`)) return;
+  toast('Updating…');
+  await fbPatchReport(fbId, { status, statusUpdatedAt: Date.now() });
+  Object.assign(a, { status, statusUpdatedAt: Date.now() });
+  toast(`Marked ${status}`, 'ok');
+  rerender();
+}
+
+async function saveOffer(fbId) {
+  const a = apps.find(x => x.firebaseId === fbId);
+  if (!a) return;
+  const raw = document.getElementById('dv-offer-input').value || '';
+  const n = parseAmount(raw);
+  if (n == null) { toast('Enter a valid amount', 'err'); return; }
+  await fbPatchReport(fbId, { amount: '$' + n });
+  a.amount = '$' + n;
+}
+
+async function saveNotes(fbId) {
+  const a = apps.find(x => x.firebaseId === fbId);
+  if (!a) return;
+  const notes = document.getElementById('dv-notes-edit').value;
+  toast('Saving note…');
+  await fbPatchReport(fbId, { notes, notesUpdatedAt: Date.now() });
+  a.notes = notes;
+  a.notesUpdatedAt = Date.now();
+  toast('Note saved', 'ok');
+  renderDetail(fbId);
+}
+
+async function rerunEngine(fbId) {
+  toast('Re-running engine…');
+  try {
+    const r = await fetch('/api/rerun-v2', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firebase_id: fbId })
+    });
+    if (!r.ok) throw new Error('Re-run failed');
+    toast('Re-run complete — refreshing', 'ok');
+    await loadReports();
+  } catch (e) {
+    toast('Re-run failed: ' + e.message, 'err');
+  }
+}
+
+async function refreshFromPlaid(fbId) {
+  toast('Refreshing from Plaid…');
+  try {
+    const r = await fetch('/api/refresh-from-plaid', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firebase_id: fbId })
+    });
+    if (!r.ok) throw new Error('Refresh failed');
+    toast('Plaid refreshed — re-running engine', 'ok');
+    await loadReports();
+  } catch (e) {
+    toast('Refresh failed: ' + e.message, 'err');
+  }
+}
+
+async function pushToVergent(fbId) {
+  toast('Pushing to Vergent…');
+  try {
+    const r = await fetch('/api/push-to-vergent', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firebase_id: fbId, push_dl: true, push_statement: true })
+    });
+    const d = await r.json();
+    if (d && d.success) {
+      toast('Pushed to Vergent #' + (d.customerId || ''), 'ok');
+      await loadReports();
+    } else {
+      toast(d && d.error ? d.error : 'Push failed', 'err');
+    }
+  } catch (e) {
+    toast('Push failed: ' + e.message, 'err');
+  }
 }
 
 // ───────── Init ─────────
@@ -1149,6 +1416,8 @@ async function init() {
 
 // ───────── Wiring ─────────
 document.addEventListener('click', (e) => {
+  const tab = e.target.closest('.dv-tab[data-tab]');
+  if (tab) { switchDetailTab(tab.getAttribute('data-tab')); return; }
   const t = e.target.closest('[data-route]');
   if (t) {
     e.preventDefault();
@@ -1160,6 +1429,20 @@ document.addEventListener('click', (e) => {
   const act = e.target.closest('.activity-row[data-fb]');
   if (act) { setRoute('detail', act.getAttribute('data-fb')); return; }
 });
+
+// Detail action handlers — read fbId from body dataset on each click
+function _activeFbId() { return document.body.dataset.firebaseId || ''; }
+document.getElementById('dv-decline-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) setStatus(id, 'Declined'); });
+document.getElementById('dv-approve-btn').addEventListener('click', async () => {
+  const id = _activeFbId(); if (!id) return;
+  await saveOffer(id);
+  await setStatus(id, 'Approved');
+});
+document.getElementById('dv-rerun-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) rerunEngine(id); });
+document.getElementById('dv-refresh-plaid-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) refreshFromPlaid(id); });
+document.getElementById('dv-vergent-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) pushToVergent(id); });
+document.getElementById('dv-notes-save').addEventListener('click', () => { const id = _activeFbId(); if (id) saveNotes(id); });
+document.getElementById('dv-offer-input').addEventListener('blur', () => { const id = _activeFbId(); if (id) saveOffer(id); });
 
 document.getElementById('refresh-btn').addEventListener('click', () => { toast('Refreshing…'); loadReports(); });
 document.getElementById('refresh-btn-2').addEventListener('click', () => { toast('Refreshing…'); loadReports(); });
