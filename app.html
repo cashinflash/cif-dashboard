@@ -10,8 +10,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
-  --green:#1a6b3c;--green-mid:#1e7d46;--green-dark:#144f2c;
-  --green-light:#eaf5ef;--green-border:#b2d9c0;
+  --green:#16a34a;--green-mid:#22c55e;--green-dark:#15803d;
+  --green-light:#dcfce7;--green-border:#bbf7d0;
   --gold:#c9a84c;--gold-dark:#a8852e;--gold-light:#fdf8ec;--gold-border:#e8d48e;
   --red:#c0392b;--red-light:#fdf2f2;--red-border:#f5b8b0;
   --amber:#d97706;--amber-light:#fffbeb;--amber-border:#fcd34d;
@@ -224,8 +224,8 @@ header{background:linear-gradient(180deg,var(--green-dark),var(--green));height:
 .dz-icon{width:60px;height:60px;background:white;border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;border:1px solid var(--green-border)}
 .dz-title{font-size:16px;font-weight:600;color:var(--green);margin-bottom:5px}
 .dz-sub{font-size:13px;color:var(--muted)}
-.abtn{width:100%;padding:16px;background:linear-gradient(135deg,var(--green-dark),var(--green));color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;font-family:var(--sans);cursor:pointer;transition:all .2s;position:relative;overflow:hidden;box-shadow:0 4px 16px rgba(26,107,60,.25)}
-.abtn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 24px rgba(26,107,60,.35)}
+.abtn{width:100%;padding:16px;background:linear-gradient(135deg,var(--green-dark),var(--green));color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;font-family:var(--sans);cursor:pointer;transition:all .2s;position:relative;overflow:hidden;box-shadow:0 4px 16px rgba(22,163,74,.25)}
+.abtn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 24px rgba(22,163,74,.35)}
 .abtn:disabled{opacity:.5;cursor:not-allowed;transform:none}
 .abtn.loading{color:transparent}
 .abtn.loading::after{content:'';position:absolute;width:22px;height:22px;border:3px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;top:50%;left:50%;margin:-11px 0 0 -11px;animation:spin .7s linear infinite}
@@ -263,7 +263,7 @@ header{background:linear-gradient(180deg,var(--green-dark),var(--green));height:
 .rhtml h1{font-size:20px;font-weight:700;color:var(--green-dark);margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid var(--green-border)}
 .rhtml h2{font-size:14px;font-weight:700;color:var(--green);margin:22px 0 12px;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:6px}
 .rhtml h2::after{content:'';flex:1;height:1px;background:var(--green-border);margin-left:6px}
-.rhtml .tier-breakdown{background:linear-gradient(135deg,rgba(26,107,60,.06),rgba(26,107,60,.02));border:2px solid var(--green-border);border-radius:12px;padding:16px 18px;margin:10px 0 16px}
+.rhtml .tier-breakdown{background:linear-gradient(135deg,rgba(22,163,74,.06),rgba(22,163,74,.02));border:2px solid var(--green-border);border-radius:12px;padding:16px 18px;margin:10px 0 16px}
 .rhtml .tier-breakdown p{margin-bottom:6px;font-size:14px}
 .rhtml .tier-breakdown p:last-child{margin-bottom:0;font-weight:700;color:var(--green);font-size:15px;border-top:1px solid var(--green-border);padding-top:8px;margin-top:8px}
 .rhtml p{margin-bottom:9px;font-size:14.5px}.rhtml p b{color:var(--text);font-weight:600}
@@ -401,7 +401,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .mb{padding:24px}
 /* Modal hero */
 .mdh{border-radius:14px;overflow:hidden;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,.07)}
-.mdh.ok{background:linear-gradient(160deg,#0f4425,#1a6b3c 90%)}
+.mdh.ok{background:linear-gradient(160deg,#14532d,#16a34a 90%)}
 .mdh.no{background:linear-gradient(160deg,#7a1a14,#c0392b 90%)}
 .mdh.pending{background:linear-gradient(160deg,#7a6000,#b8860b 90%)}
 .mdh-inner{padding:28px 32px 24px;display:flex;align-items:flex-start;gap:24px;flex-wrap:wrap}
@@ -454,7 +454,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .mrhtml table th{background:var(--green-light);color:var(--green-dark);font-weight:700;padding:7px 10px;border:1px solid var(--green-border);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
 .mrhtml table td{padding:7px 10px;border:1px solid var(--border);font-size:12px;word-wrap:break-word;vertical-align:top}
 .mrhtml table tr:nth-child(even) td{background:var(--surface)}
-.mrhtml .tier-breakdown{background:linear-gradient(135deg,rgba(26,107,60,.06),rgba(26,107,60,.02));border:2px solid var(--green-border);border-radius:10px;padding:14px 16px;margin:8px 0 14px}
+.mrhtml .tier-breakdown{background:linear-gradient(135deg,rgba(22,163,74,.06),rgba(22,163,74,.02));border:2px solid var(--green-border);border-radius:10px;padding:14px 16px;margin:8px 0 14px}
 .mrhtml .tier-breakdown p{margin-bottom:5px;font-size:13.5px}
 .mrhtml .tier-breakdown p:last-child{margin-bottom:0;font-weight:700;color:var(--green);font-size:14px;border-top:1px solid var(--green-border);padding-top:7px;margin-top:7px}
 .mrhtml p{margin-bottom:8px;font-size:14.5px}.mrhtml p b{color:var(--text);font-weight:600}
@@ -474,7 +474,7 @@ tr:hover td{background:#f5f9f6;cursor:pointer}
 .psteps{margin-top:18px;text-align:left}
 .pst{font-size:12px;color:var(--muted);padding:4px 0;display:flex;align-items:center;gap:8px}
 .dot{width:6px;height:6px;border-radius:50%;background:var(--border2);flex-shrink:0;transition:all .3s}
-.dot.active{background:var(--green);box-shadow:0 0 0 3px rgba(26,107,60,.15)}
+.dot.active{background:var(--green);box-shadow:0 0 0 3px rgba(22,163,74,.15)}
 .dot.done{background:var(--green)}
 .toast{position:fixed;bottom:2rem;right:2rem;background:var(--text);color:white;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;z-index:400;opacity:0;transform:translateY(8px);transition:all .25s;pointer-events:none;box-shadow:var(--shadow-lg)}
 .toast.show{opacity:1;transform:translateY(0)}
@@ -658,12 +658,12 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
       <div class="card-body">
         <div class="dz" id="sdz">
           <input type="file" id="sfi" accept=".pdf" onchange="handleSingle(this)">
-          <div class="dz-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1a6b3c" stroke-width="1.6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+          <div class="dz-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="1.6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
           <div class="dz-title">Drop PDF here or click to browse</div>
           <div class="dz-sub">Bank statements and Plaid asset reports</div>
         </div>
         <div id="sfs" style="display:none;margin-top:14px;padding:11px 16px;background:white;border:1px solid var(--green-border);border-radius:10px;align-items:center;gap:10px">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a6b3c" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           <span id="sfn" style="font-size:13px;font-weight:600;flex:1"></span>
           <span id="sfz" style="font-size:11px;color:var(--muted)"></span>
           <button onclick="clearSingle()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;padding:3px">✕</button>
@@ -713,7 +713,7 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
       <div class="card-hdr"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="card-hdr-title">Upload Multiple PDFs</span><span class="card-hdr-sub">Hold Ctrl to select multiple · Max 10</span></div>
       <div class="card-body">
         <div class="dz" id="bdz"><input type="file" id="bfi" accept=".pdf" multiple onchange="handleBatch(this)">
-          <div class="dz-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1a6b3c" stroke-width="1.6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+          <div class="dz-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="1.6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
           <div class="dz-title">Drop up to 10 PDFs here or click to browse</div>
           <div class="dz-sub">Hold Ctrl to select multiple files at once</div>
         </div>
@@ -2169,7 +2169,7 @@ function handleBatch(input){bFiles=Array.from(input.files).slice(0,10);renderQue
 function renderQueue(){
   const q=document.getElementById('bqueue'),btn=document.getElementById('babtn'),clr=document.getElementById('bclrbtn');
   if(!bFiles.length){q.innerHTML='';btn.style.display='none';clr.style.display='none';return;}
-  q.innerHTML=bFiles.map((f,i)=>`<div class="bqi" id="bqi${i}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1a6b3c" stroke-width="2" style="flex-shrink:0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="bqn">${f.name}</span><span class="bqs" id="bqs${i}">${fmtSz(f.size)}</span></div>`).join('');
+  q.innerHTML=bFiles.map((f,i)=>`<div class="bqi" id="bqi${i}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" style="flex-shrink:0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="bqn">${f.name}</span><span class="bqs" id="bqs${i}">${fmtSz(f.size)}</span></div>`).join('');
   btn.style.display='block';clr.style.display='block';
   document.getElementById('bresults').innerHTML='';
   document.getElementById('bprogwrap').style.display='none';
@@ -2247,7 +2247,7 @@ function srcBadge(src) {
 }
 
 function scoreBg(score) {
-  if (score >= 70) return 'rgba(26,107,60,.08)';
+  if (score >= 70) return 'rgba(22,163,74,.08)';
   if (score >= 50) return 'rgba(201,168,76,.1)';
   if (score >= 30) return 'rgba(217,119,6,.08)';
   return 'rgba(192,57,43,.07)';
@@ -2270,7 +2270,7 @@ function drawStatDonuts(tot,pend,appr,decl){
   const rev=appr+decl;
   drawStatDonut('sc-tot-c',rev/Math.max(tot,1),'#4b7c5e','rgba(0,0,0,.07)');
   drawStatDonut('sc-pen-c',tot>0?pend/tot:0,'#d97706','rgba(217,119,6,.15)');
-  drawStatDonut('sc-app-c',rev>0?appr/rev:0,'#1a6b3c','rgba(26,107,60,.12)');
+  drawStatDonut('sc-app-c',rev>0?appr/rev:0,'#16a34a','rgba(22,163,74,.12)');
   drawStatDonut('sc-dec-c',rev>0?decl/rev:0,'#c0392b','rgba(192,57,43,.1)');
 }
 
@@ -2471,8 +2471,8 @@ function renderDash(){
     const body = group.items.map(a=>{
       const wid='dw'+(a.firebaseId?.replace(/[^a-z0-9]/gi,'')||'');
       const ok=a.status==='Approved';
-      const v2Badge = a.v2Decision ? ` <span title="v2: ${a.v2Decision} $${a.v2TierAmount||0}" style="background:${a.v2Decision==='APPROVE'?'#eef9f1':'#fff4f0'};color:${a.v2Decision==='APPROVE'?'#1a6b3c':'#c0392b'};padding:1px 5px;border-radius:8px;font-size:9px;font-weight:700;margin-left:4px">v2</span>` : '';
-      const autoBadge = a.v2AutoDecide ? ` <span title="High confidence, no review flags — engine would 1-click approve" style="background:#e6f4ea;color:#1a6b3c;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;margin-left:4px">auto ✓</span>` : '';
+      const v2Badge = a.v2Decision ? ` <span title="v2: ${a.v2Decision} $${a.v2TierAmount||0}" style="background:${a.v2Decision==='APPROVE'?'#eef9f1':'#fff4f0'};color:${a.v2Decision==='APPROVE'?'#16a34a':'#c0392b'};padding:1px 5px;border-radius:8px;font-size:9px;font-weight:700;margin-left:4px">v2</span>` : '';
+      const autoBadge = a.v2AutoDecide ? ` <span title="High confidence, no review flags — engine would 1-click approve" style="background:#e6f4ea;color:#16a34a;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;margin-left:4px">auto ✓</span>` : '';
       // Green 💳 badge whenever the customer attached a debit card on
       // the application. Click → opens the app modal on the Debit
       // Card tab so staff can copy the details straight into Vergent.
@@ -2910,13 +2910,13 @@ function renderReviewQueue(data) {
     const samples = (m.samples || []).slice(0,3).map(s => {
       const desc = (s.description || '').replace(/</g,'&lt;');
       return `<div style="font-size:11px;color:#555;padding:2px 0;border-top:1px dashed #eee">
-        <span style="display:inline-block;min-width:54px;color:${s.is_credit?'#1a6b3c':'#c0392b'};font-weight:600">${s.is_credit ? '▲ IN' : '▼ OUT'} $${(s.amount||0).toFixed(2)}</span>
+        <span style="display:inline-block;min-width:54px;color:${s.is_credit?'#16a34a':'#c0392b'};font-weight:600">${s.is_credit ? '▲ IN' : '▼ OUT'} $${(s.amount||0).toFixed(2)}</span>
         <span style="color:#333">${desc}</span>
         <span style="color:#999">&nbsp;·&nbsp;${s.date || ''}</span>
       </div>`;
     }).join('');
     const sugg = m.suggestion_source && m.suggestion_source !== 'none';
-    const suggHint = sugg ? `<div style="font-size:10px;color:#1a6b3c;margin-top:4px">💡 Suggested from ${m.suggestion_source}</div>` : '';
+    const suggHint = sugg ? `<div style="font-size:10px;color:#16a34a;margin-top:4px">💡 Suggested from ${m.suggestion_source}</div>` : '';
     const directionHint = `<div style="font-size:10px;color:#888;margin-top:3px">${m.credit_count||0} incoming · ${m.debit_count||0} outgoing</div>`;
     return `<tr>
       <td style="vertical-align:top;padding:10px 12px">
@@ -3588,8 +3588,8 @@ function pushDocFromTab(fbId, kind, btn) {
       if (ok) {
         const cid = res.body.vergentCustomerId || '?';
         btn.textContent = '✓ Pushed to #' + cid;
-        btn.style.background = '#1a6b3c';
-        btn.style.borderColor = '#1a6b3c';
+        btn.style.background = '#16a34a';
+        btn.style.borderColor = '#16a34a';
         toast('Pushed to Vergent #' + cid, 'ok');
       } else {
         const rb = res.body || {};
@@ -4222,7 +4222,7 @@ async function loadAuditLog() {
     }
     const tbody = rows.map(r => {
       const when = new Date(r.at).toLocaleString();
-      const actionColor = r.action?.startsWith('decision.approve') ? '#1a6b3c' : r.action?.startsWith('decision.decline') || r.action?.startsWith('report.delete') ? '#c0392b' : r.action?.startsWith('user.') ? '#1d4ed8' : '#475';
+      const actionColor = r.action?.startsWith('decision.approve') ? '#16a34a' : r.action?.startsWith('decision.decline') || r.action?.startsWith('report.delete') ? '#c0392b' : r.action?.startsWith('user.') ? '#1d4ed8' : '#475';
       return `<tr>
         <td style="padding:8px 12px;font-size:12px;color:#555;white-space:nowrap">${escHtml(when)}</td>
         <td style="padding:8px 12px;font-weight:600">${escHtml(r.user || '?')}</td>
@@ -4299,7 +4299,7 @@ function _buildDupeBanner(a) {
   if (!hits.length) return '';
   const rows = hits.slice(0, 5).map(h => {
     const when = h.app.createdAt ? new Date(h.app.createdAt).toLocaleDateString() : '(no date)';
-    const statusColor = h.app.status === 'Approved' ? '#1a6b3c' : h.app.status === 'Declined' ? '#c0392b' : '#6b7c72';
+    const statusColor = h.app.status === 'Approved' ? '#16a34a' : h.app.status === 'Declined' ? '#c0392b' : '#6b7c72';
     return `<li style="margin:3px 0">
       <a href="#" onclick="event.preventDefault();openModal('${h.app.firebaseId}')" style="color:#b3261e;text-decoration:underline;font-weight:600">${h.app.name || '(no name)'}</a>
       — matched on ${h.on} ·
@@ -4468,7 +4468,7 @@ function drawProcessingWheel(id, size) {
   ctx.strokeStyle = 'rgba(200,210,205,.4)'; ctx.lineWidth = lw; ctx.stroke();
   // Draw spinning arc (about 1/3 of circle)
   ctx.beginPath(); ctx.arc(cx,cy,r,-Math.PI/2, Math.PI/6);
-  ctx.strokeStyle = '#1a6b3c'; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.stroke();
+  ctx.strokeStyle = '#16a34a'; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.stroke();
   // Draw dots in center
   const fs = size>80?11:8;
   ctx.fillStyle = '#6b9e7e';
@@ -4484,7 +4484,7 @@ function drawWheel(id,score,size,darkBg){
   const trackCol = darkBg ? 'rgba(255,255,255,.2)' : '#e2e8e4';
   ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.strokeStyle=trackCol;ctx.lineWidth=lw;ctx.stroke();
   const col=score>=70?'#4ade80':score>=50?'#fbbf24':score>=30?'#fb923c':'#f87171';
-  const textCol = darkBg ? 'white' : (score>=70?'#1a6b3c':score>=50?'#c9a84c':score>=30?'#d97706':'#c0392b');
+  const textCol = darkBg ? 'white' : (score>=70?'#16a34a':score>=50?'#c9a84c':score>=30?'#d97706':'#c0392b');
   ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+(Math.PI*2*score/100));ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.lineCap='round';ctx.stroke();
   if(size>60){
     const bigFs=size>80?26:16;
@@ -4853,7 +4853,7 @@ function renderPortalPlaid(rows){
     const isPortal = r.source === 'Portal';
     const sourcePill = isPortal
       ? '<span style="display:inline-block;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;margin-left:8px">PORTAL</span>'
-      : '<span style="display:inline-block;background:#e8f5ee;color:#1a6b3c;border:1px solid #88c4a0;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;margin-left:8px">APPLICATION</span>';
+      : '<span style="display:inline-block;background:#e8f5ee;color:#16a34a;border:1px solid #88c4a0;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;margin-left:8px">APPLICATION</span>';
     const onClick = isPortal && r.customerId
       ? `openPortalPlaidDrawer('${_esc(r.customerId)}')`
       : `void 0`;
@@ -5043,7 +5043,7 @@ async function rerunAssetReport(itemId, customerId, institutionName, btn) {
 
   // ── Phase 4: open the new Firebase record in the standard Report modal ──
   const fbId = engineResult.firebase_id;
-  setStatus(`Decision: ${engineResult.decision || '?'} — opening report…`, '#1a6b3c');
+  setStatus(`Decision: ${engineResult.decision || '?'} — opening report…`, '#16a34a');
   if (actions) {
     actions.innerHTML = `
       <a href="/api/portal-plaid/asset-report/${encodeURIComponent(token)}/pdf" download class="actbtn btn-gh" style="font-size:11px;padding:5px 10px;text-decoration:none">⬇ Download PDF</a>
