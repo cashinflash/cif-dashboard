@@ -1802,11 +1802,25 @@ function _vgGetSelected() {
   const stmt = document.getElementById('vg-push-statement');
   const dl = document.getElementById('vg-push-dl');
   const note = document.getElementById('vg-note');
+  const doc_kinds = [];
+  // Server (cif-apply vergent_phase2.handle_push_to_vergent) reads
+  // doc_kinds from the body and defaults to ['bank_statement'] when
+  // missing — sending push_statement/push_dl booleans was being silently
+  // ignored, which is why DL pushes were quietly pushing the statement.
+  if (!stmt || stmt.checked) doc_kinds.push('bank_statement');
+  if (!dl || dl.checked) doc_kinds.push('drivers_license');
   return {
-    push_statement: stmt ? stmt.checked : true,
-    push_dl: dl ? dl.checked : true,
+    doc_kinds,
     note: note ? note.value : ''
   };
+}
+function _vgDocsLabel(kinds) {
+  return kinds.map(k => ({
+    bank_statement: 'Statement',
+    drivers_license: 'DL',
+    pay_stub: 'Pay Stub',
+    ssn_itin: 'SSN',
+  })[k] || k).join(' + ') || 'documents';
 }
 
 function _vgShow(kind, msg) {
@@ -1825,23 +1839,33 @@ function _vgBusy(busy) {
   if (card) card.classList.toggle('busy', !!busy);
 }
 
-async function vergentPush(fbId, createIfMissing) {
+async function _vgRunPush(fbId, body, opts) {
   const card = document.getElementById('vg-card');
   if (!card) return;
-  const sel = _vgGetSelected();
-  const docs = [sel.push_statement && 'Statement', sel.push_dl && 'DL'].filter(Boolean).join(' + ') || 'documents';
+  if (!body.doc_kinds || body.doc_kinds.length === 0) {
+    _vgShow('err', 'Pick at least one document to push.');
+    return;
+  }
   _vgBusy(true);
   card.querySelectorAll('button,input').forEach(b => b.disabled = true);
-  _vgShow('loading', createIfMissing ? `Creating customer + pushing ${docs}…` : `Pushing ${docs} to Vergent…`);
+  _vgShow('loading', opts.loadingMsg);
   try {
     const r = await fetch('/api/push-to-vergent', {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ firebase_id: fbId, create_if_missing: !!createIfMissing, ...sel })
+      body: JSON.stringify(body)
     });
-    const d = await r.json();
-    if (d && d.success) _vgShow('ok', `✓ Pushed to Vergent #${d.customerId || ''} (${docs})`);
-    else _vgShow('err', d && d.error ? d.error : 'Push failed');
+    const d = await r.json().catch(() => ({}));
+    const ok = r.status >= 200 && r.status < 300 && (d.ok || d.success);
+    if (ok) {
+      const cid = d.vergentCustomerId || d.customerId || opts.fallbackId || '?';
+      const docs = _vgDocsLabel(body.doc_kinds);
+      _vgShow('ok', `✓ Pushed to Vergent #${cid} (${docs})`);
+    } else {
+      const msg = d.body || d.detail || d.error || ('HTTP ' + r.status);
+      _vgShow('err', String(msg).slice(0, 200));
+      console.warn('[VERGENT-PUSH] error', { status: r.status, body: d });
+    }
   } catch (e) {
     _vgShow('err', 'Push failed: ' + e.message);
   }
@@ -1849,62 +1873,46 @@ async function vergentPush(fbId, createIfMissing) {
   card.querySelectorAll('button,input').forEach(b => b.disabled = false);
   await loadVergentMatch(fbId);
   await loadReports();
+}
+
+async function vergentPush(fbId, createIfMissing) {
+  const sel = _vgGetSelected();
+  const docs = _vgDocsLabel(sel.doc_kinds);
+  const body = { firebase_id: fbId };
+  if (createIfMissing) body.create_if_missing = true;
+  body.doc_kinds = sel.doc_kinds;
+  if (sel.note) body.note = sel.note;
+  await _vgRunPush(fbId, body, {
+    loadingMsg: createIfMissing ? `Creating customer + pushing ${docs}…` : `Pushing ${docs} to Vergent…`
+  });
 }
 
 async function vergentUseManualId(fbId) {
   const inp = document.getElementById('vg-manual-id');
   const id = inp ? inp.value.trim() : '';
   if (!id) { _vgShow('err', 'Enter a Vergent customer ID first.'); return; }
-  const card = document.getElementById('vg-card');
   const sel = _vgGetSelected();
-  const docs = [sel.push_statement && 'Statement', sel.push_dl && 'DL'].filter(Boolean).join(' + ') || 'documents';
-  _vgBusy(true);
-  card.querySelectorAll('button,input').forEach(b => b.disabled = true);
-  _vgShow('loading', `Pushing ${docs} to Vergent #${id}…`);
-  try {
-    const r = await fetch('/api/push-to-vergent', {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ firebase_id: fbId, vergent_id: id, ...sel })
-    });
-    const d = await r.json();
-    if (d && d.success) _vgShow('ok', `✓ Pushed to Vergent #${id} (${docs})`);
-    else _vgShow('err', d && d.error ? d.error : 'Push failed');
-  } catch (e) {
-    _vgShow('err', 'Push failed: ' + e.message);
-  }
-  _vgBusy(false);
-  card.querySelectorAll('button,input').forEach(b => b.disabled = false);
-  await loadVergentMatch(fbId);
-  await loadReports();
+  const docs = _vgDocsLabel(sel.doc_kinds);
+  const body = { firebase_id: fbId, use_vergent_customer_id: id, doc_kinds: sel.doc_kinds };
+  if (sel.note) body.note = sel.note;
+  await _vgRunPush(fbId, body, {
+    loadingMsg: `Pushing ${docs} to Vergent #${id}…`,
+    fallbackId: id
+  });
 }
 
 async function vergentPushAmbiguous(fbId) {
   const radio = document.querySelector('input[name="vg-pick"]:checked');
   if (!radio) { _vgShow('err', 'Pick a customer first.'); return; }
   const id = radio.value;
-  const card = document.getElementById('vg-card');
   const sel = _vgGetSelected();
-  const docs = [sel.push_statement && 'Statement', sel.push_dl && 'DL'].filter(Boolean).join(' + ') || 'documents';
-  _vgBusy(true);
-  card.querySelectorAll('button,input').forEach(b => b.disabled = true);
-  _vgShow('loading', `Pushing ${docs} to Vergent #${id}…`);
-  try {
-    const r = await fetch('/api/push-to-vergent', {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ firebase_id: fbId, vergent_id: id, ...sel })
-    });
-    const d = await r.json();
-    if (d && d.success) _vgShow('ok', `✓ Pushed to Vergent #${id} (${docs})`);
-    else _vgShow('err', d && d.error ? d.error : 'Push failed');
-  } catch (e) {
-    _vgShow('err', 'Push failed: ' + e.message);
-  }
-  _vgBusy(false);
-  card.querySelectorAll('button,input').forEach(b => b.disabled = false);
-  await loadVergentMatch(fbId);
-  await loadReports();
+  const docs = _vgDocsLabel(sel.doc_kinds);
+  const body = { firebase_id: fbId, use_vergent_customer_id: id, doc_kinds: sel.doc_kinds };
+  if (sel.note) body.note = sel.note;
+  await _vgRunPush(fbId, body, {
+    loadingMsg: `Pushing ${docs} to Vergent #${id}…`,
+    fallbackId: id
+  });
 }
 
 async function vergentRecheck(fbId) {
