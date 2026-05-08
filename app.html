@@ -571,15 +571,25 @@ button,input,select{font-family:inherit}
   .stat-value{font-size:24px}
   .tbl th,.tbl td{padding:10px 8px}
   .tbl th:nth-child(3),.tbl td:nth-child(3),.tbl th:nth-child(7),.tbl td:nth-child(7){display:none}
-  .dv-hero{padding:18px 16px}
+  .dv-hero{padding:16px 14px}
   .dv-hero-name{font-size:18px}
-  .dv-main{padding:16px}
+  /* Detail view on phones — go nearly edge-to-edge so content has
+     more room to breathe. Container padding goes to 6px on each side
+     (was inheriting .main.full's 28px), the detail card drops its
+     border radius + side borders, and dv-main pulls its padding in
+     from 22-24 down to 12-13. */
+  #view-detail .main.full{padding:14px 6px 50px}
+  .detail-card{box-shadow:none;border-radius:0;border-left:none;border-right:none}
+  .dv-main{padding:14px 13px 18px}
+  .dv-rail{padding:14px 13px}
+  .dv-tabs{padding:8px 6px}
   /* Tighter top nav so the bell + user avatar always fit */
   .topnav{padding:0 10px;gap:6px}
-  .topnav-search{width:0;flex:1;min-width:120px;max-width:none}
-  .brand{gap:7px}
-  .brand-img{display:none}        /* keep just the favicon icon on phones */
-  .brand-name{display:block;font-size:14px}
+  .topnav-search{width:0;flex:1;min-width:110px;max-width:none}
+  .brand{gap:6px}
+  .brand-icon{width:26px;height:26px;border-radius:6px}
+  .brand-img{display:block;height:14px;max-width:80px}  /* keep wordmark, just smaller */
+  .brand-name{display:none}
   .sync-chip{display:none}        /* free up nav width on phones */
   /* Detail action bar — wrap into 2 rows on phones, compact buttons */
   .dv-bar{gap:6px;padding:6px 0}
