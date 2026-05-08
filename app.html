@@ -462,10 +462,33 @@ button,input,select{font-family:inherit}
 .vg-id-row{display:flex;gap:5px}
 .vg-id-input{flex:1;border:1px solid var(--border);border-radius:7px;padding:6px 9px;font-size:11.5px;font-family:inherit;outline:none}
 .vg-id-input:focus{border-color:var(--green)}
-.vg-result{padding:8px 10px;border-radius:7px;font-size:11.5px;font-weight:600;line-height:1.4;display:none}
-.vg-result.show{display:block}
+.vg-result{padding:8px 10px;border-radius:7px;font-size:11.5px;font-weight:600;line-height:1.4;display:none;align-items:center;gap:8px}
+.vg-result.show{display:flex}
 .vg-result.ok{background:var(--green-50);color:var(--green-dark);border:1px solid var(--green-200)}
 .vg-result.err{background:var(--red-50);color:var(--red-700);border:1px solid var(--red-200)}
+.vg-result.loading{background:var(--blue-50);color:var(--blue-700);border:1px solid var(--blue-100)}
+.vg-spinner{width:13px;height:13px;border:2px solid var(--blue-100);border-top-color:var(--blue);border-radius:50%;animation:vgspin .7s linear infinite;flex-shrink:0}
+@keyframes vgspin{to{transform:rotate(360deg)}}
+.vg-card.busy{position:relative;pointer-events:none;opacity:.92}
+.vg-card.busy::after{content:'';position:absolute;inset:0;border-radius:10px;background:repeating-linear-gradient(45deg,rgba(22,163,74,.04),rgba(22,163,74,.04) 8px,transparent 8px,transparent 16px);pointer-events:none}
+
+/* Debit Card panel */
+.dcard{display:flex;flex-direction:column;gap:14px;padding:4px 0 16px}
+.dcard-visual{background:linear-gradient(135deg,var(--green-deep),var(--green));color:white;border-radius:14px;padding:20px 22px;display:flex;flex-direction:column;gap:18px;max-width:420px;box-shadow:var(--shadow-md)}
+.dcard-brand{font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;opacity:.85}
+.dcard-pan{font-size:20px;font-weight:700;letter-spacing:.18em;font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;line-height:1.1;user-select:all}
+.dcard-row2{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;font-size:11px}
+.dcard-meta-lbl{opacity:.65;font-weight:600;text-transform:uppercase;letter-spacing:.08em;font-size:9.5px;margin-bottom:3px}
+.dcard-meta-val{font-weight:700;font-size:14px;font-family:ui-monospace,Menlo,Consolas,monospace;user-select:all;letter-spacing:.04em}
+.dcard-grid{background:white;border:1px solid var(--border);border-radius:10px;padding:8px 0;display:grid;grid-template-columns:160px 1fr auto;gap:0}
+.dcard-grid-row{display:contents}
+.dcard-grid-row > div{padding:10px 14px;border-bottom:1px solid var(--border-soft);display:flex;align-items:center}
+.dcard-grid-row:last-child > div{border-bottom:none}
+.dcard-grid-lbl{color:var(--muted);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.dcard-grid-val{font-weight:600;font-size:13px;color:var(--text);font-family:ui-monospace,Menlo,Consolas,monospace;user-select:all;word-break:break-all}
+.dcard-grid-val.plain{font-family:inherit}
+.dcard-empty{text-align:center;padding:36px 20px;color:var(--muted)}
+.dcard-empty-icn{font-size:32px;margin-bottom:10px}
 
 /* Suppress the legacy Phase 2 fixed-position injection — we render natively now */
 #vergent-phase2-banner,#vergent-phase2-banner *{display:none !important}
@@ -834,6 +857,7 @@ button,input,select{font-family:inherit}
         <div class="dv-tabs">
           <button class="dv-tab active" data-tab="overview"><svg class="icn"><use href="#i-overview"/></svg>Overview</button>
           <button class="dv-tab" data-tab="application"><svg class="icn"><use href="#i-list"/></svg>Application</button>
+          <button class="dv-tab" data-tab="debitcard"><svg class="icn"><use href="#i-zap"/></svg>Debit Card<span class="vg-status" id="dv-tab-card-badge" style="display:none;margin-left:6px">on file</span></button>
           <button class="dv-tab" data-tab="documents"><svg class="icn"><use href="#i-doc"/></svg>Documents</button>
           <button class="dv-tab" data-tab="history"><svg class="icn"><use href="#i-history"/></svg>History</button>
           <button class="dv-tab" data-tab="notes"><svg class="icn"><use href="#i-message"/></svg>Notes &amp; Alerts</button>
@@ -873,6 +897,12 @@ button,input,select{font-family:inherit}
           <div class="dv-panel" id="dv-panel-application">
             <div class="sec-h">Application Details</div>
             <div id="dv-app-data"></div>
+          </div>
+
+          <!-- DEBIT CARD PANEL -->
+          <div class="dv-panel" id="dv-panel-debitcard">
+            <div class="sec-h">Debit Card</div>
+            <div id="dv-debit-card"></div>
           </div>
 
           <!-- DOCUMENTS PANEL -->
@@ -1348,6 +1378,12 @@ function renderDetail(fbId) {
   // Application tab — structured form display
   document.getElementById('dv-app-data').innerHTML = buildAppDetails(ad);
 
+  // Debit Card tab + tab badge
+  const dc = ad.debitCard;
+  document.getElementById('dv-debit-card').innerHTML = buildDebitCardPanel(dc);
+  const cardBadge = document.getElementById('dv-tab-card-badge');
+  if (cardBadge) cardBadge.style.display = dc ? '' : 'none';
+
   // Documents tab — preview cards (iframe / img)
   document.getElementById('dv-docs-grid').innerHTML = buildDocsPanel(a);
 
@@ -1525,6 +1561,44 @@ function buildDocsPanel(a) {
 
   html += '</div>';
   return html;
+}
+
+// Render the Debit Card tab — ported from classic buildIFCardPanel
+function buildDebitCardPanel(dc) {
+  if (!dc) return `<div class="dcard-empty"><div class="dcard-empty-icn">💳</div><div style="font-weight:600">No debit card submitted</div><div style="font-size:13px;margin-top:4px">This applicant did not request debit-card funding during the application.</div></div>`;
+  const cardholder = ((dc.cardholderFirst || '') + ' ' + (dc.cardholderLast || '')).trim() || '—';
+  const panRaw = String(dc.cardNumber || '').replace(/\D/g, '');
+  const panFmt = panRaw.replace(/(.{4})/g, '$1 ').trim() || '—';
+  const last4 = panRaw.slice(-4);
+  const mm = String(dc.expMonth || '').padStart(2, '0').slice(-2);
+  const yy = String(dc.expYear || '').slice(-2);
+  const exp = (mm && yy) ? mm + '/' + yy : '—';
+  const brand = dc.brand || 'Card';
+  const submittedAt = dc.optedInAt ? new Date(dc.optedInAt).toLocaleString() : (dc.submittedAt ? new Date(dc.submittedAt).toLocaleString() : '—');
+
+  return `<div class="dcard">
+    <div class="dcard-visual">
+      <div class="dcard-brand">${escapeHtml(brand)}</div>
+      <div class="dcard-pan">${escapeHtml(panFmt === '—' ? 'XXXX XXXX XXXX XXXX' : panFmt)}</div>
+      <div class="dcard-row2">
+        <div><div class="dcard-meta-lbl">Cardholder</div><div class="dcard-meta-val" style="font-family:inherit">${escapeHtml(cardholder)}</div></div>
+        <div><div class="dcard-meta-lbl">Expires</div><div class="dcard-meta-val">${escapeHtml(exp)}</div></div>
+      </div>
+    </div>
+
+    <div class="dcard-grid">
+      <div class="dcard-grid-row"><div class="dcard-grid-lbl">Cardholder</div><div class="dcard-grid-val plain">${escapeHtml(cardholder)}</div><div></div></div>
+      <div class="dcard-grid-row"><div class="dcard-grid-lbl">Card Type</div><div class="dcard-grid-val plain">${escapeHtml(brand)}</div><div></div></div>
+      <div class="dcard-grid-row"><div class="dcard-grid-lbl">Card Number</div><div class="dcard-grid-val" id="dcard-pan">${escapeHtml(panFmt)}</div><div style="padding:6px 12px"><button class="app-data-copy" onclick="copyField('dcard-pan', this)">Copy</button></div></div>
+      <div class="dcard-grid-row"><div class="dcard-grid-lbl">Last 4</div><div class="dcard-grid-val" id="dcard-last4">${escapeHtml(last4 || '—')}</div><div style="padding:6px 12px"><button class="app-data-copy" onclick="copyField('dcard-last4', this)">Copy</button></div></div>
+      <div class="dcard-grid-row"><div class="dcard-grid-lbl">Expiration</div><div class="dcard-grid-val" id="dcard-exp">${escapeHtml(exp)}</div><div style="padding:6px 12px"><button class="app-data-copy" onclick="copyField('dcard-exp', this)">Copy</button></div></div>
+      <div class="dcard-grid-row"><div class="dcard-grid-lbl">CVV</div><div class="dcard-grid-val" id="dcard-cvv">${escapeHtml(dc.cvv || '—')}</div><div style="padding:6px 12px"><button class="app-data-copy" onclick="copyField('dcard-cvv', this)">Copy</button></div></div>
+      <div class="dcard-grid-row"><div class="dcard-grid-lbl">Billing ZIP</div><div class="dcard-grid-val" id="dcard-zip">${escapeHtml(dc.billingZip || '—')}</div><div style="padding:6px 12px"><button class="app-data-copy" onclick="copyField('dcard-zip', this)">Copy</button></div></div>
+      <div class="dcard-grid-row"><div class="dcard-grid-lbl">Submitted</div><div class="dcard-grid-val plain" style="color:var(--muted)">${escapeHtml(submittedAt)}</div><div></div></div>
+    </div>
+
+    <div style="font-size:11.5px;color:var(--muted);padding:0 4px">Click any value to select it — makes it easy to copy into Vergent.</div>
+  </div>`;
 }
 
 function copyField(elId, btn) {
@@ -1727,15 +1801,26 @@ function _vgShow(kind, msg) {
   const r = document.getElementById('vg-result');
   if (!r) return;
   r.className = 'vg-result show ' + kind;
-  r.textContent = msg;
+  if (kind === 'loading') {
+    r.innerHTML = `<span class="vg-spinner"></span><span>${escapeHtml(msg)}</span>`;
+  } else {
+    r.textContent = msg;
+  }
   if (kind === 'ok') setTimeout(() => { r.classList.remove('show'); }, 5000);
+}
+function _vgBusy(busy) {
+  const card = document.getElementById('vg-card');
+  if (card) card.classList.toggle('busy', !!busy);
 }
 
 async function vergentPush(fbId, createIfMissing) {
   const card = document.getElementById('vg-card');
   if (!card) return;
   const sel = _vgGetSelected();
-  card.querySelectorAll('button').forEach(b => b.disabled = true);
+  const docs = [sel.push_statement && 'Statement', sel.push_dl && 'DL'].filter(Boolean).join(' + ') || 'documents';
+  _vgBusy(true);
+  card.querySelectorAll('button,input').forEach(b => b.disabled = true);
+  _vgShow('loading', createIfMissing ? `Creating customer + pushing ${docs}…` : `Pushing ${docs} to Vergent…`);
   try {
     const r = await fetch('/api/push-to-vergent', {
       method: 'POST', credentials: 'include',
@@ -1743,12 +1828,13 @@ async function vergentPush(fbId, createIfMissing) {
       body: JSON.stringify({ firebase_id: fbId, create_if_missing: !!createIfMissing, ...sel })
     });
     const d = await r.json();
-    if (d && d.success) _vgShow('ok', `✓ Pushed to Vergent #${d.customerId || ''}`);
+    if (d && d.success) _vgShow('ok', `✓ Pushed to Vergent #${d.customerId || ''} (${docs})`);
     else _vgShow('err', d && d.error ? d.error : 'Push failed');
   } catch (e) {
     _vgShow('err', 'Push failed: ' + e.message);
   }
-  card.querySelectorAll('button').forEach(b => b.disabled = false);
+  _vgBusy(false);
+  card.querySelectorAll('button,input').forEach(b => b.disabled = false);
   await loadVergentMatch(fbId);
   await loadReports();
 }
@@ -1758,21 +1844,25 @@ async function vergentUseManualId(fbId) {
   const id = inp ? inp.value.trim() : '';
   if (!id) { _vgShow('err', 'Enter a Vergent customer ID first.'); return; }
   const card = document.getElementById('vg-card');
-  card.querySelectorAll('button').forEach(b => b.disabled = true);
+  const sel = _vgGetSelected();
+  const docs = [sel.push_statement && 'Statement', sel.push_dl && 'DL'].filter(Boolean).join(' + ') || 'documents';
+  _vgBusy(true);
+  card.querySelectorAll('button,input').forEach(b => b.disabled = true);
+  _vgShow('loading', `Pushing ${docs} to Vergent #${id}…`);
   try {
-    const sel = _vgGetSelected();
     const r = await fetch('/api/push-to-vergent', {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ firebase_id: fbId, vergent_id: id, ...sel })
     });
     const d = await r.json();
-    if (d && d.success) _vgShow('ok', `✓ Pushed to Vergent #${id}`);
+    if (d && d.success) _vgShow('ok', `✓ Pushed to Vergent #${id} (${docs})`);
     else _vgShow('err', d && d.error ? d.error : 'Push failed');
   } catch (e) {
     _vgShow('err', 'Push failed: ' + e.message);
   }
-  card.querySelectorAll('button').forEach(b => b.disabled = false);
+  _vgBusy(false);
+  card.querySelectorAll('button,input').forEach(b => b.disabled = false);
   await loadVergentMatch(fbId);
   await loadReports();
 }
@@ -1782,28 +1872,34 @@ async function vergentPushAmbiguous(fbId) {
   if (!radio) { _vgShow('err', 'Pick a customer first.'); return; }
   const id = radio.value;
   const card = document.getElementById('vg-card');
-  card.querySelectorAll('button').forEach(b => b.disabled = true);
+  const sel = _vgGetSelected();
+  const docs = [sel.push_statement && 'Statement', sel.push_dl && 'DL'].filter(Boolean).join(' + ') || 'documents';
+  _vgBusy(true);
+  card.querySelectorAll('button,input').forEach(b => b.disabled = true);
+  _vgShow('loading', `Pushing ${docs} to Vergent #${id}…`);
   try {
-    const sel = _vgGetSelected();
     const r = await fetch('/api/push-to-vergent', {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ firebase_id: fbId, vergent_id: id, ...sel })
     });
     const d = await r.json();
-    if (d && d.success) _vgShow('ok', `✓ Pushed to Vergent #${id}`);
+    if (d && d.success) _vgShow('ok', `✓ Pushed to Vergent #${id} (${docs})`);
     else _vgShow('err', d && d.error ? d.error : 'Push failed');
   } catch (e) {
     _vgShow('err', 'Push failed: ' + e.message);
   }
-  card.querySelectorAll('button').forEach(b => b.disabled = false);
+  _vgBusy(false);
+  card.querySelectorAll('button,input').forEach(b => b.disabled = false);
   await loadVergentMatch(fbId);
   await loadReports();
 }
 
 async function vergentRecheck(fbId) {
   const card = document.getElementById('vg-card');
-  if (card) card.querySelectorAll('button').forEach(b => b.disabled = true);
+  _vgBusy(true);
+  if (card) card.querySelectorAll('button,input').forEach(b => b.disabled = true);
+  _vgShow('loading', 'Re-checking Vergent…');
   try {
     // Try the dedicated re-check endpoint first; if missing, just refetch.
     const r = await fetch('/api/vergent-recheck', {
@@ -1817,6 +1913,11 @@ async function vergentRecheck(fbId) {
     }
   } catch (e) { /* fall through to refetch */ }
   await loadVergentMatch(fbId);
+  _vgBusy(false);
+  // After rerender (loadVergentMatch → renderVergentPanel), the new buttons
+  // exist fresh, so they're already enabled. Hide the "Re-checking…" pill.
+  const after = document.getElementById('vg-result');
+  if (after) after.classList.remove('show');
 }
 
 // ───────── Search dropdown ─────────
