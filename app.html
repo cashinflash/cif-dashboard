@@ -1375,17 +1375,22 @@ function renderDetail(fbId) {
     reportEl.className = 'dv-report-html dv-report-empty';
   }
 
-  // Application tab — structured form display
-  document.getElementById('dv-app-data').innerHTML = buildAppDetails(ad);
-
-  // Debit Card tab + tab badge
+  // Static panels — Application / Debit Card / Documents.
+  // These only re-render when the operator opens a NEW applicant.
+  // Re-setting innerHTML on the docs grid destroys and recreates the
+  // <iframe> children, which makes the Plaid asset report reload every
+  // 8s as renderDetail fires from the loadReports poll. We render them
+  // once per applicant; the rest of the detail view (recommendation,
+  // snapshot, checks, history, notes) keeps refreshing.
+  const isNewApplicant = fbId !== _lastDetailFbId;
   const dc = ad.debitCard;
-  document.getElementById('dv-debit-card').innerHTML = buildDebitCardPanel(dc);
+  if (isNewApplicant) {
+    document.getElementById('dv-app-data').innerHTML = buildAppDetails(ad);
+    document.getElementById('dv-debit-card').innerHTML = buildDebitCardPanel(dc);
+    document.getElementById('dv-docs-grid').innerHTML = buildDocsPanel(a);
+  }
   const cardBadge = document.getElementById('dv-tab-card-badge');
   if (cardBadge) cardBadge.style.display = dc ? '' : 'none';
-
-  // Documents tab — preview cards (iframe / img)
-  document.getElementById('dv-docs-grid').innerHTML = buildDocsPanel(a);
 
   // History tab — current activity + previous applications from same customer
   const histEl = document.getElementById('dv-history');
@@ -1644,21 +1649,28 @@ function pushDocFromTab(fbId, kind, btn) {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ firebase_id: fbId, kinds: [kind], create_if_missing: true })
-  }).then(r => r.json()).then(d => {
-    if (d && d.success) {
-      btn.innerHTML = '✓ Pushed';
-      toast(`${kind} pushed to Vergent #${d.customerId || ''}`, 'ok');
-    } else {
+    body: JSON.stringify({ firebase_id: fbId, doc_kinds: [kind], create_if_missing: true })
+  }).then(r => r.json().then(d => ({ status: r.status, body: d || {} })))
+    .then(res => {
+      const ok = res.status >= 200 && res.status < 300 && (res.body.ok || res.body.success);
+      if (ok) {
+        const cid = res.body.vergentCustomerId || res.body.customerId || '?';
+        btn.innerHTML = '✓ Pushed';
+        toast(`${kind.replace(/_/g, ' ')} pushed to Vergent #${cid}`, 'ok');
+      } else {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        const rb = res.body || {};
+        const msg = rb.body || rb.detail || rb.error || ('HTTP ' + res.status);
+        toast('Vergent push failed: ' + String(msg).slice(0, 200), 'err');
+        console.warn('[VERGENT-DOCS-PUSH] error', { status: res.status, body: rb });
+      }
+    })
+    .catch(e => {
       btn.disabled = false;
       btn.innerHTML = orig;
-      toast(d && d.error ? d.error : 'Push failed', 'err');
-    }
-  }).catch(e => {
-    btn.disabled = false;
-    btn.innerHTML = orig;
-    toast('Push failed: ' + e.message, 'err');
-  });
+      toast('Push failed: ' + e.message, 'err');
+    });
 }
 
 function parseAmount(v) {
