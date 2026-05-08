@@ -358,25 +358,39 @@ button,input,select{font-family:inherit}
 .dv-panel{display:none}
 .dv-panel.active{display:block}
 
-/* Engine report HTML rendering */
-.dv-report-html{font-size:14px;line-height:1.75;color:var(--text2);max-height:none}
-.dv-report-html h1{font-size:18px;font-weight:800;color:var(--green-dark);margin:0 0 16px;padding-bottom:12px;border-bottom:2px solid var(--green-200);letter-spacing:-.015em}
-.dv-report-html h2{font-size:13px;font-weight:700;color:var(--green);margin:20px 0 11px;text-transform:uppercase;letter-spacing:.07em;display:flex;align-items:center;gap:8px}
+/* Engine report HTML rendering — wrapped in a card with inner
+   padding so the report's wide tables and full-width banners don't
+   touch the panel edge. */
+.dv-report-html{
+  font-size:14px;line-height:1.75;color:var(--text2);max-height:none;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;padding:24px 26px 22px;
+  box-shadow:var(--shadow-xs);
+}
+.dv-report-html > *:first-child{margin-top:0}
+.dv-report-html > *:last-child{margin-bottom:0}
+.dv-report-html h1{font-size:19px;font-weight:800;color:var(--green-dark);margin:0 0 18px;padding-bottom:14px;border-bottom:2px solid var(--green-200);letter-spacing:-.015em}
+.dv-report-html h2{font-size:12.5px;font-weight:700;color:var(--green);margin:22px 0 12px;text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:8px}
 .dv-report-html h2::after{content:'';flex:1;height:1px;background:var(--green-200);margin-left:6px}
-.dv-report-html h3{font-size:13px;font-weight:700;color:var(--text);margin:14px 0 8px}
+.dv-report-html h3{font-size:13.5px;font-weight:700;color:var(--text);margin:16px 0 8px}
 .dv-report-html p{margin-bottom:10px}
 .dv-report-html p b,.dv-report-html p strong{color:var(--text);font-weight:700}
 .dv-report-html ul,.dv-report-html ol{margin:8px 0 12px 22px}
 .dv-report-html ul li,.dv-report-html ol li{margin-bottom:6px}
-.dv-report-html hr{border:none;border-top:1px solid var(--border);margin:18px 0}
-.dv-report-html table{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:13px}
-.dv-report-html table th{background:var(--green-50);color:var(--green-dark);font-weight:700;padding:9px 12px;border:1px solid var(--green-200);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;text-align:left}
-.dv-report-html table td{padding:9px 12px;border:1px solid var(--border);background:white;vertical-align:top}
+.dv-report-html hr{border:none;border-top:1px solid var(--border);margin:20px 0}
+.dv-report-html table{width:100%;border-collapse:collapse;margin:12px 0 18px;font-size:13px;border-radius:8px;overflow:hidden;box-shadow:var(--shadow-xs)}
+.dv-report-html table th{background:var(--green-50);color:var(--green-dark);font-weight:700;padding:10px 13px;border:1px solid var(--green-200);font-size:11px;text-transform:uppercase;letter-spacing:.05em;text-align:left}
+.dv-report-html table td{padding:10px 13px;border:1px solid var(--border);background:white;vertical-align:top}
 .dv-report-html table tr:nth-child(even) td{background:var(--surface2)}
-.dv-report-html .tier-breakdown{background:linear-gradient(135deg,rgba(22,163,74,.06),rgba(22,163,74,.02));border:1.5px solid var(--green-200);border-radius:10px;padding:14px 16px;margin:10px 0 16px}
+.dv-report-html .tier-breakdown{background:linear-gradient(135deg,rgba(22,163,74,.06),rgba(22,163,74,.02));border:1.5px solid var(--green-200);border-radius:12px;padding:16px 18px;margin:12px 0 18px}
 .dv-report-html .tier-breakdown p{margin-bottom:5px;font-size:13px}
 .dv-report-html .tier-breakdown p:last-child{margin-bottom:0;font-weight:700;color:var(--green);border-top:1px solid var(--green-200);padding-top:7px;margin-top:7px}
-.dv-report-empty{padding:30px 20px;text-align:center;color:var(--muted);font-size:13px}
+/* Engine emits inline-styled "REVIEW REQUIRED" + warning banners.
+   Pad them so they don't touch the card edge and round their
+   corners to match. */
+.dv-report-html div[style*="background"]{border-radius:10px;margin-bottom:12px}
+.dv-report-html .underwriting-decision,.dv-report-html .uw-decision{padding:18px 22px;border-radius:12px;margin-bottom:18px}
+.dv-report-empty{padding:30px 20px;text-align:center;color:var(--muted);font-size:13px;background:var(--surface2);border:1px dashed var(--border);border-radius:12px}
 
 /* Documents grid */
 .docs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
@@ -857,7 +871,7 @@ button,input,select{font-family:inherit}
         <div class="dv-tabs">
           <button class="dv-tab active" data-tab="overview"><svg class="icn"><use href="#i-overview"/></svg>Overview</button>
           <button class="dv-tab" data-tab="application"><svg class="icn"><use href="#i-list"/></svg>Application</button>
-          <button class="dv-tab" data-tab="debitcard"><svg class="icn"><use href="#i-zap"/></svg>Debit Card<span class="vg-status" id="dv-tab-card-badge" style="display:none;margin-left:6px">on file</span></button>
+          <button class="dv-tab" data-tab="debitcard"><svg class="icn"><use href="#i-zap"/></svg>Debit Card</button>
           <button class="dv-tab" data-tab="documents"><svg class="icn"><use href="#i-doc"/></svg>Documents</button>
           <button class="dv-tab" data-tab="history"><svg class="icn"><use href="#i-history"/></svg>History</button>
           <button class="dv-tab" data-tab="notes"><svg class="icn"><use href="#i-message"/></svg>Notes &amp; Alerts</button>
@@ -1389,8 +1403,6 @@ function renderDetail(fbId) {
     document.getElementById('dv-debit-card').innerHTML = buildDebitCardPanel(dc);
     document.getElementById('dv-docs-grid').innerHTML = buildDocsPanel(a);
   }
-  const cardBadge = document.getElementById('dv-tab-card-badge');
-  if (cardBadge) cardBadge.style.display = dc ? '' : 'none';
 
   // History tab — current activity + previous applications from same customer
   const histEl = document.getElementById('dv-history');
@@ -1594,7 +1606,7 @@ function buildDebitCardPanel(dc) {
     <div class="dcard-grid">
       <div class="dcard-grid-row"><div class="dcard-grid-lbl">Cardholder</div><div class="dcard-grid-val plain">${escapeHtml(cardholder)}</div><div></div></div>
       <div class="dcard-grid-row"><div class="dcard-grid-lbl">Card Type</div><div class="dcard-grid-val plain">${escapeHtml(brand)}</div><div></div></div>
-      <div class="dcard-grid-row"><div class="dcard-grid-lbl">Card Number</div><div class="dcard-grid-val" id="dcard-pan">${escapeHtml(panFmt)}</div><div style="padding:6px 12px"><button class="app-data-copy" onclick="copyField('dcard-pan', this)">Copy</button></div></div>
+      <div class="dcard-grid-row"><div class="dcard-grid-lbl">Card Number</div><div class="dcard-grid-val" id="dcard-pan">${escapeHtml(panRaw || '—')}</div><div style="padding:6px 12px"><button class="app-data-copy" onclick="copyField('dcard-pan', this)">Copy</button></div></div>
       <div class="dcard-grid-row"><div class="dcard-grid-lbl">Last 4</div><div class="dcard-grid-val" id="dcard-last4">${escapeHtml(last4 || '—')}</div><div style="padding:6px 12px"><button class="app-data-copy" onclick="copyField('dcard-last4', this)">Copy</button></div></div>
       <div class="dcard-grid-row"><div class="dcard-grid-lbl">Expiration</div><div class="dcard-grid-val" id="dcard-exp">${escapeHtml(exp)}</div><div style="padding:6px 12px"><button class="app-data-copy" onclick="copyField('dcard-exp', this)">Copy</button></div></div>
       <div class="dcard-grid-row"><div class="dcard-grid-lbl">CVV</div><div class="dcard-grid-val" id="dcard-cvv">${escapeHtml(dc.cvv || '—')}</div><div style="padding:6px 12px"><button class="app-data-copy" onclick="copyField('dcard-cvv', this)">Copy</button></div></div>
@@ -1719,6 +1731,18 @@ async function loadVergentMatch(fbId) {
   if (document.body.dataset.firebaseId === fbId) renderVergentPanel(fbId);
 }
 
+function _vgWireDynamicLabel() {
+  // Re-attach listeners after every render — checkboxes and note input
+  // get re-created when the panel re-renders for a different state.
+  ['vg-push-statement', 'vg-push-dl'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', _vgUpdateButtonLabel);
+  });
+  const note = document.getElementById('vg-note');
+  if (note) note.addEventListener('input', _vgUpdateButtonLabel);
+  _vgUpdateButtonLabel();
+}
+
 function renderVergentPanel(fbId) {
   const card = document.getElementById('vg-card');
   const statusPill = document.getElementById('vg-status');
@@ -1750,7 +1774,7 @@ function renderVergentPanel(fbId) {
       <div class="vg-meta">Vergent #${escapeHtml(String(m.customerId || ''))}${m.dob ? ' · DOB ' + escapeHtml(m.dob) : ''}${m.phone ? ' · ' + escapeHtml(m.phone) : ''}</div>
       ${checkboxes}
       <div class="vg-actions">
-        <button class="vg-btn vg-btn-primary" onclick="vergentPush('${fbId}', false)">↗ Push selected</button>
+        <button class="vg-btn vg-btn-primary" data-vg-primary onclick="vergentPush('${fbId}', false)">↗ Push selected</button>
         <button class="vg-btn vg-btn-ghost" onclick="vergentRecheck('${fbId}')">↻ Re-check</button>
       </div>
       <div class="vg-result" id="vg-result"></div>`;
@@ -1796,6 +1820,7 @@ function renderVergentPanel(fbId) {
       <div class="vg-actions"><button class="vg-btn vg-btn-ghost" onclick="vergentRecheck('${fbId}')">↻ Re-check now</button></div>
       <div class="vg-result" id="vg-result"></div>`;
   }
+  _vgWireDynamicLabel();
 }
 
 function _vgGetSelected() {
@@ -1842,8 +1867,16 @@ function _vgBusy(busy) {
 async function _vgRunPush(fbId, body, opts) {
   const card = document.getElementById('vg-card');
   if (!card) return;
-  if (!body.doc_kinds || body.doc_kinds.length === 0) {
-    _vgShow('err', 'Pick at least one document to push.');
+  const docKinds = body.doc_kinds || [];
+  const note = (body.note || '').trim();
+  // Note-only push: no documents checked, but a note is filled in.
+  // Hit /api/vergent-add-note instead — much faster, doesn't require
+  // an existing customer-create flow.
+  if (docKinds.length === 0 && note) {
+    return _vgRunNoteOnly(fbId, note);
+  }
+  if (docKinds.length === 0) {
+    _vgShow('err', 'Pick at least one document, or write a note.');
     return;
   }
   _vgBusy(true);
@@ -1859,7 +1892,7 @@ async function _vgRunPush(fbId, body, opts) {
     const ok = r.status >= 200 && r.status < 300 && (d.ok || d.success);
     if (ok) {
       const cid = d.vergentCustomerId || d.customerId || opts.fallbackId || '?';
-      const docs = _vgDocsLabel(body.doc_kinds);
+      const docs = _vgDocsLabel(docKinds);
       _vgShow('ok', `✓ Pushed to Vergent #${cid} (${docs})`);
     } else {
       const msg = d.body || d.detail || d.error || ('HTTP ' + r.status);
@@ -1873,6 +1906,58 @@ async function _vgRunPush(fbId, body, opts) {
   card.querySelectorAll('button,input').forEach(b => b.disabled = false);
   await loadVergentMatch(fbId);
   await loadReports();
+}
+
+async function _vgRunNoteOnly(fbId, text) {
+  const card = document.getElementById('vg-card');
+  if (!card) return;
+  _vgBusy(true);
+  card.querySelectorAll('button,input').forEach(b => b.disabled = true);
+  _vgShow('loading', 'Posting note to Vergent…');
+  try {
+    const r = await fetch('/api/vergent-add-note', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firebase_id: fbId, text })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.ok) {
+      _vgShow('ok', `✓ Note posted to Vergent #${d.vergentCustomerId || '?'}`);
+      const noteEl = document.getElementById('vg-note');
+      if (noteEl) noteEl.value = '';
+    } else if (d.error === 'no_vergent_customer_id') {
+      _vgShow('err', 'No Vergent customer yet — Create + Push first.');
+    } else {
+      const msg = d.detail || d.error || ('HTTP ' + r.status);
+      _vgShow('err', String(msg).slice(0, 200));
+    }
+  } catch (e) {
+    _vgShow('err', 'Note failed: ' + e.message);
+  }
+  _vgBusy(false);
+  card.querySelectorAll('button,input').forEach(b => b.disabled = false);
+}
+
+// Live-rename the primary action button as the operator toggles
+// checkboxes / fills in the note. "Push selected" when documents are
+// chosen; "Push note" when only a note is filled; "Push selected" by
+// default.
+function _vgUpdateButtonLabel() {
+  const card = document.getElementById('vg-card');
+  if (!card) return;
+  const stmt = document.getElementById('vg-push-statement');
+  const dl = document.getElementById('vg-push-dl');
+  const note = document.getElementById('vg-note');
+  const anyChecked = (stmt && stmt.checked) || (dl && dl.checked);
+  const hasNote = note && (note.value || '').trim().length > 0;
+  // Update the primary push button (found state) — uses
+  // [data-vg-primary] so we don't conflict with create / use-id /
+  // re-check.
+  card.querySelectorAll('[data-vg-primary]').forEach(btn => {
+    if (anyChecked) btn.innerHTML = '↗ Push selected';
+    else if (hasNote) btn.innerHTML = '✎ Push note';
+    else btn.innerHTML = '↗ Push';
+  });
 }
 
 async function vergentPush(fbId, createIfMissing) {
