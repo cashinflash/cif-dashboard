@@ -2103,7 +2103,10 @@ function renderProfilePanel(fbId) {
       } else {
         subEl.textContent = 'Loading loan history…';
       }
-      if (linkEl) linkEl.style.display = '';
+      if (linkEl && m.customerId) {
+        linkEl.href = `https://shared.lms.vergentlms.com/customer/general?action=view&id=${encodeURIComponent(m.customerId)}`;
+        linkEl.style.display = '';
+      }
     } else if (s === 'not_found' || s === 'new') {
       statusEl.className = 'profile-status new';
       labelEl.textContent = 'New Customer';
