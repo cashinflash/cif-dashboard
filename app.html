@@ -423,6 +423,53 @@ button,input,select{font-family:inherit}
 .hist-text b{color:var(--text);font-weight:700}
 .hist-time{font-size:11.5px;color:var(--muted);font-weight:500}
 
+/* Profile panel */
+.profile-status{display:flex;align-items:center;gap:14px;padding:16px 18px;border:1px solid var(--border);border-radius:14px;background:linear-gradient(135deg,var(--green-50),white);margin-bottom:18px}
+.profile-status.found{border-color:var(--green-200);background:linear-gradient(135deg,var(--green-50),#fff)}
+.profile-status.new{border-color:var(--amber-200);background:linear-gradient(135deg,var(--amber-50),#fff)}
+.profile-status.amb{border-color:var(--blue-100);background:linear-gradient(135deg,var(--blue-50),#fff)}
+.profile-status.err{border-color:var(--red-200);background:linear-gradient(135deg,var(--red-50),#fff)}
+.profile-status.pending{border-color:var(--border);background:var(--surface2)}
+.profile-status-icn{width:42px;height:42px;border-radius:10px;background:var(--green);color:white;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800}
+.profile-status.found .profile-status-icn{background:var(--green)}
+.profile-status.new .profile-status-icn{background:var(--amber)}
+.profile-status.amb .profile-status-icn{background:var(--blue)}
+.profile-status.err .profile-status-icn{background:var(--red)}
+.profile-status.pending .profile-status-icn{background:var(--muted2)}
+.profile-status-icn .icn{width:20px;height:20px}
+.profile-status-text{flex:1;min-width:0}
+.profile-status-label{font-size:15px;font-weight:800;color:var(--text);letter-spacing:-.01em;line-height:1.2}
+.profile-status-sub{font-size:12.5px;color:var(--muted);margin-top:3px;font-weight:500}
+.profile-status .btn{flex-shrink:0}
+.profile-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px}
+@media(max-width:880px){.profile-cards{grid-template-columns:1fr}}
+.profile-card{background:white;border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-xs)}
+.profile-card-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
+.profile-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border-soft);font-size:13px}
+.profile-row:last-child{border-bottom:none}
+.profile-row-lbl{color:var(--muted);font-weight:500;font-size:12.5px;flex-shrink:0}
+.profile-row-val{font-weight:600;color:var(--text);text-align:right;word-break:break-word;max-width:60%}
+
+/* Vergent loan history table */
+.profile-loans-loading,.profile-loans-empty{padding:20px 18px;color:var(--muted);font-size:13px;text-align:center;background:var(--surface2);border:1px dashed var(--border);border-radius:12px}
+.loan-table{width:100%;border-collapse:collapse;background:white;border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-xs)}
+.loan-table th{text-align:left;padding:11px 14px;font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);background:var(--surface2)}
+.loan-table td{padding:11px 14px;font-size:13px;border-bottom:1px solid var(--border-soft);color:var(--text2);vertical-align:middle}
+.loan-table tr:last-child td{border-bottom:none}
+.loan-table .num{font-variant-numeric:tabular-nums;font-weight:700;color:var(--text)}
+.loan-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:.04em;padding:3px 9px;border-radius:999px;text-transform:uppercase}
+.loan-status.paid{background:var(--green-50);color:var(--green-dark);border:1px solid var(--green-200)}
+.loan-status.active{background:var(--blue-50);color:var(--blue-700);border:1px solid var(--blue-100)}
+.loan-status.late{background:var(--red-50);color:var(--red-700);border:1px solid var(--red-200)}
+.loan-status.charge{background:var(--red-50);color:var(--red-700);border:1px solid var(--red-200)}
+.loan-status.other{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.loan-late-pos{color:var(--red);font-weight:700}
+.loan-late-zero{color:var(--muted);font-weight:500}
+@media(max-width:600px){
+  .loan-table th:nth-child(2),.loan-table td:nth-child(2){display:none}
+  .loan-table th,.loan-table td{padding:9px 10px;font-size:12px}
+}
+
 /* Application data display */
 .app-data{padding:4px 0 16px}
 .app-data-section{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:18px 0 4px;padding-top:10px;border-top:1px solid var(--border)}
@@ -969,18 +1016,53 @@ button,input,select{font-family:inherit}
 
       <div class="dv-body">
         <div class="dv-tabs">
-          <button class="dv-tab active" data-tab="overview"><svg class="icn"><use href="#i-overview"/></svg>Overview</button>
+          <button class="dv-tab active" data-tab="profile"><svg class="icn"><use href="#i-overview"/></svg>Profile</button>
+          <button class="dv-tab" data-tab="report"><svg class="icn"><use href="#i-doc"/></svg>Report</button>
           <button class="dv-tab" data-tab="application"><svg class="icn"><use href="#i-list"/></svg>Application</button>
           <button class="dv-tab" data-tab="debitcard"><svg class="icn"><use href="#i-zap"/></svg>Debit Card</button>
-          <button class="dv-tab" data-tab="documents"><svg class="icn"><use href="#i-doc"/></svg>Documents</button>
+          <button class="dv-tab" data-tab="documents"><svg class="icn"><use href="#i-folder"/></svg>Documents</button>
           <button class="dv-tab" data-tab="history"><svg class="icn"><use href="#i-history"/></svg>History</button>
           <button class="dv-tab" data-tab="notes"><svg class="icn"><use href="#i-message"/></svg>Notes &amp; Alerts</button>
         </div>
 
         <div class="dv-main">
 
-          <!-- OVERVIEW PANEL -->
-          <div class="dv-panel active" id="dv-panel-overview">
+          <!-- PROFILE PANEL — customer-level admin view -->
+          <div class="dv-panel active" id="dv-panel-profile">
+            <!-- Customer status hero -->
+            <div class="profile-status" id="profile-status">
+              <div class="profile-status-icn"><svg class="icn"><use href="#i-overview"/></svg></div>
+              <div class="profile-status-text">
+                <div class="profile-status-label" id="profile-status-label">Checking Vergent…</div>
+                <div class="profile-status-sub" id="profile-status-sub">Loading customer profile</div>
+              </div>
+              <a class="btn btn-ghost" id="profile-vergent-link" href="#" target="_blank" rel="noopener" style="display:none"><svg class="icn"><use href="#i-external"/></svg>Open in Vergent</a>
+            </div>
+
+            <!-- Contact + Identity cards -->
+            <div class="sec-h">Customer Information</div>
+            <div class="profile-cards">
+              <div class="profile-card">
+                <div class="profile-card-title">Contact</div>
+                <div id="profile-contact"></div>
+              </div>
+              <div class="profile-card">
+                <div class="profile-card-title">Identity</div>
+                <div id="profile-identity"></div>
+              </div>
+            </div>
+
+            <!-- Vergent loan history -->
+            <div class="sec-h">Vergent Loan History <span style="font-size:11px;color:var(--muted);font-weight:600;text-transform:none;letter-spacing:0;margin-left:8px" id="profile-loan-count"></span></div>
+            <div id="profile-loans"><div class="profile-loans-loading">Loading loan history…</div></div>
+
+            <!-- Application history -->
+            <div class="sec-h">Application History</div>
+            <div id="profile-app-history"></div>
+          </div>
+
+          <!-- REPORT PANEL — engine recommendation, snapshot, full analysis -->
+          <div class="dv-panel" id="dv-panel-report">
             <div class="dv-recommended" id="dv-recommended">
               <div>
                 <div class="dv-rec-label">Recommended Decision</div>
@@ -1076,6 +1158,7 @@ let _currentRole = 'user';
 let pollTimer = null;
 let _lastDetailFbId = null;
 let _vergentMatchCache = {};
+let _vergentLoansCache = {};   // fbId -> {loans, count, fetchedAt, error}
 let _kpiRange = 'today';
 
 // ───────── Helpers ─────────
@@ -1719,10 +1802,16 @@ function renderDetail(fbId) {
   renderVergentPanel(fbId);
   if (fbId !== _lastDetailFbId) loadVergentMatch(fbId);
 
-  // Reset to overview tab only when opening a NEW applicant
+  // Profile panel — render customer info, app history; loans fetched async
+  renderProfilePanel(fbId);
+
+  // Reset to Profile tab only when opening a NEW applicant
   if (fbId !== _lastDetailFbId) {
-    switchDetailTab('overview');
+    switchDetailTab('profile');
     _lastDetailFbId = fbId;
+    // Kick off loan-history fetch in the background — only when we
+    // know there's an existing Vergent customer to query.
+    loadVergentLoans(fbId);
   }
 }
 
@@ -1985,6 +2074,209 @@ function customerHistory(fbId) {
     .sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
 }
 
+// ───────── Profile panel ─────────
+function renderProfilePanel(fbId) {
+  const a = apps.find(x => x.firebaseId === fbId);
+  if (!a) return;
+  const ad = a.applicationData || {};
+  const m = _vergentMatchCache[fbId];
+
+  // Status hero — shape mirrors the right-rail Vergent card states.
+  const statusEl = document.getElementById('profile-status');
+  const labelEl = document.getElementById('profile-status-label');
+  const subEl = document.getElementById('profile-status-sub');
+  const linkEl = document.getElementById('profile-vergent-link');
+  if (linkEl) linkEl.style.display = 'none';
+
+  if (!m) {
+    statusEl.className = 'profile-status pending';
+    labelEl.textContent = 'Checking Vergent…';
+    subEl.textContent = 'Loading customer profile';
+  } else {
+    const s = (m.status || '').toLowerCase();
+    if (s === 'found') {
+      statusEl.className = 'profile-status found';
+      labelEl.textContent = 'Existing Customer · Vergent #' + (m.customerId || '?');
+      const cache = _vergentLoansCache[fbId];
+      if (cache && cache.count != null) {
+        subEl.textContent = `${cache.count} prior loan${cache.count === 1 ? '' : 's'} on file`;
+      } else {
+        subEl.textContent = 'Loading loan history…';
+      }
+      if (linkEl) linkEl.style.display = '';
+    } else if (s === 'not_found' || s === 'new') {
+      statusEl.className = 'profile-status new';
+      labelEl.textContent = 'New Customer';
+      subEl.textContent = 'No prior Vergent record — Create + Push when ready';
+    } else if (s === 'ambiguous') {
+      statusEl.className = 'profile-status amb';
+      labelEl.textContent = (m.matches || []).length + ' possible matches in Vergent';
+      subEl.textContent = 'Pick the right customer in the Vergent panel';
+    } else if (s === 'error') {
+      statusEl.className = 'profile-status err';
+      labelEl.textContent = 'Vergent search failed';
+      subEl.textContent = m.error || m.errorBody || 'Use Re-check to try again';
+    } else {
+      statusEl.className = 'profile-status pending';
+      labelEl.textContent = 'Vergent Pending';
+      subEl.textContent = 'Search hasn\'t completed yet';
+    }
+  }
+
+  // Contact + Identity cards
+  function row(label, value) {
+    if (value == null || value === '' || value === '—') return '';
+    return `<div class="profile-row"><span class="profile-row-lbl">${escapeHtml(label)}</span><span class="profile-row-val">${escapeHtml(value)}</span></div>`;
+  }
+  const contact = document.getElementById('profile-contact');
+  const cName = ((ad.firstName || a.name || '') + ' ' + (ad.lastName || '')).trim() || a.name || '—';
+  const cAddr = [ad.address, ad.address2, ad.city, ad.state, ad.zip].filter(Boolean).join(', ');
+  contact.innerHTML = (
+    row('Name', cName) +
+    row('Email', ad.email || a.email) +
+    row('Phone', ad.phone || a.phone) +
+    row('Address', cAddr || '')
+  ) || '<div style="font-size:12.5px;color:var(--muted);padding:6px 0">No contact info captured.</div>';
+
+  const identity = document.getElementById('profile-identity');
+  const ssnFmt = ad.ssn ? String(ad.ssn).replace(/(\d{3})(\d{2})(\d{4})/, 'XXX-XX-$3') : '';
+  identity.innerHTML = (
+    row('Date of Birth', ad.dob) +
+    row('SSN', ssnFmt) +
+    row('DL Number', ad.dlNumber) +
+    row('DL Expires', ad.dlExpiration) +
+    row('State', ad.state) +
+    row('Bank Account', (ad.bankName || '') + (ad.accountNumber ? ' ····' + String(ad.accountNumber).slice(-4) : ''))
+  ) || '<div style="font-size:12.5px;color:var(--muted);padding:6px 0">No identity info captured.</div>';
+
+  // Render loan history (uses cache populated by loadVergentLoans)
+  renderProfileLoans(fbId);
+
+  // Application history (other submissions from same customer, deduped
+  // by customerKey)
+  const histEl = document.getElementById('profile-app-history');
+  const ownAndPrior = apps.filter(x => customerKey(x) === customerKey(a))
+    .sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
+  if (ownAndPrior.length <= 1) {
+    histEl.innerHTML = '<div class="profile-loans-empty">No prior applications from this customer.</div>';
+  } else {
+    histEl.innerHTML = '<div class="docs-grid" style="grid-template-columns:1fr">' +
+      ownAndPrior.map(p => {
+        const pb = bucketStatus(p);
+        const pAmt = parseAmount(p.amount);
+        const isCurrent = p.firebaseId === fbId;
+        const meta = `${escapeHtml(p.date || '')} ${escapeHtml(p.time || '')}${p.score != null ? ' · score ' + p.score : ''}${pAmt ? ' · $' + pAmt.toLocaleString() : ''}`;
+        return `<a class="doc-card" data-fb="${escapeHtml(p.firebaseId)}" style="cursor:${isCurrent ? 'default' : 'pointer'};${isCurrent ? 'border-color:var(--green-200);background:var(--green-50)' : ''}">
+          <div class="doc-card-icn"><svg class="icn"><use href="#i-history"/></svg></div>
+          <div class="doc-card-text"><div class="doc-card-name">${escapeHtml(p.name || 'Unnamed')} · <span class="status ${pb}" style="font-size:10px">${escapeHtml(p.status || 'Pending')}</span>${isCurrent ? ' <span style="font-size:10px;color:var(--green-dark);font-weight:700">· VIEWING</span>' : ''}</div><div class="doc-card-meta">${meta}</div></div>
+          ${isCurrent ? '' : '<div class="doc-card-arrow"><svg class="icn"><use href="#i-arrow-right"/></svg></div>'}
+        </a>`;
+      }).join('') + '</div>';
+  }
+}
+
+function renderProfileLoans(fbId) {
+  const wrap = document.getElementById('profile-loans');
+  const countEl = document.getElementById('profile-loan-count');
+  const cache = _vergentLoansCache[fbId];
+  const m = _vergentMatchCache[fbId];
+  const isExistingCustomer = m && (m.status || '').toLowerCase() === 'found';
+  if (!isExistingCustomer) {
+    wrap.innerHTML = '<div class="profile-loans-empty">No Vergent customer yet — loan history shows once they\'re pushed.</div>';
+    countEl.textContent = '';
+    return;
+  }
+  if (!cache) {
+    wrap.innerHTML = '<div class="profile-loans-loading">Loading loan history from Vergent…</div>';
+    countEl.textContent = '';
+    return;
+  }
+  if (cache.error) {
+    wrap.innerHTML = `<div class="profile-loans-empty">Vergent loan history unavailable. <span style="color:var(--muted)">(${escapeHtml(cache.error)})</span></div>`;
+    countEl.textContent = '';
+    return;
+  }
+  const loans = cache.loans || [];
+  if (loans.length === 0) {
+    wrap.innerHTML = '<div class="profile-loans-empty">No loans on file.</div>';
+    countEl.textContent = '0 loans';
+    return;
+  }
+  countEl.textContent = `${loans.length} loan${loans.length === 1 ? '' : 's'}`;
+  wrap.innerHTML = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table class="loan-table">
+    <thead><tr><th>Date</th><th>Loan #</th><th>Amount</th><th>Balance</th><th>Status</th><th>Days Late</th></tr></thead>
+    <tbody>${loans.map(l => {
+      const date = fmtLoanDate(l.date);
+      const num = l.loan_number || (l.loan_id ? '#' + l.loan_id : '—');
+      const amt = l.amount != null ? '$' + Number(l.amount).toLocaleString(undefined, {maximumFractionDigits: 0}) : '—';
+      const bal = l.balance != null ? '$' + Number(l.balance).toLocaleString(undefined, {maximumFractionDigits: 0}) : '—';
+      const stCls = loanStatusClass(l.status, l.days_late, l.balance);
+      const stTxt = (l.status || '—').toUpperCase();
+      const dl = Number(l.days_late || 0);
+      const dlCls = dl > 0 ? 'loan-late-pos' : 'loan-late-zero';
+      return `<tr>
+        <td>${escapeHtml(date)}</td>
+        <td class="num">${escapeHtml(num)}</td>
+        <td class="num">${escapeHtml(amt)}</td>
+        <td class="num">${escapeHtml(bal)}</td>
+        <td><span class="loan-status ${stCls}">${escapeHtml(stTxt)}</span></td>
+        <td class="${dlCls}">${dl}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+}
+
+function fmtLoanDate(s) {
+  if (!s) return '—';
+  try {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return String(s);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch (e) {
+    return String(s);
+  }
+}
+
+function loanStatusClass(status, daysLate, balance) {
+  const s = (status || '').toLowerCase();
+  if (s.includes('paid') || (Number(balance) <= 0 && Number(daysLate) <= 0)) return 'paid';
+  if (s.includes('charge') || s.includes('default')) return 'charge';
+  if (Number(daysLate) > 0 || s.includes('late') || s.includes('past due') || s.includes('delinq')) return 'late';
+  if (s.includes('active') || s.includes('current') || s.includes('open')) return 'active';
+  return 'other';
+}
+
+async function loadVergentLoans(fbId) {
+  const m = _vergentMatchCache[fbId];
+  if (!m || (m.status || '').toLowerCase() !== 'found') {
+    _vergentLoansCache[fbId] = null;  // not applicable
+    renderProfileLoans(fbId);
+    return;
+  }
+  // Don't refetch within 60s of a fresh load.
+  const cached = _vergentLoansCache[fbId];
+  if (cached && cached.fetchedAt && (Date.now() - cached.fetchedAt) < 60000) return;
+  try {
+    const r = await fetch('/api/vergent-loans', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firebase_id: fbId })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.ok) {
+      _vergentLoansCache[fbId] = { loans: d.loans || [], count: d.count || 0, fetchedAt: Date.now(), error: null };
+    } else {
+      const msg = d.detail || d.error || ('HTTP ' + r.status);
+      _vergentLoansCache[fbId] = { loans: [], count: 0, fetchedAt: Date.now(), error: msg };
+    }
+  } catch (e) {
+    _vergentLoansCache[fbId] = { loans: [], count: 0, fetchedAt: Date.now(), error: e.message };
+  }
+  if (document.body.dataset.firebaseId === fbId) {
+    renderProfilePanel(fbId);  // re-render the status sub-line ("3 prior loans")
+  }
+}
+
 // ───────── Vergent panel ─────────
 async function loadVergentMatch(fbId) {
   try {
@@ -1993,7 +2285,15 @@ async function loadVergentMatch(fbId) {
   } catch (e) {
     _vergentMatchCache[fbId] = null;
   }
-  if (document.body.dataset.firebaseId === fbId) renderVergentPanel(fbId);
+  if (document.body.dataset.firebaseId === fbId) {
+    renderVergentPanel(fbId);
+    renderProfilePanel(fbId);
+    // If the match just resolved to "found", kick off loan history fetch.
+    const m = _vergentMatchCache[fbId];
+    if (m && (m.status || '').toLowerCase() === 'found') {
+      loadVergentLoans(fbId);
+    }
+  }
 }
 
 function _vgWireDynamicLabel() {
