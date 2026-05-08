@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
 <title>Cash in Flash — Underwriting</title>
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,8 +26,8 @@
   --radius:12px;--topnav-h:60px;--rail-w:212px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
-body{background:var(--bg);font-family:var(--sans);color:var(--text);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+html,body{height:100%;overflow-x:hidden;max-width:100vw;-webkit-text-size-adjust:100%;touch-action:pan-y}
+body{background:var(--bg);font-family:var(--sans);color:var(--text);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
 button,input,select{font-family:inherit}
 
 /* TOP NAV — green gradient header */
@@ -562,6 +562,8 @@ button,input,select{font-family:inherit}
   .perf{grid-template-columns:repeat(2,1fr)}
   .dash-row-2{grid-template-columns:1fr}
   .tbl th:nth-child(4),.tbl td:nth-child(4),.tbl th:nth-child(8),.tbl td:nth-child(8){display:none}
+  .brand-img{height:20px;max-width:120px}
+  .brand-icon{width:30px;height:30px;border-radius:7px}
 }
 @media(max-width:600px){
   .stats{grid-template-columns:repeat(2,1fr);gap:10px}
@@ -572,6 +574,52 @@ button,input,select{font-family:inherit}
   .dv-hero{padding:18px 16px}
   .dv-hero-name{font-size:18px}
   .dv-main{padding:16px}
+  /* Tighter top nav so the bell + user avatar always fit */
+  .topnav{padding:0 10px;gap:6px}
+  .topnav-search{width:0;flex:1;min-width:120px;max-width:none}
+  .brand{gap:7px}
+  .brand-img{display:none}        /* keep just the favicon icon on phones */
+  .brand-name{display:block;font-size:14px}
+  .sync-chip{display:none}        /* free up nav width on phones */
+  /* Detail action bar — wrap into 2 rows on phones, compact buttons */
+  .dv-bar{gap:6px;padding:6px 0}
+  .dv-bar-actions{gap:4px;flex-wrap:wrap;width:100%;justify-content:flex-end}
+  .dv-bar-actions .btn{padding:7px 10px;font-size:11.5px}
+  .dv-bar-actions .btn .icn{width:13px;height:13px}
+  .dv-bar-sep{display:none}
+  .offer-input-group .ccy{padding:0 8px;font-size:12px}
+  .offer-input{width:60px;font-size:13px;padding:7px 4px}
+  .offer-lbl{padding:0 8px;font-size:10px}
+  .btn-approve{padding:7px 14px;font-size:12px}
+  /* Detail tabs scroll horizontally instead of squeezing */
+  .dv-tabs{flex-direction:row;overflow-x:auto;-webkit-overflow-scrolling:touch;border-right:none;border-bottom:1px solid var(--border);padding:8px 8px;gap:4px;background:var(--surface)}
+  .dv-tabs::-webkit-scrollbar{display:none}
+  .dv-tab{flex-shrink:0;padding:8px 12px;font-size:12px}
+  /* Detail body collapses to single column on phones */
+  .dv-body{display:flex;flex-direction:column}
+  .dv-rail{border-left:none;border-top:1px solid var(--border);padding:14px}
+  /* Wide content stays inside its container — internal scroll only */
+  .dv-report-html{padding:16px 14px;font-size:13px;border-radius:10px}
+  .dv-report-html table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;white-space:nowrap}
+  .dv-report-html h1{font-size:16px}
+  .dv-report-html h2{font-size:11px}
+  /* Performance + snapshot tighten on phones */
+  .perf{grid-template-columns:repeat(2,1fr)}
+  .snap-grid{grid-template-columns:repeat(2,1fr);gap:8px}
+  .snap-cell{padding:12px 13px;min-height:84px}
+  .snap-val{font-size:18px}
+  /* Vergent panel buttons stack on phones */
+  .vg-actions{flex-direction:column}
+  .vg-btn{width:100%}
+  /* Document preview cards shrink iframe height on phones */
+  .doc-preview-iframe{height:300px}
+  .doc-preview-img{max-height:240px}
+  /* Greeting collapses gracefully */
+  .greet-title{font-size:18px}
+  /* Time-range pills stay scrollable inside their pill bar */
+  .time-range{width:100%;-webkit-overflow-scrolling:touch}
+  /* Search dropdown anchored to the search box width on phones */
+  .search-dd{left:0;right:auto;width:calc(100vw - 24px)}
 }
 </style>
 </head>
