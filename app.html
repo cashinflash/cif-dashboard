@@ -383,7 +383,37 @@ button,input,select{font-family:inherit}
 .hist-text b{color:var(--text);font-weight:700}
 .hist-time{font-size:11.5px;color:var(--muted);font-weight:500}
 
-/* Notes editor */
+/* Application data display */
+.app-data{padding:4px 0 16px}
+.app-data-section{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:18px 0 4px;padding-top:10px;border-top:1px solid var(--border)}
+.app-data-section:first-child{margin-top:0;padding-top:0;border-top:none}
+.app-data-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border-soft);gap:12px}
+.app-data-row:last-child{border-bottom:none}
+.app-data-label{font-size:12.5px;color:var(--muted);font-weight:500;min-width:150px;flex-shrink:0}
+.app-data-value{font-size:13px;font-weight:600;color:var(--text);flex:1;text-align:right;word-break:break-word}
+.app-data-copy{flex-shrink:0;background:var(--green-50);border:1px solid var(--green-200);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;color:var(--green-dark);cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .12s}
+.app-data-copy:hover{background:var(--green-100)}
+.app-data-copy.copied{background:var(--green);color:white;border-color:var(--green)}
+.app-data-empty{text-align:center;padding:36px 20px;color:var(--muted)}
+.app-data-empty-icon{font-size:32px;margin-bottom:10px}
+
+/* Document preview cards */
+.doc-preview-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:14px}
+.doc-preview-head{padding:12px 16px;background:var(--green-50);border-bottom:1px solid var(--green-200);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.doc-preview-title{font-size:13px;font-weight:700;color:var(--green-dark);display:inline-flex;align-items:center;gap:8px}
+.doc-preview-actions{display:flex;gap:6px;flex-wrap:wrap}
+.doc-preview-btn{padding:6px 12px;border-radius:7px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;border:1.5px solid transparent;display:inline-flex;align-items:center;gap:5px;text-decoration:none;transition:all .12s;line-height:1}
+.doc-preview-btn-primary{background:var(--green);color:white;border-color:var(--green)}
+.doc-preview-btn-primary:hover{background:var(--green-dark)}
+.doc-preview-btn-ghost{background:white;color:var(--green-dark);border-color:var(--green-200)}
+.doc-preview-btn-ghost:hover{background:var(--green-50)}
+.doc-preview-btn-blue{background:var(--blue);color:white;border-color:var(--blue)}
+.doc-preview-btn-blue:hover{background:var(--blue-700)}
+.doc-preview-frame{padding:14px;text-align:center;background:white}
+.doc-preview-iframe{width:100%;height:400px;border:none;border-radius:8px;background:var(--bg)}
+.doc-preview-img{max-width:100%;max-height:340px;object-fit:contain;border-radius:8px;background:var(--bg)}
+.doc-preview-empty{padding:36px 24px;color:var(--muted);font-size:13.5px;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius)}
+.doc-preview-empty-icn{font-size:30px;margin-bottom:10px}
 .notes-text{font-size:13.5px;line-height:1.6;color:var(--text2);padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;min-height:80px;white-space:pre-wrap;margin-bottom:12px}
 .notes-text.empty{color:var(--muted);font-style:italic}
 .notes-edit{width:100%;min-height:140px;border:1.5px solid var(--border2);border-radius:10px;padding:12px 14px;font-size:13.5px;font-family:inherit;color:var(--text);background:white;resize:vertical;line-height:1.6;outline:none}
@@ -724,8 +754,8 @@ button,input,select{font-family:inherit}
       <div class="dv-body">
         <div class="dv-tabs">
           <button class="dv-tab active" data-tab="overview"><svg class="icn"><use href="#i-overview"/></svg>Overview</button>
+          <button class="dv-tab" data-tab="application"><svg class="icn"><use href="#i-list"/></svg>Application</button>
           <button class="dv-tab" data-tab="documents"><svg class="icn"><use href="#i-doc"/></svg>Documents</button>
-          <button class="dv-tab" data-tab="analysis"><svg class="icn"><use href="#i-chart"/></svg>Analysis</button>
           <button class="dv-tab" data-tab="history"><svg class="icn"><use href="#i-history"/></svg>History</button>
           <button class="dv-tab" data-tab="notes"><svg class="icn"><use href="#i-message"/></svg>Notes &amp; Alerts</button>
         </div>
@@ -755,18 +785,21 @@ button,input,select{font-family:inherit}
 
             <div class="sec-h">Application Snapshot</div>
             <div class="snap-grid" id="dv-snap"></div>
+
+            <div class="sec-h">Engine Analysis</div>
+            <div class="dv-report-html" id="dv-report-html"></div>
+          </div>
+
+          <!-- APPLICATION PANEL -->
+          <div class="dv-panel" id="dv-panel-application">
+            <div class="sec-h">Application Details</div>
+            <div id="dv-app-data"></div>
           </div>
 
           <!-- DOCUMENTS PANEL -->
           <div class="dv-panel" id="dv-panel-documents">
-            <div class="sec-h">Documents on file</div>
-            <div class="docs-grid" id="dv-docs-grid"></div>
-          </div>
-
-          <!-- ANALYSIS PANEL -->
-          <div class="dv-panel" id="dv-panel-analysis">
-            <div class="sec-h">Engine Report</div>
-            <div class="dv-report-html" id="dv-report-html"></div>
+            <div class="sec-h">Documents on File</div>
+            <div id="dv-docs-grid"></div>
           </div>
 
           <!-- HISTORY PANEL -->
@@ -1214,22 +1247,11 @@ function renderDetail(fbId) {
     reportEl.className = 'dv-report-html dv-report-empty';
   }
 
-  // Documents tab — full grid
-  const docsGrid = document.getElementById('dv-docs-grid');
-  const docList = collectDocuments(a);
-  if (docList.length === 0) {
-    docsGrid.innerHTML = '<div class="dv-report-empty">No documents on file for this applicant.</div>';
-  } else {
-    docsGrid.innerHTML = docList.map(d => {
-      const href = d.url ? `href="${escapeHtml(d.url)}" target="_blank" rel="noopener"` : '';
-      const tag = d.url ? 'a' : 'div';
-      return `<${tag} class="doc-card" ${href}>
-        <div class="doc-card-icn"><svg class="icn"><use href="#i-doc"/></svg></div>
-        <div class="doc-card-text"><div class="doc-card-name">${escapeHtml(d.name)}</div><div class="doc-card-meta">${escapeHtml(d.meta)}</div></div>
-        ${d.url ? '<div class="doc-card-arrow"><svg class="icn"><use href="#i-external"/></svg></div>' : ''}
-      </${tag}>`;
-    }).join('');
-  }
+  // Application tab — structured form display
+  document.getElementById('dv-app-data').innerHTML = buildAppDetails(ad);
+
+  // Documents tab — preview cards (iframe / img)
+  document.getElementById('dv-docs-grid').innerHTML = buildDocsPanel(a);
 
   // History tab
   const histEl = document.getElementById('dv-history');
@@ -1264,18 +1286,183 @@ function renderDetail(fbId) {
   switchDetailTab('overview');
 }
 
-function collectDocuments(a) {
-  const docs = [];
+// Build the structured Application tab — ported from classic buildAppDetails
+function buildAppDetails(d) {
+  if (!d) return '<div class="app-data-empty"><div class="app-data-empty-icon">📋</div><div style="font-weight:600">No application data</div><div style="font-size:13px;margin-top:4px">This submission was not made through the online form.</div></div>';
+  const hasData = d.firstName || d.lastName || d.phone || d.email || d.ssn || d.address || d.bankName || d.statementStart;
+  if (!hasData) return '<div class="app-data-empty"><div class="app-data-empty-icon">📋</div><div style="font-weight:600">Application data unavailable</div><div style="font-size:13px;margin-top:4px">This submission may have been processed before form data capture was enabled. Ask the customer to reapply.</div></div>';
+  const uid = Math.random().toString(36).slice(2, 8);
+  function row(label, value, key) {
+    if (value == null || value === '') return '';
+    const eid = 'adv-' + key + '-' + uid;
+    return `<div class="app-data-row"><span class="app-data-label">${escapeHtml(label)}</span><span class="app-data-value" id="${eid}">${escapeHtml(value)}</span><button class="app-data-copy" onclick="copyField('${eid}', this)">Copy</button></div>`;
+  }
+  function sec(title) { return `<div class="app-data-section">${escapeHtml(title)}</div>`; }
+  return `<div class="app-data">
+    ${sec('Personal Information')}
+    ${row('First Name', d.firstName, 'fname')}
+    ${row('Middle Name', d.middleName, 'mname')}
+    ${row('Last Name', d.lastName, 'lname')}
+    ${row('Date of Birth', d.dob, 'dob')}
+    ${row('SSN', d.ssn ? String(d.ssn).replace(/(\d{3})(\d{2})(\d{4})/, '$1-$2-$3') : '', 'ssn')}
+    ${row('Address', d.address, 'addr')}
+    ${row('Address Line 2', d.address2, 'addr2')}
+    ${row('City', d.city, 'city')}
+    ${row('State', d.state, 'state')}
+    ${row('ZIP', d.zip, 'zip')}
+    ${row('Phone', d.phone, 'phone')}
+    ${row('Email', d.email, 'email')}
+    ${sec('Loan Request')}
+    ${row('Loan Amount', d.loanAmount ? '$' + d.loanAmount : '', 'loanamt')}
+    ${sec('Source of Income & Employment')}
+    ${row('Source of Income', d.sourceOfIncome, 'src')}
+    ${row('Employer Name', d.employer, 'employer')}
+    ${row('Pay Frequency', d.payFrequency, 'payfreq')}
+    ${row('Pay Day', d.payDay, 'payday')}
+    ${row('Last Pay Date', d.lastPayDate, 'lastpay')}
+    ${row('Payment Method', d.paymentMethod, 'paymethod')}
+    ${row('Gross Pay Per Check', d.grossPay ? '$' + d.grossPay : '', 'grosspay')}
+    ${sec('Banking Information')}
+    ${row('Account Type', d.accountType, 'accttype')}
+    ${row('Routing Number', d.routingNumber, 'routing')}
+    ${row('Account Number', d.accountNumber, 'acctnum')}
+    ${row('Bank Name', d.bankName, 'bankname')}
+    ${row('Statement Start', d.statementStart, 'ststart')}
+    ${row('Statement End', d.statementEnd, 'stend')}
+    ${row('Beginning Balance', d.beginningBalance != null && d.beginningBalance !== '' ? '$' + Number(d.beginningBalance).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '', 'begbal')}
+    ${row('Ending Balance', d.endingBalance != null && d.endingBalance !== '' ? '$' + Number(d.endingBalance).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '', 'endbal')}
+    ${row('Avg Daily Balance', d.avgDailyBalance != null && d.avgDailyBalance !== '' ? '$' + Number(d.avgDailyBalance).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '', 'avgbal')}
+    ${sec('Financial Information')}
+    ${row('Housing Status', d.housingStatus, 'housing')}
+    ${row('Bankruptcy', d.bankruptcy, 'bk')}
+    ${row('Military Status', d.military, 'mil')}
+    ${sec('Bank Verification')}
+    ${row('Method', d.bankMethod, 'bankmethod')}
+    ${row('Submitted', d.submittedAt ? new Date(d.submittedAt).toLocaleString() : '', 'submitted')}
+    ${row('Language', d.language === 'es' ? 'Spanish' : 'English', 'lang')}
+  </div>`;
+}
+
+// Build the Documents tab with preview cards — ported from classic buildDocsPanel
+function buildDocsPanel(a) {
+  const fbId = a && a.firebaseId ? a.firebaseId : '';
   const ad = a.applicationData || {};
-  if (a.filename) docs.push({ name: a.filename, meta: 'Uploaded document', url: '' });
-  if (ad.bankStatementUrl) docs.push({ name: 'Bank Statement', meta: 'From application', url: ad.bankStatementUrl });
-  if (ad.driverLicenseUrl) docs.push({ name: 'Driver License', meta: 'From application', url: ad.driverLicenseUrl });
-  if (ad.dlUrl && !ad.driverLicenseUrl) docs.push({ name: 'Driver License', meta: 'From application', url: ad.dlUrl });
-  if (ad.idDocumentUrl) docs.push({ name: 'ID Document', meta: 'From application', url: ad.idDocumentUrl });
-  if (ad.paystubUrl) docs.push({ name: 'Pay Stub', meta: 'From application', url: ad.paystubUrl });
-  if (ad.assetReportUrl) docs.push({ name: 'Plaid Asset Report', meta: 'Plaid', url: ad.assetReportUrl });
-  if (a.applicationData) docs.push({ name: 'Application Data', meta: 'JSON record on file', url: '' });
-  return docs;
+  let html = '<div style="display:flex;flex-direction:column;gap:14px">';
+
+  function urlSection(title, url, icon, kind) {
+    if (!url) return '';
+    const lower = String(url).toLowerCase();
+    const isPdf = lower.endsWith('.pdf') || lower.includes('asset_report') || lower.includes('bank_statement') || lower.includes('paystub');
+    const safeTitle = title.replace(/'/g, "\\'");
+    const pushBtn = (fbId && kind) ? `<button class="doc-preview-btn doc-preview-btn-blue" onclick="pushDocFromTab('${fbId}','${kind}',this)"><svg class="icn" style="width:12px;height:12px"><use href="#i-external"/></svg>Push to Vergent</button>` : '';
+    const preview = isPdf
+      ? `<iframe class="doc-preview-iframe" src="${url}" loading="lazy"></iframe>`
+      : `<img class="doc-preview-img" src="${url}" loading="lazy" onerror="this.outerHTML='<div class=&quot;doc-preview-empty&quot;><div class=&quot;doc-preview-empty-icn&quot;>📄</div>Preview unavailable — click View</div>'" />`;
+    return `<div class="doc-preview-card">
+      <div class="doc-preview-head">
+        <div class="doc-preview-title">${icon} ${escapeHtml(title)}</div>
+        <div class="doc-preview-actions">
+          <a class="doc-preview-btn doc-preview-btn-primary" href="${url}" target="_blank" rel="noopener"><svg class="icn" style="width:12px;height:12px"><use href="#i-external"/></svg>View</a>
+          <button class="doc-preview-btn doc-preview-btn-ghost" onclick="downloadDoc('${url}','${safeTitle}')"><svg class="icn" style="width:12px;height:12px"><use href="#i-download"/></svg>Download</button>
+          ${pushBtn}
+        </div>
+      </div>
+      <div class="doc-preview-frame">${preview}</div>
+    </div>`;
+  }
+
+  function b64Section(title, b64, mime, icon) {
+    if (!b64) return '';
+    const dataUrl = 'data:' + mime + ';base64,' + b64;
+    const isImage = mime.startsWith('image/');
+    const preview = isImage
+      ? `<img class="doc-preview-img" src="${dataUrl}" loading="lazy" />`
+      : `<iframe class="doc-preview-iframe" src="${dataUrl}" loading="lazy"></iframe>`;
+    return `<div class="doc-preview-card">
+      <div class="doc-preview-head">
+        <div class="doc-preview-title">${icon} ${escapeHtml(title)}</div>
+        <div class="doc-preview-actions">
+          <a class="doc-preview-btn doc-preview-btn-primary" href="${dataUrl}" target="_blank" rel="noopener"><svg class="icn" style="width:12px;height:12px"><use href="#i-external"/></svg>View</a>
+        </div>
+      </div>
+      <div class="doc-preview-frame">${preview}</div>
+    </div>`;
+  }
+
+  if (a.govIdUrl || a.bankStatementUrl || a.paystubUrl || ad.bankStatementUrl || ad.driverLicenseUrl || ad.dlUrl || ad.idDocumentUrl || ad.paystubUrl || ad.assetReportUrl) {
+    html += urlSection('Government ID', a.govIdUrl || ad.idDocumentUrl || ad.driverLicenseUrl || ad.dlUrl, '🪪', 'drivers_license');
+    html += urlSection('Plaid Asset Report / Bank Statement', a.bankStatementUrl || ad.bankStatementUrl || ad.assetReportUrl, '🏦', 'bank_statement');
+    html += urlSection('Proof of Income / Pay Stubs', a.paystubUrl || ad.paystubUrl, '📑', 'pay_stub');
+  } else if (a.govIdB64 || a.bankStatementB64 || a.paystubB64) {
+    html += b64Section('Government ID', a.govIdB64, 'image/jpeg', '🪪');
+    html += b64Section('Bank Statement', a.bankStatementB64, 'application/pdf', '🏦');
+    html += b64Section('Pay Stubs', a.paystubB64, 'image/jpeg', '📑');
+  } else {
+    html += `<div class="doc-preview-empty"><div class="doc-preview-empty-icn">⏳</div><div style="font-weight:700;color:var(--text2);margin-bottom:5px">No documents on file</div><div>Files may still be uploading. Refresh in a moment if just submitted.</div></div>`;
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function copyField(elId, btn) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const text = el.textContent || '';
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      if (btn) {
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1200);
+      }
+    });
+  } else {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+}
+
+function downloadDoc(url, name) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name || 'document';
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function pushDocFromTab(fbId, kind, btn) {
+  if (!btn) return;
+  btn.disabled = true;
+  const orig = btn.innerHTML;
+  btn.innerHTML = 'Pushing…';
+  fetch('/api/push-to-vergent', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ firebase_id: fbId, kinds: [kind], create_if_missing: true })
+  }).then(r => r.json()).then(d => {
+    if (d && d.success) {
+      btn.innerHTML = '✓ Pushed';
+      toast(`${kind} pushed to Vergent #${d.customerId || ''}`, 'ok');
+    } else {
+      btn.disabled = false;
+      btn.innerHTML = orig;
+      toast(d && d.error ? d.error : 'Push failed', 'err');
+    }
+  }).catch(e => {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+    toast('Push failed: ' + e.message, 'err');
+  });
 }
 
 function parseAmount(v) {
@@ -1480,6 +1667,22 @@ document.getElementById('sign-out').addEventListener('click', async () => {
 window.addEventListener('hashchange', () => {
   const [route, fbId] = readRouteFromHash();
   setRoute(route, fbId);
+});
+
+// Keyboard shortcuts: Esc back to queue, J/K nav between applicants when in detail
+document.addEventListener('keydown', (e) => {
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return;
+  const detailActive = document.getElementById('view-detail').classList.contains('active');
+  if (e.key === 'Escape' && detailActive) { setRoute('queue'); return; }
+  if (detailActive && (e.key === 'j' || e.key === 'k' || e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+    const list = filteredApps();
+    const fbId = document.body.dataset.firebaseId;
+    const idx = list.findIndex(a => a.firebaseId === fbId);
+    if (idx === -1 || list.length === 0) return;
+    const dir = (e.key === 'j' || e.key === 'ArrowDown') ? 1 : -1;
+    const next = list[(idx + dir + list.length) % list.length];
+    if (next) { e.preventDefault(); setRoute('detail', next.firebaseId); }
+  }
 });
 
 init();
