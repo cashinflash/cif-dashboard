@@ -2210,7 +2210,7 @@ function renderProfileLoans(fbId) {
       const num = l.loan_number || (l.loan_id ? '#' + l.loan_id : '—');
       const amt = l.amount != null ? '$' + Number(l.amount).toLocaleString(undefined, {maximumFractionDigits: 0}) : '—';
       const bal = l.balance != null ? '$' + Number(l.balance).toLocaleString(undefined, {maximumFractionDigits: 0}) : '—';
-      const stCls = loanStatusClass(l.status, l.days_late, l.balance);
+      const stCls = loanStatusClass(l.status, l.days_late, l.balance, l.is_outstanding);
       const stTxt = (l.status || '—').toUpperCase();
       const dl = Number(l.days_late || 0);
       const dlCls = dl > 0 ? 'loan-late-pos' : 'loan-late-zero';
@@ -2237,12 +2237,22 @@ function fmtLoanDate(s) {
   }
 }
 
-function loanStatusClass(status, daysLate, balance) {
+function loanStatusClass(status, daysLate, balance, isOutstanding) {
   const s = (status || '').toLowerCase();
-  if (s.includes('paid') || (Number(balance) <= 0 && Number(daysLate) <= 0)) return 'paid';
+  // is_outstanding from Vergent is authoritative when present.
+  if (isOutstanding === false) {
+    // Closed loan — green for paid/bought back, gray for anything else.
+    if (s.includes('paid') || s.includes('bought') || s.includes('closed')
+        || s.includes('settled')) return 'paid';
+    return 'other';
+  }
+  if (Number(daysLate) > 0 || s.includes('late') || s.includes('past due')
+      || s.includes('delinq')) return 'late';
   if (s.includes('charge') || s.includes('default')) return 'charge';
-  if (Number(daysLate) > 0 || s.includes('late') || s.includes('past due') || s.includes('delinq')) return 'late';
-  if (s.includes('active') || s.includes('current') || s.includes('open')) return 'active';
+  if (s.includes('paid') || s.includes('bought') || s.includes('closed')
+      || (Number(balance) <= 0 && Number(daysLate) <= 0)) return 'paid';
+  if (s.includes('active') || s.includes('current') || s.includes('open')
+      || s.includes('outstanding') || isOutstanding === true) return 'active';
   return 'other';
 }
 
