@@ -309,13 +309,28 @@ button,input,select{font-family:inherit}
 
 .sec-h{font-size:11.5px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.07em;margin:18px 0 10px;display:flex;align-items:center;gap:10px}
 .sec-h::after{content:'';flex:1;height:1px;background:var(--border)}
-.snap-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.snap-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:6px}
+@media(max-width:1200px){.snap-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:880px){.snap-grid{grid-template-columns:repeat(2,1fr)}}
-.snap-cell{background:var(--surface);padding:14px 16px}
-.snap-lbl{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
-.snap-val{font-size:20px;font-weight:800;letter-spacing:-.02em;color:var(--text);line-height:1.1;font-variant-numeric:tabular-nums}
-.snap-val.ok{color:var(--green-dark)}.snap-val.no{color:var(--red)}
-.snap-sub{font-size:11px;color:var(--muted);margin-top:3px}
+@media(max-width:520px){.snap-grid{grid-template-columns:1fr}}
+.snap-cell{background:var(--surface);padding:14px 16px;border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;gap:4px;transition:all .15s;position:relative;min-height:96px}
+.snap-cell:hover{border-color:var(--border2);box-shadow:var(--shadow-sm)}
+.snap-lbl{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;line-height:1.3}
+.snap-val{font-size:22px;font-weight:800;letter-spacing:-.025em;color:var(--text);line-height:1.1;font-variant-numeric:tabular-nums;margin-top:2px}
+.snap-val.green{color:var(--green)}
+.snap-val.red{color:var(--red)}
+.snap-val.amber{color:var(--amber-700)}
+.snap-val.muted{color:var(--muted)}
+.snap-val.lg{font-size:22px}
+.snap-val.md{font-size:17px}
+.snap-val.sm{font-size:15px}
+.snap-val .unit{font-size:14px;font-weight:700;color:var(--muted);margin-left:2px}
+.snap-val .acc-num{font-variant-numeric:tabular-nums;letter-spacing:.04em}
+.snap-sub{font-size:11px;color:var(--muted);margin-top:auto;font-weight:500;line-height:1.3}
+.snap-verified{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-top:5px}
+.snap-verified .icn{width:12px;height:12px;stroke-width:2.5}
+.snap-verified.warn{color:var(--amber-700)}
+.snap-verified.warn .icn{stroke:var(--amber-700)}
 
 .dv-rail{background:var(--surface2);border-left:1px solid var(--border);padding:18px 16px}
 .dv-rail-section{margin-bottom:18px}
@@ -731,8 +746,8 @@ button,input,select{font-family:inherit}
     <div class="dv-bar">
       <button class="dv-back" data-route="queue"><svg class="icn"><use href="#i-arrow-left"/></svg>Back to Queue</button>
       <div class="dv-bar-actions">
-        <button class="btn btn-ghost" id="dv-rerun-btn"><svg class="icn"><use href="#i-refresh"/></svg>Re-run</button>
-        <button class="btn btn-ghost" id="dv-refresh-plaid-btn"><svg class="icn"><use href="#i-refresh"/></svg>Refresh from Plaid</button>
+        <button class="btn btn-ghost" id="dv-rerun-btn" title="Re-run the engine using stored data — no new Plaid pull"><svg class="icn"><use href="#i-refresh"/></svg>Re-Run Report</button>
+        <button class="btn btn-ghost" id="dv-refresh-plaid-btn" title="Pull a fresh Plaid asset report and re-run"><svg class="icn"><use href="#i-refresh"/></svg>Refresh from Plaid</button>
       </div>
     </div>
     <div class="detail-card">
@@ -1203,18 +1218,39 @@ function renderDetail(fbId) {
     alertEl.style.display = 'none';
   }
 
-  // Snapshot grid
+  // Financial Snapshot — real engine fields (mirrors classic msummary)
   const snap = document.getElementById('dv-snap');
   const ad = a.applicationData || {};
-  const items = [
-    { label: 'Requested', value: fmtMoney(a.amount), sub: '' },
-    { label: 'Score', value: a.score != null ? a.score : '—', sub: 'engine' },
-    { label: 'v2 Decision', value: a.v2Decision || '—', sub: a.v2TierAmount ? '$' + a.v2TierAmount : '' },
-    { label: 'Source', value: a.source || '—', sub: '' },
-    { label: 'Email', value: ad.email || a.email || '—', sub: '' },
-    { label: 'Phone', value: ad.phone || a.phone || '—', sub: '' },
+  const monthlyIncome = Number(a.monthlyIncome || 0);
+  const monthlyExpenses = Number(a.monthlyExpenses || 0);
+  const fcf = Number(a.fcf || 0);
+  const dti = monthlyIncome > 0 ? Math.round((monthlyExpenses / monthlyIncome) * 100) : null;
+  const conf = (typeof a.v2Confidence === 'number') ? a.v2Confidence : null;
+  const last4 = ad.accountNumber ? String(ad.accountNumber).slice(-4) : '';
+  const bankDisplay = ad.bankName ? (ad.bankName + (last4 ? ' ····' + last4 : '')) : (last4 ? '····' + last4 : '—');
+  const fcfClass = fcf >= 0 ? 'green' : 'red';
+  const dtiClass = dti == null ? 'muted' : (dti > 50 ? 'red' : (dti > 40 ? 'amber' : ''));
+  const confClass = conf == null ? 'muted' : (conf >= 0.80 ? 'green' : (conf >= 0.60 ? 'amber' : 'red'));
+  const offer = (typeof a.v2TierAmount === 'number') ? a.v2TierAmount : null;
+  const offerClass = (offer != null && offer > 0) ? 'green' : (offer === 0 ? 'red' : 'muted');
+
+  const cards = [
+    { lbl: 'Verified Income', val: '$' + Math.round(monthlyIncome).toLocaleString(), valClass: monthlyIncome > 0 ? 'green' : 'muted', sub: 'monthly' },
+    { lbl: 'Obligations', val: '$' + Math.round(monthlyExpenses).toLocaleString(), valClass: '', sub: 'committed monthly' },
+    { lbl: 'FCF / Mo', val: (fcf < 0 ? '-$' : '$') + Math.abs(Math.round(fcf)).toLocaleString(), valClass: fcfClass, sub: 'free cash flow' },
+    { lbl: 'DTI', val: dti == null ? '—' : (dti + '<span class="unit">%</span>'), valClass: dtiClass, sub: 'debt-to-income', valHtml: true },
+    { lbl: 'Max Offer', val: offer == null ? '—' : '$' + Number(offer).toLocaleString(), valClass: offerClass, sub: offer == null ? 'not yet run' : (offer > 0 ? 'v2 final tier' : 'declined by v2') },
+    { lbl: 'Confidence', val: conf == null ? '—' : (Math.round(conf * 100) + '<span class="unit">%</span>'), valClass: confClass, sub: 'v2 engine', verified: conf != null && conf >= 0.80, valHtml: true },
+    { lbl: 'Score', val: a.score != null ? (a.score + '<span class="unit">/100</span>') : '—', valClass: a.score >= 70 ? 'green' : (a.score >= 40 ? 'amber' : (a.score != null ? 'red' : 'muted')), sub: a.score >= 70 ? 'good' : (a.score >= 40 ? 'fair' : (a.score != null ? 'low' : 'pending')), valHtml: true },
+    { lbl: 'Bank Account', val: bankDisplay, valClass: '', valSize: 'sm', sub: ad.accountType || 'on file', verified: !!(ad.bankName && last4), verifiedLabel: 'Verified' },
   ];
-  snap.innerHTML = items.map(i => `<div class="snap-cell"><div class="snap-lbl">${escapeHtml(i.label)}</div><div class="snap-val" style="font-size:${String(i.value).length > 10 ? '14px' : '20px'}">${escapeHtml(i.value)}</div><div class="snap-sub">${escapeHtml(i.sub)}</div></div>`).join('');
+  snap.innerHTML = cards.map(c => {
+    const vs = c.valSize ? ' ' + c.valSize : '';
+    const vc = c.valClass ? ' ' + c.valClass : '';
+    const valEl = c.valHtml ? c.val : escapeHtml(c.val);
+    const verifiedEl = c.verified ? `<div class="snap-verified"><svg class="icn"><use href="#i-check"/></svg>${escapeHtml(c.verifiedLabel || 'Verified')}</div>` : '';
+    return `<div class="snap-cell"><div class="snap-lbl">${escapeHtml(c.lbl)}</div><div class="snap-val${vc}${vs}">${valEl}</div><div class="snap-sub">${escapeHtml(c.sub || '')}</div>${verifiedEl}</div>`;
+  }).join('');
 
   // Checks
   const checks = document.getElementById('dv-checks');
