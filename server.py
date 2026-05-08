@@ -1536,6 +1536,30 @@ class Handler(BaseHTTPRequestHandler):
         # lands in Vergent (with the Must-Read flag so it surfaces on the
         # customer's main page, not just the Notes tab). Body:
         #   { firebase_id, text }
+        # Vergent loan history — proxies to cif-apply's /api/vergent-loans.
+        # Body: {firebase_id} or {customer_id}. Used by the dashboard's
+        # Profile tab to render a per-customer loan list.
+        if path == '/api/vergent-loans':
+            try:
+                body = json.loads(raw)
+                payload = json.dumps(body).encode()
+                print('[VERGENT-LOANS PROXY] Forwarding to cif-apply...', flush=True)
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/vergent-loans',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=30) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[VERGENT-LOANS UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[VERGENT-LOANS ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         if path == '/api/vergent-add-note':
             try:
                 body = json.loads(raw)
