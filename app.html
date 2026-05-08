@@ -99,6 +99,12 @@ button,input,select{font-family:inherit}
 .btn-danger{background:white;color:var(--red);border-color:var(--red-200)}
 .btn-danger:hover{background:var(--red-50)}
 
+/* TIME RANGE PILLS */
+.time-range{display:flex;gap:5px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;width:max-content;max-width:100%;overflow-x:auto;flex-wrap:nowrap;box-shadow:var(--shadow-xs)}
+.tf-btn{background:none;border:none;padding:7px 14px;border-radius:7px;font-size:12.5px;font-weight:600;color:var(--muted);font-family:inherit;cursor:pointer;white-space:nowrap;transition:all .12s}
+.tf-btn:hover{color:var(--text2);background:var(--surface2)}
+.tf-btn.active{background:var(--green);color:white;box-shadow:var(--shadow-xs)}
+
 /* STATS */
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
 .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow-xs);transition:all .15s}
@@ -673,6 +679,16 @@ button,input,select{font-family:inherit}
         </div>
       </div>
 
+      <!-- KPI time-range -->
+      <div class="time-range" id="time-range">
+        <button class="tf-btn active" data-range="today">Today</button>
+        <button class="tf-btn" data-range="yesterday">Yesterday</button>
+        <button class="tf-btn" data-range="week">This Week</button>
+        <button class="tf-btn" data-range="lastweek">Last Week</button>
+        <button class="tf-btn" data-range="month">This Month</button>
+        <button class="tf-btn" data-range="all">All Time</button>
+      </div>
+
       <div class="stats">
         <div class="stat"><div class="stat-label">Total Applications</div><div class="stat-value" id="kpi-total">—</div><div class="stat-trend flat" id="kpi-total-trend">All time</div></div>
         <div class="stat"><div class="stat-label">Pending Review</div><div class="stat-value amber" id="kpi-pending">—</div><div class="stat-trend flat" id="kpi-pending-trend">Needs review</div></div>
@@ -722,11 +738,32 @@ button,input,select{font-family:inherit}
             <a class="card-link" href="/app/legacy">View report<svg class="icn"><use href="#i-arrow-right"/></svg></a>
           </div>
           <div class="perf">
-            <div class="perf-cell"><div class="perf-label">Approval Rate</div><div class="perf-value" id="perf-rate">—</div><div class="perf-row3"><span class="perf-trend flat" id="perf-rate-trend">—</span></div></div>
-            <div class="perf-cell"><div class="perf-label">Avg. Score</div><div class="perf-value" id="perf-score">—</div><div class="perf-row3"><span class="perf-trend flat">average</span></div></div>
-            <div class="perf-cell"><div class="perf-label">Approved Volume</div><div class="perf-value" id="perf-volume">—</div><div class="perf-row3"><span class="perf-trend flat">total</span></div></div>
-            <div class="perf-cell"><div class="perf-label">Pending</div><div class="perf-value" id="perf-pending">—</div><div class="perf-row3"><span class="perf-trend flat">in queue</span></div></div>
-            <div class="perf-cell"><div class="perf-label">Today's Decisions</div><div class="perf-value" id="perf-today">—</div><div class="perf-row3"><span class="perf-verified"><svg class="icn"><use href="#i-check"/></svg>Live</span></div></div>
+            <div class="perf-cell">
+              <div class="perf-label">Approval Rate</div>
+              <div class="perf-value" id="perf-rate">—</div>
+              <div class="perf-row3"><span class="perf-trend flat" id="perf-rate-trend">—</span><span class="spark" id="spark-rate"></span></div>
+            </div>
+            <div class="perf-cell">
+              <div class="perf-label">Avg. FCF / Mo</div>
+              <div class="perf-value" id="perf-fcf">—</div>
+              <div class="perf-row3"><span class="perf-trend flat" id="perf-fcf-sub">free cash flow</span><span class="spark" id="spark-fcf"></span></div>
+            </div>
+            <div class="perf-cell">
+              <div class="perf-label">Avg. Score</div>
+              <div class="perf-value" id="perf-score">—</div>
+              <div class="perf-row3"><span class="perf-trend flat" id="perf-score-sub">/100</span><span class="spark" id="spark-score"></span></div>
+            </div>
+            <div class="perf-cell">
+              <div class="perf-label">DTI</div>
+              <div class="perf-value" id="perf-dti">—</div>
+              <div class="perf-row3"><span class="perf-trend flat" id="perf-dti-sub">debt-to-income</span></div>
+            </div>
+            <div class="perf-cell">
+              <div class="perf-label">Income Stability</div>
+              <div class="perf-value" id="perf-stability">—</div>
+              <div class="perf-row3"><span class="perf-trend flat" id="perf-stability-sub">verified income</span></div>
+              <div class="perf-verified" id="perf-stability-badge" style="display:none"><svg class="icn"><use href="#i-check"/></svg>Verified</div>
+            </div>
           </div>
         </div>
       </div>
@@ -976,6 +1013,7 @@ let _currentRole = 'user';
 let pollTimer = null;
 let _lastDetailFbId = null;
 let _vergentMatchCache = {};
+let _kpiRange = 'today';
 
 // ───────── Helpers ─────────
 function authHeaders(extra) { return Object.assign({'Content-Type':'application/json'}, extra||{}); }
@@ -1109,6 +1147,64 @@ function rerender() {
   }
 }
 
+// ───────── Time-range filter ─────────
+function _rangeBounds(range) {
+  const now = new Date();
+  const today = new Date(now); today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+  const weekStart = new Date(today); weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Sunday 00:00
+  const lastWeekStart = new Date(weekStart); lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const t = now.getTime();
+  switch (range) {
+    case 'today': return [today.getTime(), t];
+    case 'yesterday': return [yesterday.getTime(), today.getTime()];
+    case 'week': return [weekStart.getTime(), t];
+    case 'lastweek': return [lastWeekStart.getTime(), weekStart.getTime()];
+    case 'month': return [monthStart.getTime(), t];
+    case 'all': return [0, t];
+    default: return [today.getTime(), t];
+  }
+}
+function _previousRangeBounds(range) {
+  // Used for "vs previous" trend percentages.
+  const now = new Date();
+  const today = new Date(now); today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+  const dayBefore = new Date(yesterday); dayBefore.setDate(dayBefore.getDate() - 1);
+  const weekStart = new Date(today); weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  const lastWeekStart = new Date(weekStart); lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  const twoWeeksAgo = new Date(lastWeekStart); twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 7);
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  switch (range) {
+    case 'today': return [yesterday.getTime(), today.getTime()];
+    case 'yesterday': return [dayBefore.getTime(), yesterday.getTime()];
+    case 'week': return [lastWeekStart.getTime(), weekStart.getTime()];
+    case 'lastweek': return [twoWeeksAgo.getTime(), lastWeekStart.getTime()];
+    case 'month': return [lastMonthStart.getTime(), monthStart.getTime()];
+    default: return [0, 0];
+  }
+}
+function appsInRange(range) {
+  const [from, to] = _rangeBounds(range);
+  return apps.filter(a => a.createdAt >= from && a.createdAt < to);
+}
+function rangeLabel(range) {
+  return ({
+    today: 'today', yesterday: 'yesterday',
+    week: 'this week', lastweek: 'last week',
+    month: 'this month', all: 'all time',
+  })[range] || range;
+}
+function previousRangeLabel(range) {
+  return ({
+    today: 'yesterday', yesterday: 'day before',
+    week: 'last week', lastweek: 'two weeks ago',
+    month: 'last month', all: '',
+  })[range] || '';
+}
+
 // ───────── Counts ─────────
 function bucketStatus(a) {
   const s = (a.status || '').toLowerCase();
@@ -1130,8 +1226,25 @@ function counts() {
 }
 
 // ───────── Dashboard ─────────
+function _bucketCounts(list) {
+  const c = { total: list.length, pending: 0, approved: 0, declined: 0 };
+  list.forEach(a => {
+    const b = bucketStatus(a);
+    if (b === 'approved') c.approved++;
+    else if (b === 'declined') c.declined++;
+    else c.pending++;
+  });
+  return c;
+}
+
 function renderDashboard() {
-  const c = counts();
+  // ── KPI cards: filter by selected time range ──
+  const inRange = appsInRange(_kpiRange);
+  const c = _bucketCounts(inRange);
+  const [prevFrom, prevTo] = _previousRangeBounds(_kpiRange);
+  const prev = (prevFrom < prevTo) ? apps.filter(a => a.createdAt >= prevFrom && a.createdAt < prevTo) : [];
+  const cPrev = _bucketCounts(prev);
+
   document.getElementById('kpi-total').textContent = c.total;
   document.getElementById('kpi-pending').textContent = c.pending;
   document.getElementById('kpi-approved').textContent = c.approved;
@@ -1140,18 +1253,31 @@ function renderDashboard() {
   const decided = c.approved + c.declined;
   const apprRate = decided ? Math.round((c.approved / decided) * 100) : 0;
   const declRate = decided ? Math.round((c.declined / decided) * 100) : 0;
-  document.getElementById('kpi-approved-trend').innerHTML = `<svg class="icn"><use href="#i-up"/></svg>${apprRate}%<span class="stat-trend-sub">approval rate</span>`;
-  document.getElementById('kpi-declined-trend').innerHTML = `<svg class="icn"><use href="#i-down"/></svg>${declRate}%<span class="stat-trend-sub">decline rate</span>`;
-  document.getElementById('kpi-pending-trend').innerHTML = c.pending ? 'Awaiting decision' : 'All caught up';
-  document.getElementById('kpi-total-trend').innerHTML = `<svg class="icn"><use href="#i-up"/></svg>All time`;
 
-  document.getElementById('greet-sub').innerHTML = `<b>${c.pending}</b> pending · <b>${c.approved}</b> approved · <b>${c.declined}</b> declined`;
+  function trendLine(now, then, label) {
+    if (!cPrev.total && _kpiRange !== 'all') return `<span class="stat-trend-sub">${rangeLabel(_kpiRange)}</span>`;
+    if (!then) return now > 0 ? `<svg class="icn"><use href="#i-up"/></svg>new<span class="stat-trend-sub">${label}</span>` : `<span class="stat-trend-sub">${label}</span>`;
+    const pct = Math.round(((now - then) / then) * 100);
+    const dir = pct >= 0 ? 'up' : 'down';
+    const sign = pct >= 0 ? '+' : '';
+    return `<svg class="icn"><use href="#i-${dir}"/></svg>${sign}${pct}%<span class="stat-trend-sub">${label}</span>`;
+  }
+  const prevLbl = previousRangeLabel(_kpiRange);
+  const vsPrev = prevLbl ? `vs ${prevLbl}` : rangeLabel(_kpiRange);
+  document.getElementById('kpi-total-trend').innerHTML = trendLine(c.total, cPrev.total, vsPrev);
+  document.getElementById('kpi-pending-trend').innerHTML = trendLine(c.pending, cPrev.pending, vsPrev);
+  document.getElementById('kpi-approved-trend').innerHTML = decided ? `<svg class="icn"><use href="#i-up"/></svg>${apprRate}%<span class="stat-trend-sub">approval rate</span>` : `<span class="stat-trend-sub">${rangeLabel(_kpiRange)}</span>`;
+  document.getElementById('kpi-declined-trend').innerHTML = decided ? `<svg class="icn"><use href="#i-down"/></svg>${declRate}%<span class="stat-trend-sub">decline rate</span>` : `<span class="stat-trend-sub">${rangeLabel(_kpiRange)}</span>`;
 
-  // Donut
-  const total = c.total || 1;
-  const pPct = (c.pending / total) * 100;
-  const aPct = (c.approved / total) * 100;
-  const dPct = (c.declined / total) * 100;
+  document.getElementById('greet-sub').innerHTML = `<b>${counts().pending}</b> pending · <b>${counts().approved}</b> approved · <b>${counts().declined}</b> declined`;
+
+  // ── Pipeline donut: deduped (unique customers) ──
+  const dedup = dedupedApps();
+  const dc = _bucketCounts(dedup);
+  const total = dc.total || 1;
+  const pPct = (dc.pending / total) * 100;
+  const aPct = (dc.approved / total) * 100;
+  const dPct = (dc.declined / total) * 100;
   const ringA = document.getElementById('ring-approved');
   const ringD = document.getElementById('ring-declined');
   const ringP = document.getElementById('ring-pending');
@@ -1161,12 +1287,12 @@ function renderDashboard() {
   ringD.setAttribute('stroke-dashoffset', `-${aPct}`);
   ringP.setAttribute('stroke-dasharray', `${pPct} ${100 - pPct}`);
   ringP.setAttribute('stroke-dashoffset', `-${aPct + dPct}`);
-  document.getElementById('donut-total').textContent = c.total;
-  document.getElementById('leg-pending').innerHTML = `${c.pending}<span class="donut-leg-pct">${Math.round(pPct)}%</span>`;
-  document.getElementById('leg-approved').innerHTML = `${c.approved}<span class="donut-leg-pct">${Math.round(aPct)}%</span>`;
-  document.getElementById('leg-declined').innerHTML = `${c.declined}<span class="donut-leg-pct">${Math.round(dPct)}%</span>`;
+  document.getElementById('donut-total').textContent = dc.total;
+  document.getElementById('leg-pending').innerHTML = `${dc.pending}<span class="donut-leg-pct">${Math.round(pPct)}%</span>`;
+  document.getElementById('leg-approved').innerHTML = `${dc.approved}<span class="donut-leg-pct">${Math.round(aPct)}%</span>`;
+  document.getElementById('leg-declined').innerHTML = `${dc.declined}<span class="donut-leg-pct">${Math.round(dPct)}%</span>`;
 
-  // Activity (last 8 events)
+  // ── Activity (last 8 events from raw apps) ──
   const feed = document.getElementById('activity-feed');
   if (apps.length === 0) {
     feed.innerHTML = '<div class="tbl-empty">No activity yet.</div>';
@@ -1185,15 +1311,91 @@ function renderDashboard() {
     }).join('');
   }
 
-  // Performance MTD
-  const todayApps = apps.filter(a => isToday(a.createdAt));
-  const todayDecisions = todayApps.filter(a => bucketStatus(a) !== 'pending').length;
-  document.getElementById('perf-rate').innerHTML = decided ? `${apprRate}<span class="unit">%</span>` : '—';
-  document.getElementById('perf-rate-trend').innerHTML = decided ? `<svg class="icn"><use href="#i-up"/></svg>${decided} decided` : '—';
-  document.getElementById('perf-score').innerHTML = avgScore() || '—';
-  document.getElementById('perf-volume').textContent = c.approved;
-  document.getElementById('perf-pending').textContent = c.pending;
-  document.getElementById('perf-today').textContent = todayDecisions;
+  // ── Performance MTD: averages across decided apps this month ──
+  renderPerformance();
+}
+
+function renderPerformance() {
+  const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+  const inMonth = apps.filter(a => a.createdAt >= monthStart.getTime());
+  const decidedMonth = inMonth.filter(a => bucketStatus(a) !== 'pending');
+  const apprMonth = decidedMonth.filter(a => bucketStatus(a) === 'approved').length;
+  const decRate = decidedMonth.length ? Math.round((apprMonth / decidedMonth.length) * 100) : 0;
+
+  // Avg FCF
+  const fcfVals = decidedMonth.map(a => Number(a.fcf || 0)).filter(n => !isNaN(n));
+  const avgFcf = fcfVals.length ? Math.round(fcfVals.reduce((s, v) => s + v, 0) / fcfVals.length) : null;
+  // Avg Score
+  const scoreVals = decidedMonth.map(a => Number(a.score)).filter(n => !isNaN(n) && n > 0);
+  const avgSc = scoreVals.length ? Math.round(scoreVals.reduce((s, v) => s + v, 0) / scoreVals.length) : null;
+  // Avg DTI
+  const dtiVals = decidedMonth
+    .map(a => Number(a.monthlyIncome) > 0 ? (Number(a.monthlyExpenses || 0) / Number(a.monthlyIncome) * 100) : null)
+    .filter(n => n != null && !isNaN(n));
+  const avgDti = dtiVals.length ? Math.round(dtiVals.reduce((s, v) => s + v, 0) / dtiVals.length) : null;
+  // Income Stability — % of decided apps with verified monthly income > 0
+  const verified = decidedMonth.filter(a => Number(a.monthlyIncome) > 0).length;
+  const stability = decidedMonth.length ? Math.round((verified / decidedMonth.length) * 100) : 0;
+
+  document.getElementById('perf-rate').innerHTML = decidedMonth.length ? `${decRate}<span class="unit">%</span>` : '—';
+  document.getElementById('perf-rate-trend').innerHTML = `<span style="color:var(--muted)">${apprMonth}/${decidedMonth.length} decided</span>`;
+  document.getElementById('perf-fcf').innerHTML = avgFcf == null ? '—' : (avgFcf < 0 ? `-$${Math.abs(avgFcf).toLocaleString()}` : `$${avgFcf.toLocaleString()}`);
+  document.getElementById('perf-score').innerHTML = avgSc == null ? '—' : `${avgSc}<span class="unit">/100</span>`;
+  document.getElementById('perf-dti').innerHTML = avgDti == null ? '—' : `${avgDti}<span class="unit">%</span>`;
+  document.getElementById('perf-stability').innerHTML = decidedMonth.length ? `${stability}<span class="unit">%</span>` : '—';
+  document.getElementById('perf-stability-sub').textContent = decidedMonth.length ? `${verified}/${decidedMonth.length} verified` : 'verified income';
+  const stabBadge = document.getElementById('perf-stability-badge');
+  if (stabBadge) stabBadge.style.display = stability >= 80 ? '' : 'none';
+
+  // Sparklines — 4-week trend (rolling decided rate / fcf / score)
+  drawSpark('spark-rate', _weeklyTrend(apps, w => {
+    const dec = w.filter(a => bucketStatus(a) !== 'pending');
+    if (!dec.length) return null;
+    return dec.filter(a => bucketStatus(a) === 'approved').length / dec.length;
+  }), 'var(--green)');
+  drawSpark('spark-fcf', _weeklyTrend(apps, w => {
+    const dec = w.filter(a => bucketStatus(a) !== 'pending');
+    const v = dec.map(a => Number(a.fcf || 0)).filter(n => !isNaN(n));
+    return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
+  }), 'var(--green)');
+  drawSpark('spark-score', _weeklyTrend(apps, w => {
+    const dec = w.filter(a => bucketStatus(a) !== 'pending');
+    const v = dec.map(a => Number(a.score)).filter(n => !isNaN(n) && n > 0);
+    return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
+  }), 'var(--green)');
+}
+
+function _weeklyTrend(list, fn) {
+  // Returns 8 values, oldest → newest, one per week.
+  const wkMs = 7 * 24 * 3600 * 1000;
+  const now = Date.now();
+  const out = [];
+  for (let i = 7; i >= 0; i--) {
+    const from = now - (i + 1) * wkMs;
+    const to = now - i * wkMs;
+    const w = list.filter(a => a.createdAt >= from && a.createdAt < to);
+    out.push(fn(w));
+  }
+  return out;
+}
+
+function drawSpark(id, values, color) {
+  const wrap = document.getElementById(id);
+  if (!wrap) return;
+  const real = values.filter(v => v != null && !isNaN(v));
+  if (real.length < 2) {
+    wrap.innerHTML = '';
+    return;
+  }
+  const min = Math.min(...real);
+  const max = Math.max(...real);
+  const range = max - min || 1;
+  const points = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * 60;
+    const y = v == null || isNaN(v) ? null : (20 - ((v - min) / range) * 18 - 1);
+    return y == null ? null : `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).filter(p => p);
+  wrap.innerHTML = `<svg viewBox="0 0 60 22" preserveAspectRatio="none"><polyline fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" points="${points.join(' ')}"/></svg>`;
 }
 
 function isToday(ts) {
@@ -2266,6 +2468,15 @@ document.getElementById('dv-offer-input').addEventListener('blur', () => { const
 document.getElementById('refresh-btn').addEventListener('click', () => { toast('Refreshing…'); loadReports(); });
 document.getElementById('refresh-btn-2').addEventListener('click', () => { toast('Refreshing…'); loadReports(); });
 document.getElementById('refresh-queue-btn').addEventListener('click', () => { toast('Refreshing…'); loadReports(); });
+
+document.getElementById('time-range').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tf-btn[data-range]');
+  if (!btn) return;
+  document.querySelectorAll('#time-range .tf-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _kpiRange = btn.getAttribute('data-range');
+  renderDashboard();
+});
 
 document.getElementById('queue-chips').addEventListener('click', (e) => {
   const chip = e.target.closest('.chip[data-filter]');
