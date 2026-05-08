@@ -1030,6 +1030,27 @@ class Handler(BaseHTTPRequestHandler):
             self.send_html(200, data or b'App not found')
             return
 
+        # Static design mockups (auth-gated). Whitelisted by name; no arbitrary
+        # file read. Serves <name>-mockup.html from repo root.
+        if path.startswith('/mockup/'):
+            if not valid_session(token):
+                self.send_response(302)
+                self.send_header('Location', '/')
+                self.end_headers()
+                return
+            name = path[len('/mockup/'):].strip('/').lower()
+            if name not in ('concept8', 'dashboard', 'detail'):
+                self.send_response(404)
+                self.end_headers()
+                return
+            data = read_file(os.path.join(DIR, name + '-mockup.html'))
+            if not data:
+                self.send_response(404)
+                self.end_headers()
+                return
+            self.send_html(200, data)
+            return
+
         if path in ('/favicon.png', '/favicon.ico', '/apple-touch-icon.png', '/logo.png'):
             fname = 'logo.png' if path == '/logo.png' else 'favicon.png'
             data = read_file(os.path.join(DIR, 'static', fname))
