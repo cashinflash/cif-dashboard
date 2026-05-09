@@ -2,472 +2,626 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Dashboard Mockup — Cash in Flash</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<title>Dashboard Refresh — Mockup</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --green:#1a6b3c;--green-mid:#1e7d46;--green-dark:#144f2c;
-  --green-light:#eaf5ef;--green-border:#b2d9c0;
-  --gold:#c9a84c;--gold-dark:#a8852e;--gold-light:#fdf8ec;--gold-border:#e8d48e;
-  --red:#c0392b;--red-light:#fdf2f2;--red-border:#f5b8b0;
-  --amber:#d97706;--amber-light:#fffbeb;--amber-border:#fcd34d;
-  --blue:#1d4ed8;--blue-light:#eff6ff;--blue-border:#bfdbfe;
-  --bg:#f0f4f1;--surface:#fff;--surface2:#f8faf8;
-  --border:#dde5df;--border2:#ccd6ce;
-  --text:#0e1a12;--text2:#2d4235;--muted:#6b7c72;--muted2:#8fa197;
-  --sans:'Inter',-apple-system,'SF Pro Text','Segoe UI',Roboto,Arial,sans-serif;--mono:'DM Mono',monospace;
-  --shadow-sm:0 1px 3px rgba(0,0,0,.06);
-  --shadow-md:0 4px 12px rgba(0,0,0,.08);
-  --shadow-lg:0 12px 32px rgba(0,0,0,.1);
+  --green:#16a34a;--green-mid:#22c55e;--green-dark:#15803d;--green-deep:#14532d;
+  --green-50:#f0fdf4;--green-100:#dcfce7;--green-200:#bbf7d0;--green-700:#15803d;--green-800:#166534;
+  --red:#dc2626;--red-50:#fef2f2;--red-100:#fee2e2;--red-200:#fecaca;--red-700:#b91c1c;
+  --amber:#f59e0b;--amber-50:#fffbeb;--amber-100:#fef3c7;--amber-200:#fde68a;--amber-700:#b45309;
+  --blue:#2563eb;--blue-50:#eff6ff;--blue-100:#dbeafe;--blue-700:#1d4ed8;
+  --bg:#f5f7f5;--surface:#fff;--surface2:#fafbfa;
+  --border:#e5e7eb;--border2:#d1d5db;--border-soft:#eef0ee;
+  --text:#111827;--text2:#374151;--muted:#6b7280;--muted2:#9ca3af;
+  --sans:'Inter',-apple-system,'SF Pro Text','Segoe UI',Roboto,Arial,sans-serif;
+  --shadow-xs:0 1px 2px rgba(15,40,25,.04);
+  --shadow-sm:0 1px 3px rgba(15,40,25,.06),0 1px 2px rgba(15,40,25,.04);
+  --shadow-md:0 4px 12px rgba(15,40,25,.06),0 2px 4px rgba(15,40,25,.04);
+  --radius:12px;--topnav-h:60px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);font-family:var(--sans);color:var(--text);font-size:15px;line-height:1.6;overflow-x:hidden}
+html,body{height:100%;-webkit-text-size-adjust:100%}
+body{background:var(--bg);font-family:var(--sans);color:var(--text);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+button,input,select{font-family:inherit}
 
-/* === HEADER — refreshed: calmer gradient, lighter shadow, subtle bottom border === */
-header{
-  background:linear-gradient(180deg,var(--green-dark),var(--green));
-  height:66px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:0 1.5rem;
-  position:sticky;
-  top:0;
-  z-index:100;
-  box-shadow:0 1px 0 rgba(0,0,0,.08);
-  border-bottom:1px solid rgba(255,255,255,.06);
-  flex-wrap:wrap;
-  gap:4px;
+/* MOCKUP RIBBON */
+.mockup-banner{background:#1f2937;color:white;padding:10px 22px;font-size:12.5px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.mockup-banner .pill{background:var(--amber-200);color:var(--amber-700);padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.mockup-banner .right{color:#9ca3af;font-size:12px;font-weight:500}
+.mockup-banner code{background:rgba(255,255,255,.08);padding:1px 6px;border-radius:4px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
+
+/* TOP NAV */
+.topnav{position:sticky;top:0;z-index:200;height:var(--topnav-h);background:linear-gradient(180deg,var(--green-dark) 0%,var(--green) 100%);border-bottom:1px solid rgba(0,0,0,.08);box-shadow:0 1px 0 rgba(0,0,0,.05);display:flex;align-items:center;padding:0 22px;gap:18px}
+.brand{display:flex;align-items:center;gap:11px;cursor:pointer;text-decoration:none}
+.brand-mark{width:36px;height:36px;border-radius:9px;background:white;color:var(--green-dark);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.4)}
+.brand-mark svg{width:20px;height:20px;fill:currentColor;stroke:none}
+.brand-name{font-size:16px;font-weight:800;letter-spacing:-.015em;color:white;text-shadow:0 1px 2px rgba(0,0,0,.12)}
+.topnav-tabs{display:flex;align-items:center;gap:2px;margin-left:14px}
+.tnt{background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:7px;padding:8px 13px;border-radius:8px;font-size:13px;font-weight:600;color:rgba(255,255,255,.78);transition:all .12s;white-space:nowrap;text-decoration:none}
+.tnt:hover{color:white;background:rgba(255,255,255,.12)}
+.tnt.active{color:white;background:rgba(255,255,255,.22);font-weight:700}
+.tnt .icn{width:15px;height:15px;opacity:.92}
+.topnav-spacer{flex:1}
+.topnav-search{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.22);padding:6px 12px;border-radius:8px;width:240px;color:rgba(255,255,255,.95);font-size:13px}
+.topnav-search .icn{width:14px;height:14px;opacity:.85}
+.topnav-search input{background:none;border:none;outline:none;color:white;font-size:13px;flex:1;font-weight:500}
+.topnav-search input::placeholder{color:rgba(255,255,255,.6)}
+.topnav-user{display:flex;align-items:center;gap:9px;padding:5px 10px;border-radius:8px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.18);color:white;cursor:pointer}
+.topnav-avatar{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.95);color:var(--green-dark);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.topnav-user-name{font-size:12.5px;font-weight:700;line-height:1.1}
+.topnav-user-role{font-size:11px;font-weight:500;color:rgba(255,255,255,.78)}
+
+/* SHELL */
+.shell{display:grid;grid-template-columns:212px 1fr;gap:0;max-width:1440px;margin:0 auto;padding:0}
+
+/* SUBNAV */
+.subnav{padding:24px 14px;border-right:1px solid var(--border);background:var(--surface);min-height:calc(100vh - 60px - 41px);display:flex;flex-direction:column;gap:18px}
+.subnav-section{display:flex;flex-direction:column;gap:2px}
+.subnav-foot{margin-top:auto;display:flex;flex-direction:column;gap:2px;padding-top:14px;border-top:1px solid var(--border-soft)}
+.subnav-label{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:0 11px;margin-bottom:7px}
+.subnav-link{background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:8px;font-size:13px;font-weight:600;color:var(--text2);font-family:inherit;text-decoration:none;text-align:left;transition:all .12s}
+.subnav-link:hover{background:var(--surface2);color:var(--text)}
+.subnav-link.active{background:var(--green-50);color:var(--green-dark)}
+.subnav-link .icn{width:16px;height:16px;stroke-width:2;color:var(--muted)}
+.subnav-link.active .icn{color:var(--green)}
+
+/* MAIN */
+.main{padding:22px 26px 36px;min-width:0}
+
+/* GREETING */
+.greet{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+.greet-title{font-size:21px;font-weight:700;letter-spacing:-.018em;color:var(--text);line-height:1.2;margin-bottom:3px;display:flex;align-items:center;gap:8px}
+.greet-title .wave{display:inline-block;font-size:18px}
+.greet-sub{font-size:13px;color:var(--muted);font-weight:500}
+.greet-sub b{color:var(--text2);font-weight:700}
+.greet-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+/* SYNC BAR — NEW (uses existing #sync-status slot) */
+.sync-bar{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;background:var(--green-50);border:1px solid var(--green-200);color:var(--green-800);border-radius:999px;font-size:11.5px;font-weight:600;letter-spacing:.01em}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(22,163,74,.2);animation:syncPulse 2.4s ease-in-out infinite}
+@keyframes syncPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.85)}}
+.sync-bar b{font-weight:700}
+.sync-bar .sep{color:var(--green-200);font-weight:400}
+
+/* BUTTONS */
+.btn{padding:8px 14px;border-radius:8px;font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;border:1px solid transparent;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;transition:all .12s;text-decoration:none}
+.btn .icn{width:14px;height:14px;stroke-width:2.25}
+.btn-primary{background:var(--green);color:white;border-color:var(--green)}
+.btn-primary:hover{background:var(--green-dark);border-color:var(--green-dark)}
+.btn-ghost{background:white;color:var(--text2);border-color:var(--border)}
+.btn-ghost:hover{background:var(--surface2);border-color:var(--border2)}
+
+/* TIME RANGE */
+.time-range{display:flex;gap:5px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;width:max-content;max-width:100%;flex-wrap:nowrap;box-shadow:var(--shadow-xs)}
+.tf-btn{background:none;border:none;padding:7px 14px;border-radius:7px;font-size:12.5px;font-weight:600;color:var(--muted);font-family:inherit;cursor:pointer;white-space:nowrap;transition:all .12s}
+.tf-btn:hover{color:var(--text2);background:var(--surface2)}
+.tf-btn.active{background:var(--green);color:white;box-shadow:var(--shadow-xs)}
+
+/* STATS — REFINED with left-edge accent strip + label icon */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.stat{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px 16px 22px;box-shadow:var(--shadow-xs);transition:all .15s;overflow:hidden}
+.stat:hover{box-shadow:var(--shadow-sm);border-color:var(--border2);transform:translateY(-1px)}
+.stat::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--muted2);border-top-left-radius:var(--radius);border-bottom-left-radius:var(--radius)}
+.stat.tot::before{background:var(--muted2)}
+.stat.pen::before{background:var(--amber)}
+.stat.app::before{background:var(--green)}
+.stat.dec::before{background:var(--red)}
+.stat-label{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.02em;margin-bottom:8px;display:flex;align-items:center;gap:6px;text-transform:uppercase}
+.stat-label .icn{width:13px;height:13px;stroke-width:2.25}
+.stat.tot .stat-label .icn{color:var(--muted2)}
+.stat.pen .stat-label .icn{color:var(--amber)}
+.stat.app .stat-label .icn{color:var(--green)}
+.stat.dec .stat-label .icn{color:var(--red)}
+.stat-value{font-size:28px;font-weight:800;letter-spacing:-.025em;line-height:1;color:var(--text);font-variant-numeric:tabular-nums}
+.stat-value.green{color:var(--green)}.stat-value.amber{color:var(--amber-700)}.stat-value.red{color:var(--red)}
+.stat-trend{display:inline-flex;align-items:center;gap:3px;margin-top:8px;font-size:11.5px;font-weight:600}
+.stat-trend.up{color:var(--green)}.stat-trend.down{color:var(--red)}.stat-trend.flat{color:var(--muted)}
+.stat-trend .icn{width:11px;height:11px;stroke-width:2.5}
+.stat-trend-sub{color:var(--muted);font-weight:500;margin-left:5px}
+
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-xs);overflow:hidden}
+.card-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.card-title{font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px}
+.card-title .icn{width:14px;height:14px;color:var(--muted)}
+.card-title-sub{font-size:11.5px;color:var(--muted);font-weight:500;margin-left:4px}
+.card-link{font-size:12px;font-weight:600;color:var(--green);cursor:pointer;display:inline-flex;align-items:center;gap:3px;text-decoration:none;background:none;border:none;font-family:inherit}
+.card-link:hover{color:var(--green-dark)}
+.card-link .icn{width:11px;height:11px}
+
+.dash-row-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+
+/* DONUT */
+.donut-wrap{display:flex;align-items:center;gap:24px;padding:22px 22px 24px}
+.donut{position:relative;width:144px;height:144px;flex-shrink:0}
+.donut-svg{transform:rotate(-90deg)}
+.donut-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;line-height:1.1}
+.donut-center-num{font-size:26px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.donut-center-lbl{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+.donut-legend{flex:1;display:flex;flex-direction:column;gap:10px;min-width:0}
+.donut-leg-item{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--text2)}
+.donut-leg-dot{width:9px;height:9px;border-radius:3px;flex-shrink:0}
+.donut-leg-name{flex:1;font-weight:500}
+.donut-leg-value{font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.donut-leg-pct{color:var(--muted);font-size:11.5px;margin-left:6px;font-weight:500}
+
+/* ACTIVITY */
+.activity{padding:8px 0}
+.activity-row{display:flex;align-items:center;gap:14px;padding:11px 22px;border-bottom:1px solid var(--border-soft);cursor:pointer;transition:background .12s}
+.activity-row:hover{background:var(--surface2)}
+.activity-row:last-child{border-bottom:none}
+.act-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0}
+.act-icon.new{background:var(--blue-100);color:var(--blue)}
+.act-icon.ok{background:var(--green-100);color:var(--green)}
+.act-icon.no{background:var(--red-100);color:var(--red)}
+.act-icon.warn{background:var(--amber-100);color:var(--amber-700)}
+.act-text{flex:1;min-width:0}
+.act-label{font-size:13px;font-weight:600;color:var(--text);line-height:1.3}
+.act-sub{font-size:11.5px;color:var(--muted);margin-top:1px}
+.act-time{font-size:11.5px;color:var(--muted);font-weight:500;flex-shrink:0}
+
+/* PERFORMANCE */
+.perf{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border)}
+.perf-cell{background:var(--surface);padding:16px 18px 14px;display:flex;flex-direction:column;gap:5px}
+.perf-label{font-size:10.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.perf-value{font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--text);line-height:1.1;font-variant-numeric:tabular-nums}
+.perf-value .unit{font-size:13px;font-weight:700;color:var(--muted);margin-left:2px}
+.perf-row3{display:flex;align-items:center;gap:10px;margin-top:4px}
+.perf-trend{font-size:11.5px;font-weight:600;display:inline-flex;align-items:center;gap:3px}
+.perf-trend.up{color:var(--green)}.perf-trend.down{color:var(--red)}.perf-trend.flat{color:var(--muted)}
+.perf-trend .icn{width:10px;height:10px;stroke-width:2.5}
+.spark{flex:1;min-width:0;height:22px}
+.spark svg{display:block;width:100%;height:100%}
+
+/* SECTIONS */
+.section{margin-top:18px}
+.section-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:11px}
+
+/* QUEUE */
+.queue-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.queue-title{font-size:18px;font-weight:700;letter-spacing:-.018em;color:var(--text);margin-bottom:3px}
+.queue-sub{font-size:12.5px;color:var(--muted)}
+
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+/* NEW: group label between chip groups */
+.chip-group{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;padding:0 6px 0 2px;align-self:center}
+.chip{padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:white;font-size:12.5px;font-weight:600;color:var(--text2);cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:all .12s}
+.chip:hover{border-color:var(--border2)}
+.chip.active{background:var(--green);border-color:var(--green);color:white}
+.chip-ct{background:var(--surface2);color:var(--muted);font-size:11px;font-weight:700;padding:0 5px;border-radius:4px;font-variant-numeric:tabular-nums}
+.chip.active .chip-ct{background:rgba(255,255,255,.2);color:white}
+.chip.right{margin-left:auto}
+
+.queue-grid{display:grid;grid-template-columns:1fr 320px;gap:16px}
+
+.tbl-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-sm);max-height:560px;overflow-y:auto}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+/* NEW: sticky thead */
+.tbl thead{background:var(--surface2);position:sticky;top:0;z-index:5}
+.tbl th{text-align:left;padding:10px 14px;font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border);background:var(--surface2)}
+/* NEW: tighter row density (was 13px → 11px) */
+.tbl td{padding:11px 14px;border-bottom:1px solid var(--border-soft);vertical-align:middle}
+.tbl tbody tr{cursor:pointer;transition:background .12s}
+.tbl tbody tr:hover td{background:var(--surface2)}
+.tbl tbody tr:last-child td{border-bottom:none}
+/* NEW: day-grouping rows */
+.tbl tr.queue-group td{padding:7px 14px;font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;background:var(--surface2);border-bottom:1px solid var(--border);cursor:default}
+.tbl tr.queue-group:hover td{background:var(--surface2)}
+
+.applicant{display:flex;align-items:center;gap:10px}
+.av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0;background:linear-gradient(135deg,#34d399,#16a34a)}
+.applicant-text{min-width:0}
+.applicant-name{font-size:13px;font-weight:700;color:var(--text);line-height:1.2;display:inline-flex;align-items:center;gap:7px}
+.applicant-id{font-size:11px;color:var(--muted);font-weight:500;font-variant-numeric:tabular-nums}
+.app-info{display:flex;flex-direction:column;line-height:1.3}
+.app-type{font-size:12.5px;color:var(--text2);font-weight:600}
+.app-meta{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+.score-circle{width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;border:2px solid;font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+.sc-h{border-color:var(--green);color:var(--green);background:white}
+.sc-m{border-color:var(--amber);color:var(--amber-700);background:white}
+.sc-l{border-color:var(--red);color:var(--red);background:white}
+
+.status{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;display:inline-flex;align-items:center;gap:5px}
+.status::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+.status.approved{color:var(--green)}
+.status.pending{color:var(--amber-700)}
+.status.declined{color:var(--red)}
+.tbl-time{font-size:11.5px;color:var(--muted);font-weight:500}
+
+/* Source badge — already shipped */
+.src-badge{font-size:9.5px;font-weight:800;letter-spacing:.07em;padding:2px 7px;border-radius:4px;text-transform:uppercase;line-height:1}
+.src-apply{background:var(--green-100);color:var(--green-700)}
+.src-docs{background:var(--blue-100);color:var(--blue-700)}
+
+/* QI panel */
+.qi-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-xs);display:flex;flex-direction:column}
+.qi-section{padding:14px 18px;border-bottom:1px solid var(--border)}
+.qi-section:last-child{border-bottom:none}
+.qi-title{font-size:11px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.06em;margin-bottom:11px}
+.qi-row{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;padding:5px 0;color:var(--text2)}
+.qi-row .qi-name{font-weight:500}
+.qi-row .qi-num{font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.qi-row.warn .qi-num{color:var(--red)}
+.qi-row.med .qi-num{color:var(--amber-700)}
+.qi-row.ok .qi-num{color:var(--green)}
+.qi-tip{padding:14px 18px;background:var(--green-50);border-top:1px solid var(--green-200);display:flex;gap:11px;align-items:flex-start}
+.qi-tip-icn{width:26px;height:26px;border-radius:7px;background:var(--green-100);color:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.qi-tip-icn .icn{width:13px;height:13px;stroke-width:2.5}
+.qi-tip-text{font-size:12px;color:var(--green-800);line-height:1.5}
+.qi-tip-text b{font-weight:700;display:block;margin-bottom:2px}
+
+/* SVG sprite icon defaults */
+.icn{width:14px;height:14px;display:inline-block;vertical-align:middle;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* FOOTER */
+.mockup-foot{padding:18px 26px;text-align:center;color:var(--muted);font-size:11.5px;border-top:1px solid var(--border);background:var(--surface)}
+
+/* RESPONSIVE */
+@media(max-width:1100px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .dash-row-2{grid-template-columns:1fr}
+  .perf{grid-template-columns:repeat(2,1fr)}
+  .queue-grid{grid-template-columns:1fr}
 }
-.logo{height:36px;object-fit:contain;border-radius:6px}
-.logo-fb{color:white;font-size:17px;font-weight:700}
-.hdiv{width:1px;height:26px;background:rgba(255,255,255,.2)}
-.hsub{font-size:11px;font-weight:500;color:rgba(255,255,255,.6);letter-spacing:.1em;text-transform:uppercase}
-.hnav{display:flex;gap:2px}
-.nb{padding:8px 16px;border-radius:9px;border:none;font-family:var(--sans);font-size:13px;font-weight:500;cursor:pointer;color:rgba(255,255,255,.7);background:transparent;transition:all .18s;display:inline-flex;align-items:center;gap:6px}
-.nb:hover{background:rgba(255,255,255,.12);color:white}
-.nb.active{background:rgba(255,255,255,.2);color:white;font-weight:600}
-.nb .icn{opacity:.85}
-.nb.active .icn,.nb:hover .icn{opacity:1}
-.hright{display:flex;align-items:center;gap:10px}
-.ibadge{background:var(--gold);color:white;font-size:10px;font-weight:700;padding:4px 10px;border-radius:20px;letter-spacing:.08em;text-transform:uppercase}
-.sbtn{width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.8);cursor:pointer;display:flex;align-items:center;justify-content:center}
-.sbtn:hover{background:rgba(255,255,255,.2);color:white}
-
-/* === CONTAINER — wider for modern monitors === */
-.container{max-width:1320px;margin:0 auto;padding:2rem 2.5rem}
-
-/* === PAGE HEADER === */
-.ptitle{font-size:26px;font-weight:700;color:var(--text);letter-spacing:-.02em;margin-bottom:4px}
-.psub{font-size:14px;color:var(--muted)}
-
-/* === SYNC BAR — small live indicator above stats === */
-.sync-bar{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-bottom:1rem;padding:4px 2px;font-weight:500}
-.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;flex-shrink:0}
-.sync-bar .sep{opacity:.4}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-
-/* === STAT CARDS — neutral surface + colored accent strip === */
-.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:1.5rem}
-.sc{
-  position:relative;
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:16px;
-  padding:20px 22px 20px 26px;
-  box-shadow:var(--shadow-sm);
-  overflow:hidden;
-  min-width:0;
-  transition:transform .15s,box-shadow .15s;
-  cursor:default;
-}
-.sc:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
-.sc::before{
-  content:'';
-  position:absolute;
-  left:0;top:0;bottom:0;
-  width:4px;
-  border-radius:16px 0 0 16px;
-}
-.sc.tot::before{background:var(--muted2)}
-.sc.pen::before{background:var(--gold)}
-.sc.app::before{background:var(--green)}
-.sc.dec::before{background:var(--red)}
-
-.slbl{
-  font-size:11px;
-  font-weight:700;
-  text-transform:uppercase;
-  letter-spacing:.1em;
-  color:var(--muted);
-  margin-bottom:8px;
-  display:flex;
-  align-items:center;
-  gap:6px;
-}
-.slbl .icn{width:13px;height:13px}
-.sc.tot .slbl .icn{color:var(--muted2)}
-.sc.pen .slbl .icn{color:var(--gold-dark)}
-.sc.app .slbl .icn{color:var(--green)}
-.sc.dec .slbl .icn{color:var(--red)}
-
-.snum{font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1;margin-bottom:4px}
-.snum.def{color:var(--text)}
-.snum.gld{color:#d97706}
-.snum.grn{color:var(--green)}
-.snum.red{color:var(--red)}
-.spct{font-size:11px;font-weight:600;color:var(--muted);margin-top:4px}
-
-/* Mocked donut placeholders (the real app draws into <canvas>) */
-.donut{
-  flex-shrink:0;
-  width:56px;height:56px;
-  border-radius:50%;
-  position:relative;
-  opacity:.85;
-}
-.donut.tot{background:conic-gradient(var(--muted2) 0 100%,transparent 0);mask:radial-gradient(circle,transparent 55%,#000 56%);-webkit-mask:radial-gradient(circle,transparent 55%,#000 56%)}
-.donut.pen{background:conic-gradient(var(--gold) 0 56deg,#f0e4c4 56deg 360deg);mask:radial-gradient(circle,transparent 55%,#000 56%);-webkit-mask:radial-gradient(circle,transparent 55%,#000 56%)}
-.donut.app{background:conic-gradient(var(--green) 0 207deg,#cfe6d8 207deg 360deg);mask:radial-gradient(circle,transparent 55%,#000 56%);-webkit-mask:radial-gradient(circle,transparent 55%,#000 56%)}
-.donut.dec{background:conic-gradient(var(--red) 0 97deg,#f0d3cf 97deg 360deg);mask:radial-gradient(circle,transparent 55%,#000 56%);-webkit-mask:radial-gradient(circle,transparent 55%,#000 56%)}
-
-/* === BUTTONS === */
-.actbtn{padding:10px 18px;border-radius:9px;font-size:13px;font-weight:600;font-family:var(--sans);cursor:pointer;border:1.5px solid transparent;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
-.btn-ok{background:var(--green);color:white;border-color:var(--green)}
-.btn-ok:hover{background:var(--green-mid)}
-.btn-gh{background:white;color:var(--text2);border-color:var(--border2)}
-.btn-gh:hover{background:var(--bg)}
-
-/* === QUICK FILTER PILLS — slightly larger + group labels === */
-.qfp{padding:7px 14px;border-radius:999px;border:1px solid var(--border);background:#fff;font-size:12.5px;font-weight:600;color:var(--text2);cursor:pointer;font-family:var(--sans);transition:all .15s}
-.qfp:hover{border-color:var(--green);color:var(--green)}
-.qfp.active{background:var(--green);border-color:var(--green);color:#fff}
-.qf-group{
-  font-size:10px;
-  font-weight:700;
-  letter-spacing:.12em;
-  color:var(--muted);
-  padding:0 6px 0 2px;
-  text-transform:uppercase;
-}
-
-/* === TABLE CARD — tighter density, sticky thead === */
-.tcard{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-md);margin-top:.5rem}
-.ttb{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--surface2)}
-.sbox{display:flex;align-items:center;gap:8px;border:1px solid var(--border2);border-radius:9px;padding:9px 14px;background:white;flex:1;max-width:340px}
-.sbox input{border:none;background:none;font-size:14px;color:var(--text);outline:none;width:100%;font-family:var(--sans)}
-.fsel{border:1px solid var(--border2);border-radius:9px;padding:8px 12px;font-size:14px;background:white;color:var(--text);font-family:var(--sans);cursor:pointer}
-
-table{width:100%;border-collapse:collapse;font-size:14px}
-thead{background:var(--surface2);position:sticky;top:0;z-index:5}
-th{text-align:left;padding:11px 18px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border);background:var(--surface2)}
-td{padding:13px 18px;border-bottom:1px solid #edf1ee;vertical-align:middle}
-tbody tr{transition:background .12s;cursor:pointer}
-tbody tr:hover td{background:#f5f9f6}
-tbody tr:last-child td{border-bottom:none}
-.nbig{font-weight:700;color:var(--text);font-size:14px}
-.nsub{font-size:11px;color:var(--muted);margin-top:2px;font-family:var(--mono)}
-.abig{font-family:var(--mono);font-weight:600;color:var(--green);font-size:14px}
-.adim{color:var(--muted)}
-
-/* === STATUS PILLS === */
-.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;line-height:1}
-.pill::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.8}
-.pill-a{background:var(--green-light);color:var(--green);border:1px solid var(--green-border)}
-.pill-d{background:var(--red-light);color:var(--red);border:1px solid var(--red-border)}
-.pill-p{background:var(--gold-light);color:var(--gold-dark);border:1px solid var(--gold-border)}
-
-/* Inline action buttons in the table */
-.tact{padding:6px 11px;border-radius:7px;font-size:12px;font-weight:600;border:1px solid var(--border2);background:white;color:var(--text2);cursor:pointer;font-family:var(--sans)}
-.tact:hover{background:var(--bg);border-color:var(--muted2)}
-
-/* === ICON UTILITY === */
-.icn{width:16px;height:16px;flex-shrink:0;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke:currentColor}
-.icn-sm{width:13px;height:13px}
-
-/* === FOOTER NOTE (mockup-only) === */
-.mockup-note{
-  max-width:1320px;
-  margin:2rem auto;
-  padding:14px 20px;
-  background:var(--amber-light);
-  border:1px solid var(--amber-border);
-  border-radius:12px;
-  font-size:13px;
-  color:#7a5c00;
-  display:flex;
-  align-items:center;
-  gap:10px;
-}
-
-/* === RESPONSIVE === */
-@media(max-width:1024px){
-  .container{padding:1.5rem 1.25rem}
-}
-@media(max-width:768px){
-  .stats-row{grid-template-columns:repeat(2,1fr)}
-  .hnav{display:none}
-  .hsub,.hdiv{display:none}
-  table th:nth-child(4),table td:nth-child(4),
-  table th:nth-child(5),table td:nth-child(5){display:none}
+@media(max-width:760px){
+  .shell{grid-template-columns:1fr}
+  .subnav{display:none}
+  .topnav-search,.topnav-tabs,.topnav-user-meta{display:none}
+  .stats{grid-template-columns:1fr}
+  .perf{grid-template-columns:1fr}
 }
 </style>
 </head>
 <body>
 
-<!-- Icon sprite — only the icons used by the dashboard view -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
-    <symbol id="icn-dashboard" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></symbol>
-    <symbol id="icn-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></symbol>
-    <symbol id="icn-bank" viewBox="0 0 24 24"><line x1="3" y1="21" x2="21" y2="21"/><path d="M3 10l9-7 9 7"/><line x1="5" y1="10" x2="5" y2="21"/><line x1="9" y1="10" x2="9" y2="21"/><line x1="15" y1="10" x2="15" y2="21"/><line x1="19" y1="10" x2="19" y2="21"/></symbol>
-    <symbol id="icn-refresh" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/><path d="M20.49 15A9 9 0 0 1 5.64 18.36L1 14"/></symbol>
-    <symbol id="icn-check" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></symbol>
-    <symbol id="icn-x-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></symbol>
-    <symbol id="icn-inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
-    <symbol id="icn-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></symbol>
-    <symbol id="icn-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
-    <symbol id="icn-key" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></symbol>
-    <!-- NEW: clock icon for Pending stat card -->
-    <symbol id="icn-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L3 14h7v8l10-12h-7V2z"/></symbol>
+    <symbol id="i-overview" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></symbol>
+    <symbol id="i-pipeline" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><line x1="6" y1="8.5" x2="11" y2="15.5"/><line x1="18" y1="8.5" x2="13" y2="15.5"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><line x1="3" y1="20" x2="21" y2="20"/><rect x="6" y="11" width="3" height="9" rx="1"/><rect x="11" y="6" width="3" height="14" rx="1"/><rect x="16" y="14" width="3" height="6" rx="1"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/><path d="M20.49 15A9 9 0 0 1 5.64 18.36L1 14"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+    <symbol id="i-x-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><polyline points="6 15 12 9 18 15"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></symbol>
+    <symbol id="i-alert-bell" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></symbol>
   </defs>
 </svg>
 
-<!-- HEADER -->
-<header>
-  <div style="display:flex;align-items:center;gap:14px">
-    <div class="logo-fb">Cash in Flash</div>
-    <div class="hdiv"></div>
-    <div class="hsub">Underwriting Portal</div>
-  </div>
-  <div class="hnav">
-    <button class="nb active"><svg class="icn"><use href="#icn-dashboard"/></svg>Dashboard</button>
-    <button class="nb"><svg class="icn"><use href="#icn-file"/></svg>Analysis <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="opacity:.7"><polyline points="6 9 12 15 18 9"/></svg></button>
-    <button class="nb"><svg class="icn"><use href="#icn-bank"/></svg>Connections <span style="font-size:10px;opacity:.6;margin-left:2px">▾</span></button>
-    <button class="nb"><svg class="icn"><use href="#icn-file"/></svg>Instant Funding</button>
-  </div>
-  <div class="hright">
-    <div class="ibadge">Internal Only</div>
-    <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:9px;padding:5px 12px">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-      <span style="font-size:12px;font-weight:600;color:rgba(255,255,255,.85)">underwriter@cashinflash.com</span>
+<div class="mockup-banner">
+  <div><span class="pill">Mockup</span> &nbsp; Dashboard visual refresh — preview only. Not connected to a backend.</div>
+  <div class="right">Compare side-by-side with <code>/app</code></div>
+</div>
+
+<header class="topnav">
+  <a class="brand">
+    <div class="brand-mark"><svg viewBox="0 0 24 24"><use href="#i-bolt"/></svg></div>
+    <div class="brand-name">Cash in Flash</div>
+  </a>
+  <nav class="topnav-tabs">
+    <a class="tnt active"><svg class="icn"><use href="#i-overview"/></svg>Dashboard</a>
+    <a class="tnt"><svg class="icn"><use href="#i-pipeline"/></svg>Pipeline</a>
+    <a class="tnt"><svg class="icn"><use href="#i-chart"/></svg>Analytics</a>
+    <a class="tnt"><svg class="icn"><use href="#i-bell"/></svg>Alerts</a>
+  </nav>
+  <div class="topnav-spacer"></div>
+  <div class="topnav-search"><svg class="icn"><use href="#i-search"/></svg><input placeholder="Search applicants…"></div>
+  <div class="topnav-user">
+    <div class="topnav-avatar">JD</div>
+    <div>
+      <div class="topnav-user-name">Jamie Doe</div>
+      <div class="topnav-user-role">Underwriter</div>
     </div>
-    <button class="sbtn" title="Keyboard shortcuts (?)" style="font-size:13px;font-weight:700">?</button>
-    <button class="sbtn" title="Change my password"><svg class="icn icn-sm"><use href="#icn-key"/></svg></button>
-    <button class="sbtn" title="Sign Out"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
   </div>
 </header>
 
-<!-- DASHBOARD VIEW -->
-<div class="container">
-
-  <!-- Page header -->
-  <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:12px">
-    <div>
-      <div class="ptitle">Applications Dashboard</div>
-      <div class="psub">All decisions — synced across all devices</div>
+<div class="shell">
+  <aside class="subnav">
+    <div class="subnav-section">
+      <div class="subnav-label">Insights</div>
+      <button class="subnav-link active"><svg class="icn"><use href="#i-overview"/></svg>Overview</button>
+      <button class="subnav-link"><svg class="icn"><use href="#i-pipeline"/></svg>Pipeline</button>
+      <a class="subnav-link"><svg class="icn"><use href="#i-chart"/></svg>Analytics</a>
+      <a class="subnav-link"><svg class="icn"><use href="#i-alert-bell"/></svg>Alerts</a>
     </div>
-    <div style="display:flex;gap:10px">
-      <button class="actbtn btn-gh"><svg class="icn icn-sm"><use href="#icn-refresh"/></svg>Refresh</button>
-      <button class="actbtn btn-ok"><svg class="icn icn-sm"><use href="#icn-plus"/></svg>New Analysis</button>
+    <div class="subnav-foot">
+      <a class="subnav-link"><svg class="icn"><use href="#i-folder"/></svg>Reports</a>
+      <a class="subnav-link"><svg class="icn"><use href="#i-download"/></svg>Exports</a>
+      <a class="subnav-link"><svg class="icn"><use href="#i-settings"/></svg>Settings</a>
     </div>
-  </div>
+  </aside>
 
-  <!-- Sync indicator (uses #sync-status slot) -->
-  <div class="sync-bar">
-    <span class="sync-dot"></span>
-    <span>Synced just now</span>
-    <span class="sep">•</span>
-    <span>Live updates active</span>
-  </div>
+  <div class="main">
+    <div class="greet">
+      <div>
+        <div class="greet-title">Good afternoon, Jamie <span class="wave">👋</span></div>
+        <div class="greet-sub"><b>247</b> applications today &middot; <b>38</b> need review</div>
+      </div>
+      <div class="greet-actions">
+        <span class="sync-bar"><span class="sync-dot"></span><b>Synced just now</b><span class="sep">&middot;</span>Live</span>
+        <button class="btn btn-ghost"><svg class="icn"><use href="#i-refresh"/></svg>Refresh</button>
+        <a class="btn btn-primary"><svg class="icn"><use href="#i-plus"/></svg>New Analysis</a>
+      </div>
+    </div>
 
-  <!-- Stat cards -->
-  <div class="stats-row">
-    <div class="sc tot">
-      <div class="slbl"><svg class="icn icn-sm"><use href="#icn-inbox"/></svg>Total</div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="flex:1;min-width:0">
-          <div class="snum def">247</div>
-          <div class="spct">All applications</div>
+    <div class="time-range">
+      <button class="tf-btn active">Today</button>
+      <button class="tf-btn">Yesterday</button>
+      <button class="tf-btn">This Week</button>
+      <button class="tf-btn">Last Week</button>
+      <button class="tf-btn">This Month</button>
+      <button class="tf-btn">All Time</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat tot">
+        <div class="stat-label"><svg class="icn"><use href="#i-inbox"/></svg>Total Applications</div>
+        <div class="stat-value">247</div>
+        <div class="stat-trend up"><svg class="icn"><use href="#i-up"/></svg>+12%<span class="stat-trend-sub">vs yesterday</span></div>
+      </div>
+      <div class="stat pen">
+        <div class="stat-label"><svg class="icn"><use href="#i-clock"/></svg>Pending Review</div>
+        <div class="stat-value amber">38</div>
+        <div class="stat-trend flat"><span class="stat-trend-sub">needs review</span></div>
+      </div>
+      <div class="stat app">
+        <div class="stat-label"><svg class="icn"><use href="#i-check"/></svg>Approved</div>
+        <div class="stat-value green">142</div>
+        <div class="stat-trend up"><svg class="icn"><use href="#i-up"/></svg>57.5%<span class="stat-trend-sub">approval rate</span></div>
+      </div>
+      <div class="stat dec">
+        <div class="stat-label"><svg class="icn"><use href="#i-x-circle"/></svg>Declined</div>
+        <div class="stat-value red">67</div>
+        <div class="stat-trend down"><svg class="icn"><use href="#i-down"/></svg>27.1%<span class="stat-trend-sub">decline rate</span></div>
+      </div>
+    </div>
+
+    <div class="dash-row-2">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title"><svg class="icn"><use href="#i-pipeline"/></svg>Application Pipeline</div>
+          <button class="card-link">View all<svg class="icn"><use href="#i-arrow-right"/></svg></button>
         </div>
-        <div class="donut tot"></div>
+        <div class="donut-wrap">
+          <div class="donut">
+            <svg class="donut-svg" viewBox="0 0 36 36" width="144" height="144">
+              <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f1f5f3" stroke-width="3.5"/>
+              <circle cx="18" cy="18" r="15.915" fill="none" stroke="#16a34a" stroke-width="3.5" stroke-dasharray="57.5 100" stroke-dashoffset="0"/>
+              <circle cx="18" cy="18" r="15.915" fill="none" stroke="#dc2626" stroke-width="3.5" stroke-dasharray="27.1 100" stroke-dashoffset="-57.5"/>
+              <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f59e0b" stroke-width="3.5" stroke-dasharray="15.4 100" stroke-dashoffset="-84.6"/>
+            </svg>
+            <div class="donut-center"><div class="donut-center-num">247</div><div class="donut-center-lbl">Total</div></div>
+          </div>
+          <div class="donut-legend">
+            <div class="donut-leg-item"><span class="donut-leg-dot" style="background:#f59e0b"></span><span class="donut-leg-name">Pending</span><span class="donut-leg-value">38<span class="donut-leg-pct">15%</span></span></div>
+            <div class="donut-leg-item"><span class="donut-leg-dot" style="background:#16a34a"></span><span class="donut-leg-name">Approved</span><span class="donut-leg-value">142<span class="donut-leg-pct">57%</span></span></div>
+            <div class="donut-leg-item"><span class="donut-leg-dot" style="background:#dc2626"></span><span class="donut-leg-name">Declined</span><span class="donut-leg-value">67<span class="donut-leg-pct">27%</span></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title"><svg class="icn"><use href="#i-clock"/></svg>Today's Activity</div>
+          <button class="card-link">View all<svg class="icn"><use href="#i-arrow-right"/></svg></button>
+        </div>
+        <div class="activity">
+          <div class="activity-row">
+            <div class="act-icon ok">A</div>
+            <div class="act-text"><div class="act-label">Maria Rodriguez approved</div><div class="act-sub">Score 84 &middot; $2,500 offer</div></div>
+            <div class="act-time">3m ago</div>
+          </div>
+          <div class="activity-row">
+            <div class="act-icon new">N</div>
+            <div class="act-text"><div class="act-label">New application: Daniel Lee</div><div class="act-sub">Submitted via apply.cashinflash.com</div></div>
+            <div class="act-time">11m ago</div>
+          </div>
+          <div class="activity-row">
+            <div class="act-icon no">D</div>
+            <div class="act-text"><div class="act-label">James Carter declined</div><div class="act-sub">FCF below threshold</div></div>
+            <div class="act-time">28m ago</div>
+          </div>
+          <div class="activity-row">
+            <div class="act-icon warn">!</div>
+            <div class="act-text"><div class="act-label">Aging application: Priya Patel</div><div class="act-sub">Pending &gt; 18h</div></div>
+            <div class="act-time">42m ago</div>
+          </div>
+          <div class="activity-row">
+            <div class="act-icon ok">A</div>
+            <div class="act-text"><div class="act-label">Lakshmi Narayan approved</div><div class="act-sub">Score 79 &middot; $1,800 offer</div></div>
+            <div class="act-time">1h ago</div>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="sc pen">
-      <div class="slbl"><svg class="icn icn-sm"><use href="#icn-clock"/></svg>Pending</div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="flex:1;min-width:0">
-          <div class="snum gld">38</div>
-          <div class="spct">Awaiting review</div>
+
+    <div class="section">
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title"><svg class="icn"><use href="#i-chart"/></svg>Performance <span class="card-title-sub">(MTD)</span></div>
+          <a class="card-link">View report<svg class="icn"><use href="#i-arrow-right"/></svg></a>
         </div>
-        <div class="donut pen"></div>
+        <div class="perf">
+          <div class="perf-cell">
+            <div class="perf-label">Approval Rate</div>
+            <div class="perf-value">57.5<span class="unit">%</span></div>
+            <div class="perf-row3"><span class="perf-trend up"><svg class="icn"><use href="#i-up"/></svg>+3.2%</span><span class="spark"><svg viewBox="0 0 100 22" preserveAspectRatio="none"><polyline points="0,16 12,14 24,10 36,12 48,8 60,9 72,5 84,7 100,4" fill="none" stroke="#16a34a" stroke-width="1.6"/></svg></span></div>
+          </div>
+          <div class="perf-cell">
+            <div class="perf-label">Avg. FCF / Mo</div>
+            <div class="perf-value">$2,850</div>
+            <div class="perf-row3"><span class="perf-trend flat">free cash flow</span><span class="spark"><svg viewBox="0 0 100 22" preserveAspectRatio="none"><polyline points="0,12 12,11 24,13 36,10 48,11 60,8 72,11 84,9 100,10" fill="none" stroke="#22c55e" stroke-width="1.6"/></svg></span></div>
+          </div>
+          <div class="perf-cell">
+            <div class="perf-label">Avg. Score</div>
+            <div class="perf-value">71<span class="unit">/100</span></div>
+            <div class="perf-row3"><span class="perf-trend up"><svg class="icn"><use href="#i-up"/></svg>+1.4</span><span class="spark"><svg viewBox="0 0 100 22" preserveAspectRatio="none"><polyline points="0,14 12,12 24,13 36,11 48,11 60,9 72,10 84,7 100,7" fill="none" stroke="#16a34a" stroke-width="1.6"/></svg></span></div>
+          </div>
+          <div class="perf-cell">
+            <div class="perf-label">DTI</div>
+            <div class="perf-value">38<span class="unit">%</span></div>
+            <div class="perf-row3"><span class="perf-trend down"><svg class="icn"><use href="#i-down"/></svg>-1.1%</span></div>
+          </div>
+          <div class="perf-cell">
+            <div class="perf-label">Income Stability</div>
+            <div class="perf-value">86<span class="unit">%</span></div>
+            <div class="perf-row3"><span class="perf-trend flat">verified income</span></div>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="sc app">
-      <div class="slbl"><svg class="icn icn-sm"><use href="#icn-check"/></svg>Approved</div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="flex:1;min-width:0">
-          <div class="snum grn">142</div>
-          <div class="spct">57.5% approval rate</div>
+
+    <div class="section">
+      <div class="queue-head">
+        <div>
+          <div class="queue-title">Recent Applications</div>
+          <div class="queue-sub">Last 24 hours, grouped by day</div>
         </div>
-        <div class="donut app"></div>
       </div>
-    </div>
-    <div class="sc dec">
-      <div class="slbl"><svg class="icn icn-sm"><use href="#icn-x-circle"/></svg>Declined</div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="flex:1;min-width:0">
-          <div class="snum red">67</div>
-          <div class="spct">27.1% decline rate</div>
+
+      <div class="chips">
+        <span class="chip-group">View</span>
+        <button class="chip active">All<span class="chip-ct">247</span></button>
+        <button class="chip">Pending<span class="chip-ct">38</span></button>
+        <button class="chip">Approved<span class="chip-ct">142</span></button>
+        <button class="chip">Declined<span class="chip-ct">67</span></button>
+        <span class="chip-group">Source</span>
+        <button class="chip">apply<span class="chip-ct">189</span></button>
+        <button class="chip">docs<span class="chip-ct">58</span></button>
+        <button class="chip right"><svg class="icn" style="width:12px;height:12px"><use href="#i-download"/></svg>Export CSV</button>
+      </div>
+
+      <div class="queue-grid">
+        <div class="tbl-card">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Applicant</th>
+                <th>Application</th>
+                <th>Score</th>
+                <th>Status</th>
+                <th>Submitted</th>
+                <th>Last Activity</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="queue-group"><td colspan="6">Today &middot; May 9</td></tr>
+              <tr>
+                <td><div class="applicant"><div class="av">MR</div><div class="applicant-text"><div class="applicant-name">Maria Rodriguez <span class="src-badge src-apply">Apply</span></div><div class="applicant-id">#A-148293</div></div></div></td>
+                <td><div class="app-info"><span class="app-type">$2,500 · 8wk</span><span class="app-meta">FCF $3,180/mo</span></div></td>
+                <td><div class="score-circle sc-h">84</div></td>
+                <td><span class="status approved">Approved</span></td>
+                <td><span class="tbl-time">10:42 AM</span></td>
+                <td><span class="tbl-time">3m ago</span></td>
+              </tr>
+              <tr>
+                <td><div class="applicant"><div class="av">DL</div><div class="applicant-text"><div class="applicant-name">Daniel Lee <span class="src-badge src-apply">Apply</span></div><div class="applicant-id">#A-148292</div></div></div></td>
+                <td><div class="app-info"><span class="app-type">$1,800 · 6wk</span><span class="app-meta">FCF $2,420/mo</span></div></td>
+                <td><div class="score-circle sc-m">71</div></td>
+                <td><span class="status pending">Pending</span></td>
+                <td><span class="tbl-time">10:31 AM</span></td>
+                <td><span class="tbl-time">11m ago</span></td>
+              </tr>
+              <tr>
+                <td><div class="applicant"><div class="av">JC</div><div class="applicant-text"><div class="applicant-name">James Carter <span class="src-badge src-apply">Apply</span></div><div class="applicant-id">#A-148290</div></div></div></td>
+                <td><div class="app-info"><span class="app-type">$3,200 · 10wk</span><span class="app-meta">FCF $1,180/mo</span></div></td>
+                <td><div class="score-circle sc-l">42</div></td>
+                <td><span class="status declined">Declined</span></td>
+                <td><span class="tbl-time">10:14 AM</span></td>
+                <td><span class="tbl-time">28m ago</span></td>
+              </tr>
+              <tr>
+                <td><div class="applicant"><div class="av">PP</div><div class="applicant-text"><div class="applicant-name">Priya Patel <span class="src-badge src-docs">Docs</span></div><div class="applicant-id">#A-148281</div></div></div></td>
+                <td><div class="app-info"><span class="app-type">$2,000 · 8wk</span><span class="app-meta">FCF $2,950/mo</span></div></td>
+                <td><div class="score-circle sc-m">68</div></td>
+                <td><span class="status pending">Pending</span></td>
+                <td><span class="tbl-time">9:58 AM</span></td>
+                <td><span class="tbl-time">42m ago</span></td>
+              </tr>
+              <tr class="queue-group"><td colspan="6">Yesterday &middot; May 8</td></tr>
+              <tr>
+                <td><div class="applicant"><div class="av">LN</div><div class="applicant-text"><div class="applicant-name">Lakshmi Narayan <span class="src-badge src-apply">Apply</span></div><div class="applicant-id">#A-148270</div></div></div></td>
+                <td><div class="app-info"><span class="app-type">$1,800 · 6wk</span><span class="app-meta">FCF $2,560/mo</span></div></td>
+                <td><div class="score-circle sc-h">79</div></td>
+                <td><span class="status approved">Approved</span></td>
+                <td><span class="tbl-time">5:18 PM</span></td>
+                <td><span class="tbl-time">1h ago</span></td>
+              </tr>
+              <tr>
+                <td><div class="applicant"><div class="av">RW</div><div class="applicant-text"><div class="applicant-name">Robert Washington <span class="src-badge src-docs">Docs</span></div><div class="applicant-id">#A-148265</div></div></div></td>
+                <td><div class="app-info"><span class="app-type">$2,400 · 8wk</span><span class="app-meta">FCF $2,890/mo</span></div></td>
+                <td><div class="score-circle sc-h">82</div></td>
+                <td><span class="status approved">Approved</span></td>
+                <td><span class="tbl-time">3:02 PM</span></td>
+                <td><span class="tbl-time">Yesterday</span></td>
+              </tr>
+              <tr>
+                <td><div class="applicant"><div class="av">SE</div><div class="applicant-text"><div class="applicant-name">Sarah Edwards <span class="src-badge src-apply">Apply</span></div><div class="applicant-id">#A-148259</div></div></div></td>
+                <td><div class="app-info"><span class="app-type">$1,500 · 6wk</span><span class="app-meta">FCF $1,690/mo</span></div></td>
+                <td><div class="score-circle sc-m">66</div></td>
+                <td><span class="status pending">Pending</span></td>
+                <td><span class="tbl-time">1:47 PM</span></td>
+                <td><span class="tbl-time">Yesterday</span></td>
+              </tr>
+              <tr>
+                <td><div class="applicant"><div class="av">TG</div><div class="applicant-text"><div class="applicant-name">Tomas Garcia <span class="src-badge src-apply">Apply</span></div><div class="applicant-id">#A-148254</div></div></div></td>
+                <td><div class="app-info"><span class="app-type">$2,800 · 10wk</span><span class="app-meta">FCF $980/mo</span></div></td>
+                <td><div class="score-circle sc-l">38</div></td>
+                <td><span class="status declined">Declined</span></td>
+                <td><span class="tbl-time">11:22 AM</span></td>
+                <td><span class="tbl-time">Yesterday</span></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <div class="donut dec"></div>
+
+        <div class="qi-card">
+          <div class="qi-section">
+            <div class="qi-title">Status Distribution</div>
+            <div class="qi-row"><span class="qi-name">Pending</span><span class="qi-num">38</span></div>
+            <div class="qi-row ok"><span class="qi-name">Approved</span><span class="qi-num">142</span></div>
+            <div class="qi-row warn"><span class="qi-name">Declined</span><span class="qi-num">67</span></div>
+          </div>
+          <div class="qi-section">
+            <div class="qi-title">Aging</div>
+            <div class="qi-row warn"><span class="qi-name">&gt; 24 hours</span><span class="qi-num">4</span></div>
+            <div class="qi-row med"><span class="qi-name">12 — 24 hours</span><span class="qi-num">11</span></div>
+            <div class="qi-row ok"><span class="qi-name">&lt; 12 hours</span><span class="qi-num">23</span></div>
+          </div>
+          <div class="qi-section">
+            <div class="qi-title">Today</div>
+            <div class="qi-row"><span class="qi-name">New today</span><span class="qi-num">28</span></div>
+            <div class="qi-row"><span class="qi-name">Decisions today</span><span class="qi-num">17</span></div>
+          </div>
+          <div class="qi-tip">
+            <div class="qi-tip-icn"><svg class="icn"><use href="#i-info"/></svg></div>
+            <div class="qi-tip-text"><b>Tip</b>Click any applicant to open their full report.</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
-
-  <!-- Quick filter pills -->
-  <div id="quick-filters" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
-    <span class="qf-group">View</span>
-    <button class="qfp active">All</button>
-    <button class="qfp">Today</button>
-    <button class="qfp">Pending</button>
-    <button class="qfp">Pending &gt; 24h</button>
-    <button class="qfp">Declined</button>
-    <button class="qfp">Approved</button>
-    <button class="qfp">Auto-decide candidates</button>
-    <span class="qf-group" style="margin-left:8px">Audit</span>
-    <button class="qfp">Review required</button>
-    <button class="qfp">Low confidence</button>
-    <button class="qfp">Reconciliation failed</button>
-    <button class="qfp" style="margin-left:auto;border-color:var(--green);color:var(--green)">Export CSV</button>
-  </div>
-
-  <!-- Table card -->
-  <div class="tcard">
-    <div class="ttb">
-      <div class="sbox">
-        <svg class="icn icn-sm" style="color:var(--muted)"><use href="#icn-search"/></svg>
-        <input type="text" placeholder="Search applicants... (press / to focus)">
-      </div>
-      <select class="fsel">
-        <option>All statuses</option>
-        <option>Approved</option>
-        <option>Declined</option>
-        <option>Pending</option>
-      </select>
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th style="width:32px"><input type="checkbox" style="cursor:pointer"></th>
-          <th>Applicant</th>
-          <th>Status</th>
-          <th>Amount</th>
-          <th>Income</th>
-          <th>Submitted</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><input type="checkbox" style="cursor:pointer"></td>
-          <td>
-            <div class="nbig">Jordan Carrillo</div>
-            <div class="nsub">jordan.c@gmail.com · 555-0142</div>
-          </td>
-          <td><span class="pill pill-a">Approved</span></td>
-          <td><span class="abig">$2,400</span></td>
-          <td><span class="abig adim">$5,820/mo</span></td>
-          <td><span class="nsub" style="margin:0">2 min ago</span></td>
-          <td style="text-align:right"><button class="tact">View</button></td>
-        </tr>
-        <tr>
-          <td><input type="checkbox" style="cursor:pointer"></td>
-          <td>
-            <div class="nbig">Priya Mehta</div>
-            <div class="nsub">priya.mehta@outlook.com · 555-0288</div>
-          </td>
-          <td><span class="pill pill-p">Pending</span></td>
-          <td><span class="abig">$1,800</span></td>
-          <td><span class="abig adim">$4,310/mo</span></td>
-          <td><span class="nsub" style="margin:0">14 min ago</span></td>
-          <td style="text-align:right"><button class="tact">View</button></td>
-        </tr>
-        <tr>
-          <td><input type="checkbox" style="cursor:pointer"></td>
-          <td>
-            <div class="nbig">Marcus Whitfield</div>
-            <div class="nsub">m.whitfield@yahoo.com · 555-0317</div>
-          </td>
-          <td><span class="pill pill-d">Declined</span></td>
-          <td><span class="abig adim">—</span></td>
-          <td><span class="abig adim">$2,140/mo</span></td>
-          <td><span class="nsub" style="margin:0">42 min ago</span></td>
-          <td style="text-align:right"><button class="tact">View</button></td>
-        </tr>
-        <tr>
-          <td><input type="checkbox" style="cursor:pointer"></td>
-          <td>
-            <div class="nbig">Sofia Andersson</div>
-            <div class="nsub">sofia.a.92@gmail.com · 555-0451</div>
-          </td>
-          <td><span class="pill pill-a">Approved</span></td>
-          <td><span class="abig">$3,200</span></td>
-          <td><span class="abig adim">$7,490/mo</span></td>
-          <td><span class="nsub" style="margin:0">1 hr ago</span></td>
-          <td style="text-align:right"><button class="tact">View</button></td>
-        </tr>
-        <tr>
-          <td><input type="checkbox" style="cursor:pointer"></td>
-          <td>
-            <div class="nbig">Devonte Brooks</div>
-            <div class="nsub">devonte.b@hotmail.com · 555-0629</div>
-          </td>
-          <td><span class="pill pill-p">Pending</span></td>
-          <td><span class="abig">$2,100</span></td>
-          <td><span class="abig adim">$5,025/mo</span></td>
-          <td><span class="nsub" style="margin:0">2 hr ago</span></td>
-          <td style="text-align:right"><button class="tact">View</button></td>
-        </tr>
-        <tr>
-          <td><input type="checkbox" style="cursor:pointer"></td>
-          <td>
-            <div class="nbig">Aisha Rahman</div>
-            <div class="nsub">aisha.r@protonmail.com · 555-0773</div>
-          </td>
-          <td><span class="pill pill-a">Approved</span></td>
-          <td><span class="abig">$1,500</span></td>
-          <td><span class="abig adim">$3,890/mo</span></td>
-          <td><span class="nsub" style="margin:0">3 hr ago</span></td>
-          <td style="text-align:right"><button class="tact">View</button></td>
-        </tr>
-        <tr>
-          <td><input type="checkbox" style="cursor:pointer"></td>
-          <td>
-            <div class="nbig">Tomás Vargas</div>
-            <div class="nsub">tomas.v.dev@gmail.com · 555-0894</div>
-          </td>
-          <td><span class="pill pill-d">Declined</span></td>
-          <td><span class="abig adim">—</span></td>
-          <td><span class="abig adim">$1,820/mo</span></td>
-          <td><span class="nsub" style="margin:0">5 hr ago</span></td>
-          <td style="text-align:right"><button class="tact">View</button></td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-
 </div>
 
-<!-- Footer mockup note -->
-<div class="mockup-note">
-  <svg class="icn" style="color:#a07820"><use href="#icn-file"/></svg>
-  <div>
-    <strong>Mockup preview</strong> — open this file directly in a browser. Not connected to any backend; numbers and applicants are sample data. Resize the window to test responsive behaviour.
-  </div>
+<div class="mockup-foot">
+  Mockup preview &middot; visual refinements layered on the current Concept 8 dashboard. No backend, no JS.
+  Refresh / chip / filter buttons are non-functional in this preview.
 </div>
 
 </body>

@@ -510,6 +510,22 @@ button,input,select{font-family:inherit}
 .doc-preview-empty{padding:36px 24px;color:var(--muted);font-size:13.5px;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius)}
 .doc-preview-empty-icn{font-size:30px;margin-bottom:10px}
 .notes-text{font-size:13.5px;line-height:1.6;color:var(--text2);padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;min-height:80px;white-space:pre-wrap;margin-bottom:12px;max-height:380px;overflow-y:auto}
+
+/* Source badge — shows whether the application came in via
+   apply.cashinflash.com (long form) or docs.cashinflash.com
+   (returning-customer doc upload). Visible in the queue, search
+   dropdown, and detail hero so operators don't have to peek at the
+   Application tab to figure out which form was used. */
+.src-badge{display:inline-flex;align-items:center;font-size:9.5px;font-weight:800;letter-spacing:.06em;padding:2px 7px;border-radius:5px;text-transform:uppercase;line-height:1.4;flex-shrink:0;white-space:nowrap}
+.src-badge.src-apply{background:var(--green-100);color:var(--green-800);border:1px solid var(--green-200)}
+.src-badge.src-docs{background:var(--blue-100);color:var(--blue-700);border:1px solid var(--blue-100)}
+/* On the green hero the contrast flips — both variants get a translucent white background. */
+.dv-hero .src-badge{background:rgba(255,255,255,.92);color:var(--green-dark);border-color:rgba(255,255,255,.6)}
+.dv-hero .src-badge.src-docs{color:var(--blue-700)}
+
+/* Queue group-by-day header rows */
+.queue-group td{padding:14px 14px 6px !important;background:var(--bg) !important;border-bottom:none !important;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.queue-group:hover td{background:var(--bg) !important;cursor:default}
 .notes-text.empty{color:var(--muted);font-style:italic}
 .note-entry{padding:10px 12px;background:white;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;white-space:normal}
 .note-entry:last-child{margin-bottom:0}
@@ -1066,7 +1082,7 @@ button,input,select{font-family:inherit}
         <div class="dv-hero-left">
           <div class="dv-hero-av" id="dv-av">—</div>
           <div class="dv-hero-text">
-            <div class="dv-hero-name"><span id="dv-name">—</span> <span class="dv-hero-pill" id="dv-pill">—</span></div>
+            <div class="dv-hero-name"><span id="dv-name">—</span> <span class="dv-hero-pill" id="dv-pill">—</span> <span id="dv-source-badge"></span></div>
             <div class="dv-hero-meta" id="dv-meta">—</div>
           </div>
         </div>
@@ -1321,6 +1337,38 @@ function _fmtDLDate(s) {
   // Already MM/DD/YYYY-ish — leave alone
   if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(str)) return str;
   return str;
+}
+
+function _sourceOf(a) {
+  // Treat anything except an explicit "docs" as the apply form. The
+  // apply submission path was the original; "docs" was added later, so
+  // older records may have null/empty source and should land on apply.
+  const s = (a && (a.source || '')).toLowerCase().trim();
+  return s === 'docs' ? 'docs' : 'apply';
+}
+function sourceBadge(a) {
+  const src = _sourceOf(a);
+  return src === 'docs'
+    ? '<span class="src-badge src-docs" title="Submitted via docs.cashinflash.com (returning customer)">DOCS</span>'
+    : '<span class="src-badge src-apply" title="Submitted via apply.cashinflash.com (full new-applicant form)">CASHINFLASH</span>';
+}
+
+// Group label for the queue's day separators. Today / Yesterday for
+// the most recent two days, "Wed, May 7" or "Wed, May 7, 2025" for
+// older.
+function _groupDateLabel(ts) {
+  if (!ts) return 'Unknown';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return 'Unknown';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dDay = new Date(d); dDay.setHours(0,0,0,0);
+  const dayMs = 24 * 3600 * 1000;
+  const diffDays = Math.round((today.getTime() - dDay.getTime()) / dayMs);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  const opts = { weekday: 'short', month: 'short', day: 'numeric' };
+  if (today.getFullYear() !== dDay.getFullYear()) opts.year = 'numeric';
+  return d.toLocaleDateString(undefined, opts);
 }
 
 function initials(name) {
@@ -1723,21 +1771,32 @@ function renderQueue() {
     tbody.innerHTML = `<tr><td colspan="6" class="tbl-empty">No applications match.</td></tr>`;
     return;
   }
-  tbody.innerHTML = list.map(a => {
+  // Group rows by day. Insert a "Today" / "Yesterday" / "Mon, May 7"
+  // separator row before the first record of each new day. The list is
+  // already sorted newest-first by createdAt.
+  const rows = [];
+  let lastGroup = null;
+  for (const a of list) {
+    const group = _groupDateLabel(a.createdAt);
+    if (group !== lastGroup) {
+      rows.push(`<tr class="queue-group"><td colspan="6">${escapeHtml(group)}</td></tr>`);
+      lastGroup = group;
+    }
     const sc = scoreClass(a.score);
     const sCls = statusClass(a.status);
     const idShort = (a.submissionId || a.firebaseId || '').slice(-6).toUpperCase();
     const appType = a.applicationData ? 'Application' : (a.filename ? 'Document' : 'Manual');
     const appMeta = a.amount ? a.amount.replace(/^N\/A$/, '—') : '';
-    return `<tr data-fb="${escapeHtml(a.firebaseId)}">
-      <td><div class="applicant"><div class="av">${escapeHtml(initials(a.name))}</div><div class="applicant-text"><div class="applicant-name">${escapeHtml(a.name || 'Unnamed')}</div><div class="applicant-id">#${escapeHtml(idShort)}</div></div></div></td>
+    rows.push(`<tr data-fb="${escapeHtml(a.firebaseId)}">
+      <td><div class="applicant"><div class="av">${escapeHtml(initials(a.name))}</div><div class="applicant-text"><div class="applicant-name">${escapeHtml(a.name || 'Unnamed')} ${sourceBadge(a)}</div><div class="applicant-id">#${escapeHtml(idShort)}</div></div></div></td>
       <td><div class="app-info"><div class="app-type">${escapeHtml(appType)}</div><div class="app-meta">${escapeHtml(appMeta)}</div></div></td>
       <td><span class="score-circle ${sc}">${a.score != null ? a.score : '—'}</span></td>
       <td><span class="status ${sCls}">${escapeHtml(a.status || 'Pending')}</span></td>
       <td><div class="tbl-time">${escapeHtml(a.date || '')}<br>${escapeHtml(a.time || '')}</div></td>
       <td><div class="tbl-time">${fmtTimeAgo(a.updatedAt || a.createdAt)}</div></td>
-    </tr>`;
-  }).join('');
+    </tr>`);
+  }
+  tbody.innerHTML = rows.join('');
 }
 
 // ───────── Detail ─────────
@@ -1754,6 +1813,8 @@ function renderDetail(fbId) {
   const pillEl = document.getElementById('dv-pill');
   pillEl.textContent = a.status || 'Pending';
   pillEl.className = 'dv-hero-pill ' + heroPillCls;
+  const srcBadgeEl = document.getElementById('dv-source-badge');
+  if (srcBadgeEl) srcBadgeEl.innerHTML = sourceBadge(a);
   document.getElementById('dv-meta').textContent = `Application #${(a.submissionId||a.firebaseId||'').slice(-8).toUpperCase()} · ${a.date||''} ${a.time||''}${a.email?' · '+a.email:''}`;
 
   // Loans + Avg Days Late — sourced from the Vergent loans cache.
@@ -2797,7 +2858,7 @@ function renderSearchDropdown(query) {
     const meta = (ad.email || a.email || '') || (ad.phone || a.phone || '') || (a.submissionId || a.firebaseId || '').slice(-8);
     return `<a class="search-dd-item${i === 0 ? ' kbd' : ''}" data-fb="${escapeHtml(a.firebaseId)}" data-idx="${i}">
       <div class="search-dd-av">${escapeHtml(initials(a.name))}</div>
-      <div class="search-dd-text"><div class="search-dd-name">${escapeHtml(a.name || 'Unnamed')}</div><div class="search-dd-meta">${escapeHtml(meta)}</div></div>
+      <div class="search-dd-text"><div class="search-dd-name">${escapeHtml(a.name || 'Unnamed')} ${sourceBadge(a)}</div><div class="search-dd-meta">${escapeHtml(meta)}</div></div>
       <span class="search-dd-status ${b}">${escapeHtml(a.status || 'Pending')}</span>
     </a>`;
   }).join('') + `<div class="search-dd-foot">${list.length} match${list.length === 1 ? '' : 'es'} — ↑↓ to navigate · Enter to open</div>`;
