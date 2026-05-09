@@ -704,13 +704,18 @@ button,input,select{font-family:inherit}
   .dv-main{padding:14px 13px 18px}
   .dv-rail{padding:14px 13px}
   .dv-tabs{padding:8px 6px}
-  /* Tighter top nav so the bell + user avatar always fit */
-  .topnav{padding:0 10px;gap:6px}
-  .topnav-search{width:0;flex:1;min-width:110px;max-width:none}
-  .brand{gap:6px}
-  .brand-icon{width:26px;height:26px;border-radius:6px}
-  .brand-img{display:block;height:14px;max-width:80px}  /* keep wordmark, just smaller */
+  /* Top nav on phones — bigger logo + search per operator request. The
+     bell + user avatar still fit because we trim other slots (sync-chip
+     hidden, sub-name hidden) and the search box flexes to fill. */
+  .topnav{padding:0 10px;gap:8px;height:64px}
+  .topnav-search{width:0;flex:1;min-width:140px;max-width:none;padding:9px 14px;border-radius:11px}
+  .topnav-search input{font-size:14px}
+  .topnav-search .icn{width:17px;height:17px}
+  .brand{gap:8px}
+  .brand-icon{width:34px;height:34px;border-radius:8px}
+  .brand-img{display:block;height:22px;max-width:130px}  /* bigger wordmark */
   .brand-name{display:none}
+  .topnav-user-meta{display:none}        /* free up width for the search */
   .sync-chip{display:none}        /* free up nav width on phones */
   /* Detail action bar — wrap into 2 rows on phones, compact buttons */
   /* Detail action bar — wrap into 2 rows on phones, compact buttons.
@@ -808,7 +813,6 @@ button,input,select{font-family:inherit}
   <nav class="topnav-tabs">
     <button class="tnt active" data-route="dashboard"><svg class="icn"><use href="#i-dashboard"/></svg>Dashboard</button>
     <button class="tnt" data-route="queue"><svg class="icn"><use href="#i-list"/></svg>Applications</button>
-    <a class="tnt" href="/app/legacy#analyze"><svg class="icn"><use href="#i-chart"/></svg>Analysis</a>
     <a class="tnt" href="/app/legacy#connections"><svg class="icn"><use href="#i-bank"/></svg>Connections<svg class="caret"><use href="#i-caret"/></svg></a>
   </nav>
   <div class="topnav-spacer"></div>
@@ -860,10 +864,6 @@ button,input,select{font-family:inherit}
         <div>
           <div class="greet-title">Good <span id="time-of-day">morning</span>, <span id="greet-name">there</span> <span class="wave">👋</span></div>
           <div class="greet-sub" id="greet-sub">Loading applications…</div>
-        </div>
-        <div class="greet-actions">
-          <button class="btn btn-ghost" id="refresh-btn"><svg class="icn"><use href="#i-refresh"/></svg>Refresh</button>
-          <a class="btn btn-primary" href="/app/legacy#analyze"><svg class="icn"><use href="#i-plus"/></svg>New Analysis</a>
         </div>
       </div>
 
@@ -997,10 +997,6 @@ button,input,select{font-family:inherit}
       <div>
         <div class="queue-title">Applications Queue</div>
         <div class="queue-sub" id="queue-sub">All applications across all statuses.</div>
-      </div>
-      <div class="greet-actions">
-        <button class="btn btn-ghost" id="refresh-queue-btn"><svg class="icn"><use href="#i-refresh"/></svg>Refresh</button>
-        <a class="btn btn-primary" href="/app/legacy#analyze"><svg class="icn"><use href="#i-plus"/></svg>New Analysis</a>
       </div>
     </div>
 
@@ -1998,8 +1994,9 @@ function renderDetail(fbId) {
   histEl.innerHTML = histHtml;
 
   // Notes tab — show the full thread (append-only). Older notes
-  // accumulate; the textarea is always empty so operators can write a
-  // new note without overwriting prior ones.
+  // accumulate; the textarea is preserved across polls so an operator
+  // mid-typing doesn't lose what they've written. Only cleared when
+  // switching to a different applicant (or via saveNotes after submit).
   const notesText = document.getElementById('dv-notes-text');
   const notesEdit = document.getElementById('dv-notes-edit');
   const thread = _readNotesThread(a);
@@ -2018,11 +2015,15 @@ function renderDetail(fbId) {
       return `<div class="note-entry"><div class="note-entry-meta">${escapeHtml(meta || '—')}</div><div class="note-entry-text">${escapeHtml(n.text || '')}</div></div>`;
     }).join('');
   }
-  notesEdit.value = '';
+  if (isNewApplicant) notesEdit.value = '';
 
-  // Action bar — pre-fill offer with current amount
-  const amtNum = parseAmount(a.amount);
-  document.getElementById('dv-offer-input').value = amtNum != null ? amtNum.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '';
+  // Action bar — pre-fill offer with current amount on applicant
+  // switch only. If we re-set it on every poll, an operator editing
+  // the offer would see their input reset every ~8s.
+  if (isNewApplicant) {
+    const amtNum = parseAmount(a.amount);
+    document.getElementById('dv-offer-input').value = amtNum != null ? amtNum.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '';
+  }
 
   // Vergent panel — render from cache, then refresh in background
   renderVergentPanel(fbId);
@@ -3384,9 +3385,12 @@ document.getElementById('note-templates-edit').addEventListener('click', _editNo
 renderNoteQuickPicks();
 document.getElementById('dv-offer-input').addEventListener('blur', () => { const id = _activeFbId(); if (id) saveOffer(id); });
 
-document.getElementById('refresh-btn').addEventListener('click', () => { toast('Refreshing…'); loadReports(); });
+// refresh-btn and refresh-queue-btn were removed from the dashboard
+// header per design — guard the listeners so a null element doesn't
+// throw at startup. The Quick Actions tile #refresh-btn-2 still exists.
+document.getElementById('refresh-btn')?.addEventListener('click', () => { toast('Refreshing…'); loadReports(); });
 document.getElementById('refresh-btn-2').addEventListener('click', () => { toast('Refreshing…'); loadReports(); });
-document.getElementById('refresh-queue-btn').addEventListener('click', () => { toast('Refreshing…'); loadReports(); });
+document.getElementById('refresh-queue-btn')?.addEventListener('click', () => { toast('Refreshing…'); loadReports(); });
 
 document.getElementById('time-range').addEventListener('click', (e) => {
   const btn = e.target.closest('.tf-btn[data-range]');
