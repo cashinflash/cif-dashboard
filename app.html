@@ -2533,12 +2533,41 @@ async function loadVergentLoans(fbId) {
 }
 
 // ───────── Vergent panel ─────────
+// One-shot guard: each fbId only gets auto-rechecked once per page
+// load. Operators can still click "Re-check" manually after that.
+const _autoRecheckedFbIds = new Set();
+
 async function loadVergentMatch(fbId) {
   try {
     const m = await fbGet(`reports/${fbId}/vergentMatch.json`);
     _vergentMatchCache[fbId] = m && typeof m === 'object' && !m.error ? m : null;
   } catch (e) {
     _vergentMatchCache[fbId] = null;
+  }
+  // docs.cashinflash.com submissions whose stored match is "not_found"
+  // (or absent / error) get one automatic recheck per page load. This
+  // covers existing records whose vergentMatch was written before the
+  // backend learned to search by full SSN — without it, the operator
+  // would have to click "Re-check" manually for every old docs record.
+  const cached = _vergentMatchCache[fbId];
+  const status = ((cached && cached.status) || '').toLowerCase();
+  const a = apps.find(x => x.firebaseId === fbId);
+  const isDocs = a && _sourceOf(a) === 'docs';
+  const stale = !cached || status === 'not_found' || status === 'error' || status === '';
+  if (isDocs && stale && !_autoRecheckedFbIds.has(fbId)) {
+    _autoRecheckedFbIds.add(fbId);
+    try {
+      const r = await fetch('/api/vergent-recheck', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ firebase_id: fbId, source: 'docs' }),
+      });
+      const d = await r.json();
+      if (d && d.vergentMatch) _vergentMatchCache[fbId] = d.vergentMatch;
+    } catch (e) {
+      console.warn('[vergent] docs auto-recheck failed', e);
+    }
   }
   if (document.body.dataset.firebaseId === fbId) {
     renderVergentPanel(fbId);
