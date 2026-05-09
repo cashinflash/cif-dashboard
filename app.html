@@ -662,7 +662,11 @@ button,input,select{font-family:inherit}
   .brand-name{display:none}
   .sync-chip{display:none}        /* free up nav width on phones */
   /* Detail action bar — wrap into 2 rows on phones, compact buttons */
-  .dv-bar{gap:6px;padding:6px 0}
+  /* Detail action bar — wrap into 2 rows on phones, compact buttons.
+     Sticky positioning is dropped on mobile; with the bar wrapping to
+     two rows, sticky was overlapping the hero (avatar's top got
+     clipped by the bar's z-index:50). */
+  .dv-bar{gap:6px;padding:6px 0;position:static;background:transparent}
   .dv-bar-actions{gap:4px;flex-wrap:wrap;width:100%;justify-content:flex-end}
   .dv-bar-actions .btn{padding:7px 10px;font-size:11.5px}
   .dv-bar-actions .btn .icn{width:13px;height:13px}
