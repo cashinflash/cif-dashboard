@@ -1643,6 +1643,7 @@ function renderDetail(fbId) {
   // (or the customer is new in Vergent), show "—" placeholders. The
   // panel re-renders when loadVergentLoans finishes, so these update
   // on their own.
+  const m = _vergentMatchCache[fbId];
   const loanCache = _vergentLoansCache[fbId];
   const vmStatus = m && (m.status || '').toLowerCase();
   const loansEl = document.getElementById('dv-loans-count');
