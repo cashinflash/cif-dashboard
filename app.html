@@ -501,8 +501,12 @@ button,input,select{font-family:inherit}
 .doc-preview-img{max-width:100%;max-height:340px;object-fit:contain;border-radius:8px;background:var(--bg)}
 .doc-preview-empty{padding:36px 24px;color:var(--muted);font-size:13.5px;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius)}
 .doc-preview-empty-icn{font-size:30px;margin-bottom:10px}
-.notes-text{font-size:13.5px;line-height:1.6;color:var(--text2);padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;min-height:80px;white-space:pre-wrap;margin-bottom:12px}
+.notes-text{font-size:13.5px;line-height:1.6;color:var(--text2);padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;min-height:80px;white-space:pre-wrap;margin-bottom:12px;max-height:380px;overflow-y:auto}
 .notes-text.empty{color:var(--muted);font-style:italic}
+.note-entry{padding:10px 12px;background:white;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;white-space:normal}
+.note-entry:last-child{margin-bottom:0}
+.note-entry-meta{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.note-entry-text{font-size:13.5px;color:var(--text);line-height:1.55;white-space:pre-wrap;word-break:break-word}
 .notes-edit{width:100%;min-height:140px;border:1.5px solid var(--border2);border-radius:10px;padding:12px 14px;font-size:13.5px;font-family:inherit;color:var(--text);background:white;resize:vertical;line-height:1.6;outline:none}
 .notes-edit:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--green-100)}
 
@@ -1865,17 +1869,28 @@ function renderDetail(fbId) {
   }
   histEl.innerHTML = histHtml;
 
-  // Notes tab
+  // Notes tab — show the full thread (append-only). Older notes
+  // accumulate; the textarea is always empty so operators can write a
+  // new note without overwriting prior ones.
   const notesText = document.getElementById('dv-notes-text');
   const notesEdit = document.getElementById('dv-notes-edit');
-  if (a.notes && String(a.notes).trim()) {
-    notesText.textContent = a.notes;
-    notesText.classList.remove('empty');
-  } else {
+  const thread = _readNotesThread(a);
+  if (thread.length === 0) {
     notesText.textContent = 'No notes yet.';
     notesText.classList.add('empty');
+    notesText.style.padding = '';
+  } else {
+    notesText.classList.remove('empty');
+    notesText.style.padding = '8px';
+    // Newest first.
+    notesText.innerHTML = thread.slice().reverse().map(n => {
+      const when = n.at ? new Date(n.at).toLocaleString() : '';
+      const author = n.author && n.author !== 'unknown' ? n.author : '';
+      const meta = [when, author].filter(Boolean).join(' · ');
+      return `<div class="note-entry"><div class="note-entry-meta">${escapeHtml(meta || '—')}</div><div class="note-entry-text">${escapeHtml(n.text || '')}</div></div>`;
+    }).join('');
   }
-  notesEdit.value = a.notes || '';
+  notesEdit.value = '';
 
   // Action bar — pre-fill offer with current amount
   const amtNum = parseAmount(a.amount);
@@ -2892,21 +2907,50 @@ function _editNoteTemplates() {
   renderNoteQuickPicks();
 }
 
+// Read a normalized notes thread off the application record. New
+// records use notesThread (array of {at, author, text}); older records
+// only have a single notes string. Both surface as a thread for
+// rendering.
+function _readNotesThread(a) {
+  if (Array.isArray(a.notesThread) && a.notesThread.length) {
+    return a.notesThread.filter(n => n && (n.text || '').trim());
+  }
+  if (a.notes && String(a.notes).trim()) {
+    return [{ at: a.notesUpdatedAt || a.updatedAt || a.createdAt, author: 'legacy', text: a.notes }];
+  }
+  return [];
+}
+
 async function saveNotes(fbId) {
   const a = apps.find(x => x.firebaseId === fbId);
   if (!a) return;
-  const notes = document.getElementById('dv-notes-edit').value;
-  const trimmed = (notes || '').trim();
+  const trimmed = (document.getElementById('dv-notes-edit').value || '').trim();
+  if (!trimmed) { toast('Type a note first', 'err'); return; }
   toast('Saving note…');
-  await fbPatchReport(fbId, { notes, notesUpdatedAt: Date.now() });
-  a.notes = notes;
-  a.notesUpdatedAt = Date.now();
+  // Append-only thread. Falls back to wrapping the legacy single-note
+  // string into the first thread entry so older records grow naturally.
+  const prior = _readNotesThread(a);
+  const entry = { at: Date.now(), author: _currentUser || 'unknown', text: trimmed };
+  const thread = prior.concat([entry]);
+  // Keep the legacy `notes` field in sync with the latest entry so
+  // anything still reading the old field (decision-checks tag, History
+  // tab "Note added" event) keeps working.
+  await fbPatchReport(fbId, {
+    notesThread: thread,
+    notes: trimmed,
+    notesUpdatedAt: entry.at,
+  });
+  a.notesThread = thread;
+  a.notes = trimmed;
+  a.notesUpdatedAt = entry.at;
+  // Clear the textarea so the operator can start a fresh note.
+  const ta = document.getElementById('dv-notes-edit');
+  if (ta) ta.value = '';
   toast('Note saved', 'ok');
   renderDetail(fbId);
-  // Best-effort: also push the note to Vergent so it surfaces on the
-  // customer's main page. Skips silently if the applicant hasn't been
-  // pushed to Vergent yet — operator gets a non-blocking toast.
-  if (trimmed) pushNoteToVergent(fbId, trimmed).catch(() => {});
+  // Best-effort: also push to Vergent. Skips silently if the applicant
+  // hasn't been pushed yet — operator gets a non-blocking toast.
+  pushNoteToVergent(fbId, trimmed).catch(() => {});
 }
 
 async function pushNoteToVergent(fbId, text) {
