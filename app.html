@@ -587,6 +587,7 @@ button,input,select{font-family:inherit}
 .vg-result.loading{background:var(--blue-50);color:var(--blue-700);border:1px solid var(--blue-100)}
 .vg-spinner{width:13px;height:13px;border:2px solid var(--blue-100);border-top-color:var(--blue);border-radius:50%;animation:vgspin .7s linear infinite;flex-shrink:0}
 @keyframes vgspin{to{transform:rotate(360deg)}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .vg-card.busy{position:relative;pointer-events:none;opacity:.92}
 .vg-card.busy::after{content:'';position:absolute;inset:0;border-radius:10px;background:repeating-linear-gradient(45deg,rgba(22,163,74,.04),rgba(22,163,74,.04) 8px,transparent 8px,transparent 16px);pointer-events:none}
 
@@ -1112,6 +1113,7 @@ button,input,select{font-family:inherit}
                 <div class="profile-status-label" id="profile-status-label">Checking Vergent…</div>
                 <div class="profile-status-sub" id="profile-status-sub">Loading customer profile</div>
               </div>
+              <span id="profile-bank-badge" style="display:none;align-items:center;gap:5px;background:var(--green-50);color:var(--green-dark);border:1px solid var(--green-200);padding:6px 11px;border-radius:999px;font-size:11.5px;font-weight:700;letter-spacing:.02em;margin-right:6px"><svg class="icn" style="width:13px;height:13px"><use href="#i-bank"/></svg>Bank Connected</span>
               <a class="btn btn-ghost" id="profile-vergent-link" href="#" target="_blank" rel="noopener" style="display:none"><svg class="icn"><use href="#i-external"/></svg>Open in Vergent</a>
             </div>
 
@@ -2388,6 +2390,17 @@ function renderProfilePanel(fbId) {
   const labelEl = document.getElementById('profile-status-label');
   const subEl = document.getElementById('profile-status-sub');
   const linkEl = document.getElementById('profile-vergent-link');
+
+  // Bank Connected badge — shown when the customer has an active Plaid
+  // access_token (meaning the App Links / Portal Links flow can re-pull
+  // a fresh asset report at any time without prompting the customer to
+  // reconnect). Asset-token-only records aren't "live" (token refers to
+  // a single static snapshot), so they don't qualify.
+  const bankBadgeEl = document.getElementById('profile-bank-badge');
+  if (bankBadgeEl) {
+    const hasActivePlaid = !!(a.plaidAccessToken || ad.plaidAccessToken);
+    bankBadgeEl.style.display = hasActivePlaid ? 'inline-flex' : 'none';
+  }
   if (linkEl) linkEl.style.display = 'none';
 
   if (!m) {
@@ -3693,7 +3706,7 @@ function openAppLinksDrawer(idx) {
           ? '<span style="font-size:10px;color:var(--amber-700);background:var(--amber-100);padding:2px 6px;border-radius:4px;font-weight:700">asset_token only</span>'
           : '<span style="font-size:10px;color:var(--red);background:var(--red-100);padding:2px 6px;border-radius:4px;font-weight:700">no token</span>');
     const refreshBtn = a.accessToken
-      ? `<button onclick="refreshFromPlaid('${escapeHtml(a.firebaseId)}')" id="plaidref-${escapeHtml(a.firebaseId)}" class="btn btn-ghost" style="font-size:11.5px;padding:6px 10px">Re-run report</button>`
+      ? `<button onclick="rerunAppLinkPlaid('${escapeHtml(a.firebaseId)}', this)" id="plaidref-${escapeHtml(a.firebaseId)}" class="btn btn-ghost" style="font-size:11.5px;padding:6px 10px">Re-run report</button>`
       : `<button disabled title="No access_token stored on this record — applicant must reconnect via the application form." class="btn btn-ghost" style="font-size:11.5px;padding:6px 10px;opacity:.5;cursor:not-allowed">Re-run (no token)</button>`;
     return `
       <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px;background:#fff">
@@ -3755,29 +3768,147 @@ function renderPortalPlaid(rows) {
     list.innerHTML = '<div class="tbl-empty">No portal connections yet. Customers who tap "Connect your bank" in the customer portal will appear here.</div>';
     return;
   }
+  // Match App Links table styling. All rows clickable — Portal source
+  // opens the per-customer Items drawer (with Re-run inside it),
+  // Application source falls through to the App Links drawer (since
+  // those records also live there).
   const sorted = rows.slice().sort((a,b) => (b.linkedAt||'').localeCompare(a.linkedAt||''));
-  list.innerHTML = sorted.map(r => {
-    const sub = r.accountSubtype ? r.accountSubtype.charAt(0).toUpperCase()+r.accountSubtype.slice(1) : '';
-    const mask = r.accountMask ? '···'+r.accountMask : '';
-    const bank = [sub, mask].filter(Boolean).join(' · ');
-    const phone = r.phoneLast4 ? '···'+r.phoneLast4 : '';
-    const meta = [r.email, phone].filter(Boolean).join(' · ');
-    const isPortal = r.source === 'Portal';
-    const sourcePill = isPortal
-      ? '<span style="display:inline-block;background:var(--blue-100);color:var(--blue-700);padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;margin-left:8px">PORTAL</span>'
-      : '<span style="display:inline-block;background:var(--green-100);color:var(--green-700);padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;margin-left:8px">APPLICATION</span>';
-    const onClick = isPortal && r.customerId ? `openPortalPlaidDrawer('${_esc(r.customerId)}')` : `void 0`;
-    const cursor = isPortal && r.customerId ? 'pointer' : 'default';
-    return `
-      <div class="ppl-row" onclick="${onClick}" style="cursor:${cursor};display:grid;grid-template-columns:1fr max-content;gap:14px;padding:14px 16px;border:1px solid var(--border);border-radius:10px;margin-bottom:10px;background:#fff;transition:background .12s ease" ${isPortal && r.customerId ? `onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='#fff'"` : ''}>
-        <div style="min-width:0">
-          <div style="font-weight:600;color:var(--text);font-size:14px;margin-bottom:2px">${escapeHtml(r.name || r.customerId || '(unknown)')}${sourcePill}</div>
-          <div style="font-size:12px;color:var(--muted)">${escapeHtml(meta || '—')}</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px">${escapeHtml(r.institutionName||'')} ${escapeHtml(bank ? '· '+bank : '')}</div>
-        </div>
-        <div style="text-align:right;font-size:11px;color:var(--muted);align-self:center;white-space:nowrap">${escapeHtml(_fmtDate(r.linkedAt) || '')}</div>
-      </div>`;
-  }).join('');
+  window._portalPlaidRendered = sorted;
+  list.innerHTML = `<div class="tbl-card"><table class="tbl">
+    <thead><tr>
+      <th>Customer</th><th>Bank</th><th>Account</th><th>Source</th><th>Linked</th>
+    </tr></thead>
+    <tbody>${sorted.map((r, i) => {
+      const sub = r.accountSubtype ? r.accountSubtype.charAt(0).toUpperCase()+r.accountSubtype.slice(1) : '';
+      const mask = r.accountMask ? '···'+r.accountMask : '';
+      const bank = [sub, mask].filter(Boolean).join(' · ');
+      const phone = r.phoneLast4 ? '···'+r.phoneLast4 : '';
+      const meta = [r.email, phone].filter(Boolean).join(' · ');
+      const isPortal = r.source === 'Portal';
+      const srcPill = isPortal
+        ? '<span style="display:inline-block;background:var(--blue-100);color:var(--blue-700);padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700">PORTAL</span>'
+        : '<span style="display:inline-block;background:var(--green-100);color:var(--green-700);padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700">APPLICATION</span>';
+      const onClick = `openPortalPlaidRow(${i})`;
+      return `
+        <tr onclick="${onClick}">
+          <td><div class="applicant-name">${escapeHtml(r.name || r.customerId || '(unknown)')}</div><div class="applicant-id">${escapeHtml(meta || '—')}</div></td>
+          <td><span class="tbl-time">${escapeHtml(r.institutionName||'—')}</span></td>
+          <td><span class="tbl-time">${escapeHtml(bank || '—')}</span></td>
+          <td>${srcPill}</td>
+          <td><span class="tbl-time">${escapeHtml(_fmtDate(r.linkedAt) || '—')}</span></td>
+        </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+}
+
+// Click handler for any Portal Links row. Portal-source rows go to the
+// per-Item drawer (with Re-run report). Application-source rows route
+// to the App Links drawer for that customer (if we can match by name
+// or email), otherwise fall through to the dashboard's detail view.
+function openPortalPlaidRow(idx) {
+  const list = window._portalPlaidRendered || [];
+  const r = list[idx];
+  if (!r) return;
+  if (r.source === 'Portal' && r.customerId) {
+    openPortalPlaidDrawer(r.customerId);
+    return;
+  }
+  // Application source — find the matching App Links customer group
+  // (same email/phone) and open that drawer instead so the operator
+  // gets the full re-run + history view.
+  const key = plaidCustomerKey(r.phoneLast4 || '', r.email || '');
+  if (allPlaidCustomers && allPlaidCustomers.length) {
+    const i = allPlaidCustomers.findIndex(c =>
+      (key && plaidCustomerKey(c.phone, c.email) === key) ||
+      (r.email && c.email && c.email.toLowerCase() === r.email.toLowerCase())
+    );
+    if (i >= 0) {
+      window._alLastList = allPlaidCustomers;
+      openAppLinksDrawer(i);
+      return;
+    }
+  }
+  // Last resort — load App Links data and try again.
+  loadPlaidCustomers().then(() => {
+    const i = (allPlaidCustomers || []).findIndex(c =>
+      (r.email && c.email && c.email.toLowerCase() === r.email.toLowerCase())
+    );
+    if (i >= 0) { window._alLastList = allPlaidCustomers; openAppLinksDrawer(i); }
+    else toast('No App Links record found for this customer', 'err');
+  });
+}
+
+// Re-run an App Links applicant through Plaid: kicks off /api/rerun-plaid
+// (which creates a FRESH asset report token, generates a new PDF,
+// uploads to Firebase Storage, updates bankStatementUrl + plaidAssetToken,
+// and re-runs the underwriting engine). Polls Firebase for the bank-
+// statement-URL change, then opens the refreshed report so the operator
+// sees the new PDF in the Documents tab.
+async function rerunAppLinkPlaid(fbId, btn) {
+  const a = apps.find(x => x.firebaseId === fbId);
+  if (!a) { toast('Applicant record missing', 'err'); return; }
+  const accessToken = a.plaidAccessToken || (a.applicationData && a.applicationData.plaidAccessToken) || '';
+  if (!accessToken) {
+    toast('No Plaid access_token on this record — applicant must reconnect.', 'err');
+    return;
+  }
+  if (!confirm(
+    'Pull a fresh Plaid asset report and re-run this applicant?\n\n' +
+    'This generates a brand-new asset report (~$5 cost), uploads the PDF, ' +
+    'and re-runs the underwriting engine. Takes ~30s-2min.'
+  )) return;
+
+  const baselineUrl = a.bankStatementUrl || '';
+  const baselineToken = a.plaidAssetToken || '';
+  if (btn) {
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+    btn.innerHTML = '<span style="display:inline-block;width:11px;height:11px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;margin-right:6px;vertical-align:-2px"></span> Generating…';
+  }
+
+  // Kick off the async backend rerun. /api/rerun-plaid returns 200
+  // immediately — the actual work happens in a daemon thread on cif-apply.
+  try {
+    await fetch('/api/rerun-plaid', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accessToken: accessToken,
+        firebaseId: fbId,
+        formData: a.applicationData || {},
+      }),
+    });
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = 'Re-run report'; }
+    toast('Re-run kickoff failed: ' + (e.message || e), 'err');
+    return;
+  }
+  toast('Plaid is generating the new report (~30s-2min)…');
+
+  // Poll Firebase for the updated bankStatementUrl / plaidAssetToken.
+  // 48 attempts × 5s = 4 min total.
+  const maxAttempts = 48;
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(r => setTimeout(r, 5000));
+    let rec;
+    try { rec = await fbGet(`reports/${fbId}.json`); }
+    catch (e) { continue; }
+    if (!rec) continue;
+    const urlChanged = rec.bankStatementUrl && rec.bankStatementUrl !== baselineUrl;
+    const tokenChanged = rec.plaidAssetToken && rec.plaidAssetToken !== baselineToken;
+    if (urlChanged || tokenChanged) {
+      const decision = (rec.claudeDecision || rec.status || 'updated').toString();
+      toast('Report ready — ' + decision, 'ok');
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = 'Re-run report'; }
+      await loadReports();
+      closeAppLinksDrawer();
+      setRoute('detail', fbId);
+      return;
+    }
+    if (btn) btn.innerHTML = `<span style="display:inline-block;width:11px;height:11px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;margin-right:6px;vertical-align:-2px"></span> Generating… (${(i+1)*5}s)`;
+  }
+  if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = 'Re-run report'; }
+  toast('Timed out after 4 min — check Render logs for /rerun-plaid', 'err');
 }
 
 async function openPortalPlaidDrawer(cid) {
