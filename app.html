@@ -988,6 +988,7 @@ button,input,select{font-family:inherit}
       <div class="dv-bar-actions">
         <button class="btn btn-ghost" id="dv-rerun-btn" title="Re-run the engine using stored data — no new Plaid pull"><svg class="icn"><use href="#i-refresh"/></svg>Re-Run Report</button>
         <button class="btn btn-ghost" id="dv-refresh-plaid-btn" title="Pull a fresh Plaid asset report and re-run"><svg class="icn"><use href="#i-refresh"/></svg>Refresh from Plaid</button>
+        <button class="btn btn-danger" id="dv-delete-btn" title="Permanently delete this application from Firebase"><svg class="icn"><use href="#i-x"/></svg>Delete</button>
         <span class="dv-bar-sep"></span>
         <button class="btn btn-danger" id="dv-decline-btn"><svg class="icn"><use href="#i-x"/></svg>Decline</button>
         <div class="offer-input-group">
@@ -1008,8 +1009,8 @@ button,input,select{font-family:inherit}
           </div>
         </div>
         <div class="dv-hero-stats" id="dv-stats">
-          <div class="dv-hero-stat"><div class="dv-hero-stat-lbl">Score</div><div class="dv-hero-stat-val" id="dv-score">—</div><div class="dv-hero-stat-tag" id="dv-score-tag">—</div></div>
-          <div class="dv-hero-stat"><div class="dv-hero-stat-lbl">Amount</div><div class="dv-hero-stat-val" id="dv-amount">—</div><div class="dv-hero-stat-tag" id="dv-amount-tag">—</div></div>
+          <div class="dv-hero-stat"><div class="dv-hero-stat-lbl">Loans</div><div class="dv-hero-stat-val" id="dv-loans-count">—</div><div class="dv-hero-stat-tag" id="dv-loans-tag">total</div></div>
+          <div class="dv-hero-stat"><div class="dv-hero-stat-lbl">Avg Days Late</div><div class="dv-hero-stat-val" id="dv-avg-days-late">—</div><div class="dv-hero-stat-tag" id="dv-avg-days-late-tag">across history</div></div>
           <div class="dv-hero-stat"><div class="dv-hero-stat-lbl">Status</div><div class="dv-hero-stat-val" id="dv-status">—</div><div class="dv-hero-stat-tag" id="dv-status-tag">—</div></div>
         </div>
       </div>
@@ -1637,17 +1638,51 @@ function renderDetail(fbId) {
   pillEl.className = 'dv-hero-pill ' + heroPillCls;
   document.getElementById('dv-meta').textContent = `Application #${(a.submissionId||a.firebaseId||'').slice(-8).toUpperCase()} · ${a.date||''} ${a.time||''}${a.email?' · '+a.email:''}`;
 
-  document.getElementById('dv-score').innerHTML = a.score != null ? `${a.score}<span class="unit">/100</span>` : '—';
-  const scoreTag = document.getElementById('dv-score-tag');
-  if (a.score >= 70) { scoreTag.textContent = 'Good'; scoreTag.className = 'dv-hero-stat-tag ok'; }
-  else if (a.score >= 40) { scoreTag.textContent = 'Fair'; scoreTag.className = 'dv-hero-stat-tag warn'; }
-  else if (a.score != null) { scoreTag.textContent = 'Low'; scoreTag.className = 'dv-hero-stat-tag no'; }
-  else { scoreTag.textContent = '—'; scoreTag.className = 'dv-hero-stat-tag'; }
-
-  document.getElementById('dv-amount').textContent = fmtMoney(a.amount);
-  const amtTag = document.getElementById('dv-amount-tag');
-  amtTag.textContent = a.amount && a.amount !== 'N/A' ? 'Requested' : '—';
-  amtTag.className = 'dv-hero-stat-tag ok';
+  // Loans + Avg Days Late — sourced from the Vergent loans cache.
+  // Cache populates async via loadVergentLoans; if it isn't ready yet
+  // (or the customer is new in Vergent), show "—" placeholders. The
+  // panel re-renders when loadVergentLoans finishes, so these update
+  // on their own.
+  const loanCache = _vergentLoansCache[fbId];
+  const vmStatus = m && (m.status || '').toLowerCase();
+  const loansEl = document.getElementById('dv-loans-count');
+  const loansTag = document.getElementById('dv-loans-tag');
+  const avgEl = document.getElementById('dv-avg-days-late');
+  const avgTag = document.getElementById('dv-avg-days-late-tag');
+  if (vmStatus !== 'found') {
+    loansEl.textContent = '—';
+    loansTag.textContent = 'no Vergent record';
+    loansTag.className = 'dv-hero-stat-tag';
+    avgEl.textContent = '—';
+    avgTag.textContent = 'no history';
+    avgTag.className = 'dv-hero-stat-tag';
+  } else if (!loanCache) {
+    loansEl.textContent = '…';
+    loansTag.textContent = 'loading';
+    loansTag.className = 'dv-hero-stat-tag';
+    avgEl.textContent = '…';
+    avgTag.textContent = 'loading';
+    avgTag.className = 'dv-hero-stat-tag';
+  } else {
+    const loans = loanCache.loans || [];
+    loansEl.textContent = loans.length;
+    loansTag.textContent = loans.length === 1 ? 'total' : 'total loans';
+    loansTag.className = 'dv-hero-stat-tag';
+    if (loans.length === 0) {
+      avgEl.textContent = '—';
+      avgTag.textContent = 'no history';
+      avgTag.className = 'dv-hero-stat-tag';
+    } else {
+      // Average across all loans — late-strings ("Not Late") parse to
+      // 0 in the backend's days_late field, so the average is honest.
+      const sum = loans.reduce((s, l) => s + Number(l.days_late || 0), 0);
+      const avg = Math.round((sum / loans.length) * 10) / 10;
+      avgEl.innerHTML = `${avg}<span class="unit"> d</span>`;
+      const everLate = loans.some(l => Number(l.days_late || 0) > 0);
+      avgTag.textContent = everLate ? 'across history' : 'always current';
+      avgTag.className = 'dv-hero-stat-tag ' + (avg >= 5 ? 'no' : avg > 0 ? 'warn' : 'ok');
+    }
+  }
 
   document.getElementById('dv-status').textContent = a.status || 'Pending';
   const stTag = document.getElementById('dv-status-tag');
@@ -2676,6 +2711,32 @@ async function fbPatchReport(fbId, data) {
   return r.json();
 }
 
+async function deleteApplication(fbId) {
+  const a = apps.find(x => x.firebaseId === fbId);
+  if (!a) return;
+  const name = a.name || 'this applicant';
+  if (!confirm(`Permanently delete ${name}'s application? This removes the record from Firebase and can't be undone.`)) return;
+  toast('Deleting application…');
+  try {
+    const r = await fetch(`${FB}/reports/${fbId}.json`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-Method': 'DELETE' },
+      body: '{}'
+    });
+    if (r.status === 401) { window.location.replace('/'); return; }
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    // Remove from local cache so the queue updates immediately.
+    const idx = apps.findIndex(x => x.firebaseId === fbId);
+    if (idx >= 0) apps.splice(idx, 1);
+    toast('Application deleted', 'ok');
+    // Reload from Firebase + bounce back to the queue.
+    setRoute('queue');
+    loadReports();
+  } catch (e) {
+    toast('Delete failed: ' + e.message, 'err');
+  }
+}
+
 async function setStatus(fbId, status) {
   const a = apps.find(x => x.firebaseId === fbId);
   if (!a) return;
@@ -2843,6 +2904,7 @@ document.getElementById('dv-approve-btn').addEventListener('click', async () => 
   await setStatus(id, 'Approved');
 });
 document.getElementById('dv-rerun-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) rerunEngine(id); });
+document.getElementById('dv-delete-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) deleteApplication(id); });
 document.getElementById('dv-refresh-plaid-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) refreshFromPlaid(id); });
 document.getElementById('dv-notes-save').addEventListener('click', () => { const id = _activeFbId(); if (id) saveNotes(id); });
 document.getElementById('dv-offer-input').addEventListener('blur', () => { const id = _activeFbId(); if (id) saveOffer(id); });
