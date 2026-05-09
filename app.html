@@ -2334,9 +2334,19 @@ function renderProfilePanel(fbId) {
         linkEl.style.display = '';
       }
     } else if (s === 'not_found' || s === 'new') {
-      statusEl.className = 'profile-status new';
-      labelEl.textContent = 'New Customer';
-      subEl.textContent = 'No prior Vergent record — Create + Push when ready';
+      // docs.cashinflash.com submissions are returning customers by
+      // definition — the link is only sent to people who already exist
+      // in Vergent. If auto-search couldn't match (partial info), don't
+      // call them "New"; ask the operator for the Vergent ID.
+      if (_sourceOf(a) === 'docs') {
+        statusEl.className = 'profile-status amb';
+        labelEl.textContent = 'Returning Customer';
+        subEl.textContent = 'Enter their Vergent ID in the panel to push documents';
+      } else {
+        statusEl.className = 'profile-status new';
+        labelEl.textContent = 'New Customer';
+        subEl.textContent = 'No prior Vergent record — Create + Push when ready';
+      }
     } else if (s === 'ambiguous') {
       statusEl.className = 'profile-status amb';
       labelEl.textContent = (m.matches || []).length + ' possible matches in Vergent';
@@ -2589,18 +2599,36 @@ function renderVergentPanel(fbId) {
       </div>
       <div class="vg-result" id="vg-result"></div>`;
   } else if (status === 'not_found' || status === 'new') {
-    statusPill.textContent = 'New';
-    statusPill.className = 'vg-status new';
-    card.innerHTML = `
-      <div class="vg-headline">No matching customer</div>
-      <div class="vg-meta">Will create a new Vergent record and push the selected documents.</div>
-      ${checkboxes}
-      <div class="vg-actions">
-        <button class="vg-btn vg-btn-primary" onclick="vergentPush('${fbId}', true)">+ Create + Push</button>
-      </div>
-      <div class="vg-id-row"><input class="vg-id-input" id="vg-manual-id" placeholder="…or use existing Vergent ID"><button class="vg-btn vg-btn-ghost" style="flex:0 0 auto" onclick="vergentUseManualId('${fbId}')">Use ID</button></div>
-      <div class="vg-actions"><button class="vg-btn vg-btn-ghost" onclick="vergentRecheck('${fbId}')">↻ Re-check</button></div>
-      <div class="vg-result" id="vg-result"></div>`;
+    // docs.cashinflash.com submissions are returning customers by
+    // definition (the link is only handed out to existing customers),
+    // so never offer Create+Push for them — surface manual ID entry
+    // as the primary action instead.
+    const a = apps.find(x => x.firebaseId === fbId);
+    const isDocs = a && _sourceOf(a) === 'docs';
+    if (isDocs) {
+      statusPill.textContent = 'Returning';
+      statusPill.className = 'vg-status amb';
+      card.innerHTML = `
+        <div class="vg-headline">Returning customer — enter Vergent ID</div>
+        <div class="vg-meta">docs.cashinflash.com submissions are existing customers. Enter their Vergent ID to push the selected documents.</div>
+        ${checkboxes}
+        <div class="vg-id-row"><input class="vg-id-input" id="vg-manual-id" placeholder="Vergent customer ID"><button class="vg-btn vg-btn-primary" style="flex:0 0 auto" onclick="vergentUseManualId('${fbId}')">↗ Push to ID</button></div>
+        <div class="vg-actions"><button class="vg-btn vg-btn-ghost" onclick="vergentRecheck('${fbId}')">↻ Re-check</button></div>
+        <div class="vg-result" id="vg-result"></div>`;
+    } else {
+      statusPill.textContent = 'New';
+      statusPill.className = 'vg-status new';
+      card.innerHTML = `
+        <div class="vg-headline">No matching customer</div>
+        <div class="vg-meta">Will create a new Vergent record and push the selected documents.</div>
+        ${checkboxes}
+        <div class="vg-actions">
+          <button class="vg-btn vg-btn-primary" onclick="vergentPush('${fbId}', true)">+ Create + Push</button>
+        </div>
+        <div class="vg-id-row"><input class="vg-id-input" id="vg-manual-id" placeholder="…or use existing Vergent ID"><button class="vg-btn vg-btn-ghost" style="flex:0 0 auto" onclick="vergentUseManualId('${fbId}')">Use ID</button></div>
+        <div class="vg-actions"><button class="vg-btn vg-btn-ghost" onclick="vergentRecheck('${fbId}')">↻ Re-check</button></div>
+        <div class="vg-result" id="vg-result"></div>`;
+    }
   } else if (status === 'ambiguous' && Array.isArray(m.matches)) {
     statusPill.textContent = m.matches.length + ' matches';
     statusPill.className = 'vg-status amb';
