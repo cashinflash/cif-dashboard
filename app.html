@@ -1279,7 +1279,10 @@ button,input,select{font-family:inherit}
         <div id="ppl-drawer-name" style="font-size:18px;font-weight:700;color:var(--text)"></div>
         <div id="ppl-drawer-meta" style="font-size:13px;color:var(--muted);margin-top:4px"></div>
       </div>
-      <button onclick="closePortalPlaidDrawer()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted)">&times;</button>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button onclick="refreshPortalPlaidDrawer()" title="Refresh balances" class="btn btn-ghost" style="font-size:12px;padding:6px 10px"><svg class="icn" style="width:13px;height:13px"><use href="#i-refresh"/></svg>Refresh</button>
+        <button onclick="closePortalPlaidDrawer()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted)">&times;</button>
+      </div>
     </div>
     <div id="ppl-drawer-body"><div class="tbl-loading">Loading…</div></div>
   </div>
@@ -3916,8 +3919,12 @@ async function openPortalPlaidDrawer(cid) {
   body.innerHTML = '<div class="tbl-loading">Loading…</div>';
   nameEl.textContent = 'Loading…';
   metaEl.textContent = '';
+  // Remember the active cid so the inline Refresh button can refetch.
+  window._pplActiveCid = cid;
   try {
-    const r = await fetch('/api/portal-plaid/customer/'+encodeURIComponent(cid), { credentials: 'include' });
+    // Cache-bust so portal admin returns fresh /accounts/get balances
+    // every time the operator opens the drawer (e.g. after a Re-run).
+    const r = await fetch('/api/portal-plaid/customer/'+encodeURIComponent(cid)+'?_='+Date.now(), { credentials: 'include', cache: 'no-store' });
     if (!r.ok) {
       body.innerHTML = `<div class="tbl-empty">Couldn't load (HTTP ${r.status})</div>`;
       return;
@@ -3966,6 +3973,14 @@ async function openPortalPlaidDrawer(cid) {
 function closePortalPlaidDrawer() {
   const drawer = document.getElementById('portal-plaid-drawer');
   if (drawer) drawer.style.display = 'none';
+  window._pplActiveCid = null;
+}
+
+// Re-fetch the currently-open drawer's data. Hits the customer endpoint
+// with a cache-buster so portal admin returns fresh /accounts/get balances.
+function refreshPortalPlaidDrawer() {
+  const cid = window._pplActiveCid;
+  if (cid) openPortalPlaidDrawer(cid);
 }
 
 async function rerunAssetReport(itemId, customerId, institutionName, btn) {
@@ -4055,6 +4070,21 @@ async function rerunAssetReport(itemId, customerId, institutionName, btn) {
     return;
   }
   const fbId = engineResult.firebase_id;
+  setStatus(`Decision: ${engineResult.decision || '?'} — saving PDF…`, 'var(--green)');
+  // Store the freshly-generated PDF on the new Firebase report so the
+  // Documents tab can render it. The dashboard fetches the bytes from
+  // the portal admin service (portal Plaid app holds the token) and
+  // forwards to cif-apply for Storage upload + bankStatementUrl patch.
+  // Best-effort: failures don't block opening the report.
+  try {
+    await fetch('/api/store-portal-pdf', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firebase_id: fbId, asset_report_token: token }),
+    });
+  } catch (e) {
+    console.warn('[portal-rerun] PDF store failed', e);
+  }
   setStatus(`Decision: ${engineResult.decision || '?'} — opening report…`, 'var(--green)');
   if (actions) {
     actions.innerHTML = `
