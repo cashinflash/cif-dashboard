@@ -813,7 +813,8 @@ button,input,select{font-family:inherit}
   <nav class="topnav-tabs">
     <button class="tnt active" data-route="dashboard"><svg class="icn"><use href="#i-dashboard"/></svg>Dashboard</button>
     <button class="tnt" data-route="queue"><svg class="icn"><use href="#i-list"/></svg>Applications</button>
-    <a class="tnt" href="/app/legacy#connections"><svg class="icn"><use href="#i-bank"/></svg>Connections<svg class="caret"><use href="#i-caret"/></svg></a>
+    <button class="tnt" data-route="applinks"><svg class="icn"><use href="#i-bank"/></svg>App Links</button>
+    <button class="tnt" data-route="portallinks"><svg class="icn"><use href="#i-bank"/></svg>Portal Links</button>
   </nav>
   <div class="topnav-spacer"></div>
   <div class="search-wrap">
@@ -1227,6 +1228,76 @@ button,input,select{font-family:inherit}
   </div>
 </div>
 
+<!-- APP LINKS — Plaid connections from cif-apply applications. Ported
+     from /app/legacy#plaid; same backend (Firebase reports + Plaid
+     refresh endpoint); same Plaid-token model. -->
+<div class="view" id="view-applinks">
+  <div class="main full">
+    <div class="greet">
+      <div>
+        <div class="greet-title">App Links</div>
+        <div class="greet-sub">Plaid connections from cif-apply applications — re-run reports anytime</div>
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <input type="text" id="plaid-search" placeholder="Search by name, phone or email..." oninput="filterPlaidCustomers(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+    </div>
+    <div id="plaid-list">
+      <div class="tbl-loading">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- PORTAL LINKS — Plaid connections from the customer portal. Ported
+     from /app/legacy#portal-plaid; same backend (PORTAL_ADMIN_SVC_*
+     env vars + /api/portal-plaid/* endpoints); same token model. -->
+<div class="view" id="view-portallinks">
+  <div class="main full">
+    <div class="greet">
+      <div>
+        <div class="greet-title">Portal Links</div>
+        <div class="greet-sub">Plaid connections from the customer portal — re-pull data anytime</div>
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <input type="text" id="portal-plaid-search" placeholder="Search by name, email, customer id, bank, or source…" oninput="filterPortalPlaid(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+    </div>
+    <div id="portal-plaid-list">
+      <div class="tbl-loading">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Drawer for one customer's Portal Plaid Items -->
+<div id="portal-plaid-drawer" style="display:none;position:fixed;inset:0;z-index:9999">
+  <div onclick="closePortalPlaidDrawer()" style="position:absolute;inset:0;background:rgba(0,0,0,.45)"></div>
+  <div style="position:absolute;right:0;top:0;bottom:0;width:min(640px,100%);background:#fff;box-shadow:-12px 0 30px rgba(0,0,0,.18);overflow-y:auto;padding:24px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px">
+      <div>
+        <div id="ppl-drawer-name" style="font-size:18px;font-weight:700;color:var(--text)"></div>
+        <div id="ppl-drawer-meta" style="font-size:13px;color:var(--muted);margin-top:4px"></div>
+      </div>
+      <button onclick="closePortalPlaidDrawer()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted)">&times;</button>
+    </div>
+    <div id="ppl-drawer-body"><div class="tbl-loading">Loading…</div></div>
+  </div>
+</div>
+
+<!-- Drawer for one customer's App Links applications -->
+<div id="app-links-drawer" style="display:none;position:fixed;inset:0;z-index:9999">
+  <div onclick="closeAppLinksDrawer()" style="position:absolute;inset:0;background:rgba(0,0,0,.45)"></div>
+  <div style="position:absolute;right:0;top:0;bottom:0;width:min(640px,100%);background:#fff;box-shadow:-12px 0 30px rgba(0,0,0,.18);overflow-y:auto;padding:24px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px">
+      <div>
+        <div id="al-drawer-name" style="font-size:18px;font-weight:700;color:var(--text)"></div>
+        <div id="al-drawer-meta" style="font-size:13px;color:var(--muted);margin-top:4px"></div>
+      </div>
+      <button onclick="closeAppLinksDrawer()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted)">&times;</button>
+    </div>
+    <div id="al-drawer-body"><div class="tbl-loading">Loading…</div></div>
+  </div>
+</div>
+
 <div class="toast-wrap" id="toasts"></div>
 
 <!-- Denial Email modal — ported from classic. POSTs to /api/send-denial
@@ -1408,6 +1479,8 @@ function setRoute(name, fbId) {
   if (name === 'detail' && fbId) renderDetail(fbId);
   if (name === 'queue') renderQueue();
   if (name === 'dashboard') renderDashboard();
+  if (name === 'applinks') loadPlaidCustomers();
+  if (name === 'portallinks') loadPortalPlaid();
   document.body.dataset.firebaseId = (name === 'detail' && fbId) ? fbId : '';
   if (name === 'detail' && fbId) {
     location.hash = '#fb=' + encodeURIComponent(fbId);
@@ -1424,6 +1497,8 @@ function readRouteFromHash() {
     return ['detail', fbId];
   }
   if (h === '#queue' || h === '#applications') return ['queue', null];
+  if (h === '#applinks' || h === '#plaid' || h === '#connections') return ['applinks', null];
+  if (h === '#portallinks' || h === '#portal-plaid') return ['portallinks', null];
   return ['dashboard', null];
 }
 
@@ -3478,6 +3553,407 @@ document.addEventListener('keydown', (e) => {
 });
 
 init();
+
+// ─────────────────────────────────────────────────────────────────────
+// CONNECTIONS — App Links + Portal Links
+// Ported from app-legacy.html (lines 4539-5224). All HTTP endpoints,
+// Firebase paths, and Plaid-token reads are byte-identical to the
+// classic flow so no Plaid tokens are at risk during the port.
+// Aliases bridge the legacy helper names (_esc, _fmtDate, openModal,
+// allPlaidCustomers) to their current-app equivalents.
+// ─────────────────────────────────────────────────────────────────────
+const _esc = escapeHtml;
+function _fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+}
+const openModal = (fbId) => setRoute('detail', fbId);
+let allPlaidCustomers = [];
+let allPortalPlaid = [];
+
+function plaidCustomerKey(phone, email) {
+  const p = (phone || '').replace(/\D/g, '');
+  const e = (email || '').trim().toLowerCase();
+  return (p + '|' + e) || null;
+}
+
+async function loadPlaidCustomers() {
+  const list = document.getElementById('plaid-list');
+  if (!list) return;
+  list.innerHTML = '<div class="tbl-loading">Loading…</div>';
+  try {
+    const data = await fbGet('reports.json');
+    if (!data) { allPlaidCustomers = []; renderPlaidCustomers([]); return; }
+    const groups = {};
+    Object.entries(data).forEach(([id, r]) => {
+      if (!r) return;
+      const bankMethod = (r.applicationData?.bankMethod || r.bankMethod || r.filename || '').toLowerCase();
+      const hasPlaidToken = !!(r.plaidAssetToken || r.plaidAccessToken);
+      const isPlaid = bankMethod.includes('plaid') || hasPlaidToken;
+      if (!isPlaid) return;
+      const phone = r.applicationData?.phone || '';
+      const email = r.applicationData?.email || '';
+      const fallbackName = r.name || `${r.applicationData?.firstName||''} ${r.applicationData?.lastName||''}`.trim();
+      const key = plaidCustomerKey(phone, email) || fallbackName || id;
+      const app = {
+        firebaseId: id, date: r.date || '', time: r.time || '',
+        createdAt: r.createdAt || 0,
+        accessToken: r.plaidAccessToken || r.applicationData?.plaidAccessToken || '',
+        assetToken: r.plaidAssetToken || '',
+        status: r.status || '', amount: r.amount || '',
+        decision: r.claudeDecision || '',
+      };
+      if (!groups[key]) groups[key] = { key, name: fallbackName, phone, email, applications: [] };
+      groups[key].applications.push(app);
+      if (!groups[key].name && fallbackName) groups[key].name = fallbackName;
+    });
+    allPlaidCustomers = Object.values(groups).map(g => {
+      g.applications.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+      const latest = g.applications[0] || {};
+      g.latestStatus = latest.status || '';
+      g.latestDate = latest.date || '';
+      g.latestCreatedAt = latest.createdAt || 0;
+      g.totalApps = g.applications.length;
+      return g;
+    }).sort((a,b) => b.latestCreatedAt - a.latestCreatedAt);
+    renderPlaidCustomers(allPlaidCustomers);
+  } catch (e) {
+    list.innerHTML = `<div class="tbl-empty">Error loading: ${escapeHtml(e.message||String(e))}</div>`;
+  }
+}
+
+function filterPlaidCustomers(q) {
+  if (!q) { renderPlaidCustomers(allPlaidCustomers); return; }
+  const lq = q.toLowerCase();
+  renderPlaidCustomers(allPlaidCustomers.filter(c =>
+    (c.name||'').toLowerCase().includes(lq) ||
+    (c.phone||'').includes(lq) ||
+    (c.email||'').toLowerCase().includes(lq)
+  ));
+}
+
+function _connStatusPill(s) {
+  const lo = (s || '').toLowerCase();
+  let cls = 'pending';
+  if (lo === 'approved') cls = 'approved';
+  else if (lo === 'declined') cls = 'declined';
+  return `<span class="status ${cls}">${escapeHtml(s || '—')}</span>`;
+}
+
+function renderPlaidCustomers(list) {
+  window._alLastList = list;
+  const el = document.getElementById('plaid-list');
+  if (!el) return;
+  if (!list.length) {
+    el.innerHTML = '<div class="tbl-empty">No Plaid customers found. Customers who connect via Plaid will appear here.</div>';
+    return;
+  }
+  el.innerHTML = `<div class="tbl-card"><table class="tbl">
+    <thead><tr>
+      <th>Customer</th><th>Phone</th><th>Latest Report</th><th>Apps</th><th>Latest Status</th>
+    </tr></thead>
+    <tbody>${list.map((c, i) => `
+      <tr onclick="openAppLinksDrawer(${i})">
+        <td><div class="applicant-name">${escapeHtml(c.name||'—')}</div><div class="applicant-id">${escapeHtml(c.email||'')}</div></td>
+        <td><span class="tbl-time">${escapeHtml(c.phone||'—')}</span></td>
+        <td><span class="tbl-time">${escapeHtml(c.latestDate||'—')}</span></td>
+        <td><span class="chip-ct">${c.totalApps}</span></td>
+        <td>${_connStatusPill(c.latestStatus)}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table></div>`;
+}
+
+function openAppLinksDrawer(idx) {
+  const drawer = document.getElementById('app-links-drawer');
+  const body = document.getElementById('al-drawer-body');
+  const nameEl = document.getElementById('al-drawer-name');
+  const metaEl = document.getElementById('al-drawer-meta');
+  if (!drawer || !body) return;
+  const list = window._alLastList || allPlaidCustomers;
+  const c = list[idx];
+  if (!c) return;
+  drawer.style.display = 'block';
+  nameEl.textContent = c.name || '—';
+  metaEl.textContent = [c.phone, c.email,
+                        `${c.totalApps} application${c.totalApps>1?'s':''}`,
+                        c.latestDate ? `latest ${c.latestDate}` : '']
+                       .filter(Boolean).join(' · ');
+  if (!c.applications || !c.applications.length) {
+    body.innerHTML = '<div class="tbl-empty">No applications</div>';
+    return;
+  }
+  body.innerHTML = c.applications.map(a => {
+    const stamp = `${escapeHtml(a.date||'—')}${a.time?(' • '+escapeHtml(a.time)):''}`;
+    const tokenBadge = a.accessToken
+      ? '<span style="font-size:10px;color:var(--green-dark);background:var(--green-100);padding:2px 6px;border-radius:4px;font-weight:700">access_token</span>'
+      : (a.assetToken
+          ? '<span style="font-size:10px;color:var(--amber-700);background:var(--amber-100);padding:2px 6px;border-radius:4px;font-weight:700">asset_token only</span>'
+          : '<span style="font-size:10px;color:var(--red);background:var(--red-100);padding:2px 6px;border-radius:4px;font-weight:700">no token</span>');
+    const refreshBtn = a.accessToken
+      ? `<button onclick="refreshFromPlaid('${escapeHtml(a.firebaseId)}')" id="plaidref-${escapeHtml(a.firebaseId)}" class="btn btn-ghost" style="font-size:11.5px;padding:6px 10px">Re-run report</button>`
+      : `<button disabled title="No access_token stored on this record — applicant must reconnect via the application form." class="btn btn-ghost" style="font-size:11.5px;padding:6px 10px;opacity:.5;cursor:not-allowed">Re-run (no token)</button>`;
+    return `
+      <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px;background:#fff">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="font-weight:600;color:var(--text)">${stamp}</div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            ${_connStatusPill(a.status)}
+            ${tokenBadge}
+          </div>
+        </div>
+        <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap">
+          <button onclick="closeAppLinksDrawer();openModal('${escapeHtml(a.firebaseId)}')" class="btn btn-ghost" style="font-size:11.5px;padding:6px 10px">Open report</button>
+          ${refreshBtn}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function closeAppLinksDrawer() {
+  const drawer = document.getElementById('app-links-drawer');
+  if (drawer) drawer.style.display = 'none';
+}
+
+async function loadPortalPlaid() {
+  const list = document.getElementById('portal-plaid-list');
+  if (!list) return;
+  list.innerHTML = '<div class="tbl-loading">Loading…</div>';
+  try {
+    const r = await fetch('/api/portal-plaid/customers', { credentials: 'include' });
+    if (!r.ok) {
+      list.innerHTML = `<div class="tbl-empty">Couldn't load Portal Links (HTTP ${r.status}). Check that PORTAL_ADMIN_SVC_* env vars are set in Render.</div>`;
+      return;
+    }
+    const d = await r.json();
+    allPortalPlaid = (d.rows || d.customers || d || []);
+    if (!Array.isArray(allPortalPlaid)) allPortalPlaid = [];
+    renderPortalPlaid(allPortalPlaid);
+  } catch (e) {
+    list.innerHTML = `<div class="tbl-empty">Network error: ${escapeHtml(e.message||String(e))}</div>`;
+  }
+}
+
+function filterPortalPlaid(q) {
+  if (!q) { renderPortalPlaid(allPortalPlaid); return; }
+  const lq = q.toLowerCase();
+  renderPortalPlaid(allPortalPlaid.filter(c =>
+    (c.name||'').toLowerCase().includes(lq) ||
+    (c.email||'').toLowerCase().includes(lq) ||
+    (c.customerId||'').toLowerCase().includes(lq) ||
+    (c.institutionName||'').toLowerCase().includes(lq) ||
+    (c.source||'').toLowerCase().includes(lq)
+  ));
+}
+
+function renderPortalPlaid(rows) {
+  const list = document.getElementById('portal-plaid-list');
+  if (!list) return;
+  if (!rows || !rows.length) {
+    list.innerHTML = '<div class="tbl-empty">No portal connections yet. Customers who tap "Connect your bank" in the customer portal will appear here.</div>';
+    return;
+  }
+  const sorted = rows.slice().sort((a,b) => (b.linkedAt||'').localeCompare(a.linkedAt||''));
+  list.innerHTML = sorted.map(r => {
+    const sub = r.accountSubtype ? r.accountSubtype.charAt(0).toUpperCase()+r.accountSubtype.slice(1) : '';
+    const mask = r.accountMask ? '···'+r.accountMask : '';
+    const bank = [sub, mask].filter(Boolean).join(' · ');
+    const phone = r.phoneLast4 ? '···'+r.phoneLast4 : '';
+    const meta = [r.email, phone].filter(Boolean).join(' · ');
+    const isPortal = r.source === 'Portal';
+    const sourcePill = isPortal
+      ? '<span style="display:inline-block;background:var(--blue-100);color:var(--blue-700);padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;margin-left:8px">PORTAL</span>'
+      : '<span style="display:inline-block;background:var(--green-100);color:var(--green-700);padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;margin-left:8px">APPLICATION</span>';
+    const onClick = isPortal && r.customerId ? `openPortalPlaidDrawer('${_esc(r.customerId)}')` : `void 0`;
+    const cursor = isPortal && r.customerId ? 'pointer' : 'default';
+    return `
+      <div class="ppl-row" onclick="${onClick}" style="cursor:${cursor};display:grid;grid-template-columns:1fr max-content;gap:14px;padding:14px 16px;border:1px solid var(--border);border-radius:10px;margin-bottom:10px;background:#fff;transition:background .12s ease" ${isPortal && r.customerId ? `onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='#fff'"` : ''}>
+        <div style="min-width:0">
+          <div style="font-weight:600;color:var(--text);font-size:14px;margin-bottom:2px">${escapeHtml(r.name || r.customerId || '(unknown)')}${sourcePill}</div>
+          <div style="font-size:12px;color:var(--muted)">${escapeHtml(meta || '—')}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${escapeHtml(r.institutionName||'')} ${escapeHtml(bank ? '· '+bank : '')}</div>
+        </div>
+        <div style="text-align:right;font-size:11px;color:var(--muted);align-self:center;white-space:nowrap">${escapeHtml(_fmtDate(r.linkedAt) || '')}</div>
+      </div>`;
+  }).join('');
+}
+
+async function openPortalPlaidDrawer(cid) {
+  const drawer = document.getElementById('portal-plaid-drawer');
+  const body = document.getElementById('ppl-drawer-body');
+  const nameEl = document.getElementById('ppl-drawer-name');
+  const metaEl = document.getElementById('ppl-drawer-meta');
+  if (!drawer || !body) return;
+  drawer.style.display = 'block';
+  body.innerHTML = '<div class="tbl-loading">Loading…</div>';
+  nameEl.textContent = 'Loading…';
+  metaEl.textContent = '';
+  try {
+    const r = await fetch('/api/portal-plaid/customer/'+encodeURIComponent(cid), { credentials: 'include' });
+    if (!r.ok) {
+      body.innerHTML = `<div class="tbl-empty">Couldn't load (HTTP ${r.status})</div>`;
+      return;
+    }
+    const d = await r.json();
+    nameEl.textContent = d.customerName || d.customerId;
+    metaEl.textContent = [d.customerEmail, d.customerPhoneLast4 ? '···'+d.customerPhoneLast4 : '', 'cid '+d.customerId].filter(Boolean).join(' · ');
+    const items = d.items || [];
+    if (!items.length) {
+      body.innerHTML = '<div class="tbl-empty">No connections</div>';
+      return;
+    }
+    body.innerHTML = items.map(it => {
+      const accountsHtml = (it.accounts || []).length
+        ? `<table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:8px">
+             <thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--border)">
+               <th style="padding:6px 8px">Account</th><th style="padding:6px 8px">Type</th><th style="padding:6px 8px;text-align:right">Current</th><th style="padding:6px 8px;text-align:right">Available</th>
+             </tr></thead>
+             <tbody>${(it.accounts||[]).map(a => `
+               <tr style="border-bottom:1px solid var(--border)">
+                 <td style="padding:6px 8px">${escapeHtml(a.officialName || a.name || '—')}${a.mask?` <span style="color:var(--muted)">···${escapeHtml(a.mask)}</span>`:''}</td>
+                 <td style="padding:6px 8px;color:var(--muted)">${escapeHtml((a.subtype||a.type||'—'))}</td>
+                 <td style="padding:6px 8px;text-align:right">${a.currentBalance!=null?'$'+Number(a.currentBalance).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'}</td>
+                 <td style="padding:6px 8px;text-align:right">${a.availableBalance!=null?'$'+Number(a.availableBalance).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'—'}</td>
+               </tr>`).join('')}</tbody>
+           </table>`
+        : '<div style="font-size:12px;color:var(--muted);margin-top:8px">No account detail returned by Plaid.</div>';
+      return `
+        <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px;background:#fff" data-asset-card="${escapeHtml(it.itemId || '')}">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+            <div style="font-weight:600;color:var(--text)">${escapeHtml(it.institutionName || 'Bank')}</div>
+            <div style="font-size:11px;color:var(--muted)">Linked ${escapeHtml(_fmtDate(it.linkedAt) || '')}</div>
+          </div>
+          ${accountsHtml}
+          <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:6px" data-asset-actions="${escapeHtml(it.itemId || '')}">
+            <button class="btn btn-ghost" onclick="rerunAssetReport('${escapeHtml(it.itemId || '')}', '${escapeHtml(d.customerId || '')}', '${escapeHtml((it.institutionName || '').replace(/'/g, '&#39;'))}', this)" style="font-size:11.5px;padding:6px 10px">Re-run report</button>
+          </div>
+          <div data-asset-status="${escapeHtml(it.itemId || '')}" style="margin-top:6px;font-size:11px;color:var(--muted);text-align:right"></div>
+        </div>`;
+    }).join('');
+  } catch (e) {
+    body.innerHTML = `<div class="tbl-empty">Network error: ${escapeHtml(e.message||String(e))}</div>`;
+  }
+}
+
+function closePortalPlaidDrawer() {
+  const drawer = document.getElementById('portal-plaid-drawer');
+  if (drawer) drawer.style.display = 'none';
+}
+
+async function rerunAssetReport(itemId, customerId, institutionName, btn) {
+  if (!itemId) return;
+  if (!confirm('This pulls a fresh Plaid asset report (~$5 cost) and runs the customer through engine_v3. Continue?')) return;
+  const card = document.querySelector(`[data-asset-card="${itemId}"]`);
+  const actions = card ? card.querySelector(`[data-asset-actions="${itemId}"]`) : null;
+  const status = card ? card.querySelector(`[data-asset-status="${itemId}"]`) : null;
+  const setStatus = (msg, color) => { if (status) { status.textContent = msg; status.style.color = color || 'var(--muted)'; } };
+  if (btn) { btn.disabled = true; btn.textContent = 'Triggering…'; }
+  let token = '';
+  try {
+    const res = await fetch(`/api/portal-plaid/asset-report/${encodeURIComponent(itemId)}`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      const code = data.errorCode || data.error || ('HTTP ' + res.status);
+      const hint = code === 'ITEM_LOGIN_REQUIRED' ? ' This connection has expired — ask the customer to reconnect from the portal Profile page.' : '';
+      if (btn) { btn.disabled = false; btn.textContent = 'Re-run report'; }
+      setStatus('Failed: ' + code + hint, 'var(--red)');
+      return;
+    }
+    token = data.assetReportToken || '';
+    if (!token) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Re-run report'; }
+      setStatus('Failed: no token returned', 'var(--red)');
+      return;
+    }
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Re-run report'; }
+    setStatus('Network error: ' + (e.message || e), 'var(--red)');
+    return;
+  }
+  if (btn) btn.textContent = 'Generating…';
+  setStatus('Generating asset report — Plaid typically takes 30s-2min…', 'var(--muted)');
+  let plaidReport = null;
+  const maxAttempts = 48;
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(r => setTimeout(r, 5000));
+    let pollData;
+    try {
+      const pollRes = await fetch(`/api/portal-plaid/asset-report/${encodeURIComponent(token)}`, { credentials: 'include' });
+      pollData = await pollRes.json().catch(() => ({}));
+    } catch (e) {
+      setStatus('Network error while polling — retrying…', 'var(--muted)');
+      continue;
+    }
+    if (pollData.ready === false) { setStatus(`Generating asset report… (${(i + 1) * 5}s)`, 'var(--muted)'); continue; }
+    if (pollData.ready === true) {
+      plaidReport = pollData.report || {};
+      const acctCount = (plaidReport.items || []).reduce((sum, it) => sum + ((it.accounts || []).length), 0);
+      setStatus(`Plaid report ready (${acctCount} accounts) — running v3 engine…`, 'var(--muted)');
+      break;
+    }
+    if (pollData.error || pollData.ok === false) {
+      const code = pollData.errorCode || pollData.error || 'unknown';
+      if (btn) { btn.disabled = false; btn.textContent = 'Re-run report'; }
+      setStatus('Failed: ' + code, 'var(--red)');
+      return;
+    }
+  }
+  if (!plaidReport) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Re-run report'; }
+    setStatus('Timed out after 4 minutes — Plaid usually takes ≤2 min. Try again.', 'var(--amber-700)');
+    return;
+  }
+  if (btn) btn.textContent = 'Running v3…';
+  let engineResult;
+  try {
+    const engineRes = await fetch('/api/portal-engine-v3', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vergent_customer_id: customerId, plaid_report: plaidReport, institution_name: institutionName || '' }),
+    });
+    engineResult = await engineRes.json().catch(() => ({}));
+    if (!engineRes.ok || !engineResult.ok || !engineResult.firebase_id) {
+      const code = engineResult.error || ('HTTP ' + engineRes.status);
+      if (btn) { btn.disabled = false; btn.textContent = 'Re-run report'; }
+      setStatus('Engine v3 failed: ' + code + (engineResult.detail ? ' — ' + engineResult.detail : ''), 'var(--red)');
+      return;
+    }
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Re-run report'; }
+    setStatus('Engine v3 network error: ' + (e.message || e), 'var(--red)');
+    return;
+  }
+  const fbId = engineResult.firebase_id;
+  setStatus(`Decision: ${engineResult.decision || '?'} — opening report…`, 'var(--green)');
+  if (actions) {
+    actions.innerHTML = `
+      <a href="/api/portal-plaid/asset-report/${encodeURIComponent(token)}/pdf" download class="btn btn-ghost" style="font-size:11.5px;padding:6px 10px;text-decoration:none">Download PDF</a>
+      <button class="btn btn-ghost" onclick="openPortalRerunReport('${escapeHtml(fbId)}')" style="font-size:11.5px;padding:6px 10px">Open report</button>
+      <button class="btn btn-ghost" onclick="rerunAssetReport('${escapeHtml(itemId)}','${escapeHtml(customerId)}','${escapeHtml((institutionName || '').replace(/'/g, '&#39;'))}',this)" style="font-size:11.5px;padding:6px 10px">Re-run again</button>`;
+  }
+  await openPortalRerunReport(fbId);
+}
+
+async function openPortalRerunReport(fbId) {
+  if (!fbId) return;
+  try {
+    const rec = await fbGet(`reports/${fbId}.json`);
+    if (!rec || rec.error) { toast('Couldn\'t load fresh report', 'err'); return; }
+    const idx = apps.findIndex(a => a.firebaseId === fbId);
+    const merged = { ...rec, firebaseId: fbId };
+    if (idx >= 0) apps[idx] = merged;
+    else apps.unshift(merged);
+    closePortalPlaidDrawer();
+    setRoute('detail', fbId);
+  } catch (e) {
+    toast('Open report failed: ' + (e.message || e), 'err');
+  }
+}
 </script>
 
 </body>
