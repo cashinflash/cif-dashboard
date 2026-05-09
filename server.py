@@ -1420,6 +1420,50 @@ class Handler(BaseHTTPRequestHandler):
         # applicationData from Vergent, runs engine_v3, persists to
         # /reports/{portal_<cid>_<ts>}, returns the synthetic firebase_id.
         # Dashboard then opens that record in the standard Report modal.
+        # Store a portal Plaid asset-report PDF on a Firebase report.
+        # Two-hop because the PDF lives behind the portal admin service
+        # (different Plaid app than cif-apply) and Firebase Storage admin
+        # access is in cif-apply:
+        #   1. We fetch the PDF here via _call_portal_admin_pdf.
+        #   2. Forward the bytes (base64) to cif-apply's /api/store-portal-pdf
+        #      which uploads to Firebase Storage + patches bankStatementUrl.
+        if path == '/api/store-portal-pdf':
+            try:
+                body = json.loads(raw)
+                fb_id = (body.get('firebase_id') or '').strip()
+                token = (body.get('asset_report_token') or '').strip()
+                if not fb_id or not token:
+                    self.send_json(400, {'error': 'Missing firebase_id or asset_report_token'})
+                    return
+                code, pdf_bytes, ctype = _call_portal_admin_pdf(
+                    f'/api/admin/plaid/asset-report/{token}/pdf',
+                )
+                if not pdf_bytes or (code and code >= 400):
+                    self.send_json(502, {
+                        'error': 'portal_pdf_fetch_failed',
+                        'detail': f'portal returned HTTP {code}',
+                    })
+                    return
+                import base64 as _b64
+                import urllib.request as ur
+                payload = json.dumps({
+                    'firebase_id': fb_id,
+                    'pdf_base64': _b64.b64encode(pdf_bytes).decode('ascii'),
+                    'asset_report_token': token,
+                }).encode()
+                req = ur.Request(
+                    'https://cif-apply.onrender.com/api/store-portal-pdf',
+                    data=payload, headers={'Content-Type': 'application/json'},
+                    method='POST',
+                )
+                with ur.urlopen(req, timeout=60) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except Exception as e:
+                print(f'[STORE-PORTAL-PDF PROXY ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         if path == '/api/portal-engine-v3':
             try:
                 body = json.loads(raw)
