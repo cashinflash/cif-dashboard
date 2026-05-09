@@ -814,8 +814,7 @@ button,input,select{font-family:inherit}
   <nav class="topnav-tabs">
     <button class="tnt active" data-route="dashboard"><svg class="icn"><use href="#i-dashboard"/></svg>Dashboard</button>
     <button class="tnt" data-route="queue"><svg class="icn"><use href="#i-list"/></svg>Applications</button>
-    <button class="tnt" data-route="applinks"><svg class="icn"><use href="#i-bank"/></svg>App Links</button>
-    <button class="tnt" data-route="portallinks"><svg class="icn"><use href="#i-bank"/></svg>Portal Links</button>
+    <button class="tnt" data-route="connections"><svg class="icn"><use href="#i-bank"/></svg>Connections</button>
   </nav>
   <div class="topnav-spacer"></div>
   <div class="search-wrap">
@@ -1230,42 +1229,40 @@ button,input,select{font-family:inherit}
   </div>
 </div>
 
-<!-- APP LINKS — Plaid connections from cif-apply applications. Ported
-     from /app/legacy#plaid; same backend (Firebase reports + Plaid
-     refresh endpoint); same Plaid-token model. -->
-<div class="view" id="view-applinks">
+<!-- CONNECTIONS — App Links + Portal Links unified. Sub-tabs inside the
+     page choose which panel shows. All inner IDs (plaid-list, plaid-search,
+     portal-plaid-list, portal-plaid-search) are preserved so the JS that
+     drives the loaders/filters keeps working unchanged. -->
+<div class="view" id="view-connections">
   <div class="main full">
     <div class="greet">
       <div>
-        <div class="greet-title">App Links</div>
-        <div class="greet-sub">Plaid connections from cif-apply applications — re-run reports anytime</div>
+        <div class="greet-title">Connections</div>
+        <div class="greet-sub" id="conn-sub">Plaid connections from cif-apply applications — re-run reports anytime</div>
       </div>
     </div>
-    <div style="margin-bottom:14px">
-      <input type="text" id="plaid-search" placeholder="Search by name, phone or email..." oninput="filterPlaidCustomers(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+    <!-- Sub-tab strip; mirrors the time-range pill chrome. -->
+    <div class="conn-tabs" style="display:flex;gap:5px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;width:max-content;max-width:100%;flex-wrap:wrap;box-shadow:var(--shadow-xs)">
+      <button class="tf-btn active" data-conn-tab="applinks" onclick="setConnTab('applinks')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-bank"/></svg>App Links</button>
+      <button class="tf-btn" data-conn-tab="portallinks" onclick="setConnTab('portallinks')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-bank"/></svg>Portal Links</button>
     </div>
-    <div id="plaid-list">
-      <div class="tbl-loading">Loading…</div>
-    </div>
-  </div>
-</div>
 
-<!-- PORTAL LINKS — Plaid connections from the customer portal. Ported
-     from /app/legacy#portal-plaid; same backend (PORTAL_ADMIN_SVC_*
-     env vars + /api/portal-plaid/* endpoints); same token model. -->
-<div class="view" id="view-portallinks">
-  <div class="main full">
-    <div class="greet">
-      <div>
-        <div class="greet-title">Portal Links</div>
-        <div class="greet-sub">Plaid connections from the customer portal — re-pull data anytime</div>
+    <div class="conn-panel" id="conn-panel-applinks">
+      <div style="margin-bottom:14px">
+        <input type="text" id="plaid-search" placeholder="Search by name, phone or email..." oninput="filterPlaidCustomers(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+      </div>
+      <div id="plaid-list">
+        <div class="tbl-loading">Loading…</div>
       </div>
     </div>
-    <div style="margin-bottom:14px">
-      <input type="text" id="portal-plaid-search" placeholder="Search by name, email, customer id, bank, or source…" oninput="filterPortalPlaid(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
-    </div>
-    <div id="portal-plaid-list">
-      <div class="tbl-loading">Loading…</div>
+
+    <div class="conn-panel" id="conn-panel-portallinks" style="display:none">
+      <div style="margin-bottom:14px">
+        <input type="text" id="portal-plaid-search" placeholder="Search by name, email, customer id, bank, or source…" oninput="filterPortalPlaid(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+      </div>
+      <div id="portal-plaid-list">
+        <div class="tbl-loading">Loading…</div>
+      </div>
     </div>
   </div>
 </div>
@@ -1484,11 +1481,20 @@ function setRoute(name, fbId) {
   if (name === 'detail' && fbId) renderDetail(fbId);
   if (name === 'queue') renderQueue();
   if (name === 'dashboard') renderDashboard();
-  if (name === 'applinks') loadPlaidCustomers();
-  if (name === 'portallinks') loadPortalPlaid();
+  if (name === 'connections') {
+    // setRoute('connections', 'applinks' | 'portallinks') honors the
+    // requested inner tab; otherwise stays on whichever was last shown.
+    if (fbId === 'applinks' || fbId === 'portallinks') setConnTab(fbId);
+    else setConnTab(_connInnerTab || 'applinks');
+  }
   document.body.dataset.firebaseId = (name === 'detail' && fbId) ? fbId : '';
   if (name === 'detail' && fbId) {
     location.hash = '#fb=' + encodeURIComponent(fbId);
+  } else if (name === 'connections') {
+    // Preserve which sub-tab is active in the URL so back/forward and
+    // bookmarks both restore correctly. #applinks / #portallinks both
+    // route to view-connections via readRouteFromHash().
+    location.hash = '#' + (_connInnerTab || 'applinks');
   } else if (name !== 'detail') {
     location.hash = '#' + name;
   }
@@ -1502,8 +1508,10 @@ function readRouteFromHash() {
     return ['detail', fbId];
   }
   if (h === '#queue' || h === '#applications') return ['queue', null];
-  if (h === '#applinks' || h === '#plaid' || h === '#connections') return ['applinks', null];
-  if (h === '#portallinks' || h === '#portal-plaid') return ['portallinks', null];
+  // All Connections-related hashes resolve to the unified view; the
+  // 2nd tuple element selects the inner sub-tab.
+  if (h === '#connections' || h === '#applinks' || h === '#plaid') return ['connections', 'applinks'];
+  if (h === '#portallinks' || h === '#portal-plaid') return ['connections', 'portallinks'];
   return ['dashboard', null];
 }
 
@@ -3578,6 +3586,36 @@ init();
 // Aliases bridge the legacy helper names (_esc, _fmtDate, openModal,
 // allPlaidCustomers) to their current-app equivalents.
 // ─────────────────────────────────────────────────────────────────────
+// Which Connections sub-tab is active. Persisted across route changes
+// so reopening Connections lands on whichever panel was last visible.
+let _connInnerTab = 'applinks';
+
+// Toggle between the App Links and Portal Links panels inside the
+// unified Connections view. Activates the relevant tab button, swaps
+// the visible panel, kicks off the loader for whichever tab is now
+// active, and updates the URL hash so back/forward + bookmarks work.
+function setConnTab(name) {
+  if (name !== 'applinks' && name !== 'portallinks') name = 'applinks';
+  _connInnerTab = name;
+  document.querySelectorAll('[data-conn-tab]').forEach(b =>
+    b.classList.toggle('active', b.getAttribute('data-conn-tab') === name));
+  const a = document.getElementById('conn-panel-applinks');
+  const p = document.getElementById('conn-panel-portallinks');
+  if (a) a.style.display = name === 'applinks' ? '' : 'none';
+  if (p) p.style.display = name === 'portallinks' ? '' : 'none';
+  const sub = document.getElementById('conn-sub');
+  if (sub) {
+    sub.textContent = name === 'applinks'
+      ? 'Plaid connections from cif-apply applications — re-run reports anytime'
+      : 'Plaid connections from the customer portal — re-pull data anytime';
+  }
+  if (name === 'applinks') loadPlaidCustomers();
+  else if (name === 'portallinks') loadPortalPlaid();
+  // Mirror the active sub-tab in the hash so the URL is shareable.
+  const target = '#' + name;
+  if (location.hash !== target) location.hash = target;
+}
+
 const _esc = escapeHtml;
 function _fmtDate(iso) {
   if (!iso) return '';
