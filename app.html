@@ -107,6 +107,9 @@ button,input,select{font-family:inherit}
 .btn-ghost:hover{background:var(--surface2);border-color:var(--border2)}
 .btn-danger{background:white;color:var(--red);border-color:var(--red-200)}
 .btn-danger:hover{background:var(--red-50)}
+/* Denial-email button — orange, between Decline and Approve. */
+.btn-denial{background:white;color:#c2410c;border-color:#fcd34d}
+.btn-denial:hover{background:#fffbeb;border-color:#f59e0b}
 
 /* TIME RANGE PILLS */
 .time-range{display:flex;gap:5px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;width:max-content;max-width:100%;overflow-x:auto;flex-wrap:nowrap;box-shadow:var(--shadow-xs)}
@@ -612,6 +615,33 @@ button,input,select{font-family:inherit}
 .icn{flex-shrink:0;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke:currentColor}
 .view{display:none}.view.active{display:block}
 
+/* DENIAL EMAIL MODAL */
+.dnl-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:center;justify-content:center;padding:1rem;display:none}
+.dnl-ov.open{display:flex}
+.dnl-card{background:white;border-radius:14px;width:100%;max-width:580px;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.dnl-head{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.dnl-title{font-size:16px;font-weight:800;color:var(--text);letter-spacing:-.01em}
+.dnl-meta{font-size:12px;color:var(--muted);margin-top:3px;font-weight:500}
+.dnl-close{width:32px;height:32px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:14px;color:var(--muted);font-family:inherit}
+.dnl-close:hover{background:var(--bg);color:var(--text2)}
+.dnl-body{padding:18px 22px 20px;overflow-y:auto;flex:1}
+.dnl-help{font-size:12.5px;color:var(--muted);margin-bottom:14px;line-height:1.5}
+.dnl-reasons{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.dnl-reason{display:flex;align-items:flex-start;gap:11px;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:9px;background:white;transition:all .12s}
+.dnl-reason.on{border-color:var(--green-200);background:var(--green-50)}
+.dnl-reason input{width:16px;height:16px;margin-top:2px;accent-color:var(--green);cursor:pointer;flex-shrink:0}
+.dnl-reason span{font-size:13px;color:var(--text2);line-height:1.5}
+.dnl-to-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px}
+.dnl-to-lbl{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
+.dnl-to-val{font-size:13.5px;font-weight:600;color:var(--text);word-break:break-word}
+.dnl-actions{display:flex;gap:8px}
+.dnl-actions .btn{flex:1;justify-content:center}
+.btn-denial-send{flex:2 !important;background:#c2410c;color:white;border:1px solid #c2410c;padding:8px 14px;border-radius:8px;font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.btn-denial-send:hover{background:#9a3412;border-color:#9a3412}
+.btn-denial-send:disabled{opacity:.5;cursor:not-allowed}
+.btn-denial-send .icn{width:14px;height:14px;stroke-width:2.25}
+@media(max-width:600px){.dnl-card{border-radius:10px;max-height:96vh}.dnl-head,.dnl-body{padding:14px 16px}}
+
 /* TOAST */
 .toast-wrap{position:fixed;bottom:20px;right:20px;z-index:500;display:flex;flex-direction:column;gap:8px}
 .toast{padding:10px 16px;background:var(--text);color:white;border-radius:8px;font-size:13px;font-weight:600;box-shadow:var(--shadow-md);animation:slidein .2s ease}
@@ -1022,6 +1052,7 @@ button,input,select{font-family:inherit}
         <button class="btn btn-ghost" id="dv-refresh-plaid-btn" title="Pull a fresh Plaid asset report and re-run"><svg class="icn"><use href="#i-refresh"/></svg>Refresh from Plaid</button>
         <span class="dv-bar-sep"></span>
         <button class="btn btn-danger" id="dv-decline-btn"><svg class="icn"><use href="#i-x"/></svg>Decline</button>
+        <button class="btn btn-denial" id="dv-denial-btn" title="Send the denial-reasons email to the applicant"><svg class="icn"><use href="#i-message"/></svg>Denial Email</button>
         <div class="offer-input-group">
           <span class="ccy">$</span>
           <input class="offer-input" type="text" id="dv-offer-input" value="" placeholder="0">
@@ -1185,6 +1216,33 @@ button,input,select{font-family:inherit}
 </div>
 
 <div class="toast-wrap" id="toasts"></div>
+
+<!-- Denial Email modal — ported from classic. POSTs to /api/send-denial
+     which proxies to cif-apply. Only the JS-rendered checkboxes change
+     between visits; the chrome stays static. -->
+<div class="dnl-ov" id="dnl-ov" style="display:none">
+  <div class="dnl-card">
+    <div class="dnl-head">
+      <div>
+        <div class="dnl-title">📧 Send Denial Email</div>
+        <div class="dnl-meta" id="dnl-to-label">To: —</div>
+      </div>
+      <button class="dnl-close" id="dnl-close" type="button">✕</button>
+    </div>
+    <div class="dnl-body">
+      <p class="dnl-help">Pick the reasons to include. Pre-selected based on the engine's decline reason — uncheck any that don't apply.</p>
+      <div class="dnl-reasons" id="dnl-reasons"></div>
+      <div class="dnl-to-card">
+        <div class="dnl-to-lbl">Sending to</div>
+        <div class="dnl-to-val" id="dnl-to-display">—</div>
+      </div>
+      <div class="dnl-actions">
+        <button class="btn btn-ghost" id="dnl-cancel" type="button">Cancel</button>
+        <button class="btn btn-denial-send" id="dnl-send" type="button"><svg class="icn"><use href="#i-message"/></svg>Send Denial Email</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 'use strict';
@@ -2783,6 +2841,111 @@ async function fbPatchReport(fbId, data) {
   return r.json();
 }
 
+// ───────── Denial Email ─────────
+// Same wording + auto-select rules as the classic dashboard so the
+// recipient experience is identical. Operators can uncheck reasons
+// the engine flagged and add ones it missed.
+const DENIAL_REASONS = [
+  "Insufficient income to support a cash advance loan",
+  "No verified income in statement period",
+  "Excessive payday/advance activity",
+  "Excessive NSF/returned items",
+  "Chronic negative balance",
+  "Low average daily balance",
+  "Account closed",
+  "Fraud indication",
+  "Identity mismatch",
+  "Bank statement outside acceptable window",
+  "Excessive speculative activity",
+  "Inability to demonstrate repayment without hardship",
+  "Incomplete or unreadable bank statement"
+];
+const DENIAL_KEYWORD_MAP = [
+  { keywords: ['income','pay','gross','salary','employment','wages'], reasons: [0,1] },
+  { keywords: ['nsf','returned','insufficient fund','bounced'], reasons: [3] },
+  { keywords: ['negative','below zero','overdraft'], reasons: [4] },
+  { keywords: ['balance','low','average daily'], reasons: [5] },
+  { keywords: ['closed','account close'], reasons: [6] },
+  { keywords: ['fraud','suspicious','unusual'], reasons: [7] },
+  { keywords: ['identity','mismatch','name','id'], reasons: [8] },
+  { keywords: ['fintech','advance','dave','brigit','earnin','payday','cash advance'], reasons: [2] },
+  { keywords: ['speculative','gambling','crypto','betting'], reasons: [10] },
+  { keywords: ['repayment','hardship','afford','cash flow','fcf'], reasons: [11] },
+  { keywords: ['statement','window','30 day','period','outside'], reasons: [9,12] }
+];
+
+let _denialFbId = null;
+let _denialEmail = '';
+let _denialName = '';
+
+function openDenialModal(fbId) {
+  const a = apps.find(x => x.firebaseId === fbId);
+  if (!a) return;
+  _denialFbId = fbId;
+  _denialEmail = (a.applicationData?.email || a.email || '').trim();
+  _denialName = a.name || '';
+  document.getElementById('dnl-to-label').textContent = 'To: ' + (_denialEmail || 'No email on file');
+  document.getElementById('dnl-to-display').textContent = _denialEmail || 'No email address found';
+
+  // Auto-select reasons based on the engine's decline-reason text.
+  const reasonText = (a.reason || '').toLowerCase();
+  const auto = new Set();
+  DENIAL_KEYWORD_MAP.forEach(({ keywords, reasons }) => {
+    if (keywords.some(k => reasonText.includes(k))) reasons.forEach(r => auto.add(r));
+  });
+  if (auto.size === 0) auto.add(0);  // fallback to "insufficient income"
+
+  const wrap = document.getElementById('dnl-reasons');
+  wrap.innerHTML = DENIAL_REASONS.map((text, i) => `
+    <label class="dnl-reason${auto.has(i) ? ' on' : ''}" data-idx="${i}">
+      <input type="checkbox" ${auto.has(i) ? 'checked' : ''}>
+      <span>${escapeHtml(text)}</span>
+    </label>`).join('');
+  // Each checkbox toggles the row's .on class for the green tint.
+  wrap.querySelectorAll('.dnl-reason').forEach(row => {
+    const cb = row.querySelector('input');
+    cb.addEventListener('change', () => row.classList.toggle('on', cb.checked));
+  });
+
+  document.getElementById('dnl-ov').classList.add('open');
+}
+
+function closeDenialModal() {
+  document.getElementById('dnl-ov').classList.remove('open');
+  _denialFbId = null;
+}
+
+async function sendDenialEmail() {
+  if (!_denialEmail) { toast('No email address on file for this customer', 'err'); return; }
+  const selectedReasons = DENIAL_REASONS.filter(
+    (_, i) => document.querySelectorAll('#dnl-reasons .dnl-reason input')[i]?.checked
+  );
+  if (selectedReasons.length === 0) { toast('Pick at least one denial reason', 'err'); return; }
+  const btn = document.getElementById('dnl-send');
+  btn.disabled = true;
+  const orig = btn.innerHTML;
+  btn.innerHTML = 'Sending…';
+  try {
+    const r = await fetch('/api/send-denial', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: _denialEmail, name: _denialName, reasons: selectedReasons })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.ok) {
+      toast(`Denial email sent to ${_denialEmail} ✓`, 'ok');
+      closeDenialModal();
+    } else {
+      toast('Send failed: ' + (d.error || ('HTTP ' + r.status)), 'err');
+    }
+  } catch (e) {
+    toast('Send failed: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+}
+
 async function deleteApplication(fbId) {
   const a = apps.find(x => x.firebaseId === fbId);
   if (!a) return;
@@ -3085,6 +3248,11 @@ document.addEventListener('click', (e) => {
 // Detail action handlers — read fbId from body dataset on each click
 function _activeFbId() { return document.body.dataset.firebaseId || ''; }
 document.getElementById('dv-decline-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) setStatus(id, 'Declined'); });
+document.getElementById('dv-denial-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) openDenialModal(id); });
+document.getElementById('dnl-cancel').addEventListener('click', closeDenialModal);
+document.getElementById('dnl-close').addEventListener('click', closeDenialModal);
+document.getElementById('dnl-send').addEventListener('click', sendDenialEmail);
+document.getElementById('dnl-ov').addEventListener('click', (e) => { if (e.target.id === 'dnl-ov') closeDenialModal(); });
 document.getElementById('dv-approve-btn').addEventListener('click', async () => {
   const id = _activeFbId(); if (!id) return;
   await saveOffer(id);
