@@ -3741,8 +3741,30 @@ async function loadPortalPlaid() {
       return;
     }
     const d = await r.json();
-    allPortalPlaid = (d.rows || d.customers || d || []);
-    if (!Array.isArray(allPortalPlaid)) allPortalPlaid = [];
+    // The portal admin service returns
+    //   { customers: [{ customerId, customerName, customerEmail,
+    //                   customerPhoneLast4, institutionName,
+    //                   accountMask, accountSubtype, linkedAt, itemId }] }
+    // — different field names than what render expects. Map them
+    // verbatim from the classic loadPortalPlaid (app-legacy.html L4793-4806).
+    // Without this mapping every row showed the raw customerId as the
+    // "name" and the row click fell through to a random App Links lookup
+    // because r.source was undefined.
+    const raw = (d && Array.isArray(d.customers)) ? d.customers
+              : (d && Array.isArray(d.rows)) ? d.rows
+              : Array.isArray(d) ? d : [];
+    allPortalPlaid = raw.map(c => ({
+      source: 'Portal',
+      customerId: c.customerId || '',
+      name: c.customerName || c.name || '',
+      email: c.customerEmail || c.email || '',
+      phoneLast4: c.customerPhoneLast4 || c.phoneLast4 || '',
+      institutionName: c.institutionName || 'Bank',
+      accountMask: c.accountMask || '',
+      accountSubtype: c.accountSubtype || '',
+      linkedAt: c.linkedAt || '',
+      portalItemId: c.itemId || c.portalItemId || '',
+    }));
     renderPortalPlaid(allPortalPlaid);
   } catch (e) {
     list.innerHTML = `<div class="tbl-empty">Network error: ${escapeHtml(e.message||String(e))}</div>`;
@@ -3801,41 +3823,14 @@ function renderPortalPlaid(rows) {
   </table></div>`;
 }
 
-// Click handler for any Portal Links row. Portal-source rows go to the
-// per-Item drawer (with Re-run report). Application-source rows route
-// to the App Links drawer for that customer (if we can match by name
-// or email), otherwise fall through to the dashboard's detail view.
+// Click handler for any Portal Links row. The Portal Links endpoint
+// only returns portal-linked customers, so every row opens the
+// per-Item drawer for that exact customerId.
 function openPortalPlaidRow(idx) {
   const list = window._portalPlaidRendered || [];
   const r = list[idx];
-  if (!r) return;
-  if (r.source === 'Portal' && r.customerId) {
-    openPortalPlaidDrawer(r.customerId);
-    return;
-  }
-  // Application source — find the matching App Links customer group
-  // (same email/phone) and open that drawer instead so the operator
-  // gets the full re-run + history view.
-  const key = plaidCustomerKey(r.phoneLast4 || '', r.email || '');
-  if (allPlaidCustomers && allPlaidCustomers.length) {
-    const i = allPlaidCustomers.findIndex(c =>
-      (key && plaidCustomerKey(c.phone, c.email) === key) ||
-      (r.email && c.email && c.email.toLowerCase() === r.email.toLowerCase())
-    );
-    if (i >= 0) {
-      window._alLastList = allPlaidCustomers;
-      openAppLinksDrawer(i);
-      return;
-    }
-  }
-  // Last resort — load App Links data and try again.
-  loadPlaidCustomers().then(() => {
-    const i = (allPlaidCustomers || []).findIndex(c =>
-      (r.email && c.email && c.email.toLowerCase() === r.email.toLowerCase())
-    );
-    if (i >= 0) { window._alLastList = allPlaidCustomers; openAppLinksDrawer(i); }
-    else toast('No App Links record found for this customer', 'err');
-  });
+  if (!r || !r.customerId) return;
+  openPortalPlaidDrawer(r.customerId);
 }
 
 // Re-run an App Links applicant through Plaid: kicks off /api/rerun-plaid
