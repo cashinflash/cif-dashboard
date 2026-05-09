@@ -506,6 +506,25 @@ button,input,select{font-family:inherit}
 .notes-edit{width:100%;min-height:140px;border:1.5px solid var(--border2);border-radius:10px;padding:12px 14px;font-size:13.5px;font-family:inherit;color:var(--text);background:white;resize:vertical;line-height:1.6;outline:none}
 .notes-edit:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--green-100)}
 
+/* Quick-pick note chips */
+.note-quick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.note-quick-lbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;width:100%;margin-bottom:2px}
+.note-chip{padding:6px 11px;border-radius:7px;border:1px solid var(--border);background:white;color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px;transition:all .12s}
+.note-chip:hover{border-color:var(--green-200);background:var(--green-50);color:var(--green-dark)}
+.note-chip-add{border-style:dashed;color:var(--muted)}
+.note-chip-add:hover{color:var(--green);border-color:var(--green)}
+.note-chip-edit{margin-left:auto;font-size:11px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 6px}
+.note-chip-edit:hover{color:var(--text2)}
+.note-chip-x{display:inline-flex;width:14px;height:14px;border-radius:50%;background:var(--red-100);color:var(--red);align-items:center;justify-content:center;font-size:10px;font-weight:700;cursor:pointer;border:none;margin-left:4px}
+.note-chip-x:hover{background:var(--red);color:white}
+
+/* Danger Zone in the detail right rail */
+.dv-rail-danger{padding-top:16px;border-top:1px solid var(--red-100);margin-top:auto}
+.dv-rail-danger-btn{width:100%;padding:9px 14px;border-radius:8px;background:var(--red-50);color:var(--red);border:1px solid var(--red-200);font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:all .12s}
+.dv-rail-danger-btn:hover{background:var(--red);color:white;border-color:var(--red)}
+.dv-rail-danger-btn .icn{width:13px;height:13px;stroke-width:2.5}
+.dv-rail-danger-hint{font-size:11px;color:var(--muted);line-height:1.4;margin-top:8px;padding:0 2px}
+
 /* Vergent right-rail card */
 .vg-status{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
 .vg-status.found{background:var(--green-50);color:var(--green-dark);border-color:var(--green-200)}
@@ -988,7 +1007,6 @@ button,input,select{font-family:inherit}
       <div class="dv-bar-actions">
         <button class="btn btn-ghost" id="dv-rerun-btn" title="Re-run the engine using stored data — no new Plaid pull"><svg class="icn"><use href="#i-refresh"/></svg>Re-Run Report</button>
         <button class="btn btn-ghost" id="dv-refresh-plaid-btn" title="Pull a fresh Plaid asset report and re-run"><svg class="icn"><use href="#i-refresh"/></svg>Refresh from Plaid</button>
-        <button class="btn btn-danger" id="dv-delete-btn" title="Permanently delete this application from Firebase"><svg class="icn"><use href="#i-x"/></svg>Delete</button>
         <span class="dv-bar-sep"></span>
         <button class="btn btn-danger" id="dv-decline-btn"><svg class="icn"><use href="#i-x"/></svg>Decline</button>
         <div class="offer-input-group">
@@ -1118,6 +1136,10 @@ button,input,select{font-family:inherit}
           <div class="dv-panel" id="dv-panel-notes">
             <div class="sec-h">Notes &amp; Alerts</div>
             <div class="notes-text empty" id="dv-notes-text">No notes yet.</div>
+            <div class="note-quick" id="note-quick">
+              <div class="note-quick-lbl" style="display:flex;align-items:center">Quick Picks <button class="note-chip-edit" id="note-templates-edit" title="Add or remove templates">Edit</button></div>
+              <!-- chips populated by renderNoteQuickPicks() -->
+            </div>
             <textarea class="notes-edit" id="dv-notes-edit" placeholder="Add a note for the next operator..."></textarea>
             <div style="margin-top:10px;display:flex;gap:8px"><button class="btn btn-primary" id="dv-notes-save"><svg class="icn"><use href="#i-check"/></svg>Save Note</button></div>
           </div>
@@ -1136,6 +1158,11 @@ button,input,select{font-family:inherit}
           <div class="dv-rail-section">
             <div class="dv-rail-title">Documents</div>
             <div id="dv-docs"></div>
+          </div>
+          <div class="dv-rail-section dv-rail-danger">
+            <div class="dv-rail-title" style="color:var(--red)">Danger Zone</div>
+            <button class="dv-rail-danger-btn" id="dv-delete-btn" title="Permanently delete this application from Firebase"><svg class="icn"><use href="#i-x"/></svg>Delete Application</button>
+            <div class="dv-rail-danger-hint">This permanently removes the application record from Firebase. Can't be undone.</div>
           </div>
         </aside>
       </div>
@@ -1203,6 +1230,26 @@ function fmtTimeAgo(ts) {
   if (hr < 24) return hr + 'h ago';
   const d = Math.floor(hr/24);
   return d + 'd ago';
+}
+
+// Format a DL expiration date for the Profile Identity card. The
+// apply form sends YYYY-MM-DD (date-input native format); operators
+// asked for MM/DD/YYYY for readability. Bare yyyy-mm-dd parsing is
+// timezone-safe — we slice the string instead of using Date which
+// can shift the day across UTC offsets.
+function _fmtDLDate(s) {
+  if (!s) return '';
+  const str = String(s).trim();
+  // YYYY-MM-DD or YYYY/MM/DD → MM/DD/YYYY
+  const m = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (m) {
+    const mm = m[2].padStart(2, '0');
+    const dd = m[3].padStart(2, '0');
+    return `${mm}/${dd}/${m[1]}`;
+  }
+  // Already MM/DD/YYYY-ish — leave alone
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(str)) return str;
+  return str;
 }
 
 function initials(name) {
@@ -2183,7 +2230,7 @@ function renderProfilePanel(fbId) {
     row('Date of Birth', ad.dob) +
     row('SSN', ssnFmt) +
     row('DL Number', ad.dlNumber) +
-    row('DL Expires', ad.dlExpiration) +
+    row('DL Expires', _fmtDLDate(ad.dlExpiration)) +
     row('State', ad.state) +
     row('Bank Account', (ad.bankName || '') + (ad.accountNumber ? ' ····' + String(ad.accountNumber).slice(-4) : ''))
   ) || '<div style="font-size:12.5px;color:var(--muted);padding:6px 0">No identity info captured.</div>';
@@ -2759,6 +2806,92 @@ async function saveOffer(fbId) {
   a.amount = '$' + n;
 }
 
+// ───────── Note quick-pick templates ─────────
+// Stored per-operator in localStorage so the list persists across
+// sessions and devices stay independent. Default seed is the one
+// template the operator asked for first; they can add/remove via the
+// "Edit" affordance in the panel header.
+const _NOTE_TEMPLATES_KEY = 'cif.noteTemplates.v1';
+const _DEFAULT_NOTE_TEMPLATES = ['Scheduled card payment on due date'];
+
+function _loadNoteTemplates() {
+  try {
+    const raw = localStorage.getItem(_NOTE_TEMPLATES_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return arr.filter(s => typeof s === 'string' && s.trim().length);
+    }
+  } catch (e) {}
+  return _DEFAULT_NOTE_TEMPLATES.slice();
+}
+function _saveNoteTemplates(list) {
+  try { localStorage.setItem(_NOTE_TEMPLATES_KEY, JSON.stringify(list)); } catch (e) {}
+}
+
+function renderNoteQuickPicks() {
+  const wrap = document.getElementById('note-quick');
+  if (!wrap) return;
+  const tpl = _loadNoteTemplates();
+  // Keep the existing label + Edit button (first child); replace the
+  // chips that follow.
+  const label = wrap.querySelector('.note-quick-lbl');
+  wrap.innerHTML = '';
+  if (label) wrap.appendChild(label);
+  tpl.forEach((text, idx) => {
+    const chip = document.createElement('button');
+    chip.className = 'note-chip';
+    chip.type = 'button';
+    chip.textContent = text;
+    chip.title = 'Click to insert into the note';
+    chip.addEventListener('click', () => {
+      const ta = document.getElementById('dv-notes-edit');
+      if (!ta) return;
+      // Append (with a separator if there's existing text); focus end.
+      const existing = ta.value.trim();
+      ta.value = existing ? existing + '\n' + text : text;
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    });
+    wrap.appendChild(chip);
+  });
+  // "Add" affordance to append new templates inline.
+  const add = document.createElement('button');
+  add.className = 'note-chip note-chip-add';
+  add.type = 'button';
+  add.textContent = '+ Add template';
+  add.addEventListener('click', () => {
+    const t = (prompt('New quick-pick note text:') || '').trim();
+    if (!t) return;
+    const next = _loadNoteTemplates().concat([t]);
+    _saveNoteTemplates(next);
+    renderNoteQuickPicks();
+  });
+  wrap.appendChild(add);
+}
+
+function _editNoteTemplates() {
+  const list = _loadNoteTemplates();
+  if (list.length === 0) {
+    alert('No saved templates yet. Use "+ Add template" to add one.');
+    return;
+  }
+  // Pick which one to remove. Simple prompt-based UI keeps this
+  // self-contained — no modal needed.
+  const lines = list.map((t, i) => `${i + 1}. ${t}`).join('\n');
+  const which = prompt(
+    `Saved note templates:\n\n${lines}\n\nEnter the number to REMOVE (or Cancel to keep all):`
+  );
+  if (!which) return;
+  const idx = parseInt(which, 10) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= list.length) {
+    alert('Invalid number — nothing removed.');
+    return;
+  }
+  list.splice(idx, 1);
+  _saveNoteTemplates(list);
+  renderNoteQuickPicks();
+}
+
 async function saveNotes(fbId) {
   const a = apps.find(x => x.firebaseId === fbId);
   if (!a) return;
@@ -2908,6 +3041,8 @@ document.getElementById('dv-rerun-btn').addEventListener('click', () => { const 
 document.getElementById('dv-delete-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) deleteApplication(id); });
 document.getElementById('dv-refresh-plaid-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) refreshFromPlaid(id); });
 document.getElementById('dv-notes-save').addEventListener('click', () => { const id = _activeFbId(); if (id) saveNotes(id); });
+document.getElementById('note-templates-edit').addEventListener('click', _editNoteTemplates);
+renderNoteQuickPicks();
 document.getElementById('dv-offer-input').addEventListener('blur', () => { const id = _activeFbId(); if (id) saveOffer(id); });
 
 document.getElementById('refresh-btn').addEventListener('click', () => { toast('Refreshing…'); loadReports(); });
