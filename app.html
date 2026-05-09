@@ -4040,7 +4040,7 @@ async function rerunAssetReport(itemId, customerId, institutionName, btn) {
     const engineRes = await fetch('/api/portal-engine-v3', {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ vergent_customer_id: customerId, plaid_report: plaidReport, institution_name: institutionName || '' }),
+      body: JSON.stringify({ vergent_customer_id: customerId, plaid_report: plaidReport, institution_name: institutionName || '', asset_report_token: token }),
     });
     engineResult = await engineRes.json().catch(() => ({}));
     if (!engineRes.ok || !engineResult.ok || !engineResult.firebase_id) {
