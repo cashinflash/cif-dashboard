@@ -3959,7 +3959,8 @@ async function openPortalPlaidDrawer(cid) {
             <div style="font-size:11px;color:var(--muted)">Linked ${escapeHtml(_fmtDate(it.linkedAt) || '')}</div>
           </div>
           ${accountsHtml}
-          <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:6px" data-asset-actions="${escapeHtml(it.itemId || '')}">
+          <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap" data-asset-actions="${escapeHtml(it.itemId || '')}">
+            <button class="btn btn-ghost" onclick="viewLastPortalReport('${escapeHtml(d.customerId || '')}')" style="font-size:11.5px;padding:6px 10px">View Last Report</button>
             <button class="btn btn-ghost" onclick="rerunAssetReport('${escapeHtml(it.itemId || '')}', '${escapeHtml(d.customerId || '')}', '${escapeHtml((it.institutionName || '').replace(/'/g, '&#39;'))}', this)" style="font-size:11.5px;padding:6px 10px">Re-run report</button>
           </div>
           <div data-asset-status="${escapeHtml(it.itemId || '')}" style="margin-top:6px;font-size:11px;color:var(--muted);text-align:right"></div>
@@ -4093,6 +4094,32 @@ async function rerunAssetReport(itemId, customerId, institutionName, btn) {
       <button class="btn btn-ghost" onclick="rerunAssetReport('${escapeHtml(itemId)}','${escapeHtml(customerId)}','${escapeHtml((institutionName || '').replace(/'/g, '&#39;'))}',this)" style="font-size:11.5px;padding:6px 10px">Re-run again</button>`;
   }
   await openPortalRerunReport(fbId);
+}
+
+// Find the most recent portal-rerun report for this Vergent customer
+// (firebase records keyed `portal_{cid}_{ts}` carry vergentCustomerId
+// and dataSource='portal-rerun'). Opens the most recent one in the
+// detail view; toasts if the customer has never had a rerun report.
+async function viewLastPortalReport(customerId) {
+  if (!customerId) return;
+  const cid = String(customerId);
+  // Make sure the apps cache is fresh — a rerun that just landed
+  // might not yet be in the in-memory list.
+  await loadReports();
+  const matches = apps
+    .filter(a =>
+      String(a.vergentCustomerId || '') === cid &&
+      ((a.dataSource || '') === 'portal-rerun' ||
+       String(a.firebaseId || '').startsWith('portal_' + cid + '_'))
+    )
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)
+                  || String(b.firebaseId || '').localeCompare(String(a.firebaseId || '')));
+  if (!matches.length) {
+    toast('No previous rerun report for this customer yet — click Re-run report to generate one.', 'err');
+    return;
+  }
+  closePortalPlaidDrawer();
+  setRoute('detail', matches[0].firebaseId);
 }
 
 async function openPortalRerunReport(fbId) {
