@@ -1262,6 +1262,47 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(raw or b'{}')
             return
 
+        # Stream a Vergent document's binary back to the browser for the
+        # Documents tab's "quick view" eye icon. We forward straight to
+        # cif-apply which talks to Vergent. Inline disposition so the
+        # browser's PDF / image viewer renders the doc in the new tab.
+        if path == '/api/vergent-doc':
+            if not valid_session(token):
+                self.send_json(401, {'error': 'Unauthorized'}); return
+            qs = ''
+            if '?' in self.path:
+                qs = self.path.split('?', 1)[1]
+            try:
+                import urllib.request as ur
+                req = ur.Request(
+                    f'https://cif-apply.onrender.com/api/vergent-doc?{qs}',
+                    method='GET',
+                )
+                with ur.urlopen(req, timeout=30) as r:
+                    body = r.read()
+                    upstream_ctype = r.headers.get('Content-Type') or 'application/octet-stream'
+                    upstream_disp = r.headers.get('Content-Disposition') or 'inline'
+                self.send_response(200)
+                for k, v in CORS.items(): self.send_header(k, v)
+                self.send_header('Content-Type', upstream_ctype)
+                self.send_header('Content-Disposition', upstream_disp)
+                self.send_header('Cache-Control', 'private, max-age=300')
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except urllib.error.HTTPError as e:
+                try: err_body = e.read().decode(errors='replace')
+                except Exception: err_body = str(e)
+                print(f'[VERGENT-DOC UPSTREAM {e.code}] {err_body[:200]}', flush=True)
+                self.send_response(e.code)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(err_body.encode() if isinstance(err_body, str) else b'{}')
+            except Exception as e:
+                print(f'[VERGENT-DOC ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         # Phase U.3: poll a Plaid asset report. Path:
         # /api/portal-plaid/asset-report/{token}        → JSON (poll)
         # /api/portal-plaid/asset-report/{token}/pdf    → binary PDF
@@ -1622,6 +1663,10 @@ class Handler(BaseHTTPRequestHandler):
                 print(f'[VERGENT-CUSTOMER-DOCS ERROR] {e}', flush=True)
                 self.send_json(500, {'error': str(e)})
             return
+
+        # /api/vergent-doc?cid=...&docId=... is handled in do_GET because
+        # it streams binary bytes (PDF / image) from Vergent through
+        # cif-apply. See do_GET below.
 
         if path == '/api/vergent-add-note':
             try:
