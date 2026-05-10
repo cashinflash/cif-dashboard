@@ -592,7 +592,29 @@ button,input,select{font-family:inherit}
 .vg-status.new{background:var(--amber-50);color:var(--amber-700);border-color:var(--amber-200)}
 .vg-status.amb{background:var(--blue-50);color:var(--blue-700);border-color:var(--blue-100)}
 .vg-status.err{background:var(--red-50);color:var(--red);border-color:var(--red-200)}
-.vg-card{background:white;border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px}
+/* QUICK ACTIONS — replaces the old Decision Checks rail block. Three
+   button shortcuts to the actions operators reach for most: re-run
+   the engine, refresh from Plaid, send the denial email. Stacked
+   full-width so they're easy to hit on narrower windows. */
+.qa-grid{display:flex;flex-direction:column;gap:6px}
+.qa-btn{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:white;color:var(--text2);font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;text-align:left;transition:all .12s}
+.qa-btn:hover{background:var(--surface2);border-color:var(--border2);color:var(--text)}
+.qa-btn .icn{width:14px;height:14px;color:var(--muted);stroke-width:2.25;flex-shrink:0}
+.qa-btn:hover .icn{color:var(--green-dark)}
+.qa-btn-amber{color:#c2410c;border-color:#fcd34d;background:#fffbeb}
+.qa-btn-amber:hover{background:#fef3c7;border-color:#f59e0b;color:#9a3412}
+.qa-btn-amber .icn{color:#c2410c}
+.qa-btn-amber:hover .icn{color:#9a3412}
+
+/* VERGENT panel — softer card to feel less like a bare rectangle.
+   Subtle shadow + a thin top accent stripe colored by status helps
+   the operator parse "this needs your attention" at a glance. Only
+   renders when status != 'found' (renderVergentPanel hides the rail
+   for matched customers). */
+.vg-card{background:white;border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:11px;box-shadow:var(--shadow-xs);position:relative;overflow:hidden}
+.vg-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--amber);border-top-left-radius:12px;border-top-right-radius:12px}
+.vg-card:has(.vg-status.err)::before,.vg-card.has-error::before{background:var(--red)}
+.vg-card:has(.vg-status.amb)::before,.vg-card.has-ambiguous::before{background:var(--blue)}
 .vg-pending{padding:10px;color:var(--muted);font-size:12px;text-align:center}
 .vg-headline{font-size:13px;font-weight:700;color:var(--text);line-height:1.35}
 .vg-headline a{color:var(--green-dark);text-decoration:none;font-weight:800}
@@ -1094,11 +1116,7 @@ button,input,select{font-family:inherit}
     <div class="dv-bar">
       <button class="dv-back" data-route="queue"><svg class="icn"><use href="#i-arrow-left"/></svg>Back to Queue</button>
       <div class="dv-bar-actions">
-        <button class="btn btn-ghost" id="dv-rerun-btn" title="Re-run the engine using stored data — no new Plaid pull"><svg class="icn"><use href="#i-refresh"/></svg>Re-Run Report</button>
-        <button class="btn btn-ghost" id="dv-refresh-plaid-btn" title="Pull a fresh Plaid asset report and re-run"><svg class="icn"><use href="#i-refresh"/></svg>Refresh from Plaid</button>
-        <span class="dv-bar-sep"></span>
         <button class="btn btn-danger" id="dv-decline-btn"><svg class="icn"><use href="#i-x"/></svg>Decline</button>
-        <button class="btn btn-denial" id="dv-denial-btn" title="Send the denial-reasons email to the applicant"><svg class="icn"><use href="#i-message"/></svg>Denial Email</button>
         <div class="offer-input-group">
           <span class="ccy">$</span>
           <input class="offer-input" type="text" id="dv-offer-input" value="" placeholder="0">
@@ -1238,13 +1256,26 @@ button,input,select{font-family:inherit}
         </div>
 
         <aside class="dv-rail">
+          <!-- Quick Actions — relocated from the top action bar so the
+               re-run / refresh-from-plaid / denial-email shortcuts live
+               next to the operator's other tools (delete + push).
+               Decline + Approve stay at the top because they're the
+               primary outcome decisions. -->
           <div class="dv-rail-section">
+            <div class="dv-rail-title">Quick Actions</div>
+            <div class="qa-grid">
+              <button class="qa-btn" id="dv-rerun-btn" title="Re-run the engine using stored data — no new Plaid pull"><svg class="icn"><use href="#i-refresh"/></svg>Re-Run Report</button>
+              <button class="qa-btn" id="dv-refresh-plaid-btn" title="Pull a fresh Plaid asset report and re-run"><svg class="icn"><use href="#i-refresh"/></svg>Refresh from Plaid</button>
+              <button class="qa-btn qa-btn-amber" id="dv-denial-btn" title="Send the denial-reasons email to the applicant"><svg class="icn"><use href="#i-message"/></svg>Denial Email</button>
+            </div>
+          </div>
+          <!-- Vergent rail — hidden for found customers via renderVergentPanel
+               since operators use the Notes / Documents tabs to push for
+               returning customers. New / ambiguous / error / pending all
+               keep this section visible so Create+Push stays one click away. -->
+          <div class="dv-rail-section" id="dv-rail-vergent">
             <div class="dv-rail-title">Vergent <span class="vg-status" id="vg-status">Pending</span></div>
             <div class="vg-card" id="vg-card"><div class="vg-pending">Checking Vergent…</div></div>
-          </div>
-          <div class="dv-rail-section">
-            <div class="dv-rail-title">Decision Checks</div>
-            <div id="dv-checks"></div>
           </div>
           <div class="dv-rail-section">
             <div class="dv-rail-title">Documents</div>
@@ -2038,16 +2069,11 @@ function renderDetail(fbId) {
     return `<div class="snap-cell"><div class="snap-lbl">${escapeHtml(c.lbl)}</div><div class="snap-val${vc}${vs}">${valEl}</div><div class="snap-sub">${escapeHtml(c.sub || '')}</div>${verifiedEl}</div>`;
   }).join('');
 
-  // Checks
-  const checks = document.getElementById('dv-checks');
-  const cks = [
-    { name: 'Engine ran', state: a.claudeDecision ? 'ok' : 'dim', tag: a.claudeDecision || 'Pending' },
-    { name: 'v2 Engine', state: a.v2Decision ? 'ok' : 'dim', tag: a.v2Decision || 'Not run' },
-    { name: 'Auto-decide', state: a.v2AutoDecide ? 'ok' : 'dim', tag: a.v2AutoDecide ? 'Yes' : 'No' },
-    { name: 'Vergent push', state: a.vergentGuid ? 'ok' : 'dim', tag: a.vergentGuid ? 'Pushed' : 'Not pushed' },
-    { name: 'Notes', state: a.notes ? 'ok' : 'dim', tag: a.notes ? 'On file' : 'None' },
-  ];
-  checks.innerHTML = cks.map(c => `<div class="check-row"><span class="check-name">${escapeHtml(c.name)}</span><span class="check-tag ${c.state}"><svg class="icn"><use href="#i-${c.state==='ok'?'check':c.state==='warn'?'warning':c.state==='no'?'x':'clock'}"/></svg>${escapeHtml(c.tag)}</span></div>`).join('');
+  // Decision-checks list removed — its right-rail slot now hosts
+  // Quick Actions. Engine / Vergent / notes status are visible on the
+  // hero strip + dedicated tabs, so the operator never asked for the
+  // duplicated rail readout. (Element guard kept so any old reference
+  // doesn't throw if a stale poll fires during an upgrade window.)
 
   // Documents (right rail — short list)
   const docs = document.getElementById('dv-docs');
@@ -2883,8 +2909,17 @@ function _vgWireDynamicLabel() {
 function renderVergentPanel(fbId) {
   const card = document.getElementById('vg-card');
   const statusPill = document.getElementById('vg-status');
+  const rail = document.getElementById('dv-rail-vergent');
   if (!card || !statusPill) return;
   const m = _vergentMatchCache[fbId];
+  // Existing customers don't need the right-rail Vergent shortcut —
+  // operators push docs / notes via the dedicated Documents and Notes
+  // tabs instead. Hide the entire rail section in that case so the
+  // panel only appears when Create+Push is the next likely action
+  // (new / ambiguous / error / pending).
+  const matched = m && (m.status || '').toLowerCase() === 'found';
+  if (rail) rail.style.display = matched ? 'none' : '';
+  if (matched) return;  // nothing to render — section is hidden
   if (!m) {
     statusPill.textContent = 'Pending';
     statusPill.className = 'vg-status';
@@ -3653,7 +3688,12 @@ document.addEventListener('click', (e) => {
 
 // Detail action handlers — read fbId from body dataset on each click
 function _activeFbId() { return document.body.dataset.firebaseId || ''; }
-document.getElementById('dv-decline-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) setStatus(id, 'Declined'); });
+// Decline now opens the denial-email modal so the operator can pick
+// reasons and send the email in one flow. Closing the modal without
+// sending leaves the status unchanged; clicking Send marks Declined
+// and dispatches the email. Use the Quick Actions Denial Email button
+// for the same flow — they're synonymous now.
+document.getElementById('dv-decline-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) openDenialModal(id); });
 document.getElementById('dv-denial-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) openDenialModal(id); });
 document.getElementById('dnl-cancel').addEventListener('click', closeDenialModal);
 document.getElementById('dnl-close').addEventListener('click', closeDenialModal);
