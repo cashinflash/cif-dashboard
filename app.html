@@ -509,6 +509,36 @@ button,input,select{font-family:inherit}
 .doc-preview-img{max-width:100%;max-height:340px;object-fit:contain;border-radius:8px;background:var(--bg)}
 .doc-preview-empty{padding:36px 24px;color:var(--muted);font-size:13.5px;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius)}
 .doc-preview-empty-icn{font-size:30px;margin-bottom:10px}
+
+/* DOCUMENTS ON FILE (VERGENT) — footer panel on the Documents tab.
+   Renders only when the customer is matched in Vergent (status=found).
+   Compact list of docId / type / date — informational, gives operators
+   a glance at what Vergent already has so they know what to push next. */
+.vcd-card{margin-top:18px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-xs)}
+.vcd-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,var(--green-50),var(--surface));flex-wrap:wrap}
+.vcd-title{font-size:13.5px;font-weight:700;color:var(--text);display:inline-flex;align-items:center;gap:8px}
+.vcd-count{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:20px;padding:0 7px;background:var(--green);color:white;font-size:11px;font-weight:800;border-radius:999px;font-variant-numeric:tabular-nums}
+.vcd-meta{font-size:11.5px;color:var(--muted);font-weight:500}
+.vcd-actions{display:flex;align-items:center;gap:6px}
+.vcd-btn{font-size:11.5px;font-weight:600;padding:5px 9px;border-radius:7px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-family:inherit;text-decoration:none;border:1px solid var(--border);background:white;color:var(--text2);transition:all .12s}
+.vcd-btn:hover{border-color:var(--border2);background:var(--surface2);color:var(--text)}
+.vcd-list{padding:6px 8px}
+.vcd-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;transition:background .12s}
+.vcd-row:hover{background:var(--surface2)}
+.vcd-row + .vcd-row{border-top:1px solid var(--border-soft)}
+.vcd-row-icn{width:30px;height:30px;border-radius:8px;background:var(--green-50);border:1px solid var(--green-200);color:var(--green-dark);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.vcd-row-text{flex:1;min-width:0}
+.vcd-row-name{font-size:13px;font-weight:600;color:var(--text);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vcd-row-meta{font-size:11.5px;color:var(--muted);font-weight:500;margin-top:1px}
+.vcd-row-id{font-size:11px;color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums;flex-shrink:0;background:var(--surface2);padding:3px 8px;border-radius:5px}
+.vcd-empty{padding:28px 18px;text-align:center;color:var(--muted)}
+.vcd-empty-icn{font-size:24px;margin-bottom:6px}
+@media(max-width:600px){
+  .vcd-row-id{display:none}
+  .vcd-head{padding:10px 12px}
+  .vcd-list{padding:4px}
+  .vcd-row{padding:8px 10px;gap:10px}
+}
 .notes-text{font-size:13.5px;line-height:1.6;color:var(--text2);padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;min-height:80px;white-space:pre-wrap;margin-bottom:12px;max-height:380px;overflow-y:auto}
 
 /* Source badge — shows whether the application came in via
@@ -2124,9 +2154,13 @@ function renderDetail(fbId) {
   if (fbId !== _lastDetailFbId) {
     switchDetailTab('profile');
     _lastDetailFbId = fbId;
-    // Kick off loan-history fetch in the background — only when we
-    // know there's an existing Vergent customer to query.
+    // Kick off loan-history + Vergent docs fetches in the background —
+    // only when we know there's an existing Vergent customer to query.
     loadVergentLoans(fbId);
+    const _m1 = _vergentMatchCache[fbId];
+    if (_m1 && (_m1.status || '').toLowerCase() === 'found' && _m1.customerId) {
+      loadVergentCustomerDocs(_m1.customerId, fbId);
+    }
   }
 }
 
@@ -2244,6 +2278,11 @@ function buildDocsPanel(a) {
   } else {
     html += `<div class="doc-preview-empty"><div class="doc-preview-empty-icn">⏳</div><div style="font-weight:700;color:var(--text2);margin-bottom:5px">No documents on file</div><div>Files may still be uploading. Refresh in a moment if just submitted.</div></div>`;
   }
+
+  // Slot for the "Documents on File (Vergent)" panel. Populated async
+  // by loadVergentCustomerDocs once vergentMatch resolves to 'found'.
+  // Stays empty (zero height) when the customer isn't in Vergent.
+  html += `<div id="dv-vergent-docs"></div>`;
 
   html += '</div>';
   return html;
@@ -2601,6 +2640,122 @@ function loanStatusClass(status, daysLate, balance, isOutstanding) {
   return 'other';
 }
 
+// ─────────── Documents on File (Vergent) — Documents tab footer ───────────
+// Cached per-customerId so flipping between applicants of the same
+// Vergent customer (rare but possible) doesn't refetch within 60s.
+let _vergentCustDocsCache = {};
+
+const _DOC_TYPE_ICON = {
+  4:  '🏦',  // Bank Statement
+  5:  '📑',  // Pay Stub
+  20: '🆔',  // Customer ID
+  35: '🪪',  // Driver's License
+  36: '🆔',  // SSN/ITIN
+  55: '🏠',  // Proof of Address
+  56: '💵',  // Proof of Income
+};
+
+async function loadVergentCustomerDocs(customerId, fbId) {
+  if (!customerId) return;
+  const cid = String(customerId);
+  // 60s TTL to avoid hammering Vergent on every detail re-render.
+  const cached = _vergentCustDocsCache[cid];
+  if (cached && cached.fetchedAt && (Date.now() - cached.fetchedAt) < 60000) {
+    renderVergentCustomerDocs(cid);
+    return;
+  }
+  // Show a small loading state.
+  const slot = document.getElementById('dv-vergent-docs');
+  if (slot && !cached) {
+    slot.innerHTML = `<div class="vcd-card"><div class="vcd-head"><div class="vcd-title">📂 Documents on File (Vergent)</div><div class="vcd-meta">Loading…</div></div></div>`;
+  }
+  try {
+    const r = await fetch('/api/vergent-customer-docs', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customer_id: cid }),
+    });
+    const d = await r.json().catch(() => ({}));
+    _vergentCustDocsCache[cid] = {
+      ok:        !!(d && d.ok),
+      documents: (d && d.documents) || [],
+      detail:    (d && d.detail) || '',
+      fetchedAt: Date.now(),
+    };
+  } catch (e) {
+    _vergentCustDocsCache[cid] = {
+      ok:        false,
+      documents: [],
+      detail:    String(e && e.message || e),
+      fetchedAt: Date.now(),
+    };
+  }
+  renderVergentCustomerDocs(cid);
+}
+
+function renderVergentCustomerDocs(customerId) {
+  const slot = document.getElementById('dv-vergent-docs');
+  if (!slot) return;
+  const cid = String(customerId);
+  const data = _vergentCustDocsCache[cid];
+  if (!data) { slot.innerHTML = ''; return; }
+  const vergentLink = `https://shared.lms.vergentlms.com/customer/general?action=view&id=${encodeURIComponent(cid)}`;
+  if (!data.ok) {
+    slot.innerHTML = `
+      <div class="vcd-card">
+        <div class="vcd-head">
+          <div class="vcd-title">📂 Documents on File (Vergent)</div>
+          <div class="vcd-actions">
+            <a class="vcd-btn vcd-btn-ghost" href="${vergentLink}" target="_blank" rel="noopener"><svg class="icn" style="width:11px;height:11px"><use href="#i-external"/></svg>Open in Vergent</a>
+            <button class="vcd-btn vcd-btn-ghost" onclick="loadVergentCustomerDocs('${escapeHtml(cid)}', null)"><svg class="icn" style="width:11px;height:11px"><use href="#i-refresh"/></svg>Retry</button>
+          </div>
+        </div>
+        <div class="vcd-empty"><div class="vcd-empty-icn">⚠</div><div style="font-weight:700;color:var(--text2);margin-bottom:4px">Couldn't load Vergent documents</div><div style="font-size:11.5px;color:var(--muted)">${escapeHtml((data.detail || 'Unknown error').slice(0, 200))}</div></div>
+      </div>`;
+    return;
+  }
+  const docs = data.documents || [];
+  if (!docs.length) {
+    slot.innerHTML = `
+      <div class="vcd-card">
+        <div class="vcd-head">
+          <div class="vcd-title">📂 Documents on File (Vergent)</div>
+          <div class="vcd-actions">
+            <a class="vcd-btn vcd-btn-ghost" href="${vergentLink}" target="_blank" rel="noopener"><svg class="icn" style="width:11px;height:11px"><use href="#i-external"/></svg>Open in Vergent</a>
+            <button class="vcd-btn vcd-btn-ghost" onclick="loadVergentCustomerDocs('${escapeHtml(cid)}', null)"><svg class="icn" style="width:11px;height:11px"><use href="#i-refresh"/></svg>Refresh</button>
+          </div>
+        </div>
+        <div class="vcd-empty"><div class="vcd-empty-icn">📭</div><div style="font-weight:700;color:var(--text2);margin-bottom:4px">No documents on file in Vergent</div><div style="font-size:11.5px;color:var(--muted)">Use Push to Vergent above to upload the bank statement, DL, etc.</div></div>
+      </div>`;
+    return;
+  }
+  const rows = docs.map(d => {
+    const icon = _DOC_TYPE_ICON[d.typeId] || '📄';
+    const meta = [d.typeLabel, d.dateCreated]
+      .filter(Boolean).join(' · ');
+    return `<div class="vcd-row">
+      <div class="vcd-row-icn">${icon}</div>
+      <div class="vcd-row-text">
+        <div class="vcd-row-name">${escapeHtml(d.name || d.typeLabel || 'Document')}</div>
+        <div class="vcd-row-meta">${escapeHtml(meta || '—')}</div>
+      </div>
+      <div class="vcd-row-id" title="Vergent doc id">#${escapeHtml(d.id || '?')}</div>
+    </div>`;
+  }).join('');
+  slot.innerHTML = `
+    <div class="vcd-card">
+      <div class="vcd-head">
+        <div class="vcd-title">📂 Documents on File (Vergent) <span class="vcd-count">${docs.length}</span></div>
+        <div class="vcd-actions">
+          <a class="vcd-btn vcd-btn-ghost" href="${vergentLink}" target="_blank" rel="noopener"><svg class="icn" style="width:11px;height:11px"><use href="#i-external"/></svg>Open in Vergent</a>
+          <button class="vcd-btn vcd-btn-ghost" onclick="loadVergentCustomerDocs('${escapeHtml(cid)}', null); _vergentCustDocsCache['${escapeHtml(cid)}']=null;"><svg class="icn" style="width:11px;height:11px"><use href="#i-refresh"/></svg>Refresh</button>
+        </div>
+      </div>
+      <div class="vcd-list">${rows}</div>
+    </div>`;
+}
+
 async function loadVergentLoans(fbId) {
   const m = _vergentMatchCache[fbId];
   if (!m || (m.status || '').toLowerCase() !== 'found') {
@@ -2672,10 +2827,12 @@ async function loadVergentMatch(fbId) {
   if (document.body.dataset.firebaseId === fbId) {
     renderVergentPanel(fbId);
     renderProfilePanel(fbId);
-    // If the match just resolved to "found", kick off loan history fetch.
+    // If the match just resolved to "found", kick off loan history +
+    // Vergent docs fetches.
     const m = _vergentMatchCache[fbId];
     if (m && (m.status || '').toLowerCase() === 'found') {
       loadVergentLoans(fbId);
+      if (m.customerId) loadVergentCustomerDocs(m.customerId, fbId);
     }
   }
 }
