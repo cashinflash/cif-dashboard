@@ -2975,10 +2975,9 @@ function renderVergentPanel(fbId) {
         <div class="vg-meta">Will create a new Vergent record and push the selected documents.</div>
         ${checkboxes}
         <div class="vg-actions">
-          <button class="vg-btn vg-btn-primary" onclick="vergentPush('${fbId}', true)">+ Create + Push</button>
+          <button class="vg-btn vg-btn-primary" onclick="vergentPush('${fbId}', true)">+ Create Customer</button>
+          <button class="vg-btn vg-btn-ghost" onclick="vergentRecheck('${fbId}')">↻ Re-check</button>
         </div>
-        <div class="vg-id-row"><input class="vg-id-input" id="vg-manual-id" placeholder="…or use existing Vergent ID"><button class="vg-btn vg-btn-ghost" style="flex:0 0 auto" onclick="vergentUseManualId('${fbId}')">Use ID</button></div>
-        <div class="vg-actions"><button class="vg-btn vg-btn-ghost" onclick="vergentRecheck('${fbId}')">↻ Re-check</button></div>
         <div class="vg-result" id="vg-result"></div>`;
     }
   } else if (status === 'ambiguous' && Array.isArray(m.matches)) {
