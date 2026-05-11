@@ -872,6 +872,11 @@ button,input,select{font-family:inherit}
     <button class="tnt" data-route="connections"><svg class="icn"><use href="#i-bank"/></svg>Connections</button>
     <button class="tnt" data-route="if"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
     <button class="tnt" data-route="reports"><svg class="icn"><use href="#i-chart"/></svg>Reports</button>
+    <!-- Customers tab — admin-only. Revealed when /api/me reports
+         role==='admin' (see role-gating block where #user-role text
+         is set). Lets an operator search the portal customer base
+         for support / impersonation. -->
+    <button class="tnt admin-only" data-route="customers" style="display:none"><svg class="icn"><use href="#i-list"/></svg>Customers</button>
   </nav>
   <div class="topnav-spacer"></div>
   <div class="search-wrap">
@@ -1461,6 +1466,54 @@ button,input,select{font-family:inherit}
   </div>
 </div>
 
+<!-- CUSTOMERS — admin search of the portal customer base. Looks up by
+     customerId / email / last name via cif-portal's
+     /api/admin/customers/search endpoint. Used to find a customer for
+     support (and later, in Phase 3, to impersonate). Admin-only:
+     #user-role gating reveals the tab + view at boot. -->
+<div class="view" id="view-customers">
+  <div class="main full">
+    <div class="greet">
+      <div>
+        <div class="greet-title">Customers</div>
+        <div class="greet-sub" id="cust-greet-sub">Search the portal customer base by <b>customer ID</b>, <b>email</b>, or <b>last name</b>.</div>
+      </div>
+    </div>
+
+    <!-- Inner tab strip — pattern matches the Connections sub-tabs.
+         Switching panels also switches which data source the search
+         hits (portal = Cognito; vergent = Vergent v1). -->
+    <div class="conn-tabs" style="display:flex;gap:5px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;width:max-content;max-width:100%;flex-wrap:wrap;box-shadow:var(--shadow-xs)">
+      <button class="tf-btn active" data-cust-tab="portal" onclick="setCustTab('portal')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-bolt"/></svg>Portal Customers</button>
+      <button class="tf-btn" data-cust-tab="vergent" onclick="setCustTab('vergent')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-list"/></svg>Vergent Customers</button>
+    </div>
+
+    <!-- Portal Customers panel (Cognito-sourced) -->
+    <div id="cust-panel-portal">
+      <div style="margin-bottom:14px;display:flex;gap:10px;align-items:center">
+        <form id="cust-portal-form" onsubmit="event.preventDefault(); doCustomerSearch('portal');" style="display:flex;gap:10px;align-items:center;flex:1">
+          <input id="cust-portal-q" type="text" autocomplete="off" placeholder="Customer ID (e.g. 601488), email (jane@x.com), or last name" style="flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+          <button type="submit" class="btn btn-primary" style="padding:10px 18px">Search</button>
+        </form>
+      </div>
+      <div id="cust-portal-meta" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
+      <div id="cust-portal-results" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+
+    <!-- Vergent Customers panel (Vergent v1-sourced) -->
+    <div id="cust-panel-vergent" style="display:none">
+      <div style="margin-bottom:14px;display:flex;gap:10px;align-items:center">
+        <form id="cust-vergent-form" onsubmit="event.preventDefault(); doCustomerSearch('vergent');" style="display:flex;gap:10px;align-items:center;flex:1">
+          <input id="cust-vergent-q" type="text" autocomplete="off" placeholder="Customer ID (e.g. 601488), email, or last name" style="flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+          <button type="submit" class="btn btn-primary" style="padding:10px 18px">Search</button>
+        </form>
+      </div>
+      <div id="cust-vergent-meta" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
+      <div id="cust-vergent-results" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+  </div>
+</div>
+
 <script>
 'use strict';
 
@@ -1621,6 +1674,7 @@ function setRoute(name, fbId) {
   }
   if (name === 'if') loadIFSubmissions();
   if (name === 'reports') loadPastDueReport();
+  if (name === 'customers') loadCustomers();
   document.body.dataset.firebaseId = (name === 'detail' && fbId) ? fbId : '';
   if (name === 'detail' && fbId) {
     location.hash = '#fb=' + encodeURIComponent(fbId);
@@ -1648,6 +1702,7 @@ function readRouteFromHash() {
   // 2nd tuple element selects the inner sub-tab.
   if (h === '#connections' || h === '#applinks' || h === '#plaid') return ['connections', 'applinks'];
   if (h === '#portallinks' || h === '#portal-plaid') return ['connections', 'portallinks'];
+  if (h === '#customers') return ['customers', null];
   return ['dashboard', null];
 }
 
@@ -3756,6 +3811,12 @@ async function init() {
     document.getElementById('user-name').textContent = me.user || 'User';
     document.getElementById('user-role').textContent = (me.role || 'user').charAt(0).toUpperCase() + (me.role || 'user').slice(1);
     document.getElementById('user-avatar').textContent = (me.user || 'U').charAt(0).toUpperCase();
+    // Reveal .admin-only elements (Customers tab, etc.) only when
+    // the cif-dashboard session reports admin role. The default
+    // display:none on those elements keeps them hidden for non-admins.
+    if ((me.role || '') === 'admin') {
+      document.querySelectorAll('.admin-only').forEach(function(el) { el.style.display = ''; });
+    }
   }
 
   await loadReports();
@@ -4537,6 +4598,220 @@ async function _fbDeleteRaw(path) {
     headers: { 'X-Method': 'DELETE' },
   });
   if (!r.ok) throw new Error('HTTP ' + r.status);
+}
+
+// ───────── Customers (admin-only) ─────────
+// Two tabs share the same UI scaffolding — only the data source
+// differs:
+//   portal:  cif-portal /api/admin/customers/search?source=portal
+//            → Cognito User Pool (only customers who registered
+//              for the portal at apply.cashinflash.com)
+//   vergent: cif-portal /api/admin/customers/search?source=vergent
+//            → Vergent v1 (the LMS's full historical customer base)
+let _custTab = 'portal';
+let _custPortalLoaded = false;
+
+function loadCustomers() {
+  setCustTab(_custTab || 'portal');
+}
+
+function setCustTab(name) {
+  if (name !== 'portal' && name !== 'vergent') name = 'portal';
+  _custTab = name;
+  document.querySelectorAll('[data-cust-tab]').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-cust-tab') === name);
+  });
+  const portalPanel = document.getElementById('cust-panel-portal');
+  const vergentPanel = document.getElementById('cust-panel-vergent');
+  if (portalPanel) portalPanel.style.display = name === 'portal' ? '' : 'none';
+  if (vergentPanel) vergentPanel.style.display = name === 'vergent' ? '' : 'none';
+  const sub = document.getElementById('cust-greet-sub');
+  if (sub) {
+    sub.innerHTML = name === 'portal'
+      ? 'Customers who registered at <b>apply.cashinflash.com</b>. Search by customer ID, email, or last name — or browse the full list below.'
+      : 'All customers in <b>Vergent</b> (LMS\'s full base, regardless of portal account). Search by customer ID, email, or last name.';
+  }
+  const input = document.getElementById('cust-' + name + '-q');
+  if (input) input.focus();
+  // Portal tab auto-loads the full list on first activation so the
+  // operator sees every registered customer without having to type.
+  // Subsequent switches don't re-fetch — search results (or refreshes
+  // via the empty-q "Show all" form submit) replace the panel.
+  if (name === 'portal' && !_custPortalLoaded) {
+    _custPortalLoaded = true;
+    doCustomerSearch('portal');  // empty-q → list-all from backend
+  } else if (name === 'vergent') {
+    const meta = document.getElementById('cust-vergent-meta');
+    if (meta && !meta.textContent) {
+      meta.textContent = 'Type something above and click Search.';
+    }
+  }
+}
+
+async function doCustomerSearch(source) {
+  if (source !== 'portal' && source !== 'vergent') source = 'portal';
+  const qEl = document.getElementById('cust-' + source + '-q');
+  const meta = document.getElementById('cust-' + source + '-meta');
+  const results = document.getElementById('cust-' + source + '-results');
+  const q = (qEl && qEl.value || '').trim();
+  // Empty q is allowed for portal (returns the list-all view) but
+  // not for vergent (the LMS's full base would be ~50k rows).
+  if (!q && source === 'vergent') {
+    if (meta) meta.textContent = 'Type something to search.';
+    return;
+  }
+  if (meta) meta.textContent = q ? 'Searching…' : 'Loading all portal customers…';
+  if (results) results.innerHTML = '';
+  try {
+    const url = '/api/portal-customers/search'
+      + '?q=' + encodeURIComponent(q)
+      + '&source=' + encodeURIComponent(source);
+    const r = await fetch(url, { credentials: 'include' });
+    const d = await r.json();
+    if (!r.ok) {
+      if (meta) meta.textContent = 'Error: ' + (d.error || ('HTTP ' + r.status));
+      return;
+    }
+    const rows = (d.results || []);
+    // Backend may return rows AND an error (e.g., partial pagination
+    // failure). Surface the error inline so misconfigured deploys
+    // don't look like "no matches."
+    if (d.error && rows.length === 0) {
+      if (meta) meta.textContent = 'Backend error: ' + d.error;
+      return;
+    }
+    if (rows.length === 0) {
+      if (meta) {
+        meta.textContent = q
+          ? 'No matches for "' + q + '".'
+          : 'No portal customers yet.';
+      }
+      return;
+    }
+    if (meta) {
+      const errSuffix = d.error ? ' · partial: ' + d.error : '';
+      meta.textContent = q
+        ? rows.length + ' match' + (rows.length === 1 ? '' : 'es') + ' for "' + q + '".' + errSuffix
+        : 'Showing ' + rows.length + ' portal customer' + (rows.length === 1 ? '' : 's') + ' (newest signup first).' + errSuffix;
+    }
+    renderCustomerSearchResults(source, rows);
+  } catch (e) {
+    if (meta) meta.textContent = 'Error: ' + e.message;
+  }
+}
+
+function renderCustomerSearchResults(source, rows) {
+  const box = document.getElementById('cust-' + source + '-results');
+  if (!box) return;
+  box.innerHTML = '';
+  const esc = function(s) { return (s == null ? '' : String(s)).replace(/[<>&"]/g, function(c) { return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]; }); };
+  for (const row of rows) {
+    const card = document.createElement('div');
+    card.style.cssText = 'background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap';
+    const name = esc(row.fullName || 'Unknown');
+    const cid = esc(row.customerId || '—');
+    const email = esc(row.email || '—');
+    const phoneLast4 = row.phoneLast4 ? '••••' + esc(row.phoneLast4) : '—';
+    // Source-specific meta-line tail + status pill color.
+    let metaTail = '';
+    let pillBg = '#e8f5ee';
+    let pillFg = '#1a6b3c';
+    if (row.source === 'portal') {
+      if (row.signupAt) metaTail = ' · Signed up ' + esc(row.signupAt);
+      // Cognito UNCONFIRMED → orange; CONFIRMED → green.
+      if (row.statusName && row.statusName !== 'CONFIRMED') {
+        pillBg = '#fff5e6'; pillFg = '#5a3300';
+      }
+    } else if (row.source === 'vergent') {
+      if (row.storeName) metaTail = ' · ' + esc(row.storeName);
+    }
+    const statusPill = row.statusName
+      ? '<span style="background:' + pillBg + ';color:' + pillFg + ';padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;margin-left:6px">' + esc(row.statusName) + '</span>'
+      : '';
+    card.innerHTML =
+      '<div style="flex:1;min-width:260px">' +
+        '<div style="font-size:15px;font-weight:700;color:var(--text)">' + name + statusPill + '</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:4px">Customer #' + cid + ' · ' + email + ' · ' + phoneLast4 + metaTail + '</div>' +
+      '</div>';
+    // "View as customer" — only show for portal-source rows (Vergent
+    // rows don't carry a cognitoSub so we can't impersonate them).
+    if (row.source === 'portal' && (row.cognitoSub || row.customerId)) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-primary';
+      btn.textContent = 'View as customer';
+      btn.style.cssText = 'padding:8px 14px;font-size:12px;font-weight:700;font-family:inherit';
+      // Capture both — backend prefers cognitoSub but falls back to
+      // customerId via the Cognito pool scan.
+      const sub = row.cognitoSub || '';
+      const cidArg = row.customerId || '';
+      btn.addEventListener('click', function() {
+        impersonateCustomer(btn, { cognitoSub: sub, customerId: cidArg });
+      });
+      card.appendChild(btn);
+    } else {
+      const note = document.createElement('span');
+      note.style.cssText = 'font-size:11px;color:var(--muted)';
+      note.textContent = row.source === 'vergent'
+        ? '(no portal account)' : '';
+      card.appendChild(note);
+    }
+    box.appendChild(card);
+  }
+}
+
+async function impersonateCustomer(btn, target) {
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Opening…';
+  try {
+    const r = await fetch('/api/portal-customers/impersonate', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(target),
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      btn.textContent = 'Failed';
+      // Show inline so operator sees what happened.
+      const msg = (d && (d.error || d.message)) || ('HTTP ' + r.status);
+      btn.title = msg;
+      console.error('impersonate failed:', d);
+      setTimeout(function() {
+        btn.textContent = orig;
+        btn.disabled = false;
+        btn.title = '';
+      }, 2500);
+      return;
+    }
+    if (!d.portalUrl) {
+      btn.textContent = 'No URL';
+      console.error('impersonate response missing portalUrl:', d);
+      setTimeout(function() {
+        btn.textContent = orig;
+        btn.disabled = false;
+      }, 2500);
+      return;
+    }
+    // Open the portal in a new tab. The fragment carries the JWT +
+    // impersonation token; portal.js bootstraps from there.
+    window.open(d.portalUrl, '_blank', 'noopener');
+    btn.textContent = '✓ Opened';
+    setTimeout(function() {
+      btn.textContent = orig;
+      btn.disabled = false;
+    }, 1500);
+  } catch (e) {
+    btn.textContent = 'Error';
+    btn.title = e.message;
+    console.error('impersonate exception:', e);
+    setTimeout(function() {
+      btn.textContent = orig;
+      btn.disabled = false;
+      btn.title = '';
+    }, 2500);
+  }
 }
 
 async function loadIFSubmissions() {
