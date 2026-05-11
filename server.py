@@ -1219,6 +1219,30 @@ class Handler(BaseHTTPRequestHandler):
         # (Phase U.3) re-pull asset reports any time.
         # ─────────────────────────────────────────
 
+        # JSON: admin customer search (proxies to cif-portal
+        # /api/admin/customers/search). Single ?q=<term> param;
+        # backend decides whether it's a customerId, email, or
+        # last-name lookup based on the shape of q. Used by the
+        # dashboard's Customers tab to find a customer to support
+        # or impersonate.
+        if path == '/api/portal-customers/search':
+            if not valid_session(token):
+                self.send_json(401, {'error': 'Unauthorized'}); return
+            qs = ''
+            if '?' in self.path:
+                qs = '?' + self.path.split('?', 1)[1]
+            code, raw = _call_portal_admin(
+                'GET', f'/api/admin/customers/search{qs}',
+            )
+            self.send_response(code or 502)
+            for k, v in CORS.items(): self.send_header(k, v)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw or b'{}')
+            return
+
         # JSON: list of all customers who've linked a bank via the portal.
         # Optional ?search=… filter on name / email / customerId / institution.
         if path == '/api/portal-plaid/customers':

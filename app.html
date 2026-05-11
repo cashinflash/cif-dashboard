@@ -871,6 +871,11 @@ button,input,select{font-family:inherit}
     <button class="tnt" data-route="queue"><svg class="icn"><use href="#i-list"/></svg>Applications</button>
     <button class="tnt" data-route="connections"><svg class="icn"><use href="#i-bank"/></svg>Connections</button>
     <button class="tnt" data-route="if"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
+    <!-- Customers tab — admin-only. Revealed when /api/me reports
+         role==='admin' (see role-gating block where #user-role text
+         is set). Lets an operator search the portal customer base
+         for support / impersonation. -->
+    <button class="tnt admin-only" data-route="customers" style="display:none"><svg class="icn"><use href="#i-list"/></svg>Customers</button>
   </nav>
   <div class="topnav-spacer"></div>
   <div class="search-wrap">
@@ -1431,6 +1436,30 @@ button,input,select{font-family:inherit}
   </div>
 </div>
 
+<!-- CUSTOMERS — admin search of the portal customer base. Looks up by
+     customerId / email / last name via cif-portal's
+     /api/admin/customers/search endpoint. Used to find a customer for
+     support (and later, in Phase 3, to impersonate). Admin-only:
+     #user-role gating reveals the tab + view at boot. -->
+<div class="view" id="view-customers">
+  <div class="main full">
+    <div class="greet">
+      <div>
+        <div class="greet-title">Customers</div>
+        <div class="greet-sub">Search the portal customer base by <b>customer ID</b>, <b>email</b>, or <b>last name</b>. Click a row to view their account for support.</div>
+      </div>
+    </div>
+    <div style="margin-bottom:14px;display:flex;gap:10px;align-items:center">
+      <form id="cust-search-form" onsubmit="event.preventDefault(); doCustomerSearch();" style="display:flex;gap:10px;align-items:center;flex:1">
+        <input id="cust-search-q" type="text" autocomplete="off" placeholder="Customer ID (e.g. 601488), email (jane@x.com), or last name" style="flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+        <button type="submit" class="btn btn-primary" style="padding:10px 18px">Search</button>
+      </form>
+    </div>
+    <div id="cust-search-meta" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
+    <div id="cust-search-results" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+</div>
+
 <script>
 'use strict';
 
@@ -1590,6 +1619,7 @@ function setRoute(name, fbId) {
     else setConnTab(_connInnerTab || 'applinks');
   }
   if (name === 'if') loadIFSubmissions();
+  if (name === 'customers') loadCustomers();
   document.body.dataset.firebaseId = (name === 'detail' && fbId) ? fbId : '';
   if (name === 'detail' && fbId) {
     location.hash = '#fb=' + encodeURIComponent(fbId);
@@ -1616,6 +1646,7 @@ function readRouteFromHash() {
   // 2nd tuple element selects the inner sub-tab.
   if (h === '#connections' || h === '#applinks' || h === '#plaid') return ['connections', 'applinks'];
   if (h === '#portallinks' || h === '#portal-plaid') return ['connections', 'portallinks'];
+  if (h === '#customers') return ['customers', null];
   return ['dashboard', null];
 }
 
@@ -3724,6 +3755,12 @@ async function init() {
     document.getElementById('user-name').textContent = me.user || 'User';
     document.getElementById('user-role').textContent = (me.role || 'user').charAt(0).toUpperCase() + (me.role || 'user').slice(1);
     document.getElementById('user-avatar').textContent = (me.user || 'U').charAt(0).toUpperCase();
+    // Reveal .admin-only elements (Customers tab, etc.) only when
+    // the cif-dashboard session reports admin role. The default
+    // display:none on those elements keeps them hidden for non-admins.
+    if ((me.role || '') === 'admin') {
+      document.querySelectorAll('.admin-only').forEach(function(el) { el.style.display = ''; });
+    }
   }
 
   await loadReports();
@@ -4505,6 +4542,78 @@ async function _fbDeleteRaw(path) {
     headers: { 'X-Method': 'DELETE' },
   });
   if (!r.ok) throw new Error('HTTP ' + r.status);
+}
+
+// ───────── Customers (admin-only) ─────────
+// Search the portal customer base via cif-portal's
+// /api/admin/customers/search. Single ?q= input — backend decides
+// whether to look up by customerId, email, or last name.
+function loadCustomers() {
+  const q = document.getElementById('cust-search-q');
+  const meta = document.getElementById('cust-search-meta');
+  const results = document.getElementById('cust-search-results');
+  if (q) q.focus();
+  if (meta) meta.textContent = 'Enter a customer ID, email, or last name above and click Search.';
+  if (results) results.innerHTML = '';
+}
+
+async function doCustomerSearch() {
+  const qEl = document.getElementById('cust-search-q');
+  const meta = document.getElementById('cust-search-meta');
+  const results = document.getElementById('cust-search-results');
+  const q = (qEl && qEl.value || '').trim();
+  if (!q) {
+    if (meta) meta.textContent = 'Type something to search.';
+    return;
+  }
+  if (meta) meta.textContent = 'Searching…';
+  if (results) results.innerHTML = '';
+  try {
+    const r = await fetch('/api/portal-customers/search?q=' + encodeURIComponent(q), {
+      credentials: 'include',
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      if (meta) meta.textContent = 'Error: ' + (d.error || ('HTTP ' + r.status));
+      return;
+    }
+    const rows = (d.results || []);
+    if (rows.length === 0) {
+      if (meta) meta.textContent = 'No matches for "' + q + '".';
+      return;
+    }
+    if (meta) meta.textContent = rows.length + ' match' + (rows.length === 1 ? '' : 'es') + ' for "' + q + '".';
+    renderCustomerSearchResults(rows);
+  } catch (e) {
+    if (meta) meta.textContent = 'Error: ' + e.message;
+  }
+}
+
+function renderCustomerSearchResults(rows) {
+  const box = document.getElementById('cust-search-results');
+  if (!box) return;
+  box.innerHTML = '';
+  const esc = function(s) { return (s == null ? '' : String(s)).replace(/[<>&"]/g, function(c) { return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]; }); };
+  for (const row of rows) {
+    const card = document.createElement('div');
+    card.style.cssText = 'background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap';
+    const name = esc(row.fullName || 'Unknown');
+    const cid = esc(row.customerId || '');
+    const email = esc(row.email || '—');
+    const phoneLast4 = row.phoneLast4 ? '••••' + esc(row.phoneLast4) : '—';
+    const statusPill = row.statusName ? '<span style="background:#e8f5ee;color:#1a6b3c;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;margin-left:6px">' + esc(row.statusName) + '</span>' : '';
+    const store = row.storeName ? ' · ' + esc(row.storeName) : '';
+    card.innerHTML =
+      '<div style="flex:1;min-width:260px">' +
+        '<div style="font-size:15px;font-weight:700;color:var(--text)">' + name + statusPill + '</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:4px">Customer #' + cid + ' · ' + email + ' · ' + phoneLast4 + store + '</div>' +
+      '</div>' +
+      // "View as customer" wires up in Phase 3 (impersonation backend).
+      // Render disabled with a tooltip so operators see where the
+      // action will live.
+      '<button type="button" class="btn btn-ghost" disabled title="Impersonation not yet enabled — Phase 3" style="opacity:.5;cursor:not-allowed">View as customer</button>';
+    box.appendChild(card);
+  }
 }
 
 async function loadIFSubmissions() {
