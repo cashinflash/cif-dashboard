@@ -251,6 +251,34 @@ button,input,select{font-family:inherit}
 .tbl-empty{text-align:center;padding:60px 20px;color:var(--muted);font-size:13px}
 .tbl-loading{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px}
 
+/* Reports: scrollable table wrapper with sticky thead.
+   .tbl-card uses overflow:hidden which would break position:sticky on
+   thead, so reports get a dedicated wrapper. */
+.tbl-card-scroll{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-xs);overflow:auto;max-height:calc(100vh - 380px)}
+.tbl-card-scroll .tbl thead{position:sticky;top:0;z-index:5;box-shadow:inset 0 -1px 0 var(--border)}
+.tbl-card-scroll .tbl thead th{background:var(--surface2)}
+.tbl-sortable{cursor:pointer;user-select:none}
+.tbl-sortable:hover{background:#eef3ee !important}
+.tbl-sort-ind{display:inline-block;width:9px;text-align:center;margin-left:4px;color:var(--muted);font-size:9px;line-height:1}
+.tbl-sort-ind.active{color:var(--green-dark)}
+/* Aging bucket left-edge stripe on table rows. */
+.tbl tbody tr.ab-1::before,.tbl tbody tr.ab-2::before,.tbl tbody tr.ab-3::before,.tbl tbody tr.ab-4::before,.tbl tbody tr.ab-5::before{content:''}
+.tbl tbody tr.ab-1 td:first-child{border-left:3px solid #fbbf24}
+.tbl tbody tr.ab-2 td:first-child{border-left:3px solid #f59e0b}
+.tbl tbody tr.ab-3 td:first-child{border-left:3px solid #f97316}
+.tbl tbody tr.ab-4 td:first-child{border-left:3px solid #ef4444}
+.tbl tbody tr.ab-5 td:first-child{border-left:3px solid #b91c1c}
+/* Aging bucket tiles. */
+.agetile{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer;transition:all .12s;box-shadow:var(--shadow-xs)}
+.agetile:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.agetile.active{border-color:var(--green-dark);box-shadow:0 0 0 2px rgba(22,101,52,.15)}
+.agetile-band{height:3px;border-radius:2px;margin:-2px -2px 8px -2px}
+.agetile-label{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.agetile-count{font-size:20px;font-weight:800;color:var(--text);line-height:1;font-variant-numeric:tabular-nums}
+.agetile-amt{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:3px}
+@media(max-width:900px){#rpt-aging{grid-template-columns:repeat(3,1fr) !important}}
+@media(max-width:600px){#rpt-aging{grid-template-columns:repeat(2,1fr) !important}}
+
 /* QI panel */
 .qi-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-xs);display:flex;flex-direction:column}
 .qi-section{padding:14px 18px;border-bottom:1px solid var(--border)}
@@ -1344,16 +1372,32 @@ button,input,select{font-family:inherit}
       <button class="tf-btn active" data-rpt-tab="pastdue">Past Due Contact List</button>
     </div>
     <div class="stats" id="rpt-stats" style="grid-template-columns:repeat(4,1fr)"></div>
+    <!-- Aging bucket tiles — click to filter table to that bucket.
+         Counts + dollar exposure rendered by JS from the same row set
+         the table sees, so totals always agree with what's on screen. -->
+    <div id="rpt-aging" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px"></div>
     <!-- Filter chips — default is "Active only" (currently past-due with
          non-zero balance/amount-due and not Bought-Back/Paid-Off/etc.).
          Operators can flip to "All" for historical/audit views. -->
-    <div class="chips" style="margin-bottom:12px">
+    <div class="chips" style="margin-bottom:12px;align-items:center;flex-wrap:wrap">
       <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;padding:0 6px;align-self:center">Show</span>
       <button class="chip active" id="rpt-chip-active" onclick="setPastDueShowAll(false)">Active only<span class="chip-ct" id="rpt-chip-active-ct">0</span></button>
       <button class="chip" id="rpt-chip-all" onclick="setPastDueShowAll(true)">All (incl. closed)<span class="chip-ct" id="rpt-chip-all-ct">0</span></button>
+      <span id="rpt-active-aging" style="display:none;font-size:11.5px;color:var(--muted);padding-left:8px">Aging filter: <strong id="rpt-active-aging-label" style="color:var(--text)"></strong> <button onclick="setPastDueAging(null)" style="background:none;border:0;color:var(--green-dark);cursor:pointer;font-size:11.5px;font-weight:700;padding:0 4px;font-family:inherit">Clear</button></span>
+      <button id="rpt-reset-btn" class="chip" style="margin-left:auto" onclick="resetPastDueView()" title="Reset all filters + sort to defaults">Reset view</button>
     </div>
-    <div style="margin-bottom:14px">
-      <input type="text" id="rpt-search" placeholder="Search by name, phone, loan id, store…" oninput="filterPastDueReport(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+    <!-- Toolbar — search, bulk actions, CSV export, auto-refresh, last-loaded. -->
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <input type="text" id="rpt-search" placeholder="Search by name, phone, loan id, store…" oninput="filterPastDueReport(this.value)" style="flex:1;min-width:240px;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+      <button class="chip" onclick="exportPastDueCSV(false)" title="Download visible rows as CSV"><svg class="icn" style="width:13px;height:13px"><use href="#i-download"/></svg> Export CSV</button>
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);cursor:pointer;padding:0 6px"><input type="checkbox" id="rpt-autorefresh" onchange="togglePastDueAutoRefresh(this.checked)" style="margin:0;cursor:pointer"> Auto-refresh</label>
+      <span id="rpt-loaded-at" style="font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums"></span>
+    </div>
+    <!-- Bulk-action bar — only shown when rows are selected. -->
+    <div id="rpt-bulkbar" style="display:none;align-items:center;gap:10px;margin-bottom:12px;padding:8px 12px;background:#eef6ff;border:1px solid #c8def0;border-radius:10px">
+      <strong id="rpt-bulk-count" style="font-size:13px;color:#1a4d6b">0 selected</strong>
+      <button class="chip" onclick="exportPastDueCSV(true)" style="background:white">Export selected</button>
+      <button class="chip" onclick="clearPastDueSelection()" style="background:transparent;border:0;color:var(--green-dark);margin-left:auto">Clear</button>
     </div>
     <div id="rpt-status" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
     <div id="rpt-table">
@@ -5038,23 +5082,35 @@ async function markIFProcessed(rowKey) {
 
 // ─────────────────────────────────────────────────────────────────────
 // REPORTS — Vergent V1 reports
-// Currently only the Past Due Contact List; structured so more
-// reports can drop in as sibling functions without refactor.
-// ─────────────────────────────────────────────────────────────────────
-let _pastDueRows = [];
-// When false (default), the Reports table only shows actively-past-due
-// loans: balance > 0 OR amount-due > 0, AND loan status not in the
-// closed-loan set below. Operators flip this to true via the "All"
-// chip when they need historical / audit context.
-let _pastDueShowAll = false;
+// Past Due Contact List with aging buckets, priority sort, sticky-header
+// table, click-to-sort columns, multi-select + CSV export, saved view in
+// localStorage, and 5-minute auto-refresh.
 
-// Loan statuses that mean "this loan is closed / resolved" and shouldn't
-// appear on a current-collections list. Lowercased; we compare with
-// .toLowerCase() so the casing in Vergent's response doesn't matter.
+let _pastDueRows = [];
+let _pastDueShowAll = false;
+let _pastDueAging = null;
+let _pastDueSortKey = 'priority';
+let _pastDueSortDir = 'desc';
+let _pastDueSelected = new Set();
+let _pastDueLastVisible = [];
+let _pastDueLoadedAt = 0;
+let _pastDueAutoTimer = null;
+let _pastDueLoadedTickTimer = null;
+
+const _PASTDUE_STORAGE_KEY = 'cif_pastdue_view';
+
 const _PASTDUE_CLOSED_STATUSES = new Set([
   'bought back', 'paid off', 'paid', 'returned', 'closed',
   'charged off', 'charge off', 'rejected', 'cancelled', 'canceled',
 ]);
+
+const _PASTDUE_BUCKETS = [
+  { key: 'b1', label: '1–15 days',  cls: 'ab-1', min: 1,  max: 15,    band: '#fbbf24' },
+  { key: 'b2', label: '16–30 days', cls: 'ab-2', min: 16, max: 30,    band: '#f59e0b' },
+  { key: 'b3', label: '31–60 days', cls: 'ab-3', min: 31, max: 60,    band: '#f97316' },
+  { key: 'b4', label: '61–90 days', cls: 'ab-4', min: 61, max: 90,    band: '#ef4444' },
+  { key: 'b5', label: '90+ days',   cls: 'ab-5', min: 91, max: 1e9,   band: '#b91c1c' },
+];
 
 function _pastDueIsActive(r) {
   const balance = Number(r.Balance) || 0;
@@ -5065,13 +5121,151 @@ function _pastDueIsActive(r) {
   return true;
 }
 
+function _pastDueBucket(r) {
+  const d = Number(r.DaysLate) || 0;
+  if (d <= 0) return null;
+  return _PASTDUE_BUCKETS.find(b => d >= b.min && d <= b.max) || null;
+}
+
+function _pastDueDaysSince(iso) {
+  if (!iso) return 999;
+  const t = Date.parse(iso);
+  if (isNaN(t)) return 999;
+  return Math.max(0, (Date.now() - t) / 86400000);
+}
+
+// Priority score: bigger balance, older delinquency, longer since last
+// contact → rank higher. Used as the default sort so the "today's call
+// list" is what the operator sees at the top.
+function _pastDuePriorityScore(r) {
+  const bal = Number(r.Balance) || 0;
+  const dl  = Math.max(0, Number(r.DaysLate) || 0);
+  const stale = _pastDueDaysSince(r.LastCallUtcDateTime);
+  return bal * Math.sqrt(dl + 1) * (1 + Math.min(stale, 30) / 10);
+}
+
+function _pastDueSaveView() {
+  try {
+    localStorage.setItem(_PASTDUE_STORAGE_KEY, JSON.stringify({
+      showAll: _pastDueShowAll,
+      aging:   _pastDueAging,
+      sortKey: _pastDueSortKey,
+      sortDir: _pastDueSortDir,
+      search:  document.getElementById('rpt-search')?.value || '',
+      auto:    document.getElementById('rpt-autorefresh')?.checked || false,
+    }));
+  } catch (e) { /* private mode, ignore */ }
+}
+
+function _pastDueLoadView() {
+  try {
+    const raw = localStorage.getItem(_PASTDUE_STORAGE_KEY);
+    if (!raw) return;
+    const v = JSON.parse(raw);
+    if (typeof v.showAll === 'boolean') _pastDueShowAll = v.showAll;
+    if (v.aging === null || _PASTDUE_BUCKETS.some(b => b.key === v.aging)) _pastDueAging = v.aging;
+    if (typeof v.sortKey === 'string') _pastDueSortKey = v.sortKey;
+    if (v.sortDir === 'asc' || v.sortDir === 'desc') _pastDueSortDir = v.sortDir;
+    const s = document.getElementById('rpt-search');  if (s && typeof v.search === 'string') s.value = v.search;
+    const a = document.getElementById('rpt-autorefresh'); if (a) a.checked = !!v.auto;
+    document.getElementById('rpt-chip-active')?.classList.toggle('active', !_pastDueShowAll);
+    document.getElementById('rpt-chip-all')?.classList.toggle('active',     _pastDueShowAll);
+    if (a && a.checked) togglePastDueAutoRefresh(true);
+  } catch (e) { /* ignore */ }
+}
+
 function setPastDueShowAll(showAll) {
   _pastDueShowAll = !!showAll;
   document.getElementById('rpt-chip-active')?.classList.toggle('active', !showAll);
   document.getElementById('rpt-chip-all')?.classList.toggle('active', showAll);
-  // Re-apply current search term so the toggle picks up.
-  const q = document.getElementById('rpt-search')?.value || '';
-  filterPastDueReport(q);
+  _pastDueSaveView();
+  filterPastDueReport(document.getElementById('rpt-search')?.value || '');
+}
+
+function setPastDueAging(bucketKey) {
+  _pastDueAging = bucketKey || null;
+  _pastDueSaveView();
+  filterPastDueReport(document.getElementById('rpt-search')?.value || '');
+}
+
+function setPastDueSort(key) {
+  if (_pastDueSortKey === key) {
+    _pastDueSortDir = _pastDueSortDir === 'desc' ? 'asc' : 'desc';
+  } else {
+    _pastDueSortKey = key;
+    _pastDueSortDir = ['name', 'loan', 'phone'].includes(key) ? 'asc' : 'desc';
+  }
+  _pastDueSaveView();
+  filterPastDueReport(document.getElementById('rpt-search')?.value || '');
+}
+
+function togglePastDueRow(loanId) {
+  if (_pastDueSelected.has(loanId)) _pastDueSelected.delete(loanId);
+  else _pastDueSelected.add(loanId);
+  _pastDueRefreshBulkBar();
+}
+
+function togglePastDueAllVisible(el) {
+  const rows = _pastDueLastVisible;
+  const all = rows.length > 0 && rows.every(r => _pastDueSelected.has(String(r.LoanId || '')));
+  if (all) rows.forEach(r => _pastDueSelected.delete(String(r.LoanId || '')));
+  else     rows.forEach(r => _pastDueSelected.add(String(r.LoanId || '')));
+  document.querySelectorAll('.rpt-rowchk').forEach(cb => {
+    cb.checked = _pastDueSelected.has(cb.dataset.loanid);
+  });
+  _pastDueRefreshBulkBar();
+}
+
+function clearPastDueSelection() {
+  _pastDueSelected.clear();
+  document.querySelectorAll('.rpt-rowchk').forEach(cb => cb.checked = false);
+  const head = document.getElementById('rpt-headchk'); if (head) head.checked = false;
+  _pastDueRefreshBulkBar();
+}
+
+function _pastDueRefreshBulkBar() {
+  const bar = document.getElementById('rpt-bulkbar');
+  const ct  = document.getElementById('rpt-bulk-count');
+  if (!bar) return;
+  const n = _pastDueSelected.size;
+  bar.style.display = n ? 'flex' : 'none';
+  if (ct) ct.textContent = `${n} selected`;
+}
+
+function resetPastDueView() {
+  _pastDueShowAll = false;
+  _pastDueAging = null;
+  _pastDueSortKey = 'priority';
+  _pastDueSortDir = 'desc';
+  clearPastDueSelection();
+  const s = document.getElementById('rpt-search'); if (s) s.value = '';
+  document.getElementById('rpt-chip-active')?.classList.add('active');
+  document.getElementById('rpt-chip-all')?.classList.remove('active');
+  _pastDueSaveView();
+  filterPastDueReport('');
+}
+
+function _pastDueApplySort(rows) {
+  const dir = _pastDueSortDir === 'asc' ? 1 : -1;
+  const key = _pastDueSortKey;
+  const get = {
+    priority: r => _pastDuePriorityScore(r),
+    name:     r => ((r.LastName || '') + ' ' + (r.FirstName || '')).toLowerCase(),
+    loan:     r => String(r.LoanId || '').toLowerCase(),
+    days:     r => Number(r.DaysLate) || 0,
+    amtdue:   r => Number(r.AmountDue) || 0,
+    balance:  r => Number(r.Balance) || 0,
+    due:      r => Date.parse(r.DueDate || '') || 0,
+    nextpay:  r => Date.parse(r.NextPayDate || '') || 0,
+    phone:    r => String(r.PrimaryPhoenNumber || r.PrimaryPhoneNumber || ''),
+    lastcall: r => Date.parse(r.LastCallUtcDateTime || '') || 0,
+  }[key] || (r => _pastDuePriorityScore(r));
+  return rows.slice().sort((a, b) => {
+    const va = get(a), vb = get(b);
+    if (va < vb) return -1 * dir;
+    if (va > vb) return  1 * dir;
+    return 0;
+  });
 }
 
 function _rptFmtMoney(n) {
@@ -5086,6 +5280,14 @@ function _rptFmtDate(s) {
   if (isNaN(d.getTime())) return String(s);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 }
+function _rptFmtRelative(t) {
+  if (!t) return '';
+  const sec = Math.floor((Date.now() - t) / 1000);
+  if (sec < 60)    return 'just now';
+  if (sec < 3600)  return Math.floor(sec/60) + ' min ago';
+  if (sec < 86400) return Math.floor(sec/3600) + ' h ago';
+  return Math.floor(sec/86400) + ' d ago';
+}
 function _rptDaysLatePill(n) {
   const v = Number(n || 0);
   let cls = 'amber';
@@ -5097,10 +5299,62 @@ function _rptDaysLatePill(n) {
   return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:800;background:${bg};color:${color};border:1px solid ${border};font-variant-numeric:tabular-nums">${v} d</span>`;
 }
 
+function _pastDueUpdateLoadedAt() {
+  const el = document.getElementById('rpt-loaded-at');
+  if (!el) return;
+  el.textContent = _pastDueLoadedAt ? ('Loaded ' + _rptFmtRelative(_pastDueLoadedAt)) : '';
+}
+
+function togglePastDueAutoRefresh(on) {
+  if (_pastDueAutoTimer) { clearInterval(_pastDueAutoTimer); _pastDueAutoTimer = null; }
+  const cb = document.getElementById('rpt-autorefresh');
+  if (cb) cb.checked = !!on;
+  if (on) {
+    _pastDueAutoTimer = setInterval(() => {
+      if (document.visibilityState === 'visible' &&
+          document.getElementById('view-reports')?.classList.contains('active')) {
+        loadPastDueReport();
+      }
+    }, 300000);
+  }
+  _pastDueSaveView();
+}
+
+function exportPastDueCSV(selectedOnly) {
+  const rows = selectedOnly
+    ? _pastDueLastVisible.filter(r => _pastDueSelected.has(String(r.LoanId || '')))
+    : _pastDueLastVisible;
+  if (!rows.length) { alert('No rows to export.'); return; }
+  const cell = v => {
+    if (v == null) return '';
+    const s = String(v);
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const headers = ['CustomerId', 'StoreNumber', 'FirstName', 'LastName', 'LoanId', 'LoanStatus', 'LoanSubStatus', 'DaysLate', 'AmountDue', 'Balance', 'DueDate', 'NextPayDate', 'Phone', 'LastCallUtc', 'LastCallResult', 'LastCallNote', 'PriorityScore'];
+  const lines = [headers.join(',')];
+  rows.forEach(r => {
+    lines.push([
+      r.CustomerId, r.StoreNumber, r.FirstName, r.LastName,
+      r.LoanId, r.LoanStatus, r.LoanSubStatus, r.DaysLate,
+      r.AmountDue, r.Balance, r.DueDate, r.NextPayDate,
+      r.PrimaryPhoenNumber || r.PrimaryPhoneNumber || '',
+      r.LastCallUtcDateTime, r.LastCallResult, r.LastCallNote,
+      _pastDuePriorityScore(r).toFixed(0),
+    ].map(cell).join(','));
+  });
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `past-due_${new Date().toISOString().slice(0,10)}${selectedOnly?'_selected':''}.csv`;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+}
+
 async function loadPastDueReport() {
   const table = document.getElementById('rpt-table');
   const status = document.getElementById('rpt-status');
-  if (table) table.innerHTML = '<div class="tbl-loading">Loading report…</div>';
+  if (table && !_pastDueLoadedAt) table.innerHTML = '<div class="tbl-loading">Loading report…</div>';
   if (status) status.textContent = '';
   try {
     const r = await fetch('/api/vergent-report-pastdue', {
@@ -5111,25 +5365,20 @@ async function loadPastDueReport() {
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d || d.ok === false) {
       const detail = (d && d.detail) || (d && d.error) || ('HTTP ' + r.status);
-      // Render the full Vergent stack trace as a scrollable <pre> so
-      // we can see exactly which field is null without the message
-      // getting cut off.
       table.innerHTML = `<div class="tbl-empty"><div style="margin-bottom:10px;color:var(--red);font-weight:700">Couldn't load report</div><pre style="text-align:left;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;font-size:11px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow:auto;max-height:400px;white-space:pre-wrap;word-break:break-word">${escapeHtml(String(detail))}</pre></div>`;
       return;
     }
-    // Filter out deleted loans — they're noise on a collections list
-    // (the underlying loan was wiped out in Vergent but Vergent's report
-    // still surfaces them with a "Deleted" status).
     _pastDueRows = (d.rows || []).filter(r =>
       String(r.LoanStatus || '').toLowerCase() !== 'deleted'
     );
-    // Update the chip counts so the operator can see how many rows
-    // each filter would surface before clicking.
+    _pastDueLoadedAt = Date.now();
     const activeCt = _pastDueRows.filter(_pastDueIsActive).length;
     document.getElementById('rpt-chip-active-ct').textContent = activeCt.toLocaleString();
     document.getElementById('rpt-chip-all-ct').textContent = _pastDueRows.length.toLocaleString();
-    // Go through filterPastDueReport so the active-only chip + search
-    // term are both honored on initial render.
+    _pastDueUpdateLoadedAt();
+    if (!_pastDueLoadedTickTimer) {
+      _pastDueLoadedTickTimer = setInterval(_pastDueUpdateLoadedAt, 30000);
+    }
     filterPastDueReport(document.getElementById('rpt-search')?.value || '');
   } catch (e) {
     table.innerHTML = `<div class="tbl-empty">Network error: ${escapeHtml(e.message || String(e))}</div>`;
@@ -5138,6 +5387,12 @@ async function loadPastDueReport() {
 
 function filterPastDueReport(q) {
   let rows = _pastDueShowAll ? _pastDueRows : _pastDueRows.filter(_pastDueIsActive);
+  if (_pastDueAging) {
+    rows = rows.filter(r => {
+      const b = _pastDueBucket(r);
+      return b && b.key === _pastDueAging;
+    });
+  }
   const term = (q || '').trim().toLowerCase();
   if (term) {
     rows = rows.filter(r => {
@@ -5150,7 +5405,44 @@ function filterPastDueReport(q) {
           || String(r.CustomerId || '').includes(term);
     });
   }
+  _pastDueSaveView();
   renderPastDueReport(rows);
+}
+
+function _pastDueRenderAging(activeRows) {
+  // Tile counts come from the showAll-filtered set, not the aging-filtered
+  // one, so each tile reflects the full bucket population regardless of
+  // which one is currently selected.
+  const grid = document.getElementById('rpt-aging');
+  if (!grid) return;
+  const counts = {}, balances = {};
+  _PASTDUE_BUCKETS.forEach(b => { counts[b.key] = 0; balances[b.key] = 0; });
+  activeRows.forEach(r => {
+    const b = _pastDueBucket(r);
+    if (!b) return;
+    counts[b.key]++;
+    balances[b.key] += Number(r.Balance) || 0;
+  });
+  grid.innerHTML = _PASTDUE_BUCKETS.map(b => {
+    const arg = _pastDueAging === b.key ? 'null' : `'${b.key}'`;
+    return `<div class="agetile${_pastDueAging === b.key ? ' active' : ''}" onclick="setPastDueAging(${arg})">
+      <div class="agetile-band" style="background:${b.band}"></div>
+      <div class="agetile-label">${b.label}</div>
+      <div class="agetile-count">${counts[b.key].toLocaleString()}</div>
+      <div class="agetile-amt">${_rptFmtMoney(balances[b.key])}</div>
+    </div>`;
+  }).join('');
+  const indWrap = document.getElementById('rpt-active-aging');
+  const indLbl  = document.getElementById('rpt-active-aging-label');
+  if (indWrap && indLbl) {
+    if (_pastDueAging) {
+      const b = _PASTDUE_BUCKETS.find(x => x.key === _pastDueAging);
+      indWrap.style.display = 'inline-flex';
+      indLbl.textContent = b ? b.label : _pastDueAging;
+    } else {
+      indWrap.style.display = 'none';
+    }
+  }
 }
 
 function renderPastDueReport(rows) {
@@ -5159,7 +5451,6 @@ function renderPastDueReport(rows) {
   const stats = document.getElementById('rpt-stats');
   if (!table) return;
 
-  // Stat aggregates — operator triage at-a-glance.
   if (stats) {
     const totalBalance = rows.reduce((s, r) => s + (Number(r.Balance) || 0), 0);
     const totalDue     = rows.reduce((s, r) => s + (Number(r.AmountDue) || 0), 0);
@@ -5169,30 +5460,61 @@ function renderPastDueReport(rows) {
       <div class="stat-value${cls==='dec'?' red':cls==='pen'?' amber':''}">${val}</div>
     </div>`;
     stats.innerHTML =
-        card('Total customers', rows.length, 'tot')
-      + card('30+ days late',   sev30, 'dec')
-      + card('Total balance',   _rptFmtMoney(totalBalance))
+        card('Customers', rows.length, 'tot')
+      + card('30+ days late', sev30, 'dec')
+      + card('Total balance', _rptFmtMoney(totalBalance))
       + card('Total amount due', _rptFmtMoney(totalDue), 'pen');
   }
 
+  const tilesSet = _pastDueShowAll ? _pastDueRows : _pastDueRows.filter(_pastDueIsActive);
+  _pastDueRenderAging(tilesSet);
+
   if (!rows.length) {
-    table.innerHTML = '<div class="tbl-empty">No past-due records. Either everyone is paid up, or check Render logs for a Vergent error.</div>';
-    status.textContent = '';
+    table.innerHTML = '<div class="tbl-empty">No records match the current filters.</div>';
+    if (status) status.textContent = '';
+    _pastDueLastVisible = [];
+    _pastDueRefreshBulkBar();
     return;
   }
-  status.textContent = `${rows.length} record${rows.length===1?'':'s'}`;
 
-  // Sort newest-late first.
-  const sorted = rows.slice().sort((a, b) => (Number(b.DaysLate)||0) - (Number(a.DaysLate)||0));
+  const sorted = _pastDueApplySort(rows);
+  _pastDueLastVisible = sorted;
+
+  const sortInd = key => {
+    const active = _pastDueSortKey === key;
+    const arrow = active ? (_pastDueSortDir === 'desc' ? '▼' : '▲') : '↕';
+    return `<span class="tbl-sort-ind${active?' active':''}">${arrow}</span>`;
+  };
+  const headerCols = [
+    { key: 'name',     label: 'Customer' },
+    { key: 'loan',     label: 'Loan' },
+    { key: 'days',     label: 'Days late' },
+    { key: 'amtdue',   label: 'Amt due' },
+    { key: 'balance',  label: 'Balance' },
+    { key: 'due',      label: 'Due' },
+    { key: 'nextpay',  label: 'Next pay' },
+    { key: 'phone',    label: 'Phone' },
+    { key: 'lastcall', label: 'Last call' },
+  ];
+  const headHtml = headerCols.map(c =>
+    `<th class="tbl-sortable" onclick="setPastDueSort('${c.key}')">${c.label}${sortInd(c.key)}</th>`
+  ).join('');
+  const allChecked = sorted.length > 0 && sorted.every(r => _pastDueSelected.has(String(r.LoanId || '')));
+
   const body = sorted.map(r => {
     const name = ((r.FirstName || '') + ' ' + (r.LastName || '')).trim() || '—';
     const phone = (r.PrimaryPhoenNumber || r.PrimaryPhoneNumber || '').trim();
     const phoneHtml = phone
-      ? `<a href="tel:${escapeHtml(phone)}" style="color:var(--green-dark);text-decoration:none;font-variant-numeric:tabular-nums">${escapeHtml(phone)}</a>`
+      ? `<a href="tel:${escapeHtml(phone)}" style="color:var(--green-dark);text-decoration:none;font-variant-numeric:tabular-nums" onclick="event.stopPropagation()">${escapeHtml(phone)}</a>`
       : '—';
     const vergentLink = `https://shared.lms.vergentlms.com/customer/general?action=view&id=${encodeURIComponent(r.CustomerId || '')}`;
-    return `<tr>
-      <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none">${escapeHtml(name)}</a></div><div class="applicant-id">#${escapeHtml(String(r.CustomerId || '—'))} · ${escapeHtml(r.StoreNumber || '—')}</div></td>
+    const bucket = _pastDueBucket(r);
+    const rowCls = bucket ? bucket.cls : '';
+    const loanId = String(r.LoanId || '');
+    const checked = _pastDueSelected.has(loanId) ? 'checked' : '';
+    return `<tr${rowCls?` class="${rowCls}"`:''}>
+      <td class="tbl-checkbox"><input type="checkbox" class="rpt-rowchk" data-loanid="${escapeHtml(loanId)}" ${checked} onclick="event.stopPropagation();togglePastDueRow('${escapeHtml(loanId)}')"></td>
+      <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" onclick="event.stopPropagation()">${escapeHtml(name)}</a></div><div class="applicant-id">#${escapeHtml(String(r.CustomerId || '—'))} · ${escapeHtml(r.StoreNumber || '—')}</div></td>
       <td><div class="app-info"><span class="app-type">${escapeHtml(r.LoanId || '—')}</span><span class="app-meta">${escapeHtml(r.LoanStatus || '')}${r.LoanSubStatus ? ' · ' + escapeHtml(r.LoanSubStatus) : ''}</span></div></td>
       <td>${_rptDaysLatePill(r.DaysLate)}</td>
       <td><span class="tbl-time" style="font-variant-numeric:tabular-nums">${_rptFmtMoney(r.AmountDue)}</span></td>
@@ -5204,21 +5526,34 @@ function renderPastDueReport(rows) {
     </tr>`;
   }).join('');
 
-  table.innerHTML = `<div class="tbl-card"><table class="tbl">
+  table.innerHTML = `<div class="tbl-card-scroll"><table class="tbl">
     <thead><tr>
-      <th>Customer</th><th>Loan</th><th>Days late</th><th>Amt due</th>
-      <th>Balance</th><th>Due</th><th>Next pay</th><th>Phone</th><th>Last call</th>
+      <th class="tbl-checkbox"><input type="checkbox" id="rpt-headchk" ${allChecked?'checked':''} onclick="togglePastDueAllVisible(this)"></th>
+      ${headHtml}
     </tr></thead>
     <tbody>${body}</tbody>
   </table></div>`;
+
+  if (status) {
+    const total = _pastDueShowAll ? _pastDueRows.length : _pastDueRows.filter(_pastDueIsActive).length;
+    status.textContent = total === rows.length
+      ? `${rows.length} record${rows.length===1?'':'s'}`
+      : `${rows.length} of ${total} record${total===1?'':'s'}`;
+  }
+  _pastDueRefreshBulkBar();
 }
 
-// Refresh button on the Reports view.
 document.addEventListener('click', e => {
   if (e.target && e.target.closest && e.target.closest('#rpt-refresh-btn')) {
     loadPastDueReport();
   }
 });
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', _pastDueLoadView);
+} else {
+  _pastDueLoadView();
+}
 </script>
 
 </body>
