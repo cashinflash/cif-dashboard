@@ -1495,6 +1495,11 @@ button,input,select{font-family:inherit}
           <input id="cust-portal-q" type="text" autocomplete="off" placeholder="Customer ID (e.g. 601488), email (jane@x.com), or last name" style="flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
           <button type="submit" class="btn btn-primary" style="padding:10px 18px">Search</button>
         </form>
+        <!-- Refresh re-runs whatever the panel is currently showing
+             (list-all when input is empty, or the active search).
+             Lets operators pull in just-signed-up customers without
+             a full page reload. -->
+        <button type="button" id="cust-portal-refresh" class="btn btn-ghost" title="Refresh — pulls the latest portal signups" style="padding:10px 14px" onclick="refreshPortalCustomers()"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-refresh"/></svg>Refresh</button>
       </div>
       <div id="cust-portal-meta" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
       <div id="cust-portal-results" style="display:flex;flex-direction:column;gap:8px"></div>
@@ -4697,6 +4702,27 @@ async function doCustomerSearch(source) {
     renderCustomerSearchResults(source, rows);
   } catch (e) {
     if (meta) meta.textContent = 'Error: ' + e.message;
+  }
+}
+
+// Refresh the Portal Customers panel — re-runs the active query
+// (or list-all when the input is empty) and briefly disables the
+// button to discourage rapid double-clicks. Same UX as a manual
+// search-submit but explicit so the operator knows what's happening.
+async function refreshPortalCustomers() {
+  const btn = document.getElementById('cust-portal-refresh');
+  if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+  try {
+    await doCustomerSearch('portal');
+  } finally {
+    if (btn) {
+      // Small delay so the spinner-ish feedback is visible even on
+      // fast loads — keeps the affordance honest.
+      setTimeout(function () {
+        btn.disabled = false;
+        btn.style.opacity = '';
+      }, 250);
+    }
   }
 }
 
