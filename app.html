@@ -4700,12 +4700,85 @@ function renderCustomerSearchResults(source, rows) {
       '<div style="flex:1;min-width:260px">' +
         '<div style="font-size:15px;font-weight:700;color:var(--text)">' + name + statusPill + '</div>' +
         '<div style="font-size:12px;color:var(--muted);margin-top:4px">Customer #' + cid + ' · ' + email + ' · ' + phoneLast4 + metaTail + '</div>' +
-      '</div>' +
-      // "View as customer" wires up in Phase 3 (impersonation backend).
-      // Render disabled with a tooltip so operators see where the
-      // action will live.
-      '<button type="button" class="btn btn-ghost" disabled title="Impersonation not yet enabled — Phase 3" style="opacity:.5;cursor:not-allowed">View as customer</button>';
+      '</div>';
+    // "View as customer" — only show for portal-source rows (Vergent
+    // rows don't carry a cognitoSub so we can't impersonate them).
+    if (row.source === 'portal' && (row.cognitoSub || row.customerId)) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-primary';
+      btn.textContent = 'View as customer';
+      btn.style.cssText = 'padding:8px 14px;font-size:12px;font-weight:700;font-family:inherit';
+      // Capture both — backend prefers cognitoSub but falls back to
+      // customerId via the Cognito pool scan.
+      const sub = row.cognitoSub || '';
+      const cidArg = row.customerId || '';
+      btn.addEventListener('click', function() {
+        impersonateCustomer(btn, { cognitoSub: sub, customerId: cidArg });
+      });
+      card.appendChild(btn);
+    } else {
+      const note = document.createElement('span');
+      note.style.cssText = 'font-size:11px;color:var(--muted)';
+      note.textContent = row.source === 'vergent'
+        ? '(no portal account)' : '';
+      card.appendChild(note);
+    }
     box.appendChild(card);
+  }
+}
+
+async function impersonateCustomer(btn, target) {
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Opening…';
+  try {
+    const r = await fetch('/api/portal-customers/impersonate', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(target),
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      btn.textContent = 'Failed';
+      // Show inline so operator sees what happened.
+      const msg = (d && (d.error || d.message)) || ('HTTP ' + r.status);
+      btn.title = msg;
+      console.error('impersonate failed:', d);
+      setTimeout(function() {
+        btn.textContent = orig;
+        btn.disabled = false;
+        btn.title = '';
+      }, 2500);
+      return;
+    }
+    if (!d.portalUrl) {
+      btn.textContent = 'No URL';
+      console.error('impersonate response missing portalUrl:', d);
+      setTimeout(function() {
+        btn.textContent = orig;
+        btn.disabled = false;
+      }, 2500);
+      return;
+    }
+    // Open the portal in a new tab. The fragment carries the JWT +
+    // impersonation token; portal.js bootstraps from there.
+    window.open(d.portalUrl, '_blank', 'noopener');
+    btn.textContent = '✓ Opened';
+    setTimeout(function() {
+      btn.textContent = orig;
+      btn.disabled = false;
+    }, 1500);
+  } catch (e) {
+    btn.textContent = 'Error';
+    btn.title = e.message;
+    console.error('impersonate exception:', e);
+    setTimeout(function() {
+      btn.textContent = orig;
+      btn.disabled = false;
+      btn.title = '';
+    }, 2500);
   }
 }
 

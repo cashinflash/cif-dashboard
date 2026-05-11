@@ -36,6 +36,11 @@ PORTAL_COGNITO_APP_CLIENT_ID = os.environ.get(
     'PORTAL_COGNITO_APP_CLIENT_ID', '1mddi61n19hftaldt9t3r622b'
 )
 PORTAL_API_BASE = os.environ.get('PORTAL_API_BASE', IF_API_BASE).rstrip('/')
+# Portal frontend origin — used to build the "View as customer"
+# new-tab URL. Defaults to the prod apply domain.
+PORTAL_FRONTEND_ORIGIN = os.environ.get(
+    'PORTAL_FRONTEND_ORIGIN', 'https://apply.cashinflash.com'
+).rstrip('/')
 
 # Module-level cache for the service user's Cognito ID token.
 # Refreshed on TTL expiry or on a 401 from the portal.
@@ -1403,6 +1408,76 @@ class Handler(BaseHTTPRequestHandler):
 
         if not valid_session(token):
             self.send_json(401, {'error': 'Unauthorized'}); return
+
+        # Impersonation: mint a short-lived token at cif-portal and
+        # construct a "View as customer" URL with the operator's
+        # service JWT + the impersonation token in the URL fragment.
+        # Fragment so the JWT/token don't get logged by any HTTP
+        # intermediary; portal.js scrubs them on load.
+        if path == '/api/portal-customers/impersonate':
+            try:
+                req_body = json.loads(raw or b'{}')
+            except Exception:
+                self.send_json(400, {'error': 'invalid_json'}); return
+            if not isinstance(req_body, dict):
+                self.send_json(400, {'error': 'invalid_body'}); return
+            cognito_sub = (req_body.get('cognitoSub') or '').strip()
+            customer_id = (req_body.get('customerId') or '').strip()
+            if not (cognito_sub or customer_id):
+                self.send_json(400, {'error': 'missing_target'}); return
+
+            mint_body = {}
+            if cognito_sub: mint_body['cognitoSub'] = cognito_sub
+            if customer_id: mint_body['customerId'] = customer_id
+            code, raw_resp = _call_portal_admin(
+                'POST', '/api/admin/impersonate', mint_body,
+            )
+            if code != 200:
+                # Pass the upstream error body through verbatim so
+                # the operator sees why minting failed.
+                try:
+                    err_body = json.loads(raw_resp or b'{}')
+                except Exception:
+                    err_body = {'error': f'upstream_http_{code}',
+                                'raw': (raw_resp or b'').decode(
+                                    'utf-8', 'replace')[:300]}
+                self.send_json(code or 502, err_body); return
+
+            try:
+                resp = json.loads(raw_resp or b'{}')
+            except Exception:
+                self.send_json(502, {'error': 'invalid_upstream_response'})
+                return
+
+            imp_token = resp.get('token') or ''
+            expires_at = resp.get('expiresAt') or 0
+            target = resp.get('target') or {}
+            # Get the service JWT we used to mint (the portal
+            # frontend uses it to satisfy the API Gateway authorizer).
+            svc_tok, _err = _get_portal_admin_token()
+
+            # Build the destination URL. Fragment params:
+            #   impersonationToken — DDB token (read by portal.js)
+            #   jwt                — operator's service JWT (Cognito)
+            #   name, cid, email   — meta for the banner
+            #   exp                — unix epoch for the countdown
+            from urllib.parse import urlencode
+            frag = urlencode({
+                'impersonationToken': imp_token,
+                'jwt': svc_tok or '',
+                'name': target.get('fullName') or '',
+                'cid': target.get('customerId') or '',
+                'email': target.get('email') or '',
+                'exp': str(expires_at),
+            })
+            portal_url = f'{PORTAL_FRONTEND_ORIGIN}/dashboard.html#{frag}'
+
+            self.send_json(200, {
+                'portalUrl': portal_url,
+                'expiresAt': expires_at,
+                'target': target,
+            })
+            return
 
         if path.startswith('/fb/'):
             fb_path = path[4:]
