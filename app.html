@@ -5078,7 +5078,12 @@ async function loadPastDueReport() {
       table.innerHTML = `<div class="tbl-empty"><div style="margin-bottom:10px;color:var(--red);font-weight:700">Couldn't load report</div><pre style="text-align:left;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;font-size:11px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow:auto;max-height:400px;white-space:pre-wrap;word-break:break-word">${escapeHtml(String(detail))}</pre></div>`;
       return;
     }
-    _pastDueRows = (d.rows || []);
+    // Filter out deleted loans — they're noise on a collections list
+    // (the underlying loan was wiped out in Vergent but Vergent's report
+    // still surfaces them with a "Deleted" status).
+    _pastDueRows = (d.rows || []).filter(r =>
+      String(r.LoanStatus || '').toLowerCase() !== 'deleted'
+    );
     renderPastDueReport(_pastDueRows);
   } catch (e) {
     table.innerHTML = `<div class="tbl-empty">Network error: ${escapeHtml(e.message || String(e))}</div>`;
