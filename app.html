@@ -3374,7 +3374,13 @@ async function sendDenialEmail() {
     const d = await r.json().catch(() => ({}));
     if (r.ok && d.ok) {
       toast(`Denial email sent to ${_denialEmail} ✓`, 'ok');
+      // Marking Declined needs to happen BEFORE closeDenialModal clears
+      // _denialFbId. setStatus updates Firebase + the local apps cache
+      // and re-renders the detail so the operator sees the new status
+      // pill immediately.
+      const fbId = _denialFbId;
       closeDenialModal();
+      if (fbId) setStatus(fbId, 'Declined');
     } else {
       toast('Send failed: ' + (d.error || ('HTTP ' + r.status)), 'err');
     }
