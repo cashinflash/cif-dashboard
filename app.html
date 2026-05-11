@@ -870,6 +870,7 @@ button,input,select{font-family:inherit}
     <button class="tnt active" data-route="dashboard"><svg class="icn"><use href="#i-dashboard"/></svg>Dashboard</button>
     <button class="tnt" data-route="queue"><svg class="icn"><use href="#i-list"/></svg>Applications</button>
     <button class="tnt" data-route="connections"><svg class="icn"><use href="#i-bank"/></svg>Connections</button>
+    <button class="tnt" data-route="if"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
   </nav>
   <div class="topnav-spacer"></div>
   <div class="search-wrap">
@@ -891,6 +892,7 @@ button,input,select{font-family:inherit}
       <a href="/app/legacy"><svg class="icn"><use href="#i-external"/></svg>Open Classic View</a>
       <a href="#" id="open-customers"><svg class="icn"><use href="#i-list"/></svg>Plaid Customers</a>
       <button data-route="connections" type="button"><svg class="icn"><use href="#i-bank"/></svg>Connections</button>
+      <button data-route="if" type="button"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
       <hr>
       <button id="change-password"><svg class="icn"><use href="#i-key"/></svg>Change Password</button>
       <button id="sign-out"><svg class="icn"><use href="#i-logout"/></svg>Sign Out</button>
@@ -1293,6 +1295,42 @@ button,input,select{font-family:inherit}
   </div>
 </div>
 
+<!-- INSTANT FUNDING — debit cards submitted at cashinflash.com/if.
+     Ported from /app/legacy#if; same Firebase path (/ifSubmissions)
+     written by cif-apply's /if-submit endpoint. Operator reads the
+     card details, copies them into Vergent manually, marks the row
+     processed (or deletes it). -->
+<div class="view" id="view-if">
+  <div class="main full">
+    <div class="greet">
+      <div>
+        <div class="greet-title">Instant Funding</div>
+        <div class="greet-sub">Debit cards submitted via <b>cashinflash.com/if</b> — click <b>View card</b> to copy the details into Vergent.</div>
+      </div>
+    </div>
+    <div class="stats" id="if-stats" style="grid-template-columns:repeat(3,1fr)"></div>
+    <div style="margin-bottom:14px">
+      <input type="text" id="if-search" placeholder="Search by borrower, cardholder, last-4, or brand…" oninput="filterIFSubmissions(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+    </div>
+    <div id="if-status" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
+    <div id="if-table">
+      <div class="tbl-loading">Loading submissions…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Instant-Funding card-details modal -->
+<div id="if-modal-ov" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);align-items:center;justify-content:center;padding:20px"
+     onclick="if(event.target.id==='if-modal-ov')closeIFModal()">
+  <div style="background:white;border-radius:14px;width:100%;max-width:560px;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border)">
+      <div style="font-size:15px;font-weight:700;color:var(--text)">Card details</div>
+      <button onclick="closeIFModal()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted)" title="Close">&times;</button>
+    </div>
+    <div id="if-modal-body" style="padding:18px 20px;overflow-y:auto;flex:1"></div>
+  </div>
+</div>
+
 <!-- CONNECTIONS — App Links + Portal Links unified. Sub-tabs inside the
      page choose which panel shows. All inner IDs (plaid-list, plaid-search,
      portal-plaid-list, portal-plaid-search) are preserved so the JS that
@@ -1551,6 +1589,7 @@ function setRoute(name, fbId) {
     if (fbId === 'applinks' || fbId === 'portallinks') setConnTab(fbId);
     else setConnTab(_connInnerTab || 'applinks');
   }
+  if (name === 'if') loadIFSubmissions();
   document.body.dataset.firebaseId = (name === 'detail' && fbId) ? fbId : '';
   if (name === 'detail' && fbId) {
     location.hash = '#fb=' + encodeURIComponent(fbId);
@@ -1572,6 +1611,7 @@ function readRouteFromHash() {
     return ['detail', fbId];
   }
   if (h === '#queue' || h === '#applications') return ['queue', null];
+  if (h === '#if' || h === '#instant-funding') return ['if', null];
   // All Connections-related hashes resolve to the unified view; the
   // 2nd tuple element selects the inner sub-tab.
   if (h === '#connections' || h === '#applinks' || h === '#plaid') return ['connections', 'applinks'];
@@ -4427,6 +4467,257 @@ async function openPortalRerunReport(fbId) {
     setRoute('detail', fbId);
   } catch (e) {
     toast('Open report failed: ' + (e.message || e), 'err');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// INSTANT FUNDING — ported from app-legacy.html:2561-2810.
+// Reads /ifSubmissions on Firebase (written by cif-apply's /if-submit
+// endpoint), renders a table with stat cards + search + actions. Card
+// PAN / CVV stay client-side only — never logged, never stored on the
+// dashboard side. Same data path as classic; no token changes.
+// ─────────────────────────────────────────────────────────────────────
+function _ifRelTime(iso) {
+  if (!iso) return '—';
+  const t = Date.parse(iso);
+  if (isNaN(t)) return iso;
+  const s = Math.floor((Date.now() - t) / 1000);
+  if (s < 60)  return s + 's ago';
+  if (s < 3600) return Math.floor(s/60) + 'm ago';
+  if (s < 86400) return Math.floor(s/3600) + 'h ago';
+  const d = Math.floor(s/86400);
+  if (d < 30) return d + 'd ago';
+  try { return new Date(t).toLocaleDateString(); } catch (_) { return iso; }
+}
+
+async function _fbPatchRaw(path, data) {
+  const r = await fetch('/fb/' + path, {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json', 'X-Method': 'PATCH' },
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+}
+
+async function _fbDeleteRaw(path) {
+  const r = await fetch('/fb/' + path, {
+    method: 'POST', credentials: 'include',
+    headers: { 'X-Method': 'DELETE' },
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+}
+
+async function loadIFSubmissions() {
+  const status = document.getElementById('if-status');
+  const table  = document.getElementById('if-table');
+  if (table)  table.innerHTML = '<div class="tbl-loading">Loading submissions…</div>';
+  if (status) status.textContent = '';
+  try {
+    const data = await fbGet('ifSubmissions.json');
+    const rows = [];
+    if (data && typeof data === 'object' && !data.error) {
+      for (const [key, val] of Object.entries(data)) {
+        if (val && typeof val === 'object') rows.push({ ...val, firebaseId: key });
+      }
+    }
+    rows.sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || ''));
+    window._ifRows = rows;
+    renderIFSubmissions(rows);
+  } catch (e) {
+    if (table) table.innerHTML = `<div class="tbl-empty">Couldn't load submissions: ${escapeHtml(e.message || String(e))}</div>`;
+  }
+}
+
+function renderIFSubmissions(rows) {
+  const status = document.getElementById('if-status');
+  const table  = document.getElementById('if-table');
+  const stats  = document.getElementById('if-stats');
+  const pending   = rows.filter(r => (r.status || 'pending').toLowerCase() !== 'processed');
+  const processed = rows.filter(r => (r.status || '').toLowerCase() === 'processed');
+  if (stats) {
+    const card = (label, val, cls) => `<div class="stat${cls?' '+cls:''}">
+      <div class="stat-label">${escapeHtml(label)}</div>
+      <div class="stat-value${cls==='pen'?' amber':cls==='app'?' green':''}">${val}</div>
+    </div>`;
+    stats.innerHTML =
+        card('Total submissions', rows.length, 'tot')
+      + card('Action needed',     pending.length, 'pen')
+      + card('Processed',         processed.length, 'app');
+  }
+  if (!rows.length) {
+    table.innerHTML = '<div class="tbl-empty">No submissions yet. When a customer submits their debit card at <b>cashinflash.com/if</b> it will appear here.</div>';
+    status.textContent = '';
+    return;
+  }
+  status.textContent = `${rows.length}${rows.length===1?' submission':' submissions'} · ${pending.length} pending`;
+
+  const statusBadge = st => {
+    const s = (st || 'pending').toLowerCase();
+    const palette = {
+      pending:   ['#fef3c7', '#92400e', '#fde68a'],
+      processed: ['#dcfce7', '#166534', '#bbf7d0'],
+    }[s] || ['#f3f4f6', '#374151', '#d1d5db'];
+    return `<span style="display:inline-block;padding:3px 10px;border-radius:999px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;background:${palette[0]};color:${palette[1]};border:1px solid ${palette[2]}">${escapeHtml(s)}</span>`;
+  };
+  const brandChip = b => {
+    const key = (b || '').toLowerCase();
+    const c = { visa:['#1a1f71','#fff'], mastercard:['#eb001b','#fff'], amex:['#2e77bb','#fff'], discover:['#ff6000','#fff'] }[key] || ['#e9ecee', '#333'];
+    return `<span style="display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:.04em;background:${c[0]};color:${c[1]};white-space:nowrap">${escapeHtml(b || 'Card')}</span>`;
+  };
+
+  const body = rows.map(s => {
+    const borrower   = ((s.borrowerFirst   || '') + ' ' + (s.borrowerLast   || '')).trim() || '—';
+    const cardholder = ((s.cardholderFirst || '') + ' ' + (s.cardholderLast || '')).trim() || '—';
+    const mm  = String(s.expMonth || '').padStart(2, '0').slice(-2);
+    const yy  = String(s.expYear  || '').slice(-2);
+    const exp = (mm && yy) ? mm + '/' + yy : '—';
+    const rowKey = escapeHtml(s.firebaseId || '');
+    const nameAttr = escapeHtml(borrower.replace(/'/g, '').slice(0, 40));
+    const sameName = borrower === cardholder;
+    return `<tr onclick="openIFCardModal('${rowKey}')">
+      <td><div class="applicant-name">${escapeHtml(borrower)}</div><div class="applicant-id">${sameName ? 'Same cardholder' : 'Cardholder: ' + escapeHtml(cardholder)}</div></td>
+      <td>${brandChip(s.brand)} <span style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;color:var(--text2);margin-left:6px">···· ${escapeHtml(s.last4 || '----')}</span></td>
+      <td><span class="tbl-time" style="font-family:ui-monospace,Menlo,Consolas,monospace">${escapeHtml(exp)}</span></td>
+      <td><span class="tbl-time" style="font-family:ui-monospace,Menlo,Consolas,monospace">${escapeHtml(s.billingZip || '—')}</span></td>
+      <td>${statusBadge(s.status)}</td>
+      <td><span class="tbl-time" title="${escapeHtml(s.submittedAt || '')}">${escapeHtml(_ifRelTime(s.submittedAt))}</span></td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn btn-primary" onclick="event.stopPropagation();openIFCardModal('${rowKey}')" style="font-size:11.5px;padding:6px 10px">View card</button>
+        <button class="btn btn-danger" title="Delete submission" onclick="event.stopPropagation();deleteIFSubmission('${rowKey}','${nameAttr}')" style="font-size:11.5px;padding:6px 8px;margin-left:4px">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  table.innerHTML = `<div class="tbl-card"><table class="tbl">
+    <thead><tr>
+      <th>Borrower</th><th>Card</th><th>Exp</th><th>ZIP</th><th>Status</th><th>Submitted</th><th></th>
+    </tr></thead>
+    <tbody>${body}</tbody>
+  </table></div>`;
+}
+
+function filterIFSubmissions(q) {
+  const rows = window._ifRows || [];
+  const term = (q || '').trim().toLowerCase();
+  if (!term) { renderIFSubmissions(rows); return; }
+  renderIFSubmissions(rows.filter(r => {
+    const b = ((r.borrowerFirst   || '') + ' ' + (r.borrowerLast   || '')).trim().toLowerCase();
+    const c = ((r.cardholderFirst || '') + ' ' + (r.cardholderLast || '')).trim().toLowerCase();
+    return b.includes(term) || c.includes(term)
+        || (r.brand      || '').toLowerCase().includes(term)
+        || (r.last4      || '').includes(term)
+        || (r.billingZip || '').toLowerCase().includes(term);
+  }));
+}
+
+function closeIFModal() {
+  const ov = document.getElementById('if-modal-ov');
+  if (ov) ov.style.display = 'none';
+  window._ifPending = null;
+  const mb = document.getElementById('if-modal-body');
+  if (mb) mb.innerHTML = '';
+}
+
+function _ifCopy(elId, btn) {
+  const el = document.getElementById(elId); if (!el) return;
+  const v = el.textContent.trim();
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v);
+  const orig = btn.textContent;
+  btn.textContent = 'Copied';
+  btn.style.background = 'var(--green)';
+  btn.style.color = 'white';
+  setTimeout(() => { btn.textContent = orig; btn.style.background = ''; btn.style.color = ''; }, 1100);
+}
+
+function _ifCopyAll() {
+  const p = window._ifPending || {};
+  const lines = [
+    'Borrower: ' + (p.Borrower || ''),
+    'Cardholder: ' + (p.Cardholder || ''),
+    'Card Number: ' + (p.CardNumber || ''),
+    'Card Type: ' + (p.CardType || ''),
+    'Expiration: ' + (p.Expiration || ''),
+    'CVV: ' + (p.CVV || ''),
+    'Billing ZIP: ' + (p.BillingZIP || ''),
+  ].join('\n');
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(lines);
+  toast('Copied all fields', 'ok');
+}
+
+function openIFCardModal(rowKey) {
+  const ov = document.getElementById('if-modal-ov');
+  const mb = document.getElementById('if-modal-body');
+  const data = (window._ifRows || []).find(r => r.firebaseId === rowKey);
+  if (!data) {
+    mb.innerHTML = '<div style="padding:24px;text-align:center"><div style="color:var(--red);font-weight:700;margin-bottom:6px">Submission not found</div><div style="color:var(--muted)">It may have just been deleted. Refresh the page.</div></div>';
+    ov.style.display = 'flex';
+    return;
+  }
+  const borrower   = ((data.borrowerFirst   || '') + ' ' + (data.borrowerLast   || '')).trim() || '—';
+  const cardholder = ((data.cardholderFirst || '') + ' ' + (data.cardholderLast || '')).trim() || '—';
+  const mm  = String(data.expMonth || '').padStart(2, '0').slice(-2);
+  const yy  = String(data.expYear  || '').slice(-2);
+  const exp = (mm && yy) ? mm + '/' + yy : '—';
+  const panFmt = (data.cardNumber || '').replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim() || '—';
+  const row = (k, v, copy) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-soft);gap:14px">
+    <span style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">${escapeHtml(k)}</span>
+    <span style="font-weight:600;text-align:right">
+      <span id="if-field-${escapeHtml(copy || k)}" style="${copy ? 'font-family:ui-monospace,Menlo,Consolas,monospace;user-select:all' : ''}">${escapeHtml(v || '—')}</span>
+      ${copy ? `<button class="btn btn-ghost" style="margin-left:8px;padding:3px 9px;font-size:11px" onclick="_ifCopy('if-field-${escapeHtml(copy)}',this)">Copy</button>` : ''}
+    </span>
+  </div>`;
+  mb.innerHTML = `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:14px">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Borrower &amp; cardholder</div>
+      ${row('Borrower', borrower)}
+      ${row('Cardholder', cardholder)}
+      ${row('Submitted', data.submittedAt || '—')}
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:14px">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Card details — click any value to select it</div>
+      ${row('Card number', panFmt, 'cardNumber')}
+      ${row('Card type', data.brand || 'Card')}
+      ${row('Expiration', exp, 'expiration')}
+      ${row('CVV', data.cvv, 'cvv')}
+      ${row('Billing ZIP', data.billingZip, 'billingZip')}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;justify-content:flex-end">
+      <a href="https://cashinflash.my.vergentlms.com/login" target="_blank" rel="noopener" class="btn btn-ghost" style="text-decoration:none">Open Vergent ↗</a>
+      <button class="btn btn-ghost" onclick="_ifCopyAll()">Copy all fields</button>
+      <button class="btn btn-ghost" onclick="markIFProcessed('${escapeHtml(rowKey)}')">Mark processed</button>
+      <button class="btn btn-danger" onclick="deleteIFSubmission('${escapeHtml(rowKey)}','${escapeHtml(borrower.replace(/'/g,'').slice(0,40))}')">Delete</button>
+      <button class="btn btn-ghost" onclick="closeIFModal()">Done</button>
+    </div>`;
+  window._ifPending = {
+    Borrower: borrower, Cardholder: cardholder,
+    CardNumber: panFmt, CardType: data.brand || 'Card',
+    Expiration: exp, CVV: data.cvv, BillingZIP: data.billingZip,
+  };
+  ov.style.display = 'flex';
+}
+
+async function deleteIFSubmission(rowKey, label) {
+  const who = label ? ` for ${label}` : '';
+  if (!confirm(`Permanently delete this submission${who}?`)) return;
+  try {
+    await _fbDeleteRaw(`ifSubmissions/${rowKey}.json`);
+    toast('Submission deleted', 'ok');
+    closeIFModal();
+    loadIFSubmissions();
+  } catch (e) {
+    toast('Delete failed: ' + (e.message || e), 'err');
+  }
+}
+
+async function markIFProcessed(rowKey) {
+  if (!confirm('Mark this submission processed? Use this when you\'ve already entered the card into Vergent yourself. The record stays on file — use Delete to remove it.')) return;
+  try {
+    await _fbPatchRaw(`ifSubmissions/${rowKey}.json`, { status: 'processed' });
+    toast('Submission marked processed', 'ok');
+    closeIFModal();
+    loadIFSubmissions();
+  } catch (e) {
+    toast('Mark processed failed: ' + (e.message || e), 'err');
   }
 }
 </script>
