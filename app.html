@@ -871,6 +871,7 @@ button,input,select{font-family:inherit}
     <button class="tnt" data-route="queue"><svg class="icn"><use href="#i-list"/></svg>Applications</button>
     <button class="tnt" data-route="connections"><svg class="icn"><use href="#i-bank"/></svg>Connections</button>
     <button class="tnt" data-route="if"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
+    <button class="tnt" data-route="reports"><svg class="icn"><use href="#i-chart"/></svg>Reports</button>
   </nav>
   <div class="topnav-spacer"></div>
   <div class="search-wrap">
@@ -893,6 +894,7 @@ button,input,select{font-family:inherit}
       <a href="#" id="open-customers"><svg class="icn"><use href="#i-list"/></svg>Plaid Customers</a>
       <button data-route="connections" type="button"><svg class="icn"><use href="#i-bank"/></svg>Connections</button>
       <button data-route="if" type="button"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
+      <button data-route="reports" type="button"><svg class="icn"><use href="#i-chart"/></svg>Reports</button>
       <hr>
       <button id="change-password"><svg class="icn"><use href="#i-key"/></svg>Change Password</button>
       <button id="sign-out"><svg class="icn"><use href="#i-logout"/></svg>Sign Out</button>
@@ -1319,6 +1321,34 @@ button,input,select{font-family:inherit}
   </div>
 </div>
 
+<!-- REPORTS — Vergent V1 reports. Currently surfaces the Past Due
+     Contact List (collections triage). Sub-tab strip is ready for
+     adding more reports later without restructuring. -->
+<div class="view" id="view-reports">
+  <div class="main full">
+    <div class="greet">
+      <div>
+        <div class="greet-title">Reports</div>
+        <div class="greet-sub" id="rpt-sub">Past-due contact list pulled live from Vergent.</div>
+      </div>
+      <div class="greet-actions">
+        <button class="btn btn-ghost" id="rpt-refresh-btn"><svg class="icn"><use href="#i-refresh"/></svg>Refresh</button>
+      </div>
+    </div>
+    <div class="conn-tabs" style="display:flex;gap:5px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;width:max-content;max-width:100%;flex-wrap:wrap;box-shadow:var(--shadow-xs)">
+      <button class="tf-btn active" data-rpt-tab="pastdue">Past Due Contact List</button>
+    </div>
+    <div class="stats" id="rpt-stats" style="grid-template-columns:repeat(4,1fr)"></div>
+    <div style="margin-bottom:14px">
+      <input type="text" id="rpt-search" placeholder="Search by name, phone, loan id, store…" oninput="filterPastDueReport(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+    </div>
+    <div id="rpt-status" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
+    <div id="rpt-table">
+      <div class="tbl-loading">Click Refresh to load the report.</div>
+    </div>
+  </div>
+</div>
+
 <!-- Instant-Funding card-details modal -->
 <div id="if-modal-ov" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);align-items:center;justify-content:center;padding:20px"
      onclick="if(event.target.id==='if-modal-ov')closeIFModal()">
@@ -1590,6 +1620,7 @@ function setRoute(name, fbId) {
     else setConnTab(_connInnerTab || 'applinks');
   }
   if (name === 'if') loadIFSubmissions();
+  if (name === 'reports') loadPastDueReport();
   document.body.dataset.firebaseId = (name === 'detail' && fbId) ? fbId : '';
   if (name === 'detail' && fbId) {
     location.hash = '#fb=' + encodeURIComponent(fbId);
@@ -1612,6 +1643,7 @@ function readRouteFromHash() {
   }
   if (h === '#queue' || h === '#applications') return ['queue', null];
   if (h === '#if' || h === '#instant-funding') return ['if', null];
+  if (h === '#reports') return ['reports', null];
   // All Connections-related hashes resolve to the unified view; the
   // 2nd tuple element selects the inner sub-tab.
   if (h === '#connections' || h === '#applinks' || h === '#plaid') return ['connections', 'applinks'];
@@ -4720,6 +4752,141 @@ async function markIFProcessed(rowKey) {
     toast('Mark processed failed: ' + (e.message || e), 'err');
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// REPORTS — Vergent V1 reports
+// Currently only the Past Due Contact List; structured so more
+// reports can drop in as sibling functions without refactor.
+// ─────────────────────────────────────────────────────────────────────
+let _pastDueRows = [];
+
+function _rptFmtMoney(n) {
+  const v = Number(n || 0);
+  return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function _rptFmtDate(s) {
+  if (!s) return '—';
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return String(s);
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  if (isNaN(d.getTime())) return String(s);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+}
+function _rptDaysLatePill(n) {
+  const v = Number(n || 0);
+  let cls = 'amber';
+  if (v >= 30) cls = 'red';
+  else if (v <= 0) cls = 'green';
+  const color = cls === 'red' ? '#dc2626' : cls === 'green' ? '#16a34a' : '#b45309';
+  const bg = cls === 'red' ? '#fee2e2' : cls === 'green' ? '#dcfce7' : '#fef3c7';
+  const border = cls === 'red' ? '#fecaca' : cls === 'green' ? '#bbf7d0' : '#fde68a';
+  return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:800;background:${bg};color:${color};border:1px solid ${border};font-variant-numeric:tabular-nums">${v} d</span>`;
+}
+
+async function loadPastDueReport() {
+  const table = document.getElementById('rpt-table');
+  const status = document.getElementById('rpt-status');
+  if (table) table.innerHTML = '<div class="tbl-loading">Loading report…</div>';
+  if (status) status.textContent = '';
+  try {
+    const r = await fetch('/api/vergent-report-pastdue', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ options: {} }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d || d.ok === false) {
+      const detail = (d && d.detail) || (d && d.error) || ('HTTP ' + r.status);
+      table.innerHTML = `<div class="tbl-empty">Couldn't load report: ${escapeHtml(String(detail).slice(0, 200))}</div>`;
+      return;
+    }
+    _pastDueRows = (d.rows || []);
+    renderPastDueReport(_pastDueRows);
+  } catch (e) {
+    table.innerHTML = `<div class="tbl-empty">Network error: ${escapeHtml(e.message || String(e))}</div>`;
+  }
+}
+
+function filterPastDueReport(q) {
+  const term = (q || '').trim().toLowerCase();
+  if (!term) { renderPastDueReport(_pastDueRows); return; }
+  renderPastDueReport(_pastDueRows.filter(r => {
+    const name = ((r.FirstName || '') + ' ' + (r.LastName || '')).toLowerCase();
+    const phone = (r.PrimaryPhoenNumber || r.PrimaryPhoneNumber || '').toLowerCase();
+    const loan  = (r.LoanId || '').toLowerCase();
+    const store = (r.StoreNumber || '').toLowerCase();
+    return name.includes(term) || phone.includes(term)
+        || loan.includes(term) || store.includes(term)
+        || String(r.CustomerId || '').includes(term);
+  }));
+}
+
+function renderPastDueReport(rows) {
+  const table = document.getElementById('rpt-table');
+  const status = document.getElementById('rpt-status');
+  const stats = document.getElementById('rpt-stats');
+  if (!table) return;
+
+  // Stat aggregates — operator triage at-a-glance.
+  if (stats) {
+    const totalBalance = rows.reduce((s, r) => s + (Number(r.Balance) || 0), 0);
+    const totalDue     = rows.reduce((s, r) => s + (Number(r.AmountDue) || 0), 0);
+    const sev30        = rows.filter(r => (Number(r.DaysLate) || 0) >= 30).length;
+    const card = (label, val, cls) => `<div class="stat${cls?' '+cls:''}">
+      <div class="stat-label">${escapeHtml(label)}</div>
+      <div class="stat-value${cls==='dec'?' red':cls==='pen'?' amber':''}">${val}</div>
+    </div>`;
+    stats.innerHTML =
+        card('Total customers', rows.length, 'tot')
+      + card('30+ days late',   sev30, 'dec')
+      + card('Total balance',   _rptFmtMoney(totalBalance))
+      + card('Total amount due', _rptFmtMoney(totalDue), 'pen');
+  }
+
+  if (!rows.length) {
+    table.innerHTML = '<div class="tbl-empty">No past-due records. Either everyone is paid up, or check Render logs for a Vergent error.</div>';
+    status.textContent = '';
+    return;
+  }
+  status.textContent = `${rows.length} record${rows.length===1?'':'s'}`;
+
+  // Sort newest-late first.
+  const sorted = rows.slice().sort((a, b) => (Number(b.DaysLate)||0) - (Number(a.DaysLate)||0));
+  const body = sorted.map(r => {
+    const name = ((r.FirstName || '') + ' ' + (r.LastName || '')).trim() || '—';
+    const phone = (r.PrimaryPhoenNumber || r.PrimaryPhoneNumber || '').trim();
+    const phoneHtml = phone
+      ? `<a href="tel:${escapeHtml(phone)}" style="color:var(--green-dark);text-decoration:none;font-variant-numeric:tabular-nums">${escapeHtml(phone)}</a>`
+      : '—';
+    const vergentLink = `https://shared.lms.vergentlms.com/customer/general?action=view&id=${encodeURIComponent(r.CustomerId || '')}`;
+    return `<tr>
+      <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none">${escapeHtml(name)}</a></div><div class="applicant-id">#${escapeHtml(String(r.CustomerId || '—'))} · ${escapeHtml(r.StoreNumber || '—')}</div></td>
+      <td><div class="app-info"><span class="app-type">${escapeHtml(r.LoanId || '—')}</span><span class="app-meta">${escapeHtml(r.LoanStatus || '')}${r.LoanSubStatus ? ' · ' + escapeHtml(r.LoanSubStatus) : ''}</span></div></td>
+      <td>${_rptDaysLatePill(r.DaysLate)}</td>
+      <td><span class="tbl-time" style="font-variant-numeric:tabular-nums">${_rptFmtMoney(r.AmountDue)}</span></td>
+      <td><span class="tbl-time" style="font-variant-numeric:tabular-nums">${_rptFmtMoney(r.Balance)}</span></td>
+      <td><span class="tbl-time">${_rptFmtDate(r.DueDate)}</span></td>
+      <td><span class="tbl-time">${_rptFmtDate(r.NextPayDate)}</span></td>
+      <td>${phoneHtml}</td>
+      <td><div class="tbl-time">${_rptFmtDate(r.LastCallUtcDateTime)}</div><div class="applicant-id" title="${escapeHtml(r.LastCallNote || '')}">${escapeHtml((r.LastCallResult || '').slice(0, 40)) || '—'}</div></td>
+    </tr>`;
+  }).join('');
+
+  table.innerHTML = `<div class="tbl-card"><table class="tbl">
+    <thead><tr>
+      <th>Customer</th><th>Loan</th><th>Days late</th><th>Amt due</th>
+      <th>Balance</th><th>Due</th><th>Next pay</th><th>Phone</th><th>Last call</th>
+    </tr></thead>
+    <tbody>${body}</tbody>
+  </table></div>`;
+}
+
+// Refresh button on the Reports view.
+document.addEventListener('click', e => {
+  if (e.target && e.target.closest && e.target.closest('#rpt-refresh-btn')) {
+    loadPastDueReport();
+  }
+});
 </script>
 
 </body>
