@@ -766,7 +766,7 @@ button,input,select{font-family:inherit}
   .quick-grid{grid-template-columns:repeat(2,1fr)}
   .perf{grid-template-columns:repeat(2,1fr)}
   .dash-row-2{grid-template-columns:1fr}
-  .tbl th:nth-child(4),.tbl td:nth-child(4),.tbl th:nth-child(8),.tbl td:nth-child(8){display:none}
+  .tbl-card .tbl th:nth-child(4),.tbl-card .tbl td:nth-child(4),.tbl-card .tbl th:nth-child(8),.tbl-card .tbl td:nth-child(8){display:none}
   .brand-img{height:20px;max-width:120px}
   .brand-icon{width:30px;height:30px;border-radius:7px}
 }
@@ -775,7 +775,7 @@ button,input,select{font-family:inherit}
   .stat{padding:14px}
   .stat-value{font-size:24px}
   .tbl th,.tbl td{padding:10px 8px}
-  .tbl th:nth-child(3),.tbl td:nth-child(3),.tbl th:nth-child(7),.tbl td:nth-child(7){display:none}
+  .tbl-card .tbl th:nth-child(3),.tbl-card .tbl td:nth-child(3),.tbl-card .tbl th:nth-child(7),.tbl-card .tbl td:nth-child(7){display:none}
   .dv-hero{padding:16px 14px}
   .dv-hero-name{font-size:18px}
   /* Detail view on phones — go nearly edge-to-edge so content has
@@ -1383,12 +1383,22 @@ button,input,select{font-family:inherit}
     <!-- Filter chips — default is "Active only" (currently past-due with
          non-zero balance/amount-due and not Bought-Back/Paid-Off/etc.).
          Operators can flip to "All" for historical/audit views. -->
-    <div class="chips" style="margin-bottom:12px;align-items:center;flex-wrap:wrap">
+    <div class="chips" style="margin-bottom:8px;align-items:center;flex-wrap:wrap">
       <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;padding:0 6px;align-self:center">Show</span>
       <button class="chip active" id="rpt-chip-active" onclick="setPastDueShowAll(false)">Active only<span class="chip-ct" id="rpt-chip-active-ct">0</span></button>
       <button class="chip" id="rpt-chip-all" onclick="setPastDueShowAll(true)">All (incl. closed)<span class="chip-ct" id="rpt-chip-all-ct">0</span></button>
       <span id="rpt-active-aging" style="display:none;font-size:11.5px;color:var(--muted);padding-left:8px">Aging filter: <strong id="rpt-active-aging-label" style="color:var(--text)"></strong> <button onclick="setPastDueAging(null)" style="background:none;border:0;color:var(--green-dark);cursor:pointer;font-size:11.5px;font-weight:700;padding:0 4px;font-family:inherit">Clear</button></span>
       <button id="rpt-reset-btn" class="chip" style="margin-left:auto" onclick="resetPastDueView()" title="Reset all filters + sort to defaults">Reset view</button>
+    </div>
+    <!-- Due-date quick filters — match rows by their scheduled DueDate
+         relative to today (operator's local timezone). Independent of
+         the aging-bucket tiles, which key off DaysLate. -->
+    <div class="chips" style="margin-bottom:12px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;padding:0 6px;align-self:center">Due</span>
+      <button class="chip active" id="rpt-due-any" onclick="setPastDueDueFilter(null)">Any date</button>
+      <button class="chip" id="rpt-due-today" onclick="setPastDueDueFilter('today')">Today<span class="chip-ct" id="rpt-due-today-ct">0</span></button>
+      <button class="chip" id="rpt-due-yesterday" onclick="setPastDueDueFilter('yesterday')">Yesterday<span class="chip-ct" id="rpt-due-yesterday-ct">0</span></button>
+      <button class="chip" id="rpt-due-thisweek" onclick="setPastDueDueFilter('thisweek')">Past 7 days<span class="chip-ct" id="rpt-due-thisweek-ct">0</span></button>
     </div>
     <!-- Toolbar — search, bulk actions, CSV export, auto-refresh, last-loaded. -->
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
@@ -5349,6 +5359,7 @@ async function markIFProcessed(rowKey) {
 let _pastDueRows = [];
 let _pastDueShowAll = false;
 let _pastDueAging = null;
+let _pastDueDueFilter = null;  // null | 'today' | 'yesterday' | 'thisweek'
 let _pastDueSortKey = 'priority';
 let _pastDueSortDir = 'desc';
 let _pastDueSelected = new Set();
@@ -5404,15 +5415,41 @@ function _pastDuePriorityScore(r) {
   return bal * Math.sqrt(dl + 1) * (1 + Math.min(stale, 30) / 10);
 }
 
+// Parse an ISO-ish date string (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS) into
+// a local-midnight Date so date-of-day comparisons line up with the
+// operator's calendar, not UTC.
+function _pastDueLocalMidnight(s) {
+  if (!s) return null;
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const d = new Date(+m[1], +m[2] - 1, +m[3]);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function _pastDueMatchesDueFilter(r, key) {
+  if (!key) return true;
+  const due = _pastDueLocalMidnight(r.DueDate);
+  if (!due) return false;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 86400000);
+  const sevenDaysAgo = new Date(today.getTime() - 7 * 86400000);
+  if (key === 'today')     return due.getTime() === today.getTime();
+  if (key === 'yesterday') return due.getTime() === yesterday.getTime();
+  if (key === 'thisweek')  return due.getTime() >= sevenDaysAgo.getTime() && due.getTime() <= today.getTime();
+  return true;
+}
+
 function _pastDueSaveView() {
   try {
     localStorage.setItem(_PASTDUE_STORAGE_KEY, JSON.stringify({
-      showAll: _pastDueShowAll,
-      aging:   _pastDueAging,
-      sortKey: _pastDueSortKey,
-      sortDir: _pastDueSortDir,
-      search:  document.getElementById('rpt-search')?.value || '',
-      auto:    document.getElementById('rpt-autorefresh')?.checked || false,
+      showAll:   _pastDueShowAll,
+      aging:     _pastDueAging,
+      dueFilter: _pastDueDueFilter,
+      sortKey:   _pastDueSortKey,
+      sortDir:   _pastDueSortDir,
+      search:    document.getElementById('rpt-search')?.value || '',
+      auto:      document.getElementById('rpt-autorefresh')?.checked || false,
     }));
   } catch (e) { /* private mode, ignore */ }
 }
@@ -5424,14 +5461,31 @@ function _pastDueLoadView() {
     const v = JSON.parse(raw);
     if (typeof v.showAll === 'boolean') _pastDueShowAll = v.showAll;
     if (v.aging === null || _PASTDUE_BUCKETS.some(b => b.key === v.aging)) _pastDueAging = v.aging;
+    if (v.dueFilter === null || ['today','yesterday','thisweek'].includes(v.dueFilter)) _pastDueDueFilter = v.dueFilter || null;
     if (typeof v.sortKey === 'string') _pastDueSortKey = v.sortKey;
     if (v.sortDir === 'asc' || v.sortDir === 'desc') _pastDueSortDir = v.sortDir;
     const s = document.getElementById('rpt-search');  if (s && typeof v.search === 'string') s.value = v.search;
     const a = document.getElementById('rpt-autorefresh'); if (a) a.checked = !!v.auto;
     document.getElementById('rpt-chip-active')?.classList.toggle('active', !_pastDueShowAll);
     document.getElementById('rpt-chip-all')?.classList.toggle('active',     _pastDueShowAll);
+    _pastDueSyncDueChips();
     if (a && a.checked) togglePastDueAutoRefresh(true);
   } catch (e) { /* ignore */ }
+}
+
+function _pastDueSyncDueChips() {
+  const map = { 'today': 'rpt-due-today', 'yesterday': 'rpt-due-yesterday', 'thisweek': 'rpt-due-thisweek' };
+  document.getElementById('rpt-due-any')?.classList.toggle('active', !_pastDueDueFilter);
+  ['today','yesterday','thisweek'].forEach(k => {
+    document.getElementById(map[k])?.classList.toggle('active', _pastDueDueFilter === k);
+  });
+}
+
+function setPastDueDueFilter(key) {
+  _pastDueDueFilter = key || null;
+  _pastDueSyncDueChips();
+  _pastDueSaveView();
+  filterPastDueReport(document.getElementById('rpt-search')?.value || '');
 }
 
 function setPastDueShowAll(showAll) {
@@ -5495,12 +5549,14 @@ function _pastDueRefreshBulkBar() {
 function resetPastDueView() {
   _pastDueShowAll = false;
   _pastDueAging = null;
+  _pastDueDueFilter = null;
   _pastDueSortKey = 'priority';
   _pastDueSortDir = 'desc';
   clearPastDueSelection();
   const s = document.getElementById('rpt-search'); if (s) s.value = '';
   document.getElementById('rpt-chip-active')?.classList.add('active');
   document.getElementById('rpt-chip-all')?.classList.remove('active');
+  _pastDueSyncDueChips();
   _pastDueSaveView();
   filterPastDueReport('');
 }
@@ -5653,6 +5709,9 @@ function filterPastDueReport(q) {
       return b && b.key === _pastDueAging;
     });
   }
+  if (_pastDueDueFilter) {
+    rows = rows.filter(r => _pastDueMatchesDueFilter(r, _pastDueDueFilter));
+  }
   const term = (q || '').trim().toLowerCase();
   if (term) {
     rows = rows.filter(r => {
@@ -5728,6 +5787,17 @@ function renderPastDueReport(rows) {
 
   const tilesSet = _pastDueShowAll ? _pastDueRows : _pastDueRows.filter(_pastDueIsActive);
   _pastDueRenderAging(tilesSet);
+  // Due-chip counts use the show-all-filtered set so each chip
+  // shows the total population for its window regardless of which
+  // chip is currently selected (matching the aging-tile behaviour).
+  const todayCt    = tilesSet.filter(r => _pastDueMatchesDueFilter(r, 'today')).length;
+  const yesterCt   = tilesSet.filter(r => _pastDueMatchesDueFilter(r, 'yesterday')).length;
+  const weekCt     = tilesSet.filter(r => _pastDueMatchesDueFilter(r, 'thisweek')).length;
+  const e = id => document.getElementById(id);
+  if (e('rpt-due-today-ct'))     e('rpt-due-today-ct').textContent     = todayCt.toLocaleString();
+  if (e('rpt-due-yesterday-ct')) e('rpt-due-yesterday-ct').textContent = yesterCt.toLocaleString();
+  if (e('rpt-due-thisweek-ct'))  e('rpt-due-thisweek-ct').textContent  = weekCt.toLocaleString();
+  _pastDueSyncDueChips();
 
   if (!rows.length) {
     table.innerHTML = '<div class="tbl-empty">No records match the current filters.</div>';
