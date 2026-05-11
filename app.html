@@ -897,8 +897,8 @@ button,input,select{font-family:inherit}
   <nav class="topnav-tabs">
     <button class="tnt active" data-route="dashboard"><svg class="icn"><use href="#i-dashboard"/></svg>Dashboard</button>
     <button class="tnt" data-route="queue"><svg class="icn"><use href="#i-list"/></svg>Applications</button>
-    <button class="tnt" data-route="connections"><svg class="icn"><use href="#i-bank"/></svg>Connections</button>
-    <button class="tnt" data-route="if"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
+    <button class="tnt" data-route="connections" style="position:relative"><svg class="icn"><use href="#i-bank"/></svg>Connections<span id="alertcount-conn" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></button>
+    <button class="tnt" data-route="if" style="position:relative"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding<span id="alertcount-if" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></button>
     <button class="tnt" data-route="reports"><svg class="icn"><use href="#i-chart"/></svg>Reports</button>
     <!-- Customers tab — admin-only. Revealed when /api/me reports
          role==='admin' (see role-gating block where #user-role text
@@ -929,6 +929,10 @@ button,input,select{font-family:inherit}
       <button data-route="if" type="button"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
       <button data-route="reports" type="button"><svg class="icn"><use href="#i-chart"/></svg>Reports</button>
       <hr>
+      <!-- Alert sound toggle. State persists in localStorage as
+           cif_alerts_sound_enabled. The label updates to reflect
+           on/off so the operator knows the current state. -->
+      <button id="toggle-alert-sound" type="button"><svg class="icn"><use href="#i-bell"/></svg><span id="alert-sound-label">Alert sounds: on</span></button>
       <button id="change-password"><svg class="icn"><use href="#i-key"/></svg>Change Password</button>
       <button id="sign-out"><svg class="icn"><use href="#i-logout"/></svg>Sign Out</button>
     </div>
@@ -1547,6 +1551,11 @@ button,input,select{font-family:inherit}
           <input id="cust-portal-q" type="text" autocomplete="off" placeholder="Customer ID (e.g. 601488), email (jane@x.com), or last name" style="flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
           <button type="submit" class="btn btn-primary" style="padding:10px 18px">Search</button>
         </form>
+        <!-- Refresh re-runs whatever the panel is currently showing
+             (list-all when input is empty, or the active search).
+             Lets operators pull in just-signed-up customers without
+             a full page reload. -->
+        <button type="button" id="cust-portal-refresh" class="btn btn-ghost" title="Refresh — pulls the latest portal signups" style="padding:10px 14px" onclick="refreshPortalCustomers()"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-refresh"/></svg>Refresh</button>
       </div>
       <div id="cust-portal-meta" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
       <div id="cust-portal-results" style="display:flex;flex-direction:column;gap:8px"></div>
@@ -3879,6 +3888,236 @@ async function init() {
 
   // Polling
   pollTimer = setInterval(loadReports, 8000);
+
+  // Real-time alerts: new portal bank links + new Instant Funding
+  // submissions. Polls every 20s and toasts / notifies / chimes on
+  // anything newer than the operator's last-seen timestamp.
+  initAlerts();
+}
+
+// ───────── Alerts (Bank link + IF submission) ─────────
+const ALERTS_LINK_KEY = 'cif_alerts_last_link_at';
+const ALERTS_IF_KEY = 'cif_alerts_last_if_at';
+const ALERTS_SOUND_KEY = 'cif_alerts_sound_enabled';
+const ALERTS_NOTIF_ASKED_KEY = 'cif_alerts_notif_asked';
+const ALERTS_POLL_MS = 20 * 1000;
+
+let _alertCounts = { conn: 0, if: 0 };
+let _alertsBootstrapped = false;
+
+function alertsSoundEnabled() {
+  // Default ON. Operator can toggle via the user-menu entry.
+  return localStorage.getItem(ALERTS_SOUND_KEY) !== '0';
+}
+
+function setAlertsSoundEnabled(on) {
+  localStorage.setItem(ALERTS_SOUND_KEY, on ? '1' : '0');
+  const lbl = document.getElementById('alert-sound-label');
+  if (lbl) lbl.textContent = 'Alert sounds: ' + (on ? 'on' : 'off');
+}
+
+// Web Audio chime — short two-tone beep. Lazy-init the AudioContext
+// on first call (browsers require a user-interaction gesture before
+// audio plays; the toggle click counts).
+let _alertAudioCtx = null;
+function playAlertChime() {
+  if (!alertsSoundEnabled()) return;
+  try {
+    if (!_alertAudioCtx) {
+      const Ctor = window.AudioContext || window.webkitAudioContext;
+      if (!Ctor) return;
+      _alertAudioCtx = new Ctor();
+    }
+    const ctx = _alertAudioCtx;
+    const now = ctx.currentTime;
+    [880, 1320].forEach((freq, i) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.frequency.value = freq;
+      o.type = 'sine';
+      g.gain.value = 0;
+      g.gain.linearRampToValueAtTime(0.18, now + i * 0.12 + 0.01);
+      g.gain.linearRampToValueAtTime(0, now + i * 0.12 + 0.10);
+      o.connect(g).connect(ctx.destination);
+      o.start(now + i * 0.12);
+      o.stop(now + i * 0.12 + 0.12);
+    });
+  } catch (e) { /* ignore — sound is best-effort */ }
+}
+
+function bumpAlertCount(which, delta) {
+  const k = which === 'if' ? 'if' : 'conn';
+  _alertCounts[k] = (_alertCounts[k] || 0) + delta;
+  const el = document.getElementById('alertcount-' + k);
+  if (!el) return;
+  if (_alertCounts[k] > 0) {
+    el.textContent = String(_alertCounts[k]);
+    el.style.display = '';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+function clearAlertCount(which) {
+  _alertCounts[which] = 0;
+  const el = document.getElementById('alertcount-' + which);
+  if (el) el.style.display = 'none';
+}
+
+function fireBrowserNotification(title, body) {
+  if (typeof Notification === 'undefined') return;
+  if (Notification.permission !== 'granted') return;
+  // Only fire when the dashboard tab isn't focused — avoids
+  // double-stimulating the operator who is already looking at the
+  // page (the toast handles that case).
+  if (!document.hidden) return;
+  try {
+    const n = new Notification(title, {
+      body: body,
+      icon: '/favicon.png',
+      tag: title + body,  // dedupe rapid duplicates
+      renotify: false,
+    });
+    n.onclick = () => { window.focus(); n.close(); };
+  } catch (e) { /* ignore */ }
+}
+
+function maybeAskNotificationPermission() {
+  if (typeof Notification === 'undefined') return;
+  if (Notification.permission !== 'default') return;
+  if (localStorage.getItem(ALERTS_NOTIF_ASKED_KEY) === '1') return;
+  // Ask once, 5s after dashboard opens. Default-deny if the operator
+  // ignores or denies — they can manually re-enable in browser
+  // settings.
+  setTimeout(() => {
+    try {
+      Notification.requestPermission().finally(() => {
+        localStorage.setItem(ALERTS_NOTIF_ASKED_KEY, '1');
+      });
+    } catch (e) { /* ignore */ }
+  }, 5000);
+}
+
+async function pollNewBankLinks() {
+  try {
+    const r = await fetch('/api/portal-plaid/customers',
+      { credentials: 'include' });
+    if (!r.ok) return;
+    const d = await r.json();
+    const rows = (d && (d.customers || d.results || d.items)) || [];
+    if (!Array.isArray(rows) || rows.length === 0) return;
+    const lastSeen = localStorage.getItem(ALERTS_LINK_KEY) || '';
+    let newest = lastSeen;
+    let newCount = 0;
+    let firstNew = null;
+    for (const row of rows) {
+      const at = row.linkedAt || '';
+      if (!at) continue;
+      if (at > lastSeen) {
+        newCount++;
+        if (!firstNew) firstNew = row;
+        if (at > newest) newest = at;
+      }
+    }
+    if (newCount > 0 && lastSeen) {
+      // Only notify after the first poll has set a baseline. The
+      // initial poll just stores the high-watermark so we don't
+      // spam the operator with "new" entries from before they
+      // opened the dashboard.
+      const name = (firstNew && (firstNew.customerName || firstNew.fullName
+        || firstNew.customerEmail || firstNew.email)) || 'Customer';
+      const inst = (firstNew && (firstNew.institutionName
+        || firstNew.bankName)) || 'a bank';
+      const msg = newCount === 1
+        ? `🔔 ${name} linked ${inst}`
+        : `🔔 ${newCount} new bank connections (latest: ${name})`;
+      toast(msg, 'ok');
+      bumpAlertCount('conn', newCount);
+      fireBrowserNotification('New bank connection', msg);
+      playAlertChime();
+    }
+    if (newest) localStorage.setItem(ALERTS_LINK_KEY, newest);
+  } catch (e) { /* ignore — best-effort */ }
+}
+
+async function pollNewIFSubmissions() {
+  try {
+    const data = await fbGet('ifSubmissions.json');
+    if (!data || typeof data !== 'object' || data.error) return;
+    const rows = [];
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object') rows.push({ ...val, firebaseId: key });
+    }
+    if (rows.length === 0) return;
+    const lastSeen = localStorage.getItem(ALERTS_IF_KEY) || '';
+    let newest = lastSeen;
+    let newCount = 0;
+    let firstNew = null;
+    for (const row of rows) {
+      const at = row.submittedAt || row.createdAt || '';
+      if (!at) continue;
+      if (at > lastSeen) {
+        newCount++;
+        if (!firstNew) firstNew = row;
+        if (at > newest) newest = at;
+      }
+    }
+    if (newCount > 0 && lastSeen) {
+      const name = (firstNew && (firstNew.cardholderName
+        || firstNew.borrowerName || firstNew.firstName)) || 'a customer';
+      const last4 = (firstNew && firstNew.cardLast4)
+        ? ` (•••• ${firstNew.cardLast4})` : '';
+      const msg = newCount === 1
+        ? `🔔 New debit card from ${name}${last4}`
+        : `🔔 ${newCount} new debit cards (latest: ${name})`;
+      toast(msg, 'ok');
+      bumpAlertCount('if', newCount);
+      fireBrowserNotification('New Instant Funding submission', msg);
+      playAlertChime();
+    }
+    if (newest) localStorage.setItem(ALERTS_IF_KEY, newest);
+  } catch (e) { /* ignore — best-effort */ }
+}
+
+function pollAlerts() {
+  pollNewBankLinks();
+  pollNewIFSubmissions();
+}
+
+function initAlerts() {
+  if (_alertsBootstrapped) return;
+  _alertsBootstrapped = true;
+
+  // Reflect saved sound state on the menu label.
+  setAlertsSoundEnabled(alertsSoundEnabled());
+
+  // Wire the toggle.
+  const toggle = document.getElementById('toggle-alert-sound');
+  if (toggle) toggle.addEventListener('click', () => {
+    setAlertsSoundEnabled(!alertsSoundEnabled());
+    if (alertsSoundEnabled()) playAlertChime();  // confirm
+  });
+
+  // Clear nav badges when operator visits the relevant tab.
+  // (Hook into the existing route handler — see setRoute below.)
+  // Implemented inline by patching setRoute via a wrapper.
+  if (window.setRoute && !window._alertsRouteHooked) {
+    window._alertsRouteHooked = true;
+    const orig = window.setRoute;
+    window.setRoute = function (name, fbId) {
+      if (name === 'connections') clearAlertCount('conn');
+      if (name === 'if') clearAlertCount('if');
+      return orig.apply(this, arguments);
+    };
+  }
+
+  maybeAskNotificationPermission();
+
+  // First poll establishes the high-watermark — no toasts/sound.
+  // Subsequent polls compare against the watermark and fire on
+  // anything newer.
+  pollAlerts();
+  setInterval(pollAlerts, ALERTS_POLL_MS);
 }
 
 // ───────── Wiring ─────────
@@ -4749,6 +4988,27 @@ async function doCustomerSearch(source) {
     renderCustomerSearchResults(source, rows);
   } catch (e) {
     if (meta) meta.textContent = 'Error: ' + e.message;
+  }
+}
+
+// Refresh the Portal Customers panel — re-runs the active query
+// (or list-all when the input is empty) and briefly disables the
+// button to discourage rapid double-clicks. Same UX as a manual
+// search-submit but explicit so the operator knows what's happening.
+async function refreshPortalCustomers() {
+  const btn = document.getElementById('cust-portal-refresh');
+  if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+  try {
+    await doCustomerSearch('portal');
+  } finally {
+    if (btn) {
+      // Small delay so the spinner-ish feedback is visible even on
+      // fast loads — keeps the affordance honest.
+      setTimeout(function () {
+        btn.disabled = false;
+        btn.style.opacity = '';
+      }, 250);
+    }
   }
 }
 
