@@ -3082,7 +3082,23 @@ async function _vgRunPush(fbId, body, opts) {
     if (ok) {
       const cid = d.vergentCustomerId || d.customerId || opts.fallbackId || '?';
       const docs = _vgDocsLabel(docKinds);
-      _vgShow('ok', `✓ Pushed to Vergent #${cid} (${docs})`);
+      // Surface enrichment failures (bank / phone / address / etc.) so
+      // operators don't think everything pushed when one of the child
+      // entities silently failed. The backend returns `populated` with
+      // per-entity {ok, status, detail}.
+      const pop = d.populated || {};
+      const failed = Object.entries(pop)
+        .filter(([k, v]) => v && v.ok === false &&
+                            !(v.detail || '').toLowerCase().startsWith('no '))
+        .map(([k, v]) => `${k} (${(v.detail || 'failed').slice(0, 60)})`);
+      const skipped = Object.entries(pop)
+        .filter(([k, v]) => v && v.ok === false &&
+                            (v.detail || '').toLowerCase().startsWith('no '))
+        .map(([k, v]) => k);
+      let msg = `✓ Pushed to Vergent #${cid} (${docs})`;
+      if (failed.length) msg += ` — but ${failed.join(', ')} failed`;
+      else if (skipped.length) msg += ` · skipped (no data): ${skipped.join(', ')}`;
+      _vgShow(failed.length ? 'warn' : 'ok', msg);
     } else {
       const msg = d.body || d.detail || d.error || ('HTTP ' + r.status);
       _vgShow('err', String(msg).slice(0, 200));
@@ -3095,6 +3111,11 @@ async function _vgRunPush(fbId, body, opts) {
   card.querySelectorAll('button,input').forEach(b => b.disabled = false);
   await loadVergentMatch(fbId);
   await loadReports();
+  // After a successful create-or-push, the in-memory record now has
+  // a new vergentCustomerId / bankStatementUrl / etc. — re-render the
+  // detail view so the hero strip + Vergent panel + Documents tab all
+  // reflect the fresh state without waiting for the 8s poll.
+  renderDetail(fbId);
 }
 
 async function _vgRunNoteOnly(fbId, text) {
