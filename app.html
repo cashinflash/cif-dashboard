@@ -436,6 +436,7 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
     <button class="nb" onclick="showView('plaid',this);toggleMobMenu()"><svg class="icn"><use href="#icn-bank"/></svg>Plaid Customers</button>
     <button class="nb" onclick="showView('portal-plaid',this);toggleMobMenu()"><svg class="icn"><use href="#icn-bank"/></svg>Portal Bank Links</button>
     <button class="nb" onclick="showView('if',this);toggleMobMenu()"><svg class="icn"><use href="#icn-file"/></svg>Instant Funding <span id="ifcount-mob" style="display:none;background:#0E8741;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px"></span></button>
+    <button class="nb admin-only" onclick="showView('customers',this);toggleMobMenu()" style="display:none"><svg class="icn"><use href="#icn-users"/></svg>Customers</button>
     <button class="nb admin-only" onclick="showView('users',this);toggleMobMenu()" style="display:none"><svg class="icn"><use href="#icn-users"/></svg>Users</button>
     <button class="nb admin-only" onclick="showView('audit',this);toggleMobMenu()" style="display:none"><svg class="icn"><use href="#icn-file"/></svg>Audit log</button>
   </div>
@@ -456,6 +457,7 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
     <button class="nb" id="nav-plaid" onclick="showView('plaid',this)"><svg class="icn"><use href="#icn-bank"/></svg>Plaid Customers</button>
     <button class="nb" id="nav-portal-plaid" onclick="showView('portal-plaid',this)"><svg class="icn"><use href="#icn-bank"/></svg>Portal Bank Links</button>
     <button class="nb" id="nav-if" onclick="showView('if',this)"><svg class="icn"><use href="#icn-file"/></svg>Instant Funding<span id="ifcount" style="display:none;background:#0E8741;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px;margin-left:4px">0</span></button>
+    <button class="nb admin-only" id="nav-customers" onclick="showView('customers',this)" style="display:none"><svg class="icn"><use href="#icn-users"/></svg>Customers</button>
     <button class="nb admin-only" id="nav-users" onclick="showView('users',this)" style="display:none"><svg class="icn"><use href="#icn-users"/></svg>Users</button>
     <button class="nb admin-only" id="nav-audit" onclick="showView('audit',this)" style="display:none"><svg class="icn"><use href="#icn-file"/></svg>Audit log</button>
   </div>
@@ -1035,6 +1037,31 @@ kbd{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 6px;
   </div>
 </div>
 
+<!-- Customers — admin search of the portal customer base (cif-admin only).
+     Looks up by customerId / email / last name via cif-portal's
+     /api/admin/customers/search endpoint. Used to find customers for
+     support / impersonation. -->
+<div id="view-customers" class="view">
+  <div class="container">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:12px">
+      <div>
+        <div class="ptitle" style="display:flex;align-items:center;gap:10px"><svg class="icn icn-lg"><use href="#icn-users"/></svg>Customers</div>
+        <div class="psub" style="margin-bottom:0">Search the portal customer base by customer ID, email, or last name. Click a row to view their account for support.</div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.25rem;box-shadow:var(--shadow-sm);margin-bottom:1.5rem">
+      <form id="cust-search-form" onsubmit="event.preventDefault(); doCustomerSearch();" style="display:flex;gap:8px;align-items:center">
+        <input id="cust-search-q" type="text" autocomplete="off" placeholder="Customer ID (e.g. 601488), email (jane@x.com), or last name" style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit">
+        <button type="submit" style="background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Search</button>
+      </form>
+      <div id="cust-search-meta" style="margin-top:10px;font-size:12px;color:var(--muted)"></div>
+    </div>
+
+    <div id="cust-search-results" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+</div>
+
 <!-- Review Queue — unclassified merchants waiting to be added to the registry -->
 <div id="view-reviewqueue" class="view">
   <div class="container">
@@ -1488,6 +1515,7 @@ const VIEW_TO_HASH = {
   batch: '#/batch',
   plaid: '#/plaid',
   if: '#/instant-funding',
+  customers: '#/customers',
   users: '#/users',
   audit: '#/audit',
 };
@@ -1517,6 +1545,7 @@ function _renderView(name, btn) {
   if (name==='if') loadIFSubmissions();
   if (name==='users') loadUsers();
   if (name==='audit') loadAuditLog();
+  if (name==='customers') loadCustomers();
 }
 
 function router() {
@@ -4584,6 +4613,83 @@ async function logout() {
   // Clear any lingering legacy client-side state.
   try { sessionStorage.removeItem('cif_token'); sessionStorage.removeItem('cif_user'); } catch(e){}
   window.location.replace('/');
+}
+
+// ════════════════════════════════════════
+// CUSTOMER SEARCH (admin-only) — for portal support / impersonation
+// ════════════════════════════════════════
+// Proxies to cif-portal /api/admin/customers/search via cif-dashboard
+// server.py's _call_portal_admin helper. Single ?q= search input —
+// backend decides whether it's a customerId / email / last-name lookup.
+function loadCustomers() {
+  // Reset on tab activation. Don't auto-search.
+  const q = document.getElementById('cust-search-q');
+  const meta = document.getElementById('cust-search-meta');
+  const results = document.getElementById('cust-search-results');
+  if (q) q.focus();
+  if (meta) meta.textContent = 'Enter a customer ID, email, or last name above and click Search.';
+  if (results) results.innerHTML = '';
+}
+
+async function doCustomerSearch() {
+  const qEl = document.getElementById('cust-search-q');
+  const meta = document.getElementById('cust-search-meta');
+  const results = document.getElementById('cust-search-results');
+  const q = (qEl && qEl.value || '').trim();
+  if (!q) {
+    if (meta) meta.textContent = 'Type something to search.';
+    return;
+  }
+  if (meta) meta.textContent = 'Searching…';
+  if (results) results.innerHTML = '';
+  try {
+    const r = await fetch('/api/portal-customers/search?q=' + encodeURIComponent(q), {
+      credentials: 'include',
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      if (meta) meta.textContent = 'Error: ' + (d.error || ('HTTP ' + r.status));
+      return;
+    }
+    const rows = (d.results || []);
+    if (rows.length === 0) {
+      if (meta) meta.textContent = 'No matches for "' + q + '".';
+      return;
+    }
+    if (meta) meta.textContent = rows.length + ' match' + (rows.length === 1 ? '' : 'es') + ' for "' + q + '".';
+    renderCustomerSearchResults(rows);
+  } catch (e) {
+    if (meta) meta.textContent = 'Error: ' + e.message;
+  }
+}
+
+function renderCustomerSearchResults(rows) {
+  const box = document.getElementById('cust-search-results');
+  if (!box) return;
+  box.innerHTML = '';
+  for (const row of rows) {
+    const card = document.createElement('div');
+    card.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-sm);display:flex;align-items:center;gap:16px;flex-wrap:wrap';
+    const safe = function(s) { return (s == null ? '' : String(s)).replace(/[<>&]/g, function(c) { return ({'<':'&lt;','>':'&gt;','&':'&amp;'})[c]; }); };
+    const name = safe(row.fullName || 'Unknown');
+    const cid = safe(row.customerId || '');
+    const email = safe(row.email || '—');
+    const phoneLast4 = row.phoneLast4 ? '••••' + safe(row.phoneLast4) : '—';
+    const status = row.statusName ? '<span style="background:#e8f5ee;color:#1a6b3c;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;margin-left:6px">' + safe(row.statusName) + '</span>' : '';
+    card.innerHTML =
+      '<div style="flex:1;min-width:260px">' +
+        '<div style="font-size:15px;font-weight:700;color:var(--text)">' + name + status + '</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:4px">Customer #' + cid + ' · ' + email + ' · ' + phoneLast4 + (row.storeName ? ' · ' + safe(row.storeName) : '') + '</div>' +
+      '</div>' +
+      // "View as customer" button is wired in Phase 3 (impersonation
+      // backend). For now render it disabled with a helper tooltip
+      // so operators see where the action will live.
+      '<button type="button" disabled title="Impersonation not yet enabled — Phase 3" ' +
+        'style="background:#f3f4f6;color:#9ca3af;border:1px solid #e5e7eb;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:not-allowed;font-family:inherit">' +
+        'View as customer' +
+      '</button>';
+    box.appendChild(card);
+  }
 }
 
 // ════════════════════════════════════════
