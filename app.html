@@ -1348,6 +1348,14 @@ button,input,select{font-family:inherit}
       <button class="tf-btn active" data-rpt-tab="pastdue">Past Due Contact List</button>
     </div>
     <div class="stats" id="rpt-stats" style="grid-template-columns:repeat(4,1fr)"></div>
+    <!-- Filter chips — default is "Active only" (currently past-due with
+         non-zero balance/amount-due and not Bought-Back/Paid-Off/etc.).
+         Operators can flip to "All" for historical/audit views. -->
+    <div class="chips" style="margin-bottom:12px">
+      <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;padding:0 6px;align-self:center">Show</span>
+      <button class="chip active" id="rpt-chip-active" onclick="setPastDueShowAll(false)">Active only<span class="chip-ct" id="rpt-chip-active-ct">0</span></button>
+      <button class="chip" id="rpt-chip-all" onclick="setPastDueShowAll(true)">All (incl. closed)<span class="chip-ct" id="rpt-chip-all-ct">0</span></button>
+    </div>
     <div style="margin-bottom:14px">
       <input type="text" id="rpt-search" placeholder="Search by name, phone, loan id, store…" oninput="filterPastDueReport(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
     </div>
@@ -5294,6 +5302,37 @@ async function markIFProcessed(rowKey) {
 // reports can drop in as sibling functions without refactor.
 // ─────────────────────────────────────────────────────────────────────
 let _pastDueRows = [];
+// When false (default), the Reports table only shows actively-past-due
+// loans: balance > 0 OR amount-due > 0, AND loan status not in the
+// closed-loan set below. Operators flip this to true via the "All"
+// chip when they need historical / audit context.
+let _pastDueShowAll = false;
+
+// Loan statuses that mean "this loan is closed / resolved" and shouldn't
+// appear on a current-collections list. Lowercased; we compare with
+// .toLowerCase() so the casing in Vergent's response doesn't matter.
+const _PASTDUE_CLOSED_STATUSES = new Set([
+  'bought back', 'paid off', 'paid', 'returned', 'closed',
+  'charged off', 'charge off', 'rejected', 'cancelled', 'canceled',
+]);
+
+function _pastDueIsActive(r) {
+  const balance = Number(r.Balance) || 0;
+  const amtDue  = Number(r.AmountDue) || 0;
+  if (balance === 0 && amtDue === 0) return false;
+  const status = String(r.LoanStatus || '').toLowerCase().trim();
+  if (_PASTDUE_CLOSED_STATUSES.has(status)) return false;
+  return true;
+}
+
+function setPastDueShowAll(showAll) {
+  _pastDueShowAll = !!showAll;
+  document.getElementById('rpt-chip-active')?.classList.toggle('active', !showAll);
+  document.getElementById('rpt-chip-all')?.classList.toggle('active', showAll);
+  // Re-apply current search term so the toggle picks up.
+  const q = document.getElementById('rpt-search')?.value || '';
+  filterPastDueReport(q);
+}
 
 function _rptFmtMoney(n) {
   const v = Number(n || 0);
@@ -5344,24 +5383,34 @@ async function loadPastDueReport() {
     _pastDueRows = (d.rows || []).filter(r =>
       String(r.LoanStatus || '').toLowerCase() !== 'deleted'
     );
-    renderPastDueReport(_pastDueRows);
+    // Update the chip counts so the operator can see how many rows
+    // each filter would surface before clicking.
+    const activeCt = _pastDueRows.filter(_pastDueIsActive).length;
+    document.getElementById('rpt-chip-active-ct').textContent = activeCt.toLocaleString();
+    document.getElementById('rpt-chip-all-ct').textContent = _pastDueRows.length.toLocaleString();
+    // Go through filterPastDueReport so the active-only chip + search
+    // term are both honored on initial render.
+    filterPastDueReport(document.getElementById('rpt-search')?.value || '');
   } catch (e) {
     table.innerHTML = `<div class="tbl-empty">Network error: ${escapeHtml(e.message || String(e))}</div>`;
   }
 }
 
 function filterPastDueReport(q) {
+  let rows = _pastDueShowAll ? _pastDueRows : _pastDueRows.filter(_pastDueIsActive);
   const term = (q || '').trim().toLowerCase();
-  if (!term) { renderPastDueReport(_pastDueRows); return; }
-  renderPastDueReport(_pastDueRows.filter(r => {
-    const name = ((r.FirstName || '') + ' ' + (r.LastName || '')).toLowerCase();
-    const phone = (r.PrimaryPhoenNumber || r.PrimaryPhoneNumber || '').toLowerCase();
-    const loan  = (r.LoanId || '').toLowerCase();
-    const store = (r.StoreNumber || '').toLowerCase();
-    return name.includes(term) || phone.includes(term)
-        || loan.includes(term) || store.includes(term)
-        || String(r.CustomerId || '').includes(term);
-  }));
+  if (term) {
+    rows = rows.filter(r => {
+      const name = ((r.FirstName || '') + ' ' + (r.LastName || '')).toLowerCase();
+      const phone = (r.PrimaryPhoenNumber || r.PrimaryPhoneNumber || '').toLowerCase();
+      const loan  = (r.LoanId || '').toLowerCase();
+      const store = (r.StoreNumber || '').toLowerCase();
+      return name.includes(term) || phone.includes(term)
+          || loan.includes(term) || store.includes(term)
+          || String(r.CustomerId || '').includes(term);
+    });
+  }
+  renderPastDueReport(rows);
 }
 
 function renderPastDueReport(rows) {
