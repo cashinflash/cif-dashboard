@@ -5819,7 +5819,6 @@ function renderPastDueReport(rows) {
     { key: 'name',     label: 'Customer' },
     { key: 'loan',     label: 'Loan' },
     { key: 'days',     label: 'Days late' },
-    { key: 'amtdue',   label: 'Amt due' },
     { key: 'balance',  label: 'Balance' },
     { key: 'due',      label: 'Due' },
     { key: 'nextpay',  label: 'Next pay' },
@@ -5847,7 +5846,6 @@ function renderPastDueReport(rows) {
       <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" onclick="event.stopPropagation()">${escapeHtml(name)}</a></div><div class="applicant-id">#${escapeHtml(String(r.CustomerId || '—'))} · ${escapeHtml(r.StoreNumber || '—')}</div></td>
       <td><div class="app-info"><span class="app-type">${escapeHtml(r.LoanId || '—')}</span><span class="app-meta">${escapeHtml(r.LoanStatus || '')}${r.LoanSubStatus ? ' · ' + escapeHtml(r.LoanSubStatus) : ''}</span></div></td>
       <td>${_rptDaysLatePill(r.DaysLate)}</td>
-      <td><span class="tbl-time" style="font-variant-numeric:tabular-nums">${_rptFmtMoney(r.AmountDue)}</span></td>
       <td><span class="tbl-time" style="font-variant-numeric:tabular-nums">${_rptFmtMoney(r.Balance)}</span></td>
       <td><span class="tbl-time">${_rptFmtDate(r.DueDate)}</span></td>
       <td><span class="tbl-time">${_rptFmtDate(r.NextPayDate)}</span></td>
