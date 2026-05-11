@@ -1446,17 +1446,41 @@ button,input,select{font-family:inherit}
     <div class="greet">
       <div>
         <div class="greet-title">Customers</div>
-        <div class="greet-sub">Search the portal customer base by <b>customer ID</b>, <b>email</b>, or <b>last name</b>. Click a row to view their account for support.</div>
+        <div class="greet-sub" id="cust-greet-sub">Search the portal customer base by <b>customer ID</b>, <b>email</b>, or <b>last name</b>.</div>
       </div>
     </div>
-    <div style="margin-bottom:14px;display:flex;gap:10px;align-items:center">
-      <form id="cust-search-form" onsubmit="event.preventDefault(); doCustomerSearch();" style="display:flex;gap:10px;align-items:center;flex:1">
-        <input id="cust-search-q" type="text" autocomplete="off" placeholder="Customer ID (e.g. 601488), email (jane@x.com), or last name" style="flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
-        <button type="submit" class="btn btn-primary" style="padding:10px 18px">Search</button>
-      </form>
+
+    <!-- Inner tab strip — pattern matches the Connections sub-tabs.
+         Switching panels also switches which data source the search
+         hits (portal = Cognito; vergent = Vergent v1). -->
+    <div class="conn-tabs" style="display:flex;gap:5px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;width:max-content;max-width:100%;flex-wrap:wrap;box-shadow:var(--shadow-xs)">
+      <button class="tf-btn active" data-cust-tab="portal" onclick="setCustTab('portal')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-bolt"/></svg>Portal Customers</button>
+      <button class="tf-btn" data-cust-tab="vergent" onclick="setCustTab('vergent')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-list"/></svg>Vergent Customers</button>
     </div>
-    <div id="cust-search-meta" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
-    <div id="cust-search-results" style="display:flex;flex-direction:column;gap:8px"></div>
+
+    <!-- Portal Customers panel (Cognito-sourced) -->
+    <div id="cust-panel-portal">
+      <div style="margin-bottom:14px;display:flex;gap:10px;align-items:center">
+        <form id="cust-portal-form" onsubmit="event.preventDefault(); doCustomerSearch('portal');" style="display:flex;gap:10px;align-items:center;flex:1">
+          <input id="cust-portal-q" type="text" autocomplete="off" placeholder="Customer ID (e.g. 601488), email (jane@x.com), or last name" style="flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+          <button type="submit" class="btn btn-primary" style="padding:10px 18px">Search</button>
+        </form>
+      </div>
+      <div id="cust-portal-meta" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
+      <div id="cust-portal-results" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+
+    <!-- Vergent Customers panel (Vergent v1-sourced) -->
+    <div id="cust-panel-vergent" style="display:none">
+      <div style="margin-bottom:14px;display:flex;gap:10px;align-items:center">
+        <form id="cust-vergent-form" onsubmit="event.preventDefault(); doCustomerSearch('vergent');" style="display:flex;gap:10px;align-items:center;flex:1">
+          <input id="cust-vergent-q" type="text" autocomplete="off" placeholder="Customer ID (e.g. 601488), email, or last name" style="flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+          <button type="submit" class="btn btn-primary" style="padding:10px 18px">Search</button>
+        </form>
+      </div>
+      <div id="cust-vergent-meta" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
+      <div id="cust-vergent-results" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
   </div>
 </div>
 
@@ -4545,22 +4569,47 @@ async function _fbDeleteRaw(path) {
 }
 
 // ───────── Customers (admin-only) ─────────
-// Search the portal customer base via cif-portal's
-// /api/admin/customers/search. Single ?q= input — backend decides
-// whether to look up by customerId, email, or last name.
+// Two tabs share the same UI scaffolding — only the data source
+// differs:
+//   portal:  cif-portal /api/admin/customers/search?source=portal
+//            → Cognito User Pool (only customers who registered
+//              for the portal at apply.cashinflash.com)
+//   vergent: cif-portal /api/admin/customers/search?source=vergent
+//            → Vergent v1 (the LMS's full historical customer base)
+let _custTab = 'portal';
+
 function loadCustomers() {
-  const q = document.getElementById('cust-search-q');
-  const meta = document.getElementById('cust-search-meta');
-  const results = document.getElementById('cust-search-results');
-  if (q) q.focus();
-  if (meta) meta.textContent = 'Enter a customer ID, email, or last name above and click Search.';
-  if (results) results.innerHTML = '';
+  setCustTab(_custTab || 'portal');
 }
 
-async function doCustomerSearch() {
-  const qEl = document.getElementById('cust-search-q');
-  const meta = document.getElementById('cust-search-meta');
-  const results = document.getElementById('cust-search-results');
+function setCustTab(name) {
+  if (name !== 'portal' && name !== 'vergent') name = 'portal';
+  _custTab = name;
+  document.querySelectorAll('[data-cust-tab]').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-cust-tab') === name);
+  });
+  const portalPanel = document.getElementById('cust-panel-portal');
+  const vergentPanel = document.getElementById('cust-panel-vergent');
+  if (portalPanel) portalPanel.style.display = name === 'portal' ? '' : 'none';
+  if (vergentPanel) vergentPanel.style.display = name === 'vergent' ? '' : 'none';
+  const sub = document.getElementById('cust-greet-sub');
+  if (sub) {
+    sub.innerHTML = name === 'portal'
+      ? 'Customers who registered at <b>apply.cashinflash.com</b>. Search by customer ID, email, or last name.'
+      : 'All customers in <b>Vergent</b> (LMS\'s full base, regardless of portal account). Search by customer ID, email, or last name.';
+  }
+  // Auto-focus the active tab's input + reset its meta line.
+  const meta = document.getElementById('cust-' + name + '-meta');
+  const input = document.getElementById('cust-' + name + '-q');
+  if (input) input.focus();
+  if (meta && !meta.textContent) meta.textContent = 'Type something above and click Search.';
+}
+
+async function doCustomerSearch(source) {
+  if (source !== 'portal' && source !== 'vergent') source = 'portal';
+  const qEl = document.getElementById('cust-' + source + '-q');
+  const meta = document.getElementById('cust-' + source + '-meta');
+  const results = document.getElementById('cust-' + source + '-results');
   const q = (qEl && qEl.value || '').trim();
   if (!q) {
     if (meta) meta.textContent = 'Type something to search.';
@@ -4569,9 +4618,10 @@ async function doCustomerSearch() {
   if (meta) meta.textContent = 'Searching…';
   if (results) results.innerHTML = '';
   try {
-    const r = await fetch('/api/portal-customers/search?q=' + encodeURIComponent(q), {
-      credentials: 'include',
-    });
+    const url = '/api/portal-customers/search'
+      + '?q=' + encodeURIComponent(q)
+      + '&source=' + encodeURIComponent(source);
+    const r = await fetch(url, { credentials: 'include' });
     const d = await r.json();
     if (!r.ok) {
       if (meta) meta.textContent = 'Error: ' + (d.error || ('HTTP ' + r.status));
@@ -4583,14 +4633,14 @@ async function doCustomerSearch() {
       return;
     }
     if (meta) meta.textContent = rows.length + ' match' + (rows.length === 1 ? '' : 'es') + ' for "' + q + '".';
-    renderCustomerSearchResults(rows);
+    renderCustomerSearchResults(source, rows);
   } catch (e) {
     if (meta) meta.textContent = 'Error: ' + e.message;
   }
 }
 
-function renderCustomerSearchResults(rows) {
-  const box = document.getElementById('cust-search-results');
+function renderCustomerSearchResults(source, rows) {
+  const box = document.getElementById('cust-' + source + '-results');
   if (!box) return;
   box.innerHTML = '';
   const esc = function(s) { return (s == null ? '' : String(s)).replace(/[<>&"]/g, function(c) { return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]; }); };
@@ -4598,15 +4648,29 @@ function renderCustomerSearchResults(rows) {
     const card = document.createElement('div');
     card.style.cssText = 'background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap';
     const name = esc(row.fullName || 'Unknown');
-    const cid = esc(row.customerId || '');
+    const cid = esc(row.customerId || '—');
     const email = esc(row.email || '—');
     const phoneLast4 = row.phoneLast4 ? '••••' + esc(row.phoneLast4) : '—';
-    const statusPill = row.statusName ? '<span style="background:#e8f5ee;color:#1a6b3c;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;margin-left:6px">' + esc(row.statusName) + '</span>' : '';
-    const store = row.storeName ? ' · ' + esc(row.storeName) : '';
+    // Source-specific meta-line tail + status pill color.
+    let metaTail = '';
+    let pillBg = '#e8f5ee';
+    let pillFg = '#1a6b3c';
+    if (row.source === 'portal') {
+      if (row.signupAt) metaTail = ' · Signed up ' + esc(row.signupAt);
+      // Cognito UNCONFIRMED → orange; CONFIRMED → green.
+      if (row.statusName && row.statusName !== 'CONFIRMED') {
+        pillBg = '#fff5e6'; pillFg = '#5a3300';
+      }
+    } else if (row.source === 'vergent') {
+      if (row.storeName) metaTail = ' · ' + esc(row.storeName);
+    }
+    const statusPill = row.statusName
+      ? '<span style="background:' + pillBg + ';color:' + pillFg + ';padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;margin-left:6px">' + esc(row.statusName) + '</span>'
+      : '';
     card.innerHTML =
       '<div style="flex:1;min-width:260px">' +
         '<div style="font-size:15px;font-weight:700;color:var(--text)">' + name + statusPill + '</div>' +
-        '<div style="font-size:12px;color:var(--muted);margin-top:4px">Customer #' + cid + ' · ' + email + ' · ' + phoneLast4 + store + '</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:4px">Customer #' + cid + ' · ' + email + ' · ' + phoneLast4 + metaTail + '</div>' +
       '</div>' +
       // "View as customer" wires up in Phase 3 (impersonation backend).
       // Render disabled with a tooltip so operators see where the
