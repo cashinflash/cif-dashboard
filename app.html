@@ -4577,6 +4577,7 @@ async function _fbDeleteRaw(path) {
 //   vergent: cif-portal /api/admin/customers/search?source=vergent
 //            → Vergent v1 (the LMS's full historical customer base)
 let _custTab = 'portal';
+let _custPortalLoaded = false;
 
 function loadCustomers() {
   setCustTab(_custTab || 'portal');
@@ -4595,14 +4596,24 @@ function setCustTab(name) {
   const sub = document.getElementById('cust-greet-sub');
   if (sub) {
     sub.innerHTML = name === 'portal'
-      ? 'Customers who registered at <b>apply.cashinflash.com</b>. Search by customer ID, email, or last name.'
+      ? 'Customers who registered at <b>apply.cashinflash.com</b>. Search by customer ID, email, or last name — or browse the full list below.'
       : 'All customers in <b>Vergent</b> (LMS\'s full base, regardless of portal account). Search by customer ID, email, or last name.';
   }
-  // Auto-focus the active tab's input + reset its meta line.
-  const meta = document.getElementById('cust-' + name + '-meta');
   const input = document.getElementById('cust-' + name + '-q');
   if (input) input.focus();
-  if (meta && !meta.textContent) meta.textContent = 'Type something above and click Search.';
+  // Portal tab auto-loads the full list on first activation so the
+  // operator sees every registered customer without having to type.
+  // Subsequent switches don't re-fetch — search results (or refreshes
+  // via the empty-q "Show all" form submit) replace the panel.
+  if (name === 'portal' && !_custPortalLoaded) {
+    _custPortalLoaded = true;
+    doCustomerSearch('portal');  // empty-q → list-all from backend
+  } else if (name === 'vergent') {
+    const meta = document.getElementById('cust-vergent-meta');
+    if (meta && !meta.textContent) {
+      meta.textContent = 'Type something above and click Search.';
+    }
+  }
 }
 
 async function doCustomerSearch(source) {
@@ -4611,11 +4622,13 @@ async function doCustomerSearch(source) {
   const meta = document.getElementById('cust-' + source + '-meta');
   const results = document.getElementById('cust-' + source + '-results');
   const q = (qEl && qEl.value || '').trim();
-  if (!q) {
+  // Empty q is allowed for portal (returns the list-all view) but
+  // not for vergent (the LMS's full base would be ~50k rows).
+  if (!q && source === 'vergent') {
     if (meta) meta.textContent = 'Type something to search.';
     return;
   }
-  if (meta) meta.textContent = 'Searching…';
+  if (meta) meta.textContent = q ? 'Searching…' : 'Loading all portal customers…';
   if (results) results.innerHTML = '';
   try {
     const url = '/api/portal-customers/search'
@@ -4628,11 +4641,27 @@ async function doCustomerSearch(source) {
       return;
     }
     const rows = (d.results || []);
-    if (rows.length === 0) {
-      if (meta) meta.textContent = 'No matches for "' + q + '".';
+    // Backend may return rows AND an error (e.g., partial pagination
+    // failure). Surface the error inline so misconfigured deploys
+    // don't look like "no matches."
+    if (d.error && rows.length === 0) {
+      if (meta) meta.textContent = 'Backend error: ' + d.error;
       return;
     }
-    if (meta) meta.textContent = rows.length + ' match' + (rows.length === 1 ? '' : 'es') + ' for "' + q + '".';
+    if (rows.length === 0) {
+      if (meta) {
+        meta.textContent = q
+          ? 'No matches for "' + q + '".'
+          : 'No portal customers yet.';
+      }
+      return;
+    }
+    if (meta) {
+      const errSuffix = d.error ? ' · partial: ' + d.error : '';
+      meta.textContent = q
+        ? rows.length + ' match' + (rows.length === 1 ? '' : 'es') + ' for "' + q + '".' + errSuffix
+        : 'Showing ' + rows.length + ' portal customer' + (rows.length === 1 ? '' : 's') + ' (newest signup first).' + errSuffix;
+    }
     renderCustomerSearchResults(source, rows);
   } catch (e) {
     if (meta) meta.textContent = 'Error: ' + e.message;
