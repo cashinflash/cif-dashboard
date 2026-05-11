@@ -5072,7 +5072,10 @@ async function loadPastDueReport() {
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d || d.ok === false) {
       const detail = (d && d.detail) || (d && d.error) || ('HTTP ' + r.status);
-      table.innerHTML = `<div class="tbl-empty">Couldn't load report: ${escapeHtml(String(detail).slice(0, 200))}</div>`;
+      // Render the full Vergent stack trace as a scrollable <pre> so
+      // we can see exactly which field is null without the message
+      // getting cut off.
+      table.innerHTML = `<div class="tbl-empty"><div style="margin-bottom:10px;color:var(--red);font-weight:700">Couldn't load report</div><pre style="text-align:left;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;font-size:11px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow:auto;max-height:400px;white-space:pre-wrap;word-break:break-word">${escapeHtml(String(detail))}</pre></div>`;
       return;
     }
     _pastDueRows = (d.rows || []);
