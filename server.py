@@ -37,9 +37,14 @@ PORTAL_COGNITO_APP_CLIENT_ID = os.environ.get(
 )
 PORTAL_API_BASE = os.environ.get('PORTAL_API_BASE', IF_API_BASE).rstrip('/')
 # Portal frontend origin — used to build the "View as customer"
-# new-tab URL. Defaults to the prod apply domain.
+# new-tab URL. Defaults to the dev CloudFront URL where the
+# cif-portal frontend is served from S3 (the same default the
+# cif-portal Lambda's PORTAL_ORIGIN env var uses). When the
+# customer portal moves to a custom domain (e.g.
+# https://cashinflash.com), set PORTAL_FRONTEND_ORIGIN in the
+# Render environment for cif-dashboard.
 PORTAL_FRONTEND_ORIGIN = os.environ.get(
-    'PORTAL_FRONTEND_ORIGIN', 'https://apply.cashinflash.com'
+    'PORTAL_FRONTEND_ORIGIN', 'https://d1zucrj1ouu3c.cloudfront.net'
 ).rstrip('/')
 
 # Module-level cache for the service user's Cognito ID token.
