@@ -764,8 +764,25 @@ _PHASE2_PANEL_HTML = ("""
      // action controls). Keeps the inline-flow row layout that the
      // checkbox / pill / button selectors all rely on, while giving
      // the panel a clear visual home in the Report tab.
+    // Preserve any user-entered note text + focus position across the
+    // re-render — the 30s poll cycle would otherwise wipe whatever
+    // the operator was typing into the "Create + push" note field.
+    var __noteEl = badge.querySelector('[data-action="note-input"]');
+    var __noteVal = __noteEl ? (__noteEl.value || '') : '';
+    var __noteFocused = !!(__noteEl && document.activeElement === __noteEl);
+    var __noteCaret = __noteFocused ? (__noteEl.selectionStart || __noteVal.length) : 0;
     badge.innerHTML = '<div class="v2chip-hdr">Vergent</div>'
                     + '<div class="v2chip-row">' + html + '</div>';
+    if (__noteVal || __noteFocused) {
+      var __newNote = badge.querySelector('[data-action="note-input"]');
+      if (__newNote) {
+        __newNote.value = __noteVal;
+        if (__noteFocused) {
+          __newNote.focus();
+          try { __newNote.setSelectionRange(__noteCaret, __noteCaret); } catch (_e) {}
+        }
+      }
+    }
     badge.querySelectorAll('button[data-action]').forEach(function(btn) {
       btn.addEventListener('click', function() {
         var act = btn.getAttribute('data-action');

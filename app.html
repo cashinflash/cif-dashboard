@@ -1794,6 +1794,28 @@ async function loadReports() {
     document.getElementById('sync-chip').classList.add('off');
     console.warn('loadReports failed:', e);
   }
+  // Whenever an application is mid-flight (engine still working, no
+  // score written yet, or status literally "Processing"), schedule a
+  // faster follow-up poll so the operator sees the transition to
+  // Pending without having to mash Refresh. Once everything's settled
+  // we fall back to the standard 8s interval set at boot.
+  _maybeScheduleFastReportsPoll();
+}
+
+let _fastPollTimer = null;
+function _maybeScheduleFastReportsPoll() {
+  if (_fastPollTimer) { clearTimeout(_fastPollTimer); _fastPollTimer = null; }
+  const inFlight = apps.some(a => {
+    const s = String(a.status || '').toLowerCase();
+    if (s === 'processing') return true;
+    // Pending without a score yet = engine hasn't written its result.
+    // We treat that as still in-flight so we keep polling.
+    if ((s === 'pending' || s === '') && a.score == null) return true;
+    return false;
+  });
+  if (inFlight) {
+    _fastPollTimer = setTimeout(() => { loadReports(); }, 3000);
+  }
 }
 
 function rerender() {
