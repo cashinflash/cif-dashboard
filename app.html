@@ -923,8 +923,7 @@ button,input,select{font-family:inherit}
       <div class="topnav-user-role" id="user-role">…</div>
     </div>
     <div class="user-menu" id="user-menu">
-      <a href="/app/legacy"><svg class="icn"><use href="#i-external"/></svg>Open Classic View</a>
-      <a href="#" id="open-customers"><svg class="icn"><use href="#i-list"/></svg>Plaid Customers</a>
+      <button class="admin-only" data-route="customers" type="button" style="display:none"><svg class="icn"><use href="#i-list"/></svg>Customers</button>
       <button data-route="connections" type="button"><svg class="icn"><use href="#i-bank"/></svg>Connections</button>
       <button data-route="if" type="button"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
       <button data-route="reports" type="button"><svg class="icn"><use href="#i-chart"/></svg>Reports</button>
@@ -1556,9 +1555,9 @@ button,input,select{font-family:inherit}
 
     <!-- Portal Customers panel (Cognito-sourced) -->
     <div id="cust-panel-portal">
-      <div style="margin-bottom:14px;display:flex;gap:10px;align-items:center">
-        <form id="cust-portal-form" onsubmit="event.preventDefault(); doCustomerSearch('portal');" style="display:flex;gap:10px;align-items:center;flex:1">
-          <input id="cust-portal-q" type="text" autocomplete="off" placeholder="Customer ID (e.g. 601488), email (jane@x.com), or last name" style="flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+      <div style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <form id="cust-portal-form" onsubmit="event.preventDefault(); doCustomerSearch('portal');" style="display:flex;gap:10px;align-items:center;flex:1 1 240px;min-width:0;flex-wrap:wrap">
+          <input id="cust-portal-q" type="text" autocomplete="off" placeholder="Customer ID (e.g. 601488), email (jane@x.com), or last name" style="flex:1 1 200px;min-width:0;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
           <button type="submit" class="btn btn-primary" style="padding:10px 18px">Search</button>
         </form>
         <!-- Refresh re-runs whatever the panel is currently showing
@@ -1573,9 +1572,9 @@ button,input,select{font-family:inherit}
 
     <!-- Vergent Customers panel (Vergent v1-sourced) -->
     <div id="cust-panel-vergent" style="display:none">
-      <div style="margin-bottom:14px;display:flex;gap:10px;align-items:center">
-        <form id="cust-vergent-form" onsubmit="event.preventDefault(); doCustomerSearch('vergent');" style="display:flex;gap:10px;align-items:center;flex:1">
-          <input id="cust-vergent-q" type="text" autocomplete="off" placeholder="Customer ID (e.g. 601488), email, or last name" style="flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+      <div style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <form id="cust-vergent-form" onsubmit="event.preventDefault(); doCustomerSearch('vergent');" style="display:flex;gap:10px;align-items:center;flex:1 1 240px;min-width:0;flex-wrap:wrap">
+          <input id="cust-vergent-q" type="text" autocomplete="off" placeholder="Customer ID (e.g. 601488), email, or last name" style="flex:1 1 200px;min-width:0;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
           <button type="submit" class="btn btn-primary" style="padding:10px 18px">Search</button>
         </form>
       </div>
@@ -4258,7 +4257,6 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('#user-button')) document.getElementById('user-menu').classList.remove('open');
 });
 
-document.getElementById('open-customers').addEventListener('click', (e) => { e.preventDefault(); location.href = '/app/legacy#customers'; });
 document.getElementById('change-password').addEventListener('click', () => { location.href = '/app/legacy#password'; });
 document.getElementById('sign-out').addEventListener('click', async () => {
   try { await fetch('/api/logout', { method: 'POST', credentials: 'include' }); } catch (e) {}
