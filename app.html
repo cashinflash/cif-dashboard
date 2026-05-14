@@ -2570,8 +2570,62 @@ function buildDebitCardPanel(dc) {
       <div class="dcard-grid-row"><div class="dcard-grid-lbl">Submitted</div><div class="dcard-grid-val plain" style="color:var(--muted)">${escapeHtml(submittedAt)}</div><div></div></div>
     </div>
 
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:0 4px;margin-top:4px">
+      <button id="dcard-save-to-vergent" type="button"
+              onclick="saveDebitCardToVergent(this)"
+              style="background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:7px">
+        <svg class="icn" style="width:13px;height:13px"><use href="#i-zap"/></svg>Save Card to Vergent
+      </button>
+      <span id="dcard-save-result" style="font-size:11.5px;color:var(--muted)"></span>
+    </div>
     <div style="font-size:11.5px;color:var(--muted);padding:0 4px">Click any value to select it — makes it easy to copy into Vergent.</div>
   </div>`;
+}
+
+// Push the applicant's debit card into their Vergent customer record.
+// Hits cif-dashboard /api/vergent-save-card → cif-apply → Vergent APIM
+// /api/CustomerPortal/Customer/Cards. The button is rendered inside
+// buildDebitCardPanel(), so the current detail-view firebase_id is the
+// applicant whose card we save. Disables the button while in flight
+// and writes the outcome into the inline #dcard-save-result label so
+// the operator can see status without a toast/modal.
+async function saveDebitCardToVergent(btn) {
+  const fbId = document.body.dataset.firebaseId || '';
+  const resultEl = document.getElementById('dcard-save-result');
+  if (!fbId) {
+    if (resultEl) { resultEl.style.color = '#5a0d0d'; resultEl.textContent = 'No applicant selected.'; }
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.style.opacity = '.55'; }
+  if (resultEl) { resultEl.style.color = 'var(--muted)'; resultEl.textContent = 'Saving…'; }
+  try {
+    const r = await fetch('/api/vergent-save-card', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firebase_id: fbId }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d && d.ok) {
+      if (resultEl) {
+        resultEl.style.color = '#1a6b3c';
+        const last4 = d.last4 ? ' (••••' + d.last4 + ')' : '';
+        resultEl.textContent = 'Saved to customer #' + (d.vergentCustomerId || '—') + last4;
+      }
+    } else {
+      if (resultEl) {
+        resultEl.style.color = '#5a0d0d';
+        const detail = (d && (d.detail || d.error)) || ('HTTP ' + r.status);
+        resultEl.textContent = String(detail).slice(0, 180);
+      }
+    }
+  } catch (e) {
+    if (resultEl) {
+      resultEl.style.color = '#5a0d0d';
+      resultEl.textContent = 'Network error: ' + (e && e.message || String(e));
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  }
 }
 
 function copyField(elId, btn) {
