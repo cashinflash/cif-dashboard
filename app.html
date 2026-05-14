@@ -2614,8 +2614,15 @@ async function saveDebitCardToVergent(btn) {
     } else {
       if (resultEl) {
         resultEl.style.color = '#5a0d0d';
-        const detail = (d && (d.detail || d.error)) || ('HTTP ' + r.status);
-        resultEl.textContent = String(detail).slice(0, 180);
+        // Compose the most useful error label we can: Vergent's response
+        // snippet if we got one, else the upstream Vergent status code so
+        // the operator (and we) can see what Vergent actually said instead
+        // of just "HTTP 502".
+        const upstream = d && d.status ? 'Vergent HTTP ' + d.status : '';
+        const snippet = (d && (d.detail || d.error) || '').toString().trim();
+        const parts = [upstream, snippet].filter(Boolean);
+        const text = parts.length ? parts.join(' — ') : 'HTTP ' + r.status + ' (no body)';
+        resultEl.textContent = text.slice(0, 240);
       }
     }
   } catch (e) {
