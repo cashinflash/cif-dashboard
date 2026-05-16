@@ -1253,7 +1253,10 @@ button,input,select{font-family:inherit}
             <div class="sec-h">Application Snapshot</div>
             <div class="snap-grid" id="dv-snap"></div>
 
-            <div class="sec-h">Engine Analysis</div>
+            <div class="sec-h">Engine Analysis
+              <button type="button" id="dv-copy-report-btn" onclick="copyEngineReport(this)"
+                      style="margin-left:auto;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;text-transform:none;letter-spacing:0">Copy full report</button>
+            </div>
             <div class="dv-report-html" id="dv-report-html"></div>
           </div>
 
@@ -2673,6 +2676,86 @@ function copyField(elId, btn) {
     try { document.execCommand('copy'); } catch (e) {}
     document.body.removeChild(ta);
   }
+}
+
+// Copy the FULL engine report — including every collapsed <details>
+// section (Verified income, obligations breakdown, "+N more"
+// transaction lists) — for sending to auditing. Clones the report so
+// we can force every disclosure open without disturbing the operator's
+// on-screen view, then writes both a rich-text (text/html) and a
+// plain-text flavor to the clipboard so it pastes cleanly into email,
+// Google Docs, or a plain text field.
+function copyEngineReport(btn) {
+  const src = document.getElementById('dv-report-html');
+  if (!src || !src.textContent.trim() || src.classList.contains('dv-report-empty')) {
+    _copyReportFeedback(btn, 'Nothing to copy', false);
+    return;
+  }
+  const clone = src.cloneNode(true);
+  // Force every disclosure (incl. nested "+N more" ones) open so their
+  // content is part of the copy.
+  clone.querySelectorAll('details').forEach(d => d.setAttribute('open', ''));
+  // The "+N more — click to expand" hint is a UI artifact; the rows it
+  // referred to are already included now, so trim that trailing phrase.
+  clone.querySelectorAll('summary').forEach(s => {
+    s.innerHTML = s.innerHTML.replace(/\s*[—-]\s*click to expand\s*/i, '');
+  });
+  const html = clone.innerHTML;
+  // Render offscreen so innerText gives properly line-broken plain text
+  // (rendering-aware, and the forced-open details are now visible).
+  const stage = document.createElement('div');
+  stage.style.cssText = 'position:fixed;left:-99999px;top:0;width:820px;white-space:normal';
+  stage.appendChild(clone);
+  document.body.appendChild(stage);
+  const text = (clone.innerText || clone.textContent || '')
+    .replace(/\n{3,}/g, '\n\n').trim();
+  document.body.removeChild(stage);
+
+  const done = ok => _copyReportFeedback(btn, ok ? 'Copied!' : 'Copy failed', ok);
+
+  if (navigator.clipboard && window.ClipboardItem) {
+    try {
+      const item = new ClipboardItem({
+        'text/html':  new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([text], { type: 'text/plain' }),
+      });
+      navigator.clipboard.write([item])
+        .then(() => done(true))
+        .catch(() => {
+          navigator.clipboard.writeText(text).then(() => done(true)).catch(() => done(false));
+        });
+      return;
+    } catch (e) { /* fall through to plain text */ }
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => done(true)).catch(() => done(false));
+    return;
+  }
+  // Last-resort execCommand path for very old browsers.
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    done(ok);
+  } catch (e) { done(false); }
+}
+
+function _copyReportFeedback(btn, msg, ok) {
+  if (!btn) return;
+  if (!btn.dataset.label) btn.dataset.label = btn.textContent;
+  btn.textContent = msg;
+  btn.style.background = ok ? '#e8f5ee' : '#fde7e7';
+  btn.style.color      = ok ? '#1a6b3c' : '#5a0d0d';
+  btn.style.borderColor = ok ? '#8fd3ab' : '#e8a3a3';
+  setTimeout(() => {
+    btn.textContent = btn.dataset.label;
+    btn.style.background = '#e8f3f8';
+    btn.style.color = '#1a4d6b';
+    btn.style.borderColor = '#6cb1e2';
+  }, 1600);
 }
 
 function downloadDoc(url, name) {
