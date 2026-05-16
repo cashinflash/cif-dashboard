@@ -1596,6 +1596,11 @@ let _currentUser = '';
 let _currentRole = 'user';
 let pollTimer = null;
 let _lastDetailFbId = null;
+// Last report HTML injected into #dv-report-html. renderDetail fires
+// on every loadReports poll (3-8s); re-setting innerHTML each time
+// destroyed any sections the operator expanded. We only re-inject
+// when this string actually changes (new applicant / engine re-ran).
+let _lastReportHtml = null;
 let _vergentMatchCache = {};
 let _vergentLoansCache = {};   // fbId -> {loans, count, fetchedAt, error}
 let _kpiRange = 'today';
@@ -2304,14 +2309,25 @@ function renderDetail(fbId) {
   if (railDocs.length === 0) docs.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0">No documents on file.</div>';
   else docs.innerHTML = railDocs.map(d => `<div class="check-row"><span class="check-name">${escapeHtml(d.name)}</span><span class="check-tag ok">${escapeHtml(d.meta)}</span></div>`).join('');
 
-  // Engine report (Analysis tab)
+  // Engine report (Analysis tab). renderDetail fires on every
+  // loadReports poll (every 3-8s). Re-setting innerHTML each time
+  // destroyed any <details>/expanded sections the operator opened —
+  // they'd collapse a few seconds after expanding. Only re-inject
+  // when the report content actually changed (new applicant or the
+  // engine re-ran); otherwise leave the existing DOM (and its
+  // expanded state) untouched. Same lesson the docs grid below
+  // already learned with its isNewApplicant guard.
   const reportEl = document.getElementById('dv-report-html');
-  if (a.report && String(a.report).trim()) {
-    reportEl.innerHTML = a.report;
-    reportEl.classList.remove('dv-report-empty');
-  } else {
-    reportEl.innerHTML = 'No engine report on file. Run the engine to generate one.';
-    reportEl.className = 'dv-report-html dv-report-empty';
+  const reportHtml = (a.report && String(a.report).trim()) ? a.report : '';
+  if (reportHtml !== _lastReportHtml || fbId !== _lastDetailFbId) {
+    if (reportHtml) {
+      reportEl.innerHTML = reportHtml;
+      reportEl.classList.remove('dv-report-empty');
+    } else {
+      reportEl.innerHTML = 'No engine report on file. Run the engine to generate one.';
+      reportEl.className = 'dv-report-html dv-report-empty';
+    }
+    _lastReportHtml = reportHtml;
   }
 
   // Static panels — Application / Debit Card / Documents.
