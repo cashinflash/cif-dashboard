@@ -1728,13 +1728,32 @@ function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
 }
 
-function toast(msg, kind) {
+// opts (optional): { sticky:true } keeps it until the caller .remove()s
+// the returned node; { spinner:true } prepends an animated circle and
+// exposes node._msgEl so the message can be updated in place;
+// { duration:ms } overrides the 3s auto-dismiss. 2-arg calls are
+// unchanged. Returns the toast element.
+function toast(msg, kind, opts) {
+  opts = opts || {};
   const wrap = document.getElementById('toasts');
   const t = document.createElement('div');
   t.className = 'toast' + (kind ? ' ' + kind : '');
-  t.textContent = msg;
+  if (opts.spinner) {
+    t.style.display = 'flex';
+    t.style.alignItems = 'center';
+    const sp = document.createElement('span');
+    sp.style.cssText = 'display:inline-block;width:13px;height:13px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;margin-right:9px;flex:none';
+    const m = document.createElement('span');
+    m.textContent = msg;
+    t.appendChild(sp);
+    t.appendChild(m);
+    t._msgEl = m;
+  } else {
+    t.textContent = msg;
+  }
   wrap.appendChild(t);
-  setTimeout(() => t.remove(), 3000);
+  if (!opts.sticky) setTimeout(() => t.remove(), opts.duration || 3000);
+  return t;
 }
 
 // ───────── Routing ─────────
@@ -4787,7 +4806,10 @@ async function rerunAppLinkPlaid(fbId, btn) {
     toast('Re-run kickoff failed: ' + (e.message || e), 'err');
     return;
   }
-  toast('Plaid is generating the new report (~30s-2min)…');
+  const statusToast = toast(
+    'Plaid is generating the new report — this can take ~30s–2 min. The report will refresh automatically when it finishes.',
+    '', { sticky: true, spinner: true }
+  );
 
   // Poll Firebase for the updated bankStatementUrl / plaidAssetToken.
   // 48 attempts × 5s = 4 min total.
@@ -4802,6 +4824,7 @@ async function rerunAppLinkPlaid(fbId, btn) {
     const tokenChanged = rec.plaidAssetToken && rec.plaidAssetToken !== baselineToken;
     if (urlChanged || tokenChanged) {
       const decision = (rec.claudeDecision || rec.status || 'updated').toString();
+      if (statusToast) statusToast.remove();
       toast('Report ready — ' + decision, 'ok');
       if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = 'Re-run report'; }
       await loadReports();
@@ -4810,8 +4833,10 @@ async function rerunAppLinkPlaid(fbId, btn) {
       return;
     }
     if (btn) btn.innerHTML = `<span style="display:inline-block;width:11px;height:11px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;margin-right:6px;vertical-align:-2px"></span> Generating… (${(i+1)*5}s)`;
+    if (statusToast && statusToast._msgEl) statusToast._msgEl.textContent = `Plaid is generating the new report… (${(i+1)*5}s elapsed, up to ~4 min). It will refresh automatically.`;
   }
   if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = 'Re-run report'; }
+  if (statusToast) statusToast.remove();
   toast('Timed out after 4 min — check Render logs for /rerun-plaid', 'err');
 }
 
