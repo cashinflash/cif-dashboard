@@ -2271,15 +2271,16 @@ function renderDetail(fbId) {
   recValue.textContent = (a.claudeDecision || a.status || 'Pending').toUpperCase();
   recReason.textContent = a.reason || '—';
 
-  // Alert
+  // Engine-disagreement alert removed (operator request 2026-05-17):
+  // v3 is the primary engine post-cutover and the v2 reverse-shadow is
+  // backend-only validation data — surfacing "v2 disagrees" on every
+  // applicant where the deprecated shadow engine differed was
+  // non-actionable noise that made operators second-guess correct v3
+  // decisions. The dv-alert element is kept (hidden) so any stale poll
+  // referencing it doesn't throw; the engineComparison/engineV2 Firebase
+  // pipeline in cif-apply is unchanged (still silent validation data).
   const alertEl = document.getElementById('dv-alert');
-  if (a.v2Decision && a.claudeDecision && a.v2Decision !== (a.claudeDecision || '').toUpperCase()) {
-    alertEl.style.display = '';
-    document.getElementById('dv-alert-title').textContent = 'Engine disagreement';
-    document.getElementById('dv-alert-body').textContent = `v2 engine says ${a.v2Decision} ($${a.v2TierAmount||0}) — review before action.`;
-  } else {
-    alertEl.style.display = 'none';
-  }
+  if (alertEl) alertEl.style.display = 'none';
 
   // Financial Snapshot — real engine fields (mirrors classic msummary)
   const snap = document.getElementById('dv-snap');
@@ -4013,8 +4014,38 @@ async function pushNoteToVergent(fbId, text) {
   }
 }
 
+// Detail-view loading state for re-run / refresh. Paints a clear
+// spinner into the report area (operators were left staring at a
+// blank/stale panel with only a 3s toast for ~30s–2min). Resetting
+// _lastReportHtml forces renderDetail to repaint the report area on the
+// next loadReports cycle even if the resulting HTML is byte-identical.
+function dvShowRerunLoading(label) {
+  const el = document.getElementById('dv-report-html');
+  if (el) {
+    el.className = 'dv-report-html';
+    el.innerHTML =
+      '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;text-align:center">' +
+      '<div style="width:46px;height:46px;border:4px solid var(--green-200);border-top-color:var(--green);border-radius:50%;animation:spin .9s linear infinite;margin-bottom:18px"></div>' +
+      '<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">' + label + '</div>' +
+      '<div style="font-size:12.5px;color:var(--text2);line-height:1.55;max-width:420px">This can take up to ~2 minutes. The report updates here automatically when it’s done — you can keep working in other tabs meanwhile.</div>' +
+      '</div>';
+  }
+  _lastReportHtml = null;
+  ['dv-rerun-btn', 'dv-refresh-plaid-btn'].forEach(function (id) {
+    const b = document.getElementById(id);
+    if (b) { b.disabled = true; b.style.opacity = '0.6'; b.style.pointerEvents = 'none'; }
+  });
+}
+function dvEndRerunLoading() {
+  ['dv-rerun-btn', 'dv-refresh-plaid-btn'].forEach(function (id) {
+    const b = document.getElementById(id);
+    if (b) { b.disabled = false; b.style.opacity = ''; b.style.pointerEvents = ''; }
+  });
+}
+
 async function rerunEngine(fbId) {
   toast('Re-running engine…');
+  dvShowRerunLoading('Re-running the underwriting engine…');
   try {
     const r = await fetch('/api/rerun-v2', {
       method: 'POST',
@@ -4027,11 +4058,16 @@ async function rerunEngine(fbId) {
     await loadReports();
   } catch (e) {
     toast('Re-run failed: ' + e.message, 'err');
+    _lastReportHtml = null;
+    rerender();
+  } finally {
+    dvEndRerunLoading();
   }
 }
 
 async function refreshFromPlaid(fbId) {
   toast('Refreshing from Plaid…');
+  dvShowRerunLoading('Pulling a fresh Plaid asset report & re-running…');
   try {
     const r = await fetch('/api/refresh-from-plaid', {
       method: 'POST',
@@ -4044,6 +4080,10 @@ async function refreshFromPlaid(fbId) {
     await loadReports();
   } catch (e) {
     toast('Refresh failed: ' + e.message, 'err');
+    _lastReportHtml = null;
+    rerender();
+  } finally {
+    dvEndRerunLoading();
   }
 }
 
