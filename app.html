@@ -374,6 +374,7 @@ button,input,select{font-family:inherit}
 .snap-val .unit{font-size:14px;font-weight:700;color:var(--muted);margin-left:2px}
 .snap-val .acc-num{font-variant-numeric:tabular-nums;letter-spacing:.04em}
 .snap-sub{font-size:11px;color:var(--muted);margin-top:auto;font-weight:500;line-height:1.3}
+.snap-note{font-size:11px;color:var(--text2);font-weight:700;line-height:1.3;margin-top:5px;padding-top:5px;border-top:1px dashed var(--border)}
 .snap-verified{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-top:5px}
 .snap-verified .icn{width:12px;height:12px;stroke-width:2.5}
 .snap-verified.warn{color:var(--amber-700)}
@@ -2287,6 +2288,12 @@ function renderDetail(fbId) {
   const ad = a.applicationData || {};
   const monthlyIncome = Number(a.monthlyIncome || 0);
   const monthlyExpenses = Number(a.monthlyExpenses || 0);
+  // Gross money in / out (excl. internal self-transfers), monthly-
+  // normalized. Operator sanity figure — surfaced under the income /
+  // obligation cards so the gap (loans, p2p, transfers we don't count
+  // as income; spend we don't charge) is visible at a glance.
+  const grossIn = Number(a.grossDepositsMonthly || 0);
+  const grossOut = Number(a.grossWithdrawalsMonthly || 0);
   const fcf = Number(a.fcf || 0);
   const dti = monthlyIncome > 0 ? Math.round((monthlyExpenses / monthlyIncome) * 100) : null;
   const conf = (typeof a.v2Confidence === 'number') ? a.v2Confidence : null;
@@ -2299,8 +2306,8 @@ function renderDetail(fbId) {
   const offerClass = (offer != null && offer > 0) ? 'green' : (offer === 0 ? 'red' : 'muted');
 
   const cards = [
-    { lbl: 'Verified Income', val: '$' + Math.round(monthlyIncome).toLocaleString(), valClass: monthlyIncome > 0 ? 'green' : 'muted', sub: 'monthly' },
-    { lbl: 'Obligations', val: '$' + Math.round(monthlyExpenses).toLocaleString(), valClass: '', sub: 'committed monthly' },
+    { lbl: 'Verified Income', val: '$' + Math.round(monthlyIncome).toLocaleString(), valClass: monthlyIncome > 0 ? 'green' : 'muted', sub: 'monthly', note: grossIn > 0 ? ('All deposits $' + Math.round(grossIn).toLocaleString() + '/mo') : '' },
+    { lbl: 'Obligations', val: '$' + Math.round(monthlyExpenses).toLocaleString(), valClass: '', sub: 'committed monthly', note: grossOut > 0 ? ('All withdrawals $' + Math.round(grossOut).toLocaleString() + '/mo') : '' },
     { lbl: 'FCF / Mo', val: (fcf < 0 ? '-$' : '$') + Math.abs(Math.round(fcf)).toLocaleString(), valClass: fcfClass, sub: 'free cash flow' },
     { lbl: 'DTI', val: dti == null ? '—' : (dti + '<span class="unit">%</span>'), valClass: dtiClass, sub: 'debt-to-income', valHtml: true },
     { lbl: 'Max Offer', val: offer == null ? '—' : '$' + Number(offer).toLocaleString(), valClass: offerClass, sub: offer == null ? 'not yet run' : (offer > 0 ? 'v2 final tier' : 'declined by v2') },
@@ -2313,7 +2320,8 @@ function renderDetail(fbId) {
     const vc = c.valClass ? ' ' + c.valClass : '';
     const valEl = c.valHtml ? c.val : escapeHtml(c.val);
     const verifiedEl = c.verified ? `<div class="snap-verified"><svg class="icn"><use href="#i-check"/></svg>${escapeHtml(c.verifiedLabel || 'Verified')}</div>` : '';
-    return `<div class="snap-cell"><div class="snap-lbl">${escapeHtml(c.lbl)}</div><div class="snap-val${vc}${vs}">${valEl}</div><div class="snap-sub">${escapeHtml(c.sub || '')}</div>${verifiedEl}</div>`;
+    const noteEl = c.note ? `<div class="snap-note" title="Gross money ${c.lbl === 'Obligations' ? 'out' : 'in'} excluding internal self-transfers — sanity figure, not used in the decision">${escapeHtml(c.note)}</div>` : '';
+    return `<div class="snap-cell"><div class="snap-lbl">${escapeHtml(c.lbl)}</div><div class="snap-val${vc}${vs}">${valEl}</div><div class="snap-sub">${escapeHtml(c.sub || '')}</div>${noteEl}${verifiedEl}</div>`;
   }).join('');
 
   // Decision-checks list removed — its right-rail slot now hosts
