@@ -1383,14 +1383,11 @@ button,input,select{font-family:inherit}
          Counts + dollar exposure rendered by JS from the same row set
          the table sees, so totals always agree with what's on screen. -->
     <div id="rpt-aging" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px"></div>
-    <!-- Filter chips — default is "Active only" (currently past-due with
-         non-zero balance/amount-due and not Bought-Back/Paid-Off/etc.).
-         Operators can flip to "All" for historical/audit views. -->
+    <!-- Always shows ACTIVE past-due loans only (non-zero balance /
+         amount-due, status not Bought-Back/Paid-Off/etc.). The aging
+         tiles above are the segmentation control. -->
     <div class="chips" style="margin-bottom:8px;align-items:center;flex-wrap:wrap">
-      <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;padding:0 6px;align-self:center">Show</span>
-      <button class="chip active" id="rpt-chip-active" onclick="setPastDueShowAll(false)">Active only<span class="chip-ct" id="rpt-chip-active-ct">0</span></button>
-      <button class="chip" id="rpt-chip-all" onclick="setPastDueShowAll(true)">All (incl. closed)<span class="chip-ct" id="rpt-chip-all-ct">0</span></button>
-      <span id="rpt-active-aging" style="display:none;font-size:11.5px;color:var(--muted);padding-left:8px">Aging filter: <strong id="rpt-active-aging-label" style="color:var(--text)"></strong> <button onclick="setPastDueAging(null)" style="background:none;border:0;color:var(--green-dark);cursor:pointer;font-size:11.5px;font-weight:700;padding:0 4px;font-family:inherit">Clear</button></span>
+      <span id="rpt-active-aging" style="display:none;font-size:11.5px;color:var(--muted);padding-left:2px">Showing: <strong id="rpt-active-aging-label" style="color:var(--text)"></strong> <button onclick="setPastDueAging(null)" style="background:none;border:0;color:var(--green-dark);cursor:pointer;font-size:11.5px;font-weight:700;padding:0 4px;font-family:inherit">Clear</button></span>
       <button id="rpt-reset-btn" class="chip" style="margin-left:auto" onclick="resetPastDueView()" title="Reset all filters + sort to defaults">Reset view</button>
     </div>
     <!-- Toolbar — search, bulk actions, CSV export, auto-refresh, last-loaded. -->
@@ -5787,7 +5784,7 @@ function _pastDueLoadView() {
     const raw = localStorage.getItem(_PASTDUE_STORAGE_KEY);
     if (!raw) return;
     const v = JSON.parse(raw);
-    if (typeof v.showAll === 'boolean') _pastDueShowAll = v.showAll;
+    _pastDueShowAll = false;  // All/Active toggle removed — always active
     if (v.aging === null || _PASTDUE_BUCKETS.some(b => b.key === v.aging)) _pastDueAging = v.aging;
     _pastDueDueFilter = null;  // retired filter — never restore it
     if (typeof v.sortKey === 'string') _pastDueSortKey = v.sortKey;
@@ -6016,9 +6013,6 @@ async function loadPastDueReport() {
       String(r.LoanStatus || '').toLowerCase() !== 'deleted'
     );
     _pastDueLoadedAt = Date.now();
-    const activeCt = _pastDueRows.filter(_pastDueIsActive).length;
-    document.getElementById('rpt-chip-active-ct').textContent = activeCt.toLocaleString();
-    document.getElementById('rpt-chip-all-ct').textContent = _pastDueRows.length.toLocaleString();
     _pastDueUpdateLoadedAt();
     if (!_pastDueLoadedTickTimer) {
       _pastDueLoadedTickTimer = setInterval(_pastDueUpdateLoadedAt, 30000);
@@ -6030,7 +6024,8 @@ async function loadPastDueReport() {
 }
 
 function filterPastDueReport(q) {
-  let rows = _pastDueShowAll ? _pastDueRows : _pastDueRows.filter(_pastDueIsActive);
+  // Always active-only — the All/Active toggle was removed.
+  let rows = _pastDueRows.filter(_pastDueIsActive);
   if (_pastDueAging) {
     rows = rows.filter(r => {
       const b = _pastDueBucket(r);
@@ -6112,7 +6107,7 @@ function renderPastDueReport(rows) {
       + card('31+ days late', sev31, 'dec');
   }
 
-  const tilesSet = _pastDueShowAll ? _pastDueRows : _pastDueRows.filter(_pastDueIsActive);
+  const tilesSet = _pastDueRows.filter(_pastDueIsActive);
   _pastDueRenderAging(tilesSet);
   // Due-chip counts use the show-all-filtered set so each chip
   // shows the total population for its window regardless of which
@@ -6142,16 +6137,23 @@ function renderPastDueReport(rows) {
     const arrow = active ? (_pastDueSortDir === 'desc' ? '▼' : '▲') : '↕';
     return `<span class="tbl-sort-ind${active?' active':''}">${arrow}</span>`;
   };
+  // Explicit widths + table-layout:fixed so every header sits exactly
+  // over its column regardless of how wide the cell content is (the
+  // long two-line Customer/Loan/Last-call cells were making columns
+  // size to content and the headers drift off their data).
   const headerCols = [
-    { key: 'name',     label: 'Customer' },
-    { key: 'loan',     label: 'Loan' },
-    { key: 'days',     label: 'Days late' },
-    { key: 'balance',  label: 'Balance' },
-    { key: 'due',      label: 'Due' },
-    { key: 'nextpay',  label: 'Next pay' },
-    { key: 'phone',    label: 'Phone' },
-    { key: 'lastcall', label: 'Last call' },
+    { key: 'name',     label: 'Customer',  w: '19%'  },
+    { key: 'loan',     label: 'Loan',      w: '15%'  },
+    { key: 'days',     label: 'Days late', w: '8%'   },
+    { key: 'balance',  label: 'Balance',   w: '9%'   },
+    { key: 'due',      label: 'Due',       w: '11%'  },
+    { key: 'nextpay',  label: 'Next pay',  w: '11%'  },
+    { key: 'phone',    label: 'Phone',     w: '12%'  },
+    { key: 'lastcall', label: 'Last call', w: '15%'  },
   ];
+  const colGroup = '<colgroup><col style="width:34px">'
+    + headerCols.map(c => `<col style="width:${c.w}">`).join('')
+    + '</colgroup>';
   const headHtml = headerCols.map(c =>
     `<th class="tbl-sortable" onclick="setPastDueSort('${c.key}')">${c.label}${sortInd(c.key)}</th>`
   ).join('');
@@ -6181,7 +6183,8 @@ function renderPastDueReport(rows) {
     </tr>`;
   }).join('');
 
-  table.innerHTML = `<div class="tbl-card-scroll"><table class="tbl">
+  table.innerHTML = `<div class="tbl-card-scroll"><table class="tbl" style="table-layout:fixed">
+    ${colGroup}
     <thead><tr>
       <th class="tbl-checkbox"><input type="checkbox" id="rpt-headchk" ${allChecked?'checked':''} onclick="togglePastDueAllVisible(this)"></th>
       ${headHtml}
@@ -6190,7 +6193,7 @@ function renderPastDueReport(rows) {
   </table></div>`;
 
   if (status) {
-    const total = _pastDueShowAll ? _pastDueRows.length : _pastDueRows.filter(_pastDueIsActive).length;
+    const total = _pastDueRows.filter(_pastDueIsActive).length;
     status.textContent = total === rows.length
       ? `${rows.length} record${rows.length===1?'':'s'}`
       : `${rows.length} of ${total} record${total===1?'':'s'}`;
