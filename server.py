@@ -5,6 +5,22 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 
 PORT = int(os.environ.get('PORT', 8080))
 FB_BASE = 'https://cashinflash-a1dce-default-rtdb.firebaseio.com'
+# Firebase RTDB legacy database secret. When set, every server-side
+# Firebase REST call appends ?auth=<secret> (privileged, bypasses
+# rules) so we can lock the rules to deny public access. UNSET =
+# behaves exactly as before — deploying this before the env var
+# exists is a no-op.
+FIREBASE_DB_SECRET = os.environ.get('FIREBASE_DB_SECRET', '').strip()
+
+
+def _fb_url(suffix):
+    """Build a full Firebase REST URL ('<FB_BASE>/<suffix>' + auth).
+    `suffix` may already contain a query string; auth is appended with
+    & or ? accordingly."""
+    url = f'{FB_BASE}/{suffix}'
+    if FIREBASE_DB_SECRET:
+        url += ('&' if '?' in url else '?') + 'auth=' + FIREBASE_DB_SECRET
+    return url
 ANTHROPIC_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 
 # Instant-Funding vault (for /if page submissions).
@@ -391,7 +407,7 @@ def firebase_get_users() -> dict:
     """Fetch /users subtree from Firebase. Returns {} on any error (caller
     decides whether to fall back to env vars)."""
     try:
-        with urllib.request.urlopen(f'{FB_BASE}/users.json', timeout=5) as r:
+        with urllib.request.urlopen(_fb_url('users.json'), timeout=5) as r:
             data = json.loads(r.read().decode() or 'null')
         return data if isinstance(data, dict) else {}
     except Exception as e:
@@ -403,7 +419,7 @@ def firebase_put_user(username: str, record: dict) -> bool:
     try:
         payload = json.dumps(record).encode()
         req = urllib.request.Request(
-            f'{FB_BASE}/users/{username}.json',
+            _fb_url(f'users/{username}.json'),
             data=payload,
             headers={'Content-Type': 'application/json'},
             method='PUT',
@@ -419,7 +435,7 @@ def firebase_put_user(username: str, record: dict) -> bool:
 def firebase_delete_user(username: str) -> bool:
     try:
         req = urllib.request.Request(
-            f'{FB_BASE}/users/{username}.json', method='DELETE',
+            _fb_url(f'users/{username}.json'), method='DELETE',
         )
         with urllib.request.urlopen(req, timeout=5) as r:
             r.read()
@@ -1165,7 +1181,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(401, {'error': 'Unauthorized'}); return
             fb_path = path[4:]
             try:
-                with urllib.request.urlopen(f'{FB_BASE}/{fb_path}', timeout=10) as r:
+                with urllib.request.urlopen(_fb_url(fb_path), timeout=10) as r:
                     body = r.read()
                 self.send_response(200)
                 for k, v in CORS.items():
@@ -1507,7 +1523,7 @@ class Handler(BaseHTTPRequestHandler):
             fb_path = path[4:]
             method = self.headers.get('X-Method', 'POST')
             try:
-                req = urllib.request.Request(f'{FB_BASE}/{fb_path}', data=raw,
+                req = urllib.request.Request(_fb_url(fb_path), data=raw,
                     headers={'Content-Type': 'application/json'}, method=method)
                 with urllib.request.urlopen(req, timeout=10) as r:
                     body = r.read()
