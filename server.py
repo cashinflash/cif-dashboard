@@ -927,6 +927,8 @@ _PHASE2_PANEL_HTML = ("""
   }
 
   function poll() {
+    // Cost control: never hit Firebase from a backgrounded tab.
+    if (document.visibilityState && document.visibilityState !== 'visible') return;
     var fbId = findCurrentFirebaseId();
     if (!fbId) return;
     var now = Date.now();

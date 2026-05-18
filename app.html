@@ -1841,7 +1841,13 @@ function _maybeScheduleFastReportsPoll() {
     return false;
   });
   if (inFlight) {
-    _fastPollTimer = setTimeout(() => { loadReports(); }, 3000);
+    // 20s (was 3s — that 3s amplified the Realtime Database egress
+    // bill badly). Still auto-advances Processing→Pending without a
+    // manual refresh, just less aggressively, and only while the tab
+    // is visible so a backgrounded "processing" tab costs nothing.
+    _fastPollTimer = setTimeout(() => {
+      if (document.visibilityState === 'visible') loadReports();
+    }, 20000);
   }
 }
 
@@ -4144,8 +4150,18 @@ async function init() {
   const [route, fbId] = readRouteFromHash();
   setRoute(route, fbId);
 
-  // Polling
-  pollTimer = setInterval(loadReports, 8000);
+  // Polling — COST CONTROL. loadReports() downloads the whole
+  // /reports tree; polling it every 8s per open tab (incl.
+  // backgrounded/overnight tabs) was the bulk of the Realtime
+  // Database egress bill. Now: poll every 60s, and ONLY when the
+  // tab is actually visible. Returning focus to the tab triggers
+  // an immediate refresh so operators never see stale data.
+  pollTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') loadReports();
+  }, 60000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') loadReports();
+  });
 
   // Real-time alerts: new portal bank links + new Instant Funding
   // submissions. Polls every 20s and toasts / notifies / chimes on
@@ -4375,7 +4391,11 @@ function initAlerts() {
   // Subsequent polls compare against the watermark and fire on
   // anything newer.
   pollAlerts();
-  setInterval(pollAlerts, ALERTS_POLL_MS);
+  // Gate on visibility — pollAlerts() fetches the full ifSubmissions
+  // tree; no reason to keep paying for that on a backgrounded tab.
+  setInterval(() => {
+    if (document.visibilityState === 'visible') pollAlerts();
+  }, ALERTS_POLL_MS);
 }
 
 // ───────── Wiring ─────────
