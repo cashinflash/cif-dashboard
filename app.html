@@ -374,6 +374,7 @@ button,input,select{font-family:inherit}
 .snap-val .unit{font-size:14px;font-weight:700;color:var(--muted);margin-left:2px}
 .snap-val .acc-num{font-variant-numeric:tabular-nums;letter-spacing:.04em}
 .snap-sub{font-size:11px;color:var(--muted);margin-top:auto;font-weight:500;line-height:1.3}
+.snap-note{font-size:11px;color:var(--text2);font-weight:700;line-height:1.3;margin-top:5px;padding-top:5px;border-top:1px dashed var(--border)}
 .snap-verified{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-top:5px}
 .snap-verified .icn{width:12px;height:12px;stroke-width:2.5}
 .snap-verified.warn{color:var(--amber-700)}
@@ -1728,13 +1729,32 @@ function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
 }
 
-function toast(msg, kind) {
+// opts (optional): { sticky:true } keeps it until the caller .remove()s
+// the returned node; { spinner:true } prepends an animated circle and
+// exposes node._msgEl so the message can be updated in place;
+// { duration:ms } overrides the 3s auto-dismiss. 2-arg calls are
+// unchanged. Returns the toast element.
+function toast(msg, kind, opts) {
+  opts = opts || {};
   const wrap = document.getElementById('toasts');
   const t = document.createElement('div');
   t.className = 'toast' + (kind ? ' ' + kind : '');
-  t.textContent = msg;
+  if (opts.spinner) {
+    t.style.display = 'flex';
+    t.style.alignItems = 'center';
+    const sp = document.createElement('span');
+    sp.style.cssText = 'display:inline-block;width:13px;height:13px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;margin-right:9px;flex:none';
+    const m = document.createElement('span');
+    m.textContent = msg;
+    t.appendChild(sp);
+    t.appendChild(m);
+    t._msgEl = m;
+  } else {
+    t.textContent = msg;
+  }
   wrap.appendChild(t);
-  setTimeout(() => t.remove(), 3000);
+  if (!opts.sticky) setTimeout(() => t.remove(), opts.duration || 3000);
+  return t;
 }
 
 // ───────── Routing ─────────
@@ -2252,21 +2272,28 @@ function renderDetail(fbId) {
   recValue.textContent = (a.claudeDecision || a.status || 'Pending').toUpperCase();
   recReason.textContent = a.reason || '—';
 
-  // Alert
+  // Engine-disagreement alert removed (operator request 2026-05-17):
+  // v3 is the primary engine post-cutover and the v2 reverse-shadow is
+  // backend-only validation data — surfacing "v2 disagrees" on every
+  // applicant where the deprecated shadow engine differed was
+  // non-actionable noise that made operators second-guess correct v3
+  // decisions. The dv-alert element is kept (hidden) so any stale poll
+  // referencing it doesn't throw; the engineComparison/engineV2 Firebase
+  // pipeline in cif-apply is unchanged (still silent validation data).
   const alertEl = document.getElementById('dv-alert');
-  if (a.v2Decision && a.claudeDecision && a.v2Decision !== (a.claudeDecision || '').toUpperCase()) {
-    alertEl.style.display = '';
-    document.getElementById('dv-alert-title').textContent = 'Engine disagreement';
-    document.getElementById('dv-alert-body').textContent = `v2 engine says ${a.v2Decision} ($${a.v2TierAmount||0}) — review before action.`;
-  } else {
-    alertEl.style.display = 'none';
-  }
+  if (alertEl) alertEl.style.display = 'none';
 
   // Financial Snapshot — real engine fields (mirrors classic msummary)
   const snap = document.getElementById('dv-snap');
   const ad = a.applicationData || {};
   const monthlyIncome = Number(a.monthlyIncome || 0);
   const monthlyExpenses = Number(a.monthlyExpenses || 0);
+  // Gross money in / out (excl. internal self-transfers), monthly-
+  // normalized. Operator sanity figure — surfaced under the income /
+  // obligation cards so the gap (loans, p2p, transfers we don't count
+  // as income; spend we don't charge) is visible at a glance.
+  const grossIn = Number(a.grossDepositsMonthly || 0);
+  const grossOut = Number(a.grossWithdrawalsMonthly || 0);
   const fcf = Number(a.fcf || 0);
   const dti = monthlyIncome > 0 ? Math.round((monthlyExpenses / monthlyIncome) * 100) : null;
   const conf = (typeof a.v2Confidence === 'number') ? a.v2Confidence : null;
@@ -2279,8 +2306,8 @@ function renderDetail(fbId) {
   const offerClass = (offer != null && offer > 0) ? 'green' : (offer === 0 ? 'red' : 'muted');
 
   const cards = [
-    { lbl: 'Verified Income', val: '$' + Math.round(monthlyIncome).toLocaleString(), valClass: monthlyIncome > 0 ? 'green' : 'muted', sub: 'monthly' },
-    { lbl: 'Obligations', val: '$' + Math.round(monthlyExpenses).toLocaleString(), valClass: '', sub: 'committed monthly' },
+    { lbl: 'Verified Income', val: '$' + Math.round(monthlyIncome).toLocaleString(), valClass: monthlyIncome > 0 ? 'green' : 'muted', sub: 'monthly', note: grossIn > 0 ? ('All deposits $' + Math.round(grossIn).toLocaleString() + '/mo') : '' },
+    { lbl: 'Obligations', val: '$' + Math.round(monthlyExpenses).toLocaleString(), valClass: '', sub: 'committed monthly', note: grossOut > 0 ? ('All withdrawals $' + Math.round(grossOut).toLocaleString() + '/mo') : '' },
     { lbl: 'FCF / Mo', val: (fcf < 0 ? '-$' : '$') + Math.abs(Math.round(fcf)).toLocaleString(), valClass: fcfClass, sub: 'free cash flow' },
     { lbl: 'DTI', val: dti == null ? '—' : (dti + '<span class="unit">%</span>'), valClass: dtiClass, sub: 'debt-to-income', valHtml: true },
     { lbl: 'Max Offer', val: offer == null ? '—' : '$' + Number(offer).toLocaleString(), valClass: offerClass, sub: offer == null ? 'not yet run' : (offer > 0 ? 'v2 final tier' : 'declined by v2') },
@@ -2293,7 +2320,8 @@ function renderDetail(fbId) {
     const vc = c.valClass ? ' ' + c.valClass : '';
     const valEl = c.valHtml ? c.val : escapeHtml(c.val);
     const verifiedEl = c.verified ? `<div class="snap-verified"><svg class="icn"><use href="#i-check"/></svg>${escapeHtml(c.verifiedLabel || 'Verified')}</div>` : '';
-    return `<div class="snap-cell"><div class="snap-lbl">${escapeHtml(c.lbl)}</div><div class="snap-val${vc}${vs}">${valEl}</div><div class="snap-sub">${escapeHtml(c.sub || '')}</div>${verifiedEl}</div>`;
+    const noteEl = c.note ? `<div class="snap-note" title="Gross money ${c.lbl === 'Obligations' ? 'out' : 'in'} excluding internal self-transfers — sanity figure, not used in the decision">${escapeHtml(c.note)}</div>` : '';
+    return `<div class="snap-cell"><div class="snap-lbl">${escapeHtml(c.lbl)}</div><div class="snap-val${vc}${vs}">${valEl}</div><div class="snap-sub">${escapeHtml(c.sub || '')}</div>${noteEl}${verifiedEl}</div>`;
   }).join('');
 
   // Decision-checks list removed — its right-rail slot now hosts
@@ -3994,8 +4022,38 @@ async function pushNoteToVergent(fbId, text) {
   }
 }
 
+// Detail-view loading state for re-run / refresh. Paints a clear
+// spinner into the report area (operators were left staring at a
+// blank/stale panel with only a 3s toast for ~30s–2min). Resetting
+// _lastReportHtml forces renderDetail to repaint the report area on the
+// next loadReports cycle even if the resulting HTML is byte-identical.
+function dvShowRerunLoading(label) {
+  const el = document.getElementById('dv-report-html');
+  if (el) {
+    el.className = 'dv-report-html';
+    el.innerHTML =
+      '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;text-align:center">' +
+      '<div style="width:46px;height:46px;border:4px solid var(--green-200);border-top-color:var(--green);border-radius:50%;animation:spin .9s linear infinite;margin-bottom:18px"></div>' +
+      '<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">' + label + '</div>' +
+      '<div style="font-size:12.5px;color:var(--text2);line-height:1.55;max-width:420px">This can take up to ~2 minutes. The report updates here automatically when it’s done — you can keep working in other tabs meanwhile.</div>' +
+      '</div>';
+  }
+  _lastReportHtml = null;
+  ['dv-rerun-btn', 'dv-refresh-plaid-btn'].forEach(function (id) {
+    const b = document.getElementById(id);
+    if (b) { b.disabled = true; b.style.opacity = '0.6'; b.style.pointerEvents = 'none'; }
+  });
+}
+function dvEndRerunLoading() {
+  ['dv-rerun-btn', 'dv-refresh-plaid-btn'].forEach(function (id) {
+    const b = document.getElementById(id);
+    if (b) { b.disabled = false; b.style.opacity = ''; b.style.pointerEvents = ''; }
+  });
+}
+
 async function rerunEngine(fbId) {
   toast('Re-running engine…');
+  dvShowRerunLoading('Re-running the underwriting engine…');
   try {
     const r = await fetch('/api/rerun-v2', {
       method: 'POST',
@@ -4008,11 +4066,16 @@ async function rerunEngine(fbId) {
     await loadReports();
   } catch (e) {
     toast('Re-run failed: ' + e.message, 'err');
+    _lastReportHtml = null;
+    rerender();
+  } finally {
+    dvEndRerunLoading();
   }
 }
 
 async function refreshFromPlaid(fbId) {
   toast('Refreshing from Plaid…');
+  dvShowRerunLoading('Pulling a fresh Plaid asset report & re-running…');
   try {
     const r = await fetch('/api/refresh-from-plaid', {
       method: 'POST',
@@ -4025,6 +4088,10 @@ async function refreshFromPlaid(fbId) {
     await loadReports();
   } catch (e) {
     toast('Refresh failed: ' + e.message, 'err');
+    _lastReportHtml = null;
+    rerender();
+  } finally {
+    dvEndRerunLoading();
   }
 }
 
@@ -4787,7 +4854,10 @@ async function rerunAppLinkPlaid(fbId, btn) {
     toast('Re-run kickoff failed: ' + (e.message || e), 'err');
     return;
   }
-  toast('Plaid is generating the new report (~30s-2min)…');
+  const statusToast = toast(
+    'Plaid is generating the new report — this can take ~30s–2 min. The report will refresh automatically when it finishes.',
+    '', { sticky: true, spinner: true }
+  );
 
   // Poll Firebase for the updated bankStatementUrl / plaidAssetToken.
   // 48 attempts × 5s = 4 min total.
@@ -4802,6 +4872,7 @@ async function rerunAppLinkPlaid(fbId, btn) {
     const tokenChanged = rec.plaidAssetToken && rec.plaidAssetToken !== baselineToken;
     if (urlChanged || tokenChanged) {
       const decision = (rec.claudeDecision || rec.status || 'updated').toString();
+      if (statusToast) statusToast.remove();
       toast('Report ready — ' + decision, 'ok');
       if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = 'Re-run report'; }
       await loadReports();
@@ -4810,8 +4881,10 @@ async function rerunAppLinkPlaid(fbId, btn) {
       return;
     }
     if (btn) btn.innerHTML = `<span style="display:inline-block;width:11px;height:11px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;margin-right:6px;vertical-align:-2px"></span> Generating… (${(i+1)*5}s)`;
+    if (statusToast && statusToast._msgEl) statusToast._msgEl.textContent = `Plaid is generating the new report… (${(i+1)*5}s elapsed, up to ~4 min). It will refresh automatically.`;
   }
   if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = 'Re-run report'; }
+  if (statusToast) statusToast.remove();
   toast('Timed out after 4 min — check Render logs for /rerun-plaid', 'err');
 }
 
