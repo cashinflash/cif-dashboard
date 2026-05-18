@@ -255,8 +255,11 @@ button,input,select{font-family:inherit}
    .tbl-card uses overflow:hidden which would break position:sticky on
    thead, so reports get a dedicated wrapper. */
 .tbl-card-scroll{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-xs);overflow:auto;max-height:calc(100vh - 380px)}
-.tbl-card-scroll .tbl thead{position:sticky;top:0;z-index:5;box-shadow:inset 0 -1px 0 var(--border)}
-.tbl-card-scroll .tbl thead th{background:var(--surface2)}
+/* NOTE: no position:sticky on this thead. Sticky thead inside an
+   overflow:auto container makes the header size its columns
+   independently of tbody (Chromium), so headers drift off their
+   data. A plain thead always shares column widths with tbody. */
+.tbl-card-scroll .tbl thead th{background:var(--surface2);box-shadow:inset 0 -1px 0 var(--border)}
 .tbl-sortable{cursor:pointer;user-select:none}
 .tbl-sortable:hover{background:#eef3ee !important}
 .tbl-sort-ind{display:inline-block;width:9px;text-align:center;margin-left:4px;color:var(--muted);font-size:9px;line-height:1}
@@ -6137,23 +6140,19 @@ function renderPastDueReport(rows) {
     const arrow = active ? (_pastDueSortDir === 'desc' ? '▼' : '▲') : '↕';
     return `<span class="tbl-sort-ind${active?' active':''}">${arrow}</span>`;
   };
-  // Explicit widths + table-layout:fixed so every header sits exactly
-  // over its column regardless of how wide the cell content is (the
-  // long two-line Customer/Loan/Last-call cells were making columns
-  // size to content and the headers drift off their data).
+  // Plain auto-layout table (no fixed widths, no sticky thead) so the
+  // browser computes ONE set of column widths for thead + tbody — they
+  // can't drift apart.
   const headerCols = [
-    { key: 'name',     label: 'Customer',  w: '19%'  },
-    { key: 'loan',     label: 'Loan',      w: '15%'  },
-    { key: 'days',     label: 'Days late', w: '8%'   },
-    { key: 'balance',  label: 'Balance',   w: '9%'   },
-    { key: 'due',      label: 'Due',       w: '11%'  },
-    { key: 'nextpay',  label: 'Next pay',  w: '11%'  },
-    { key: 'phone',    label: 'Phone',     w: '12%'  },
-    { key: 'lastcall', label: 'Last call', w: '15%'  },
+    { key: 'name',     label: 'Customer'  },
+    { key: 'loan',     label: 'Loan'      },
+    { key: 'days',     label: 'Days late' },
+    { key: 'balance',  label: 'Balance'   },
+    { key: 'due',      label: 'Due'       },
+    { key: 'nextpay',  label: 'Next pay'  },
+    { key: 'phone',    label: 'Phone'     },
+    { key: 'lastcall', label: 'Last call' },
   ];
-  const colGroup = '<colgroup><col style="width:34px">'
-    + headerCols.map(c => `<col style="width:${c.w}">`).join('')
-    + '</colgroup>';
   const headHtml = headerCols.map(c =>
     `<th class="tbl-sortable" onclick="setPastDueSort('${c.key}')">${c.label}${sortInd(c.key)}</th>`
   ).join('');
@@ -6183,8 +6182,7 @@ function renderPastDueReport(rows) {
     </tr>`;
   }).join('');
 
-  table.innerHTML = `<div class="tbl-card-scroll"><table class="tbl" style="table-layout:fixed">
-    ${colGroup}
+  table.innerHTML = `<div class="tbl-card-scroll"><table class="tbl">
     <thead><tr>
       <th class="tbl-checkbox"><input type="checkbox" id="rpt-headchk" ${allChecked?'checked':''} onclick="togglePastDueAllVisible(this)"></th>
       ${headHtml}
