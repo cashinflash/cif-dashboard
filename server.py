@@ -21,6 +21,57 @@ def _fb_url(suffix):
     if FIREBASE_DB_SECRET:
         url += ('&' if '?' in url else '?') + 'auth=' + FIREBASE_DB_SECRET
     return url
+
+
+# Compact /reportsIndex projection — MUST stay in lock-step with
+# cif-apply run_server.py. cif-apply mirrors backend (intake/engine)
+# writes; this dashboard mirrors OPERATOR writes (approve/decline/
+# amount/notes) that go straight to /reports via the /fb/ write proxy
+# and would otherwise leave the index stale ("everything Pending after
+# refresh until you open each one").
+_INDEX_TOP_FIELDS = (
+    'name', 'status', 'score', 'createdAt', 'updatedAt', 'date', 'time',
+    'source', 'amount', 'submissionId', 'filename', 'claudeDecision',
+    'reason', 'v2Decision', 'vergentGuid', 'processingComplete',
+)
+_INDEX_APPDATA_FIELDS = ('email', 'phone', 'firstName', 'lastName')
+
+
+def _mirror_report_write_to_index(fb_path, method, raw):
+    """After a successful /fb/ PATCH|PUT to reports/{id}, push the small
+    list fields into reportsIndex/{id}. One ~150-byte write per operator
+    action — negligible, not a per-poll cost. Best-effort: never raises."""
+    try:
+        if method not in ('PATCH', 'PUT') or not fb_path.startswith('reports/'):
+            return
+        rest = fb_path[len('reports/'):]
+        if rest.endswith('.json'):
+            rest = rest[:-5]
+        sent = json.loads(raw or b'{}')
+        if not isinstance(sent, dict):
+            return
+        rid, proj = None, None
+        if '/' not in rest:                                   # reports/{id}
+            rid = rest
+            proj = {k: sent[k] for k in _INDEX_TOP_FIELDS if k in sent}
+            ad = sent.get('applicationData')
+            if isinstance(ad, dict):
+                for k in _INDEX_APPDATA_FIELDS:
+                    if k in ad:
+                        proj[k] = ad[k]
+                proj['hasApp'] = True
+        elif rest.endswith('/applicationData'):               # reports/{id}/applicationData
+            rid = rest[:-len('/applicationData')]
+            proj = {k: sent[k] for k in _INDEX_APPDATA_FIELDS if k in sent}
+        if rid and proj:
+            ireq = urllib.request.Request(
+                _fb_url(f'reportsIndex/{rid}.json'),
+                data=json.dumps(proj).encode(),
+                headers={'Content-Type': 'application/json'},
+                method='PATCH')
+            urllib.request.urlopen(ireq, timeout=10).read()
+    except Exception as e:
+        print(f'[REPORTS-INDEX-MIRROR] {fb_path} failed: {e}', flush=True)
 ANTHROPIC_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 
 # Instant-Funding vault (for /if page submissions).
@@ -1527,6 +1578,7 @@ class Handler(BaseHTTPRequestHandler):
                     headers={'Content-Type': 'application/json'}, method=method)
                 with urllib.request.urlopen(req, timeout=10) as r:
                     body = r.read()
+                _mirror_report_write_to_index(fb_path, method, raw)
                 self.send_response(200)
                 for k, v in CORS.items():
                     self.send_header(k, v)
