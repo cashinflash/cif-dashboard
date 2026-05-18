@@ -264,8 +264,11 @@ button,input,select{font-family:inherit}
 .tbl-sortable:hover{background:#eef3ee !important}
 .tbl-sort-ind{display:inline-block;width:9px;text-align:center;margin-left:4px;color:var(--muted);font-size:9px;line-height:1}
 .tbl-sort-ind.active{color:var(--green-dark)}
-/* Aging bucket left-edge stripe on table rows. */
-.tbl tbody tr.ab-1::before,.tbl tbody tr.ab-2::before,.tbl tbody tr.ab-3::before,.tbl tbody tr.ab-4::before,.tbl tbody tr.ab-5::before{content:''}
+/* Aging bucket left-edge stripe on table rows.
+   NOTE: do NOT add a ::before to these <tr>s. Chrome wraps a table-row
+   ::before in an anonymous phantom <td>, shifting every data row one
+   column right of the header. The stripe is done purely via the
+   td:first-child border-left rules below. */
 .tbl tbody tr.ab-1 td:first-child{border-left:3px solid #fbbf24}
 .tbl tbody tr.ab-2 td:first-child{border-left:3px solid #f59e0b}
 .tbl tbody tr.ab-3 td:first-child{border-left:3px solid #f97316}
