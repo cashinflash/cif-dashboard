@@ -1600,6 +1600,14 @@ let _currentUser = '';
 let _currentRole = 'user';
 let pollTimer = null;
 let _lastDetailFbId = null;
+// Stage 2 cost fix: the list/poll now reads the compact /reportsIndex
+// (≈150 bytes/applicant) instead of the whole /reports tree (which
+// embeds the heavy engine-report HTML + Plaid blobs). The full record
+// for ONE applicant is fetched on demand when their detail opens and
+// kept here so the ~11 `apps.find(...)` call sites (detail, push,
+// denial, debit card, …) keep working unchanged, and so the light
+// poll doesn't clobber the open applicant's heavy fields.
+let _fullRecordCache = {};
 // Last report HTML injected into #dv-report-html. renderDetail fires
 // on every loadReports poll (3-8s); re-setting innerHTML each time
 // destroyed any sections the operator expanded. We only re-inject
@@ -1807,11 +1815,28 @@ function readRouteFromHash() {
 // ───────── Data ─────────
 async function loadReports() {
   try {
-    const data = await fbGet('reports.json');
+    // Poll the compact /reportsIndex (tiny: name/status/score/dates per
+    // applicant). Fall back to the full /reports tree only if the index
+    // is empty/unavailable, so the dashboard never breaks during rollout
+    // or if the index writer ever lags.
+    let data = await fbGet('reportsIndex.json');
+    const haveIndex = data && typeof data === 'object' && !data.error
+      && Object.keys(data).length > 0;
+    if (!haveIndex) {
+      data = await fbGet('reports.json');
+    }
     if (data && typeof data === 'object' && !data.error) {
       apps = Object.entries(data)
         .map(([k, v]) => ({ ...v, firebaseId: k }))
         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      // Re-overlay any full records hydrated this session so the open
+      // applicant keeps its heavy fields across the light poll.
+      const cachedIds = Object.keys(_fullRecordCache);
+      if (cachedIds.length) {
+        apps = apps.map(a => _fullRecordCache[a.firebaseId]
+          ? { ..._fullRecordCache[a.firebaseId], firebaseId: a.firebaseId }
+          : a);
+      }
     } else {
       apps = [];
     }
@@ -1848,6 +1873,28 @@ function _maybeScheduleFastReportsPoll() {
     _fastPollTimer = setTimeout(() => {
       if (document.visibilityState === 'visible') loadReports();
     }, 20000);
+  }
+}
+
+// Fetch ONE applicant's full /reports/{id} record on demand (detail
+// open). Cache it + splice it into `apps` so every existing
+// apps.find(...) call site (detail render, push-to-vergent, denial,
+// debit card, …) keeps working unchanged. Bounded so a long session
+// of opening many applicants can't grow memory unbounded.
+async function hydrateFullRecord(fbId) {
+  if (!fbId) return;
+  try {
+    const rec = await fbGet(`reports/${fbId}.json`);
+    if (rec && typeof rec === 'object' && !rec.error) {
+      const ids = Object.keys(_fullRecordCache);
+      if (ids.length > 25) delete _fullRecordCache[ids[0]];
+      _fullRecordCache[fbId] = rec;
+      const i = apps.findIndex(a => a.firebaseId === fbId);
+      if (i >= 0) apps[i] = { ...rec, firebaseId: fbId };
+      else apps.push({ ...rec, firebaseId: fbId });
+    }
+  } catch (e) {
+    console.warn('hydrateFullRecord failed', fbId, e);
   }
 }
 
@@ -2186,7 +2233,7 @@ function renderQueue() {
     const sc = scoreClass(a.score);
     const sCls = statusClass(a.status);
     const idShort = (a.submissionId || a.firebaseId || '').slice(-6).toUpperCase();
-    const appType = a.applicationData ? 'Application' : (a.filename ? 'Document' : 'Manual');
+    const appType = (a.applicationData || a.hasApp) ? 'Application' : (a.filename ? 'Document' : 'Manual');
     const appMeta = a.amount ? a.amount.replace(/^N\/A$/, '—') : '';
     rows.push(`<tr data-fb="${escapeHtml(a.firebaseId)}">
       <td><div class="applicant"><div class="av">${escapeHtml(initials(a.name))}</div><div class="applicant-text"><div class="applicant-name">${escapeHtml(a.name || 'Unnamed')} ${sourceBadge(a)}</div><div class="applicant-id">#${escapeHtml(idShort)}</div></div></div></td>
@@ -2205,6 +2252,20 @@ function renderDetail(fbId) {
   const a = apps.find(x => x.firebaseId === fbId);
   if (!a) {
     document.getElementById('dv-name').textContent = 'Loading…';
+    return;
+  }
+  // Stage 2: the list/poll only carries the lightweight index entry
+  // (no applicationData/report/etc.). The detail view + its actions
+  // need the full record — fetch it once on demand, then re-render.
+  // The /reports fallback path already yields full entries (so
+  // applicationData present ⇒ already full). _fullRecordCache guards
+  // against an infinite hydrate loop for records that genuinely lack
+  // applicationData.
+  if (a.applicationData === undefined && !_fullRecordCache[fbId]) {
+    document.getElementById('dv-name').textContent = 'Loading…';
+    hydrateFullRecord(fbId).then(() => {
+      if (document.body.dataset.firebaseId === fbId) renderDetail(fbId);
+    });
     return;
   }
   const b = bucketStatus(a);
