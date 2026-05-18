@@ -1369,7 +1369,7 @@ button,input,select{font-family:inherit}
     <div class="greet">
       <div>
         <div class="greet-title">Reports</div>
-        <div class="greet-sub" id="rpt-sub">Past-due contact list pulled live from Vergent.</div>
+        <div class="greet-sub" id="rpt-sub">Past-due collections — newest delinquencies first. Click a tile to focus on Due today, this week, or older.</div>
       </div>
       <div class="greet-actions">
         <button class="btn btn-ghost" id="rpt-refresh-btn"><svg class="icn"><use href="#i-refresh"/></svg>Refresh</button>
@@ -1392,16 +1392,6 @@ button,input,select{font-family:inherit}
       <button class="chip" id="rpt-chip-all" onclick="setPastDueShowAll(true)">All (incl. closed)<span class="chip-ct" id="rpt-chip-all-ct">0</span></button>
       <span id="rpt-active-aging" style="display:none;font-size:11.5px;color:var(--muted);padding-left:8px">Aging filter: <strong id="rpt-active-aging-label" style="color:var(--text)"></strong> <button onclick="setPastDueAging(null)" style="background:none;border:0;color:var(--green-dark);cursor:pointer;font-size:11.5px;font-weight:700;padding:0 4px;font-family:inherit">Clear</button></span>
       <button id="rpt-reset-btn" class="chip" style="margin-left:auto" onclick="resetPastDueView()" title="Reset all filters + sort to defaults">Reset view</button>
-    </div>
-    <!-- Due-date quick filters — match rows by their scheduled DueDate
-         relative to today (operator's local timezone). Independent of
-         the aging-bucket tiles, which key off DaysLate. -->
-    <div class="chips" style="margin-bottom:12px;align-items:center;flex-wrap:wrap">
-      <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;padding:0 6px;align-self:center">Due</span>
-      <button class="chip active" id="rpt-due-any" onclick="setPastDueDueFilter(null)">Any date</button>
-      <button class="chip" id="rpt-due-today" onclick="setPastDueDueFilter('today')">Today<span class="chip-ct" id="rpt-due-today-ct">0</span></button>
-      <button class="chip" id="rpt-due-yesterday" onclick="setPastDueDueFilter('yesterday')">Yesterday<span class="chip-ct" id="rpt-due-yesterday-ct">0</span></button>
-      <button class="chip" id="rpt-due-thisweek" onclick="setPastDueDueFilter('thisweek')">Past 7 days<span class="chip-ct" id="rpt-due-thisweek-ct">0</span></button>
     </div>
     <!-- Toolbar — search, bulk actions, CSV export, auto-refresh, last-loaded. -->
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
@@ -5709,12 +5699,16 @@ const _PASTDUE_CLOSED_STATUSES = new Set([
   'charged off', 'charge off', 'rejected', 'cancelled', 'canceled',
 ]);
 
+// Collections-recency buckets, keyed off DaysLate (how late the loan
+// is right now) — this is what an operator means by "what's due today
+// / became past due yesterday / this week / older". Non-overlapping so
+// every active row lands in exactly one tile.
 const _PASTDUE_BUCKETS = [
-  { key: 'b1', label: '1–15 days',  cls: 'ab-1', min: 1,  max: 15,    band: '#fbbf24' },
-  { key: 'b2', label: '16–30 days', cls: 'ab-2', min: 16, max: 30,    band: '#f59e0b' },
-  { key: 'b3', label: '31–60 days', cls: 'ab-3', min: 31, max: 60,    band: '#f97316' },
-  { key: 'b4', label: '61–90 days', cls: 'ab-4', min: 61, max: 90,    band: '#ef4444' },
-  { key: 'b5', label: '90+ days',   cls: 'ab-5', min: 91, max: 1e9,   band: '#b91c1c' },
+  { key: 'b1', label: 'Due today',   cls: 'ab-1', min: 0,  max: 0,    band: '#16a34a' },
+  { key: 'b2', label: '1 day late',  cls: 'ab-2', min: 1,  max: 1,    band: '#fbbf24' },
+  { key: 'b3', label: '2–7 days',    cls: 'ab-3', min: 2,  max: 7,    band: '#f59e0b' },
+  { key: 'b4', label: '8–30 days',   cls: 'ab-4', min: 8,  max: 30,   band: '#f97316' },
+  { key: 'b5', label: '31+ days',    cls: 'ab-5', min: 31, max: 1e9,  band: '#dc2626' },
 ];
 
 function _pastDueIsActive(r) {
@@ -5728,7 +5722,7 @@ function _pastDueIsActive(r) {
 
 function _pastDueBucket(r) {
   const d = Number(r.DaysLate) || 0;
-  if (d <= 0) return null;
+  if (d < 0) return null;   // 0 = "Due today" bucket; only negatives have no bucket
   return _PASTDUE_BUCKETS.find(b => d >= b.min && d <= b.max) || null;
 }
 
@@ -5795,7 +5789,7 @@ function _pastDueLoadView() {
     const v = JSON.parse(raw);
     if (typeof v.showAll === 'boolean') _pastDueShowAll = v.showAll;
     if (v.aging === null || _PASTDUE_BUCKETS.some(b => b.key === v.aging)) _pastDueAging = v.aging;
-    if (v.dueFilter === null || ['today','yesterday','thisweek'].includes(v.dueFilter)) _pastDueDueFilter = v.dueFilter || null;
+    _pastDueDueFilter = null;  // retired filter — never restore it
     if (typeof v.sortKey === 'string') _pastDueSortKey = v.sortKey;
     if (v.sortDir === 'asc' || v.sortDir === 'desc') _pastDueSortDir = v.sortDir;
     const s = document.getElementById('rpt-search');  if (s && typeof v.search === 'string') s.value = v.search;
@@ -6043,9 +6037,8 @@ function filterPastDueReport(q) {
       return b && b.key === _pastDueAging;
     });
   }
-  if (_pastDueDueFilter) {
-    rows = rows.filter(r => _pastDueMatchesDueFilter(r, _pastDueDueFilter));
-  }
+  // (legacy DueDate "Due" chips removed — that filter is retired; the
+  // recency tiles above are the day-bucket control now.)
   const term = (q || '').trim().toLowerCase();
   if (term) {
     rows = rows.filter(r => {
@@ -6105,18 +6098,18 @@ function renderPastDueReport(rows) {
   if (!table) return;
 
   if (stats) {
-    const totalBalance = rows.reduce((s, r) => s + (Number(r.Balance) || 0), 0);
-    const totalDue     = rows.reduce((s, r) => s + (Number(r.AmountDue) || 0), 0);
-    const sev30        = rows.filter(r => (Number(r.DaysLate) || 0) >= 30).length;
+    const totalDue = rows.reduce((s, r) => s + (Number(r.AmountDue) || 0), 0);
+    const newCt    = rows.filter(r => { const d = Number(r.DaysLate) || 0; return d >= 0 && d <= 7; }).length;
+    const sev31    = rows.filter(r => (Number(r.DaysLate) || 0) >= 31).length;
     const card = (label, val, cls) => `<div class="stat${cls?' '+cls:''}">
       <div class="stat-label">${escapeHtml(label)}</div>
       <div class="stat-value${cls==='dec'?' red':cls==='pen'?' amber':''}">${val}</div>
     </div>`;
     stats.innerHTML =
-        card('Customers', rows.length, 'tot')
-      + card('30+ days late', sev30, 'dec')
-      + card('Total balance', _rptFmtMoney(totalBalance))
-      + card('Total amount due', _rptFmtMoney(totalDue), 'pen');
+        card('To collect', _rptFmtMoney(totalDue), 'pen')
+      + card('Customers', rows.length, 'tot')
+      + card('New · ≤7 days', newCt)
+      + card('31+ days late', sev31, 'dec');
   }
 
   const tilesSet = _pastDueShowAll ? _pastDueRows : _pastDueRows.filter(_pastDueIsActive);
