@@ -38,15 +38,30 @@ _INDEX_APPDATA_FIELDS = ('email', 'phone', 'firstName', 'lastName')
 
 
 def _mirror_report_write_to_index(fb_path, method, raw):
-    """After a successful /fb/ PATCH|PUT to reports/{id}, push the small
-    list fields into reportsIndex/{id}. One ~150-byte write per operator
-    action — negligible, not a per-poll cost. Best-effort: never raises."""
+    """Keep /reportsIndex in lock-step with operator writes to
+    /reports/{id} via the /fb/ proxy:
+      - PATCH|PUT → mirror the small list fields into reportsIndex/{id}
+      - DELETE of the whole record → delete reportsIndex/{id} too, or
+        the deleted applicant ghosts the list (row stays, opens empty)
+        because the dashboard now reads the index, not /reports.
+    One tiny write per operator action — not a per-poll cost.
+    Best-effort: never raises."""
     try:
-        if method not in ('PATCH', 'PUT') or not fb_path.startswith('reports/'):
+        if not fb_path.startswith('reports/'):
             return
         rest = fb_path[len('reports/'):]
         if rest.endswith('.json'):
             rest = rest[:-5]
+
+        # Whole-record delete → drop the matching index entry.
+        if method == 'DELETE' and '/' not in rest and rest:
+            dreq = urllib.request.Request(
+                _fb_url(f'reportsIndex/{rest}.json'), method='DELETE')
+            urllib.request.urlopen(dreq, timeout=10).read()
+            return
+
+        if method not in ('PATCH', 'PUT'):
+            return
         sent = json.loads(raw or b'{}')
         if not isinstance(sent, dict):
             return
