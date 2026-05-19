@@ -359,6 +359,10 @@ button,input,select{font-family:inherit}
 .dv-alert-text{flex:1}
 .dv-alert-title{font-size:13px;font-weight:700;color:var(--amber-700);margin-bottom:2px}
 .dv-alert-body{font-size:12.5px;color:var(--text2);line-height:1.55}
+.dv-alert.err{background:var(--red-50);border-color:var(--red-200)}
+.dv-alert.err .dv-alert-icn{background:var(--red-100);color:var(--red-700)}
+.dv-alert.err .dv-alert-title{color:var(--red-700)}
+#dv-compliance{margin-bottom:18px}
 
 .sec-h{font-size:11.5px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.07em;margin:18px 0 10px;display:flex;align-items:center;gap:10px}
 .sec-h::after{content:'';flex:1;height:1px;background:var(--border)}
@@ -1246,6 +1250,20 @@ button,input,select{font-family:inherit}
               <div class="dv-rec-right">
                 <div class="dv-rec-right-lbl">Engine Reason</div>
                 <div class="dv-rec-right-val" id="dv-rec-reason" style="font-size:13px;font-weight:600;text-align:right;max-width:340px">—</div>
+              </div>
+            </div>
+
+            <!-- Compliance banner (SSN / MLA). Unmissable — rendered
+                 above the engine advisory; red when a covered borrower
+                 / SSN failure forced a decline, amber for the
+                 "MLA NOT YET VERIFIED — run the free DMDC lookup before
+                 disbursing" interim posture. Populated by renderDetail
+                 from a.complianceBanner. -->
+            <div class="dv-alert" id="dv-compliance" style="display:none">
+              <div class="dv-alert-icn"><svg class="icn"><use href="#i-warning"/></svg></div>
+              <div class="dv-alert-text">
+                <div class="dv-alert-title" id="dv-compliance-title">—</div>
+                <div class="dv-alert-body" id="dv-compliance-body">—</div>
               </div>
             </div>
 
@@ -2342,6 +2360,24 @@ function renderDetail(fbId) {
   // pipeline in cif-apply is unchanged (still silent validation data).
   const alertEl = document.getElementById('dv-alert');
   if (alertEl) alertEl.style.display = 'none';
+
+  // Compliance banner (SSN / MLA). Written by cif-apply's compliance
+  // gate to a.complianceBanner = {level:'error'|'warn', title, body}.
+  // 'error' = a covered-borrower / SSN-fail decline was forced (red);
+  // 'warn' = the MLA-not-yet-verified interim advisory (amber). When
+  // absent the applicant cleared the gate — nothing to show.
+  const compEl = document.getElementById('dv-compliance');
+  if (compEl) {
+    const cb = a.complianceBanner;
+    if (cb && cb.title) {
+      compEl.className = 'dv-alert' + (cb.level === 'error' ? ' err' : '');
+      document.getElementById('dv-compliance-title').textContent = cb.title;
+      document.getElementById('dv-compliance-body').textContent = cb.body || '';
+      compEl.style.display = '';
+    } else {
+      compEl.style.display = 'none';
+    }
+  }
 
   // Financial Snapshot — real engine fields (mirrors classic msummary)
   const snap = document.getElementById('dv-snap');
