@@ -1516,6 +1516,13 @@ button,input,select{font-family:inherit}
     <div class="dnl-body">
       <p class="dnl-help">Pick the reasons to include. Pre-selected based on the engine's decline reason — uncheck any that don't apply.</p>
       <div class="dnl-reasons" id="dnl-reasons"></div>
+      <div id="dnl-custom-row" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+        <label class="dnl-reason" style="margin:0">
+          <input type="checkbox" id="dnl-custom-cb">
+          <span>Other — type a custom reason below</span>
+        </label>
+        <input type="text" id="dnl-custom-text" disabled placeholder="Custom decline reason" maxlength="240" style="display:block;width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:13px;font-family:inherit;outline:none;background:var(--surface2);color:var(--text)">
+      </div>
       <div class="dnl-to-card">
         <div class="dnl-to-lbl">Sending to</div>
         <div class="dnl-to-val" id="dnl-to-display">—</div>
@@ -3835,6 +3842,24 @@ function openDenialModal(fbId) {
     cb.addEventListener('change', () => row.classList.toggle('on', cb.checked));
   });
 
+  // Custom "Other" reason row — reset each open so the previous
+  // applicant's custom text doesn't leak. onchange (not
+  // addEventListener) avoids stacking handlers across re-opens since
+  // the row persists between modal opens (unlike the preset reasons,
+  // which are re-rendered into #dnl-reasons each time).
+  const customCb = document.getElementById('dnl-custom-cb');
+  const customTxt = document.getElementById('dnl-custom-text');
+  const customRow = customCb.closest('.dnl-reason');
+  customCb.checked = false;
+  customTxt.value = '';
+  customTxt.disabled = true;
+  customRow.classList.remove('on');
+  customCb.onchange = () => {
+    customRow.classList.toggle('on', customCb.checked);
+    customTxt.disabled = !customCb.checked;
+    if (customCb.checked) customTxt.focus();
+  };
+
   document.getElementById('dnl-ov').classList.add('open');
 }
 
@@ -3848,6 +3873,15 @@ async function sendDenialEmail() {
   const selectedReasons = DENIAL_REASONS.filter(
     (_, i) => document.querySelectorAll('#dnl-reasons .dnl-reason input')[i]?.checked
   );
+  // Append the "Other" custom reason if the operator checked it. Trim
+  // and refuse to send a blank custom reason so the email never goes
+  // out with an empty bullet.
+  const customOn = document.getElementById('dnl-custom-cb')?.checked;
+  const customTxt = (document.getElementById('dnl-custom-text')?.value || '').trim();
+  if (customOn) {
+    if (!customTxt) { toast('Type a custom reason or uncheck Other', 'err'); return; }
+    selectedReasons.push(customTxt);
+  }
   if (selectedReasons.length === 0) { toast('Pick at least one denial reason', 'err'); return; }
   const btn = document.getElementById('dnl-send');
   btn.disabled = true;
