@@ -1886,7 +1886,16 @@ async function hydrateFullRecord(fbId) {
   if (!fbId) return;
   try {
     const rec = await fbGet(`reports/${fbId}.json`);
-    if (rec && typeof rec === 'object' && !rec.error) {
+    // Cache any real report record — INCLUDING ones with status='Error'
+    // (those legitimately carry an `error` field from a processing crash
+    // and must still open so the operator can re-extract/recover). Only
+    // reject a bare Firebase fetch-error body ({"error":"..."} with no
+    // record fields), which would otherwise loop renderDetail forever on
+    // "Loading…". Incident 2026-05-21.
+    const isRealRecord = rec && typeof rec === 'object' && (
+      rec.applicationData !== undefined || rec.name !== undefined ||
+      rec.status !== undefined || rec.createdAt !== undefined);
+    if (isRealRecord) {
       const ids = Object.keys(_fullRecordCache);
       if (ids.length > 25) delete _fullRecordCache[ids[0]];
       _fullRecordCache[fbId] = rec;
