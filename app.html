@@ -1315,6 +1315,7 @@ button,input,select{font-family:inherit}
             <div class="dv-rail-title">Quick Actions</div>
             <div class="qa-grid">
               <button class="qa-btn" id="dv-rerun-btn" title="Re-run the engine using stored data — no new Plaid pull"><svg class="icn"><use href="#i-refresh"/></svg>Re-Run Report</button>
+              <button class="qa-btn" id="dv-reextract-btn" style="display:none" title="Re-read the uploaded PDF with the latest extraction logic, then re-run. Use when a stored extraction looks wrong (reconciliation failed, miscounts). Takes ~30–60s."><svg class="icn"><use href="#i-refresh"/></svg>Re-extract from PDF</button>
               <button class="qa-btn" id="dv-refresh-plaid-btn" title="Pull a fresh Plaid asset report and re-run"><svg class="icn"><use href="#i-refresh"/></svg>Refresh from Plaid</button>
               <button class="qa-btn qa-btn-amber" id="dv-denial-btn" title="Send the denial-reasons email to the applicant"><svg class="icn"><use href="#i-message"/></svg>Denial Email</button>
             </div>
@@ -1892,7 +1893,16 @@ async function hydrateFullRecord(fbId) {
   if (!fbId) return;
   try {
     const rec = await fbGet(`reports/${fbId}.json`);
-    if (rec && typeof rec === 'object' && !rec.error) {
+    // Cache any real report record — INCLUDING ones with status='Error'
+    // (those legitimately carry an `error` field from a processing crash
+    // and must still open so the operator can re-extract/recover). Only
+    // reject a bare Firebase fetch-error body ({"error":"..."} with no
+    // record fields), which would otherwise loop renderDetail forever on
+    // "Loading…". Incident 2026-05-21.
+    const isRealRecord = rec && typeof rec === 'object' && (
+      rec.applicationData !== undefined || rec.name !== undefined ||
+      rec.status !== undefined || rec.createdAt !== undefined);
+    if (isRealRecord) {
       const ids = Object.keys(_fullRecordCache);
       if (ids.length > 25) delete _fullRecordCache[ids[0]];
       _fullRecordCache[fbId] = rec;
@@ -2360,6 +2370,16 @@ function renderDetail(fbId) {
   // Financial Snapshot — real engine fields (mirrors classic msummary)
   const snap = document.getElementById('dv-snap');
   const ad = a.applicationData || {};
+  // Show "Re-extract from PDF" only for PDF-upload applicants — Plaid
+  // applicants re-pull via "Refresh from Plaid" (there's no PDF of ours
+  // to re-read). Source-aware: one Quick Actions area, the right mode shown.
+  const _reBtn = document.getElementById('dv-reextract-btn');
+  if (_reBtn) {
+    const _bm = (ad.bankMethod || a.bankMethod || a.filename || '').toLowerCase();
+    const _isPlaid = _bm.includes('plaid') || !!(a.plaidAssetToken || a.plaidAccessToken || ad.plaidAccessToken);
+    const _hasStmt = !!(a.bankStatementUrl || ad.bankStatementUrl);
+    _reBtn.style.display = (_hasStmt && !_isPlaid) ? '' : 'none';
+  }
   const monthlyIncome = Number(a.monthlyIncome || 0);
   const monthlyExpenses = Number(a.monthlyExpenses || 0);
   // Gross money in / out (excl. internal self-transfers), monthly-
@@ -4146,13 +4166,13 @@ function dvShowRerunLoading(label) {
       '</div>';
   }
   _lastReportHtml = null;
-  ['dv-rerun-btn', 'dv-refresh-plaid-btn'].forEach(function (id) {
+  ['dv-rerun-btn', 'dv-reextract-btn', 'dv-refresh-plaid-btn'].forEach(function (id) {
     const b = document.getElementById(id);
     if (b) { b.disabled = true; b.style.opacity = '0.6'; b.style.pointerEvents = 'none'; }
   });
 }
 function dvEndRerunLoading() {
-  ['dv-rerun-btn', 'dv-refresh-plaid-btn'].forEach(function (id) {
+  ['dv-rerun-btn', 'dv-reextract-btn', 'dv-refresh-plaid-btn'].forEach(function (id) {
     const b = document.getElementById(id);
     if (b) { b.disabled = false; b.style.opacity = ''; b.style.pointerEvents = ''; }
   });
@@ -4173,6 +4193,51 @@ async function rerunEngine(fbId) {
     await loadReports();
   } catch (e) {
     toast('Re-run failed: ' + e.message, 'err');
+    _lastReportHtml = null;
+    rerender();
+  } finally {
+    dvEndRerunLoading();
+  }
+}
+
+// Re-extract a PDF-uploaded applicant: re-download the original PDF and
+// re-run Claude extraction with the LATEST extraction logic, then re-run
+// the engine. Only meaningful for PDF uploads (Plaid applicants use
+// Refresh from Plaid). The cif-apply endpoint does the work on a daemon
+// thread and writes reExtractStatus to Firebase; we poll it.
+async function reExtractPdf(fbId) {
+  toast('Re-extracting the statement from the PDF…');
+  dvShowRerunLoading('Re-extracting the statement from the PDF & re-running…');
+  try {
+    const r = await fetch('/api/re-extract-pdf', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firebase_id: fbId })
+    });
+    if (!r.ok) throw new Error('Re-extract kickoff failed (HTTP ' + r.status + ')');
+    // Background job — poll Firebase reExtractStatus (36 × 5s = 3 min).
+    let done = false;
+    for (let i = 0; i < 36; i++) {
+      await new Promise(res => setTimeout(res, 5000));
+      let rec;
+      try { rec = await fbGet(`reports/${fbId}.json`); } catch (e) { continue; }
+      const status = rec && rec.reExtractStatus;
+      if (status === 'done') {
+        done = true;
+        toast('Re-extract complete — ' + (rec.reExtractTransactionCount || 0) + ' transactions', 'ok');
+        break;
+      }
+      if (status === 'error') {
+        done = true;
+        toast('Re-extract failed: ' + (rec.reExtractError || 'unknown error'), 'err');
+        break;
+      }
+    }
+    if (!done) toast('Re-extract still running — refresh in a minute to see the result', 'err');
+    await loadReports();
+  } catch (e) {
+    toast('Re-extract failed: ' + e.message, 'err');
     _lastReportHtml = null;
     rerender();
   } finally {
@@ -4534,6 +4599,7 @@ document.getElementById('dv-approve-btn').addEventListener('click', async () => 
   await setStatus(id, 'Approved');
 });
 document.getElementById('dv-rerun-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) rerunEngine(id); });
+document.getElementById('dv-reextract-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) reExtractPdf(id); });
 document.getElementById('dv-delete-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) deleteApplication(id); });
 document.getElementById('dv-refresh-plaid-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) refreshFromPlaid(id); });
 document.getElementById('dv-notes-save').addEventListener('click', () => { const id = _activeFbId(); if (id) saveNotes(id); });
