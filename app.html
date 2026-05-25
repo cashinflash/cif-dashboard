@@ -1834,8 +1834,15 @@ async function loadReports() {
       // applicant keeps its heavy fields across the light poll.
       const cachedIds = Object.keys(_fullRecordCache);
       if (cachedIds.length) {
+        // Heavy fields (applicationData, transactions, …) come from the
+        // hydrated full record; volatile light fields (status, score,
+        // dates) must come from the FRESH index entry `a`. Spreading `a`
+        // LAST is the fix for the "I declined it but the dashboard still
+        // shows Pending until I refresh" bug: previously the stale
+        // hydrated snapshot clobbered the operator's just-saved status on
+        // the very next poll.
         apps = apps.map(a => _fullRecordCache[a.firebaseId]
-          ? { ..._fullRecordCache[a.firebaseId], firebaseId: a.firebaseId }
+          ? { ..._fullRecordCache[a.firebaseId], ...a, firebaseId: a.firebaseId }
           : a);
       }
     } else {
@@ -3965,8 +3972,13 @@ async function setStatus(fbId, status) {
   if (!a) return;
   if (!confirm(`${status} ${a.name || 'this applicant'}?`)) return;
   toast('Updating…');
-  await fbPatchReport(fbId, { status, statusUpdatedAt: Date.now() });
-  Object.assign(a, { status, statusUpdatedAt: Date.now() });
+  const _now = Date.now();
+  await fbPatchReport(fbId, { status, statusUpdatedAt: _now });
+  Object.assign(a, { status, statusUpdatedAt: _now });
+  // Keep the hydrated cache in sync so the next light poll's overlay
+  // (and the open detail view) reflect the new status, not the stale
+  // snapshot captured when the applicant was first opened.
+  if (_fullRecordCache[fbId]) Object.assign(_fullRecordCache[fbId], { status, statusUpdatedAt: _now });
   toast(`Marked ${status}`, 'ok');
   rerender();
 }
@@ -3979,6 +3991,7 @@ async function saveOffer(fbId) {
   if (n == null) { toast('Enter a valid amount', 'err'); return; }
   await fbPatchReport(fbId, { amount: '$' + n });
   a.amount = '$' + n;
+  if (_fullRecordCache[fbId]) _fullRecordCache[fbId].amount = '$' + n;
 }
 
 // ───────── Note quick-pick templates ─────────
