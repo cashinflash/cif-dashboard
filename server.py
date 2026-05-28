@@ -920,245 +920,48 @@ _PHASE2_PANEL_HTML = ("""
 """).encode("utf-8")
 
 
-# OmniaText 2-way SMS messaging panel. Injected before </body> alongside
-# the Phase 2 Vergent badge (see _PHASE2_PANEL_HTML above). Mounts:
-#   - A full-screen #view-messages overlay that becomes active when the
-#     hash is #/messages. Two-pane layout: customer list (left) +
-#     thread + composer (right). Reads /fb/messages/_index.json and
-#     /fb/messages/{customerId}.json via the existing dashboard
-#     Firebase proxy. Sends via POST /api/messages/send (proxied to
-#     cif-apply, which calls Vergent's OmniaText endpoint).
-#   - A "Send message" link injected next to the Phase 2 Vergent badge
-#     on the applicant detail panel — opens the Messages page with the
-#     customer pre-selected.
-#   - A polling unread badge on the Messages nav button.
+# OmniaText 2-way SMS messaging panel — iframe embed of Vergent's
+# conversation UI. Injected before </body> alongside the Phase 2 badge.
 #
-# We deliberately don't edit _renderView in app.html — _renderView's
-# default behavior of toggling .active on #view-<name> is enough for
-# us. We hook hashchange ourselves to do view-specific data loads.
+# Vergent exposes no partner API for outbound SMS: POST
+# /api/Communication/omniatext only ingests inbound (returns 200 OK but
+# sends nothing), and the comm.ashx read endpoint rejects our API keys.
+# What DOES work is comm.aspx?cid=<customerId>&embedded=1 — a chrome-less
+# conversation view (verified) that embeds in an iframe and rides on the
+# operator's existing Vergent session. So the Messages tab hosts that
+# page in an iframe; the per-applicant "Message" button deep-links into
+# it. If Vergent ever ships a real outbound API, swap this for native
+# send/receive (the /api/messages/* proxy routes are still wired below).
 _MESSAGES_PANEL_HTML = ("""
 <style>
-  /* Messages page is a fixed overlay that takes over the area below the
-     top nav whenever the hash is #/messages. Inactive by default
-     (.view's display:none rule wins). */
+  /* Messages page: fixed overlay below the top nav, active only on
+     #/messages. Hosts an iframe of Vergent's chrome-less conversation
+     UI (comm.aspx?cid=...&embedded=1) since Vergent exposes no partner
+     API for outbound SMS — their own UI is the only send path. */
   #view-messages.view {
     position: fixed;
-    top: 64px;
-    left: 0; right: 0; bottom: 0;
-    background: #fff;
-    z-index: 100;
-    overflow: hidden;
+    top: 64px; left: 0; right: 0; bottom: 0;
+    background: #fff; z-index: 100; overflow: hidden;
   }
-  .cif-msg-wrap {
-    display: flex;
-    height: 100%;
-    font-family: inherit;
+  .cif-msg-wrap { display:flex; flex-direction:column; height:100%; font-family:inherit; }
+  .cif-msg-bar {
+    padding:10px 16px; border-bottom:1px solid #e2e8f0; background:#f7fafc;
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
   }
-  .cif-msg-list {
-    width: 320px;
-    flex-shrink: 0;
-    border-right: 1px solid #e2e8f0;
-    overflow-y: auto;
-    background: #f7fafc;
+  .cif-msg-bar-title { font-size:14px; font-weight:700; color:#1a4d6b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cif-msg-bar a {
+    font-size:12px; color:#1a4d6b; text-decoration:none; background:#e8f3f8;
+    border:1px solid #6cb1e2; padding:6px 12px; border-radius:8px; white-space:nowrap;
   }
-  .cif-msg-list-header {
-    padding: 12px 16px;
-    border-bottom: 1px solid #e2e8f0;
-    font-size: 14px;
-    font-weight: 700;
-    color: #1a4d6b;
-    background: #fff;
-    position: sticky;
-    top: 0;
+  .cif-msg-host { flex:1; display:flex; min-height:0; position:relative; }
+  #cifMsgFrame { flex:1; width:100%; height:100%; border:0; }
+  .cif-msg-ph {
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:#718096; font-size:14px; gap:16px; padding:40px; text-align:center; line-height:1.5;
   }
-  .cif-msg-list-empty {
-    padding: 24px 16px;
-    color: #718096;
-    font-size: 12px;
-    text-align: center;
-  }
-  .cif-msg-row {
-    padding: 10px 16px;
-    border-bottom: 1px solid #edf2f7;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .cif-msg-row:hover { background: #edf2f7; }
-  .cif-msg-row.active {
-    background: #e8f3f8;
-    border-left: 3px solid #6cb1e2;
-    padding-left: 13px;
-  }
-  .cif-msg-row-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 8px;
-  }
-  .cif-msg-row-name {
-    font-size: 13px;
-    font-weight: 700;
-    color: #1a4d6b;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-  }
-  .cif-msg-row-time {
-    font-size: 11px;
-    color: #718096;
-    flex-shrink: 0;
-  }
-  .cif-msg-row-preview {
-    font-size: 12px;
-    color: #4a5568;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .cif-msg-row-unread {
-    display: inline-block;
-    background: #1a4d6b;
-    color: #fff;
-    font-size: 11px;
-    font-weight: 700;
-    border-radius: 6px;
-    padding: 1px 6px;
-    margin-left: 6px;
-  }
-  .cif-msg-thread {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    background: #fafbfc;
-  }
-  .cif-msg-thread-header {
-    padding: 12px 16px;
-    border-bottom: 1px solid #e2e8f0;
-    font-size: 13px;
-    font-weight: 700;
-    color: #1a4d6b;
-    background: #fff;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .cif-msg-thread-empty {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #718096;
-    font-size: 13px;
-  }
-  .cif-msg-thread-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .cif-msg-bubble {
-    max-width: 70%;
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 13px;
-    line-height: 1.4;
-    word-wrap: break-word;
-    white-space: pre-wrap;
-  }
-  .cif-msg-bubble.outbound {
-    align-self: flex-end;
-    background: #e8f3f8;
-    color: #1a4d6b;
-    border: 1px solid #6cb1e2;
-  }
-  .cif-msg-bubble.inbound {
-    align-self: flex-start;
-    background: #fff;
-    color: #1a202c;
-    border: 1px solid #e2e8f0;
-  }
-  .cif-msg-bubble.stop {
-    align-self: flex-start;
-    background: #fde7e7;
-    color: #5a0d0d;
-    border: 1px solid #f5b3b3;
-  }
-  .cif-msg-bubble-meta {
-    font-size: 11px;
-    color: #718096;
-    margin-top: 4px;
-  }
-  .cif-msg-bubble-mms {
-    display: block;
-    max-width: 100%;
-    margin-bottom: 6px;
-    border-radius: 6px;
-    border: 1px solid #e2e8f0;
-  }
-  .cif-msg-composer {
-    border-top: 1px solid #e2e8f0;
-    padding: 12px 16px;
-    background: #fff;
-  }
-  .cif-msg-composer textarea {
-    width: 100%;
-    min-height: 60px;
-    padding: 8px 10px;
-    border: 1px solid #cbd5e0;
-    border-radius: 8px;
-    font-size: 13px;
-    font-family: inherit;
-    resize: vertical;
-    box-sizing: border-box;
-  }
-  .cif-msg-composer-row {
-    margin-top: 8px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .cif-msg-composer-status {
-    font-size: 11px;
-    color: #718096;
-  }
-  .cif-msg-send-btn {
-    background: #e8f3f8;
-    color: #1a4d6b;
-    border: 1px solid #6cb1e2;
-    padding: 8px 16px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .cif-msg-send-btn:disabled { opacity: .5; cursor: not-allowed; }
-  .cif-msg-opted-out {
-    background: #fde7e7;
-    color: #5a0d0d;
-    padding: 12px 16px;
-    text-align: center;
-    font-size: 12px;
-    font-weight: 700;
-    border-top: 1px solid #f5b3b3;
-  }
-  .cif-msg-nav-badge {
-    display: inline-block;
-    background: #5a0d0d;
-    color: #fff;
-    font-size: 11px;
-    font-weight: 700;
-    border-radius: 10px;
-    padding: 1px 6px;
-    margin-left: 6px;
-    min-width: 18px;
-    text-align: center;
+  .cif-msg-ph a {
+    font-size:13px; color:#1a4d6b; text-decoration:none; background:#e8f3f8;
+    border:1px solid #6cb1e2; padding:10px 16px; border-radius:8px; font-weight:700;
   }
 </style>
 <script>
@@ -1166,37 +969,22 @@ _MESSAGES_PANEL_HTML = ("""
   if (window.__cifMessagesInit) return;
   window.__cifMessagesInit = true;
 
-  var POLL_MS_LIST = 30000;     // index refresh while not on Messages page
-  var POLL_MS_THREAD_OPEN = 10000; // thread refresh while open
-  var state = {
-    selectedCustomerId: null,
-    cellNumber: '',
-    displayName: '',
-    optedOut: false,
-    threadTimer: null,
-    listTimer: null,
-  };
+  // Vergent surfaces. The conversation popup renders chrome-less with
+  // embedded=1 (verified) and is iframe-friendly. The unified inbox is
+  // a separate page on the lms subdomain; we link to it in a new tab
+  // rather than embed (not verified embeddable).
+  var CONV_BASE = 'https://shared.vergentlms.com/customer/comm.aspx';
+  var INBOX_URL = 'https://shared.lms.vergentlms.com/comm?rid=0&did=0&sid=0';
 
-  function fbBase() {
-    // dashboard's /fb/<path> proxy maps to Firebase REST. Pattern matches
-    // the rest of app.html — POST with X-Method header for writes, GET
-    // for reads, append .json on the path.
-    return '/fb/';
-  }
-
-  function fmtTime(ms) {
-    if (!ms) return '';
-    var d = new Date(ms);
-    var now = new Date();
-    var sameDay = d.toDateString() === now.toDateString();
-    var sameYear = d.getFullYear() === now.getFullYear();
-    if (sameDay) {
-      return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    }
-    if (sameYear) {
-      return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    }
-    return d.toLocaleDateString();
+  function phHtml() {
+    return (
+      '<div class="cif-msg-ph">'
+      + '<div>Open a customer conversation from their application using the '
+      + '<b>Message</b> button on the report panel, or open the full Vergent '
+      + 'message inbox to browse all conversations.</div>'
+      + '<a href="' + INBOX_URL + '" target="_blank" rel="noopener">Open full Vergent inbox ↗</a>'
+      + '</div>'
+    );
   }
 
   function buildView() {
@@ -1206,350 +994,95 @@ _MESSAGES_PANEL_HTML = ("""
     v.className = 'view';
     v.innerHTML = (
       '<div class="cif-msg-wrap">'
-      +   '<div class="cif-msg-list">'
-      +     '<div class="cif-msg-list-header">Conversations</div>'
-      +     '<div id="cifMsgListItems"></div>'
+      +   '<div class="cif-msg-bar">'
+      +     '<span class="cif-msg-bar-title" id="cifMsgTitle">Messages</span>'
+      +     '<span id="cifMsgBarActions">'
+      +       '<a href="' + INBOX_URL + '" target="_blank" rel="noopener">Open full Vergent inbox ↗</a>'
+      +     '</span>'
       +   '</div>'
-      +   '<div class="cif-msg-thread">'
-      +     '<div id="cifMsgThreadHeader" class="cif-msg-thread-header">'
-      +       '<span>Select a conversation</span>'
-      +     '</div>'
-      +     '<div id="cifMsgThreadBody" class="cif-msg-thread-body">'
-      +       '<div class="cif-msg-thread-empty">No conversation selected</div>'
-      +     '</div>'
-      +     '<div id="cifMsgComposer" class="cif-msg-composer" style="display:none;">'
-      +       '<textarea id="cifMsgComposerText" placeholder="Type a message..."></textarea>'
-      +       '<div class="cif-msg-composer-row">'
-      +         '<span id="cifMsgComposerStatus" class="cif-msg-composer-status"></span>'
-      +         '<button id="cifMsgSendBtn" type="button" class="cif-msg-send-btn">Send</button>'
-      +       '</div>'
-      +     '</div>'
-      +     '<div id="cifMsgOptedOut" class="cif-msg-opted-out" style="display:none;">'
-      +       'Customer has opted out (STOP). Messaging disabled.'
-      +     '</div>'
-      +   '</div>'
+      +   '<div class="cif-msg-host" id="cifMsgHost">' + phHtml() + '</div>'
       + '</div>'
     );
     document.body.appendChild(v);
-    document.getElementById('cifMsgSendBtn').addEventListener('click', onSendClick);
-    document.getElementById('cifMsgComposerText').addEventListener('keydown', function(e){
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        onSendClick();
-      }
-    });
   }
 
-  function fetchJSON(url, opts) {
-    return fetch(url, Object.assign({ credentials: 'same-origin' }, opts || {}))
-      .then(function(r){
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      });
+  function escAttr(s) {
+    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+      .replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  function loadIndex() {
-    return fetchJSON(fbBase() + 'messages/_index.json')
-      .then(function(idx){ return idx || {}; })
-      .catch(function(){ return {}; });
-  }
-
-  function renderList(idx, opts) {
-    opts = opts || {};
-    var list = document.getElementById('cifMsgListItems');
-    if (!list) return;
-    var entries = Object.keys(idx).map(function(cid){
-      return Object.assign({ customerId: cid }, idx[cid] || {});
-    });
-    entries.sort(function(a,b){ return (b.lastMessageAt||0) - (a.lastMessageAt||0); });
-    if (entries.length === 0) {
-      list.innerHTML = '<div class="cif-msg-list-empty">No conversations yet</div>';
-      return;
+  function showConversation(cid, name) {
+    buildView();
+    var host = document.getElementById('cifMsgHost');
+    var title = document.getElementById('cifMsgTitle');
+    var actions = document.getElementById('cifMsgBarActions');
+    if (!host) return;
+    var label = name || ('Customer #' + cid);
+    if (title) title.textContent = 'Conversation — ' + label;
+    var embedUrl = CONV_BASE + '?cid=' + encodeURIComponent(cid) + '&embedded=1';
+    var tabUrl   = CONV_BASE + '?cid=' + encodeURIComponent(cid) + '&embedded=0';
+    if (actions) {
+      actions.innerHTML = '<a href="' + escAttr(tabUrl) + '" target="_blank" rel="noopener">Open in new tab ↗</a>';
     }
-    list.innerHTML = entries.map(function(e){
-      var name = e.customerDisplayName || ('Customer #' + e.customerId);
-      var unread = parseInt(e.unreadCount, 10) || 0;
-      var preview = e.lastMessagePreview || '';
-      var time = fmtTime(e.lastMessageAt);
-      var isActive = e.customerId === state.selectedCustomerId;
-      return (
-        '<div class="cif-msg-row' + (isActive ? ' active' : '') + '" '
-        + 'data-cid="' + encodeURIComponent(e.customerId) + '" '
-        + 'data-name="' + encodeURIComponent(name) + '" '
-        + 'data-cell="' + encodeURIComponent(e.cellNumber || '') + '">'
-        +   '<div class="cif-msg-row-top">'
-        +     '<span class="cif-msg-row-name">' + escapeHtml(name) + '</span>'
-        +     '<span class="cif-msg-row-time">' + escapeHtml(time) + '</span>'
-        +   '</div>'
-        +   '<div class="cif-msg-row-preview">'
-        +     escapeHtml(preview)
-        +     (unread > 0 ? '<span class="cif-msg-row-unread">' + unread + '</span>' : '')
-        +   '</div>'
-        + '</div>'
-      );
-    }).join('');
-    Array.prototype.forEach.call(list.querySelectorAll('.cif-msg-row'), function(row){
-      row.addEventListener('click', function(){
-        selectCustomer({
-          customerId: decodeURIComponent(row.getAttribute('data-cid') || ''),
-          displayName: decodeURIComponent(row.getAttribute('data-name') || ''),
-          cellNumber: decodeURIComponent(row.getAttribute('data-cell') || ''),
-        });
-      });
-    });
-    // Keep nav badge in sync.
-    var totalUnread = entries.reduce(function(a, e){
-      return a + (parseInt(e.unreadCount, 10) || 0);
-    }, 0);
-    updateNavBadge(totalUnread);
+    // The iframe relies on the operator's existing Vergent session
+    // (same browser). If Vergent ever sends X-Frame-Options: DENY the
+    // frame renders blank — the "Open in new tab" link in the bar is the
+    // escape hatch (top-level context, first-party cookies, always works).
+    host.innerHTML = '<iframe id="cifMsgFrame" title="Vergent conversation" src="'
+      + escAttr(embedUrl) + '"></iframe>';
   }
 
-  function loadThread(cid) {
-    return fetchJSON(fbBase() + 'messages/' + encodeURIComponent(cid) + '.json')
-      .then(function(raw){
-        raw = raw || {};
-        var msgs = [];
-        Object.keys(raw).forEach(function(k){
-          if (k.indexOf('_') === 0) return;
-          var v = raw[k];
-          if (v && typeof v === 'object') msgs.push(v);
-        });
-        msgs.sort(function(a,b){ return (a.storedAt||0) - (b.storedAt||0); });
-        return msgs;
-      })
-      .catch(function(){ return []; });
+  function showPlaceholder() {
+    buildView();
+    var host = document.getElementById('cifMsgHost');
+    var title = document.getElementById('cifMsgTitle');
+    var actions = document.getElementById('cifMsgBarActions');
+    if (title) title.textContent = 'Messages';
+    if (actions) actions.innerHTML =
+      '<a href="' + INBOX_URL + '" target="_blank" rel="noopener">Open full Vergent inbox ↗</a>';
+    if (host) host.innerHTML = phHtml();
   }
 
-  function renderThread(msgs, opts) {
-    opts = opts || {};
-    var body = document.getElementById('cifMsgThreadBody');
-    if (!body) return;
-    if (!msgs.length) {
-      body.innerHTML = '<div class="cif-msg-thread-empty">No messages in this conversation yet</div>';
-      return;
-    }
-    var nearBottom = (body.scrollHeight - body.scrollTop - body.clientHeight) < 120;
-    body.innerHTML = msgs.map(function(m){
-      var dir = (m.direction || 'inbound');
-      var bubbleClass = 'cif-msg-bubble ' + (dir === 'outbound' ? 'outbound' : (dir === 'stop' ? 'stop' : 'inbound'));
-      var ts = m.storedAt ? fmtTime(m.storedAt) : (m.receivedTime || '');
-      var operator = m.sentByOperator ? (' · ' + escapeHtml(m.sentByOperator)) : '';
-      var img = m.fileUrl
-        ? '<img class="cif-msg-bubble-mms" src="' + escapeAttr(m.fileUrl) + '" alt="MMS attachment">'
-        : '';
-      var body_text = m.message ? escapeHtml(m.message) : (m.fileUrl ? '' : '[empty]');
-      return (
-        '<div class="' + bubbleClass + '">'
-        +   img
-        +   body_text
-        +   '<div class="cif-msg-bubble-meta">' + escapeHtml(ts) + operator + '</div>'
-        + '</div>'
-      );
-    }).join('');
-    if (nearBottom || opts.forceScroll) body.scrollTop = body.scrollHeight;
-  }
-
-  function selectCustomer(info) {
-    state.selectedCustomerId = info.customerId;
-    state.displayName = info.displayName || ('Customer #' + info.customerId);
-    state.cellNumber = info.cellNumber || '';
-    state.optedOut = false;
-    var hdr = document.getElementById('cifMsgThreadHeader');
-    if (hdr) {
-      hdr.innerHTML = (
-        '<span>' + escapeHtml(state.displayName)
-        + (state.cellNumber ? ' · ' + escapeHtml(formatPhone(state.cellNumber)) : '')
-        + '</span>'
-        + '<a href="https://shared.lms.vergentlms.com/" target="_blank" rel="noopener" '
-        + 'style="font-size:11px;color:#1a4d6b;text-decoration:none;">'
-        + 'Open in Vergent ↗</a>'
-      );
-    }
-    document.getElementById('cifMsgComposer').style.display = '';
-    document.getElementById('cifMsgComposerText').value = '';
-    document.getElementById('cifMsgComposerStatus').textContent = '';
-    refreshThread({ forceScroll: true });
-    // Pull the index entry for opted-out flag.
-    fetchJSON(fbBase() + 'messages/_index/' + encodeURIComponent(info.customerId) + '.json')
-      .then(function(idx){
-        if (idx && idx.optedOutAt) showOptedOut(true);
-      })
-      .catch(function(){ /* ignore */ });
-    // Mark the thread as read.
-    fetch('/api/messages/mark-read', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customer_id: info.customerId }),
-    }).catch(function(){ /* swallow */ });
-    // Repaint the list to show the active row.
-    loadIndex().then(renderList);
-    startThreadPolling();
-  }
-
-  function refreshThread(opts) {
-    if (!state.selectedCustomerId) return;
-    loadThread(state.selectedCustomerId).then(function(msgs){
-      renderThread(msgs, opts || {});
-    });
-  }
-
-  function showOptedOut(yes) {
-    state.optedOut = !!yes;
-    document.getElementById('cifMsgOptedOut').style.display = yes ? '' : 'none';
-    document.getElementById('cifMsgComposer').style.display = yes ? 'none' : '';
-  }
-
-  function startThreadPolling() {
-    if (state.threadTimer) clearInterval(state.threadTimer);
-    state.threadTimer = setInterval(function(){
-      if (location.hash !== '#/messages' || !state.selectedCustomerId) return;
-      refreshThread();
-    }, POLL_MS_THREAD_OPEN);
-  }
-
-  function startListPolling() {
-    if (state.listTimer) clearInterval(state.listTimer);
-    state.listTimer = setInterval(function(){
-      loadIndex().then(renderList);
-    }, POLL_MS_LIST);
-  }
-
-  function onSendClick() {
-    var ta = document.getElementById('cifMsgComposerText');
-    var btn = document.getElementById('cifMsgSendBtn');
-    var statusEl = document.getElementById('cifMsgComposerStatus');
-    var body = (ta.value || '').trim();
-    if (!body) { statusEl.textContent = 'Type a message first.'; return; }
-    if (!state.selectedCustomerId) { statusEl.textContent = 'Select a conversation.'; return; }
-    if (state.optedOut) { statusEl.textContent = 'Customer has opted out.'; return; }
-    if (!state.cellNumber) { statusEl.textContent = 'Missing cell number for this customer.'; return; }
-    btn.disabled = true;
-    statusEl.textContent = 'Sending...';
-    fetch('/api/messages/send', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        customer_id: state.selectedCustomerId,
-        cell_number: state.cellNumber,
-        body: body,
-      }),
-    }).then(function(r){
-      return r.json().then(function(d){ return { ok: r.ok, data: d }; });
-    }).then(function(res){
-      btn.disabled = false;
-      if (res.ok && res.data && res.data.ok) {
-        ta.value = '';
-        statusEl.textContent = 'Sent.';
-        refreshThread({ forceScroll: true });
-        loadIndex().then(renderList);
-        setTimeout(function(){ statusEl.textContent = ''; }, 2000);
-      } else {
-        var err = (res.data && (res.data.detail || res.data.error)) || ('HTTP error');
-        statusEl.textContent = 'Send failed: ' + err;
-      }
-    }).catch(function(e){
-      btn.disabled = false;
-      statusEl.textContent = 'Send failed: ' + e.message;
-    });
-  }
-
-  function updateNavBadge(n) {
-    var btn = document.getElementById('nav-messages');
-    if (!btn) return;
-    var existing = btn.querySelector('.cif-msg-nav-badge');
-    if (n > 0) {
-      if (!existing) {
-        existing = document.createElement('span');
-        existing.className = 'cif-msg-nav-badge';
-        btn.appendChild(existing);
-      }
-      existing.textContent = n > 99 ? '99+' : String(n);
-    } else if (existing) {
-      existing.remove();
+  function activateView() {
+    Array.prototype.forEach.call(document.querySelectorAll('.view'), function(v){ v.classList.remove('active'); });
+    var el = document.getElementById('view-messages');
+    if (el) el.classList.add('active');
+    var navBtn = document.getElementById('nav-messages');
+    if (navBtn) {
+      Array.prototype.forEach.call(document.querySelectorAll('.hnav .nb'), function(b){ b.classList.remove('active'); });
+      navBtn.classList.add('active');
     }
   }
 
-  function escapeHtml(s) {
-    return String(s == null ? '' : s)
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-  }
-  function escapeAttr(s) { return escapeHtml(s); }
-
-  function formatPhone(s) {
-    var d = String(s || '').replace(/\\D+/g, '');
-    if (d.length === 10) return '(' + d.slice(0,3) + ') ' + d.slice(3,6) + '-' + d.slice(6);
-    if (d.length === 11 && d[0] === '1') return '+1 (' + d.slice(1,4) + ') ' + d.slice(4,7) + '-' + d.slice(7);
-    return s;
+  function parseQuery(hash) {
+    var out = {};
+    var qIdx = hash.indexOf('?');
+    if (qIdx < 0) return out;
+    hash.slice(qIdx + 1).split('&').forEach(function(pair){
+      var kv = pair.split('=');
+      out[decodeURIComponent(kv[0]||'')] = decodeURIComponent(kv[1]||'');
+    });
+    return out;
   }
 
-  // ─── Hash routing hook ───
   function onHash() {
     var hash = location.hash || '';
     var qIdx = hash.indexOf('?');
     var pure = qIdx >= 0 ? hash.slice(0, qIdx) : hash;
-    if (pure === '#/messages') {
-      buildView();
-      // _renderView fires before our element exists when the user clicks
-      // the nav button, so do the active-class swap ourselves.
-      Array.prototype.forEach.call(
-        document.querySelectorAll('.view'),
-        function(v){ v.classList.remove('active'); }
-      );
-      var el = document.getElementById('view-messages');
-      if (el) el.classList.add('active');
-      var navBtn = document.getElementById('nav-messages');
-      if (navBtn) {
-        Array.prototype.forEach.call(
-          document.querySelectorAll('.hnav .nb'),
-          function(b){ b.classList.remove('active'); }
-        );
-        navBtn.classList.add('active');
-      }
-      // Allow a query string for ?customerId=X (used by the per-applicant
-      // "Send message" button) to pre-select a thread.
-      var preselect = '';
-      var preselectName = '';
-      var preselectCell = '';
-      if (qIdx >= 0) {
-        var qs = hash.slice(qIdx + 1).split('&');
-        for (var i = 0; i < qs.length; i++) {
-          var kv = qs[i].split('=');
-          var k = decodeURIComponent(kv[0] || '');
-          var v = decodeURIComponent(kv[1] || '');
-          if (k === 'customerId') preselect = v;
-          if (k === 'name') preselectName = v;
-          if (k === 'cell') preselectCell = v;
-        }
-      }
-      loadIndex().then(function(idx){
-        renderList(idx);
-        if (preselect) {
-          var entry = idx[preselect] || {};
-          selectCustomer({
-            customerId: preselect,
-            displayName: preselectName || entry.customerDisplayName || ('Customer #' + preselect),
-            cellNumber: preselectCell || entry.cellNumber || '',
-          });
-        }
-      });
-    } else if (state.threadTimer) {
-      clearInterval(state.threadTimer);
-      state.threadTimer = null;
-    }
+    if (pure !== '#/messages') return;
+    buildView();
+    activateView();
+    var q = parseQuery(hash);
+    if (q.customerId) showConversation(q.customerId, q.name || '');
+    else showPlaceholder();
   }
   window.addEventListener('hashchange', onHash);
-  // showView() in app.html uses pushState which is silent — neither
-  // hashchange nor popstate fires. Patch it so navigating to 'messages'
-  // via the nav button still triggers our view setup.
+
+  // showView() in app.html uses pushState (silent — no hashchange).
+  // Patch it so clicking the Messages nav button still runs our setup.
   function patchShowView() {
     if (window.__cifMsgPatchedShowView) return;
-    if (typeof window.showView !== 'function') {
-      setTimeout(patchShowView, 100);
-      return;
-    }
+    if (typeof window.showView !== 'function') { setTimeout(patchShowView, 100); return; }
     var orig = window.showView;
     window.showView = function(name, btn) {
       orig.call(this, name, btn);
@@ -1559,23 +1092,19 @@ _MESSAGES_PANEL_HTML = ("""
   }
   patchShowView();
   setTimeout(onHash, 100);
-  setTimeout(function(){ loadIndex().then(renderList); }, 500);
-  startListPolling();
 
-  // ─── Per-applicant "Send message" link injection ───
-  // Add a small "Send message" link next to the Phase 2 Vergent badge
-  // when an applicant has a vergentCustomerId on their report. Polls
-  // the same way the Phase 2 badge does so we hook into whatever
-  // applicant the operator currently has open.
+  // ─── Per-applicant "Message" link injection ───
+  // Adds a "Message" link next to the Phase 2 Vergent badge on the
+  // applicant detail panel when the report has a vergentCustomerId.
+  // Routes to #/messages?customerId=... which loads that customer's
+  // conversation in the iframe.
   function injectSendLink() {
     var fbId = (window.openModalState && window.openModalState.fbId)
       || (document.querySelector('[data-firebase-id]') &&
           document.querySelector('[data-firebase-id]').getAttribute('data-firebase-id'))
       || '';
     if (!fbId) return;
-    var existing = document.getElementById('cif-msg-app-send-' + fbId);
-    if (existing) return;
-    // Look for the Phase 2 badge or the legacy push button as anchors.
+    if (document.getElementById('cif-msg-app-send-' + fbId)) return;
     var anchor = document.querySelector('[id^="vergent-phase2-badge-"]')
       || document.getElementById('vergentpush-' + fbId);
     if (!anchor || !anchor.parentNode) return;
@@ -1583,23 +1112,20 @@ _MESSAGES_PANEL_HTML = ("""
           { credentials: 'same-origin' })
       .then(function(r){ return r.json(); })
       .then(function(cid){
-        if (!cid) return;
-        var phoneFetch = fetch('/fb/reports/' + encodeURIComponent(fbId)
-          + '/applicationData/phone.json', { credentials: 'same-origin' })
-          .then(function(r){ return r.json(); }).catch(function(){ return ''; });
-        return Promise.all([cid, phoneFetch]);
+        if (!cid) return null;
+        var nameFetch = fetch('/fb/reports/' + encodeURIComponent(fbId) + '/name.json',
+          { credentials: 'same-origin' }).then(function(r){ return r.json(); }).catch(function(){ return ''; });
+        return Promise.all([cid, nameFetch]);
       })
       .then(function(res){
         if (!res) return;
-        var cid = res[0];
-        var phone = res[1] || '';
-        if (!cid) return;
-        if (document.getElementById('cif-msg-app-send-' + fbId)) return;
+        var cid = res[0]; var nm = res[1] || '';
+        if (!cid || document.getElementById('cif-msg-app-send-' + fbId)) return;
         var link = document.createElement('a');
         link.id = 'cif-msg-app-send-' + fbId;
         link.href = '#/messages?customerId=' + encodeURIComponent(cid)
-          + (phone ? '&cell=' + encodeURIComponent(phone) : '');
-        link.textContent = 'Send message';
+          + (nm ? '&name=' + encodeURIComponent(nm) : '');
+        link.textContent = 'Message';
         link.style.cssText = (
           'display:inline-block;background:#e8f3f8;color:#1a4d6b;'
           + 'border:1px solid #6cb1e2;padding:8px 12px;border-radius:8px;'
