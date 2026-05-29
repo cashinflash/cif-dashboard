@@ -1031,6 +1031,232 @@ _PHASE2_PANEL_HTML = ("""
 """).encode("utf-8")
 
 
+# OmniaText 2-way SMS messaging panel — iframe embed of Vergent's
+# conversation UI. Injected before </body> alongside the Phase 2 badge.
+#
+# Vergent exposes no partner API for outbound SMS: POST
+# /api/Communication/omniatext only ingests inbound (returns 200 OK but
+# sends nothing), and the comm.ashx read endpoint rejects our API keys.
+# What DOES work is comm.aspx?cid=<customerId>&embedded=1 — a chrome-less
+# conversation view (verified) that embeds in an iframe and rides on the
+# operator's existing Vergent session. So the Messages tab hosts that
+# page in an iframe; the per-applicant "Message" button deep-links into it.
+_MESSAGES_PANEL_HTML = ("""
+<style>
+  #view-messages.view {
+    position: fixed;
+    top: 64px; left: 0; right: 0; bottom: 0;
+    background: #fff; z-index: 100; overflow: hidden;
+  }
+  .cif-msg-wrap { display:flex; flex-direction:column; height:100%; font-family:inherit; }
+  .cif-msg-bar {
+    padding:10px 16px; border-bottom:1px solid #e2e8f0; background:#f7fafc;
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+  }
+  .cif-msg-bar-title { font-size:14px; font-weight:700; color:#1a4d6b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cif-msg-bar a {
+    font-size:12px; color:#1a4d6b; text-decoration:none; background:#e8f3f8;
+    border:1px solid #6cb1e2; padding:6px 12px; border-radius:8px; white-space:nowrap;
+  }
+  .cif-msg-host { flex:1; display:flex; min-height:0; position:relative; }
+  #cifMsgFrame { flex:1; width:100%; height:100%; border:0; }
+  .cif-msg-ph {
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:#718096; font-size:14px; gap:16px; padding:40px; text-align:center; line-height:1.5;
+  }
+  .cif-msg-ph a {
+    font-size:13px; color:#1a4d6b; text-decoration:none; background:#e8f3f8;
+    border:1px solid #6cb1e2; padding:10px 16px; border-radius:8px; font-weight:700;
+  }
+</style>
+<script>
+(function(){
+  if (window.__cifMessagesInit) return;
+  window.__cifMessagesInit = true;
+
+  var CONV_BASE = 'https://shared.vergentlms.com/customer/comm.aspx';
+  var INBOX_URL = 'https://shared.lms.vergentlms.com/comm?rid=0&did=0&sid=0';
+
+  function phHtml() {
+    return (
+      '<div class="cif-msg-ph">'
+      + '<div>Open a customer conversation from their application using the '
+      + '<b>Message</b> button on the report panel, or open the full Vergent '
+      + 'message inbox to browse all conversations.</div>'
+      + '<a href="' + INBOX_URL + '" target="_blank" rel="noopener">Open full Vergent inbox ↗</a>'
+      + '</div>'
+    );
+  }
+
+  function buildView() {
+    if (document.getElementById('view-messages')) return;
+    var v = document.createElement('div');
+    v.id = 'view-messages';
+    v.className = 'view';
+    v.innerHTML = (
+      '<div class="cif-msg-wrap">'
+      +   '<div class="cif-msg-bar">'
+      +     '<span class="cif-msg-bar-title" id="cifMsgTitle">Messages</span>'
+      +     '<span id="cifMsgBarActions">'
+      +       '<a href="' + INBOX_URL + '" target="_blank" rel="noopener">Open full Vergent inbox ↗</a>'
+      +     '</span>'
+      +   '</div>'
+      +   '<div class="cif-msg-host" id="cifMsgHost">' + phHtml() + '</div>'
+      + '</div>'
+    );
+    document.body.appendChild(v);
+  }
+
+  function escAttr(s) {
+    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+      .replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function showConversation(cid, name) {
+    buildView();
+    var host = document.getElementById('cifMsgHost');
+    var title = document.getElementById('cifMsgTitle');
+    var actions = document.getElementById('cifMsgBarActions');
+    if (!host) return;
+    var label = name || ('Customer #' + cid);
+    if (title) title.textContent = 'Conversation — ' + label;
+    var embedUrl = CONV_BASE + '?cid=' + encodeURIComponent(cid) + '&embedded=1';
+    var tabUrl   = CONV_BASE + '?cid=' + encodeURIComponent(cid) + '&embedded=0';
+    if (actions) {
+      actions.innerHTML = '<a href="' + escAttr(tabUrl) + '" target="_blank" rel="noopener">Open in new tab ↗</a>';
+    }
+    host.innerHTML = '<iframe id="cifMsgFrame" title="Vergent conversation" src="'
+      + escAttr(embedUrl) + '"></iframe>';
+  }
+
+  function showPlaceholder() {
+    buildView();
+    var host = document.getElementById('cifMsgHost');
+    var title = document.getElementById('cifMsgTitle');
+    var actions = document.getElementById('cifMsgBarActions');
+    if (title) title.textContent = 'Messages';
+    if (actions) actions.innerHTML =
+      '<a href="' + INBOX_URL + '" target="_blank" rel="noopener">Open full Vergent inbox ↗</a>';
+    if (host) host.innerHTML = phHtml();
+  }
+
+  function activateView() {
+    Array.prototype.forEach.call(document.querySelectorAll('.view'), function(v){ v.classList.remove('active'); });
+    var el = document.getElementById('view-messages');
+    if (el) el.classList.add('active');
+    var navBtn = document.getElementById('nav-messages');
+    if (navBtn) {
+      Array.prototype.forEach.call(document.querySelectorAll('.hnav .nb'), function(b){ b.classList.remove('active'); });
+      navBtn.classList.add('active');
+    }
+  }
+
+  function parseQuery(hash) {
+    var out = {};
+    var qIdx = hash.indexOf('?');
+    if (qIdx < 0) return out;
+    hash.slice(qIdx + 1).split('&').forEach(function(pair){
+      var kv = pair.split('=');
+      out[decodeURIComponent(kv[0]||'')] = decodeURIComponent(kv[1]||'');
+    });
+    return out;
+  }
+
+  function onHash() {
+    var hash = location.hash || '';
+    var qIdx = hash.indexOf('?');
+    var pure = qIdx >= 0 ? hash.slice(0, qIdx) : hash;
+    if (pure !== '#/messages') return;
+    buildView();
+    activateView();
+    var q = parseQuery(hash);
+    if (q.customerId) showConversation(q.customerId, q.name || '');
+    else showPlaceholder();
+  }
+  window.addEventListener('hashchange', onHash);
+
+  function patchShowView() {
+    if (window.__cifMsgPatchedShowView) return;
+    if (typeof window.showView !== 'function') { setTimeout(patchShowView, 100); return; }
+    var orig = window.showView;
+    window.showView = function(name, btn) {
+      orig.call(this, name, btn);
+      if (name === 'messages') onHash();
+    };
+    window.__cifMsgPatchedShowView = true;
+  }
+  patchShowView();
+  setTimeout(onHash, 100);
+
+  // Per-applicant "Message" link injection next to the Phase 2 Vergent badge.
+  function injectSendLink() {
+    var fbId = (window.openModalState && window.openModalState.fbId)
+      || (document.querySelector('[data-firebase-id]') &&
+          document.querySelector('[data-firebase-id]').getAttribute('data-firebase-id'))
+      || '';
+    if (!fbId) return;
+    if (document.getElementById('cif-msg-app-send-' + fbId)) return;
+    var anchor = document.querySelector('[id^="vergent-badge-"]')
+      || document.getElementById('vergentpush-' + fbId);
+    if (!anchor || !anchor.parentNode) return;
+    fetch('/fb/reports/' + encodeURIComponent(fbId) + '/vergentCustomerId.json',
+          { credentials: 'same-origin' })
+      .then(function(r){ return r.json(); })
+      .then(function(cid){
+        if (!cid) return null;
+        var nameFetch = fetch('/fb/reports/' + encodeURIComponent(fbId) + '/name.json',
+          { credentials: 'same-origin' }).then(function(r){ return r.json(); }).catch(function(){ return ''; });
+        return Promise.all([cid, nameFetch]);
+      })
+      .then(function(res){
+        if (!res) return;
+        var cid = res[0]; var nm = res[1] || '';
+        if (!cid || document.getElementById('cif-msg-app-send-' + fbId)) return;
+        var link = document.createElement('a');
+        link.id = 'cif-msg-app-send-' + fbId;
+        link.href = '#/messages?customerId=' + encodeURIComponent(cid)
+          + (nm ? '&name=' + encodeURIComponent(nm) : '');
+        link.textContent = 'Message';
+        link.style.cssText = (
+          'display:inline-block;background:#e8f3f8;color:#1a4d6b;'
+          + 'border:1px solid #6cb1e2;padding:8px 12px;border-radius:8px;'
+          + 'font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;'
+          + 'text-decoration:none;margin-left:6px;'
+        );
+        anchor.parentNode.appendChild(link);
+      })
+      .catch(function(){ /* ignore */ });
+  }
+  setInterval(injectSendLink, 2000);
+  setTimeout(injectSendLink, 1200);
+
+  // Inject a "Messages" button into the top nav (.hnav) dynamically so
+  // the tab is reachable without editing the (huge) app.html file.
+  // Clicking it routes to #/messages via the hash, which our hashchange
+  // listener turns into the embedded conversation view.
+  function injectNavButton() {
+    if (document.getElementById('nav-messages')) return;
+    var hnav = document.querySelector('.hnav');
+    if (!hnav) return;
+    var btn = document.createElement('button');
+    btn.className = 'nb';
+    btn.id = 'nav-messages';
+    btn.innerHTML = '<svg class="icn"><use href="#icn-inbox"/></svg>Messages';
+    btn.addEventListener('click', function(){
+      if (location.hash !== '#/messages') location.hash = '#/messages';
+      onHash();
+    });
+    var navIf = document.getElementById('nav-if');
+    if (navIf && navIf.parentNode === hnav) hnav.insertBefore(btn, navIf);
+    else hnav.appendChild(btn);
+  }
+  setInterval(injectNavButton, 2000);
+  setTimeout(injectNavButton, 500);
+})();
+</script>
+""").encode("utf-8")
+
+
 def inject_phase2_panel(html_bytes: bytes) -> bytes:
     """Append the Phase 2 panel script + styles before </body> in the
     served app.html. Falls back to appending at the end if no </body>
@@ -1040,8 +1266,8 @@ def inject_phase2_panel(html_bytes: bytes) -> bytes:
     closing = b'</body>'
     idx = html_bytes.rfind(closing)
     if idx < 0:
-        return html_bytes + _PHASE2_PANEL_HTML
-    return html_bytes[:idx] + _PHASE2_PANEL_HTML + html_bytes[idx:]
+        return html_bytes + _PHASE2_PANEL_HTML + _MESSAGES_PANEL_HTML
+    return html_bytes[:idx] + _PHASE2_PANEL_HTML + _MESSAGES_PANEL_HTML + html_bytes[idx:]
 
 
 # CORS: restrict to same-origin. The dashboard is a single app; there's no
