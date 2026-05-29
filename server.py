@@ -1040,7 +1040,8 @@ _PHASE2_PANEL_HTML = ("""
 # the #vg-card. Injected on /app via inject_messages_panel().
 _MESSAGES_PANEL_HTML = ("""
 <style>
-  #view-messages .cifm-wrap{display:flex;flex-direction:column;height:calc(100vh - 64px);font-family:inherit;background:#fff;}
+  #view-messages.view.active{position:fixed;top:var(--topnav-h,60px);left:0;right:0;bottom:0;background:#fff;z-index:50;}
+  #view-messages .cifm-wrap{display:flex;flex-direction:column;height:100%;font-family:inherit;background:#fff;}
   #view-messages .cifm-bar{padding:10px 16px;border-bottom:1px solid #e2e8f0;background:#f7fafc;display:flex;align-items:center;justify-content:space-between;gap:12px;}
   #view-messages .cifm-title{font-size:14px;font-weight:700;color:#1a4d6b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   #view-messages .cifm-btn{font-size:12px;color:#1a4d6b;text-decoration:none;background:#e8f3f8;border:1px solid #6cb1e2;padding:6px 12px;border-radius:8px;white-space:nowrap;cursor:pointer;}
@@ -1115,6 +1116,23 @@ _MESSAGES_PANEL_HTML = ("""
   // Build the view eagerly so Concept-8's setRoute('messages') (from a
   // #messages hash on reload, or the nav tab) has something to show.
   buildView();
+
+  // Concept-8's hashchange handler (app.html) re-derives the route from
+  // the URL via readRouteFromHash(), which doesn't know '#messages' and
+  // falls through to 'dashboard' — that bounced the Messages tab right
+  // back off itself. Teach it the route so setRoute('messages') sticks.
+  (function patchHashRoute(){
+    if (window.__cifMsgHashPatched) return;
+    if (typeof window.readRouteFromHash !== 'function'){ setTimeout(patchHashRoute, 150); return; }
+    var orig = window.readRouteFromHash;
+    window.readRouteFromHash = function(){
+      if ((location.hash || '') === '#messages') return ['messages', null];
+      return orig.apply(this, arguments);
+    };
+    window.__cifMsgHashPatched = true;
+    // Honor a #messages deep-link / reload that booted before this patch.
+    if ((location.hash || '') === '#messages' && typeof window.setRoute === 'function') window.setRoute('messages');
+  })();
 
   // ── Messages nav tab ──
   // data-route="messages" plugs straight into Concept-8's global
