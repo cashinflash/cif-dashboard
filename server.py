@@ -1090,7 +1090,8 @@ _MESSAGES_PANEL_HTML = ("""
     if (title) title.textContent = 'Conversation — ' + (name || ('Customer #' + cid));
     var embed = CONV + '?cid=' + encodeURIComponent(cid) + '&embedded=1';
     var tab   = CONV + '?cid=' + encodeURIComponent(cid) + '&embedded=0';
-    if (act) act.innerHTML = '<a class="cifm-btn" href="' + esc(tab) + '" target="_blank" rel="noopener">Open in new tab ↗</a>';
+    if (act) act.innerHTML = '<button class="cifm-btn" type="button" onclick="window.__cifMsgInbox&&window.__cifMsgInbox()">← All messages</button> '
+      + '<a class="cifm-btn" href="' + esc(tab) + '" target="_blank" rel="noopener">Open in new tab ↗</a>';
     // If Vergent blocks framing (X-Frame-Options) the iframe is blank; the
     // "Open in new tab" link in the bar is the always-works escape hatch.
     host.innerHTML = '<iframe id="cifMsgFrame" title="Vergent conversation" src="' + esc(embed) + '"></iframe>';
@@ -1105,6 +1106,42 @@ _MESSAGES_PANEL_HTML = ("""
     if (act) act.innerHTML = '<a class="cifm-btn" href="' + INBOX + '" target="_blank" rel="noopener">Open full Vergent inbox ↗</a>';
     if (host) host.innerHTML = phHtml();
   }
+
+  // Default Messages view = Vergent's full message inbox, embedded in the
+  // same iframe. Loads lazily (only when the tab is opened) so a normal
+  // dashboard page-load never hits Vergent.
+  function showInbox(){
+    buildView();
+    var host = document.getElementById('cifm-host');
+    var title = document.getElementById('cifm-title');
+    var act = document.getElementById('cifm-actions');
+    if (title) title.textContent = 'Messages';
+    if (act) act.innerHTML = '<a class="cifm-btn" href="' + INBOX + '" target="_blank" rel="noopener">Open in new tab ↗</a>';
+    if (host) host.innerHTML = '<iframe id="cifMsgFrame" title="Vergent messages" src="' + esc(INBOX) + '"></iframe>';
+  }
+  window.__cifMsgInbox = showInbox;
+
+  // Load the inbox when the Messages tab is opened — unless a specific
+  // conversation iframe is already showing (don't clobber it).
+  function ensureMessagesView(){
+    var host = document.getElementById('cifm-host');
+    if (!host){ buildView(); host = document.getElementById('cifm-host'); }
+    if (host && !host.querySelector('iframe')) showInbox();
+  }
+
+  // Concept-8 routes via setRoute(name) and has no 'messages' branch, so
+  // wrap it to mount the inbox on entry. Wrapping leaves the tab's own
+  // active-state handling (setRoute line ~1772) intact.
+  (function patchSetRoute(){
+    if (window.__cifMsgSetRoutePatched) return;
+    if (typeof window.setRoute !== 'function'){ setTimeout(patchSetRoute, 150); return; }
+    var orig = window.setRoute;
+    window.setRoute = function(name, fbId){
+      orig.apply(this, arguments);
+      if (name === 'messages') ensureMessagesView();
+    };
+    window.__cifMsgSetRoutePatched = true;
+  })();
 
   // Public entry used by the per-applicant "Message customer" button.
   window.cifOpenMessages = function(cid, name){
