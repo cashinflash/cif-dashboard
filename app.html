@@ -1383,7 +1383,11 @@ button,input,select{font-family:inherit}
       </div>
     </div>
     <div class="conn-tabs" style="display:flex;gap:5px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;width:max-content;max-width:100%;flex-wrap:wrap;box-shadow:var(--shadow-xs)">
-      <button class="tf-btn active" data-rpt-tab="pastdue">Past Due Contact List</button>
+      <button class="tf-btn active" data-rpt-tab="pastdue" onclick="setReportTab('pastdue')">Past Due Contact List</button>
+      <button class="tf-btn" data-rpt-tab="paymentsduetoday" onclick="setReportTab('paymentsduetoday')">Due Today</button>
+      <button class="tf-btn" data-rpt-tab="paymentsduetomorrow" onclick="setReportTab('paymentsduetomorrow')">Due Tomorrow</button>
+      <button class="tf-btn" data-rpt-tab="pastduenotcontacted" onclick="setReportTab('pastduenotcontacted')">Not Yet Contacted</button>
+      <button class="tf-btn" data-rpt-tab="pastduemissedappointment" onclick="setReportTab('pastduemissedappointment')">Missed Appt</button>
     </div>
     <div class="stats" id="rpt-stats" style="grid-template-columns:repeat(4,1fr)"></div>
     <!-- Aging bucket tiles — click to filter table to that bucket.
@@ -1399,7 +1403,7 @@ button,input,select{font-family:inherit}
     </div>
     <!-- Toolbar — search, bulk actions, CSV export, auto-refresh, last-loaded. -->
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-      <input type="text" id="rpt-search" placeholder="Search by name, phone, loan id, store…" oninput="filterPastDueReport(this.value)" style="flex:1;min-width:240px;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+      <input type="text" id="rpt-search" placeholder="Search by name, phone, loan id, store…" oninput="filterReport(this.value)" style="flex:1;min-width:240px;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
       <button class="chip" onclick="exportPastDueCSV(false)" title="Download visible rows as CSV"><svg class="icn" style="width:13px;height:13px"><use href="#i-download"/></svg> Export CSV</button>
       <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);cursor:pointer;padding:0 6px"><input type="checkbox" id="rpt-autorefresh" onchange="togglePastDueAutoRefresh(this.checked)" style="margin:0;cursor:pointer"> Auto-refresh</label>
       <span id="rpt-loaded-at" style="font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums"></span>
@@ -6109,6 +6113,122 @@ function exportPastDueCSV(selectedOnly) {
   a.download = `past-due_${new Date().toISOString().slice(0,10)}${selectedOnly?'_selected':''}.csv`;
   document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+}
+
+// ─── Collections contact queues (Due Today / Tomorrow / Not Contacted /
+//     Missed Appt) — backed by Vergent's customercontact/* endpoints via
+//     /api/vergent-contact-queue. The Past Due Contact List tab stays
+//     exactly as it was; these are additive. ───
+let _rptTab = 'pastdue';
+let _contactQueueRows = [];
+const _CONTACT_QUEUE_LABELS = {
+  paymentsduetoday:          'Due Today',
+  paymentsduetomorrow:       'Due Tomorrow',
+  pastduenotcontacted:       'Not Yet Contacted',
+  pastduemissedappointment:  'Missed Appointment',
+};
+
+function setReportTab(tab) {
+  _rptTab = tab;
+  document.querySelectorAll('[data-rpt-tab]').forEach(b =>
+    b.classList.toggle('active', b.getAttribute('data-rpt-tab') === tab));
+  // Aging tiles + active-aging label are past-due specific.
+  const aging = document.getElementById('rpt-aging');
+  const activeAging = document.getElementById('rpt-active-aging');
+  if (tab === 'pastdue') {
+    if (aging) aging.style.display = '';
+    loadPastDueReport();
+  } else {
+    if (aging) aging.style.display = 'none';
+    if (activeAging) activeAging.style.display = 'none';
+    loadContactQueue(tab);
+  }
+}
+
+function filterReport(q) {
+  if (_rptTab === 'pastdue') filterPastDueReport(q);
+  else renderContactQueue(_contactQueueRows);
+}
+
+async function loadContactQueue(category) {
+  const table = document.getElementById('rpt-table');
+  const status = document.getElementById('rpt-status');
+  const label = _CONTACT_QUEUE_LABELS[category] || category;
+  if (table) table.innerHTML = '<div class="tbl-loading">Loading ' + escapeHtml(label) + '…</div>';
+  if (status) status.textContent = '';
+  try {
+    const r = await fetch('/api/vergent-contact-queue', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: category, numberOfRecords: 500 }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (_rptTab !== category) return;  // tab changed mid-flight
+    if (!r.ok || !d || d.ok === false) {
+      const detail = (d && (d.detail || d.error)) || ('HTTP ' + r.status);
+      table.innerHTML = '<div class="tbl-empty"><div style="margin-bottom:10px;color:var(--red);font-weight:700">Couldn\'t load ' + escapeHtml(label) + '</div><pre style="text-align:left;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;font-size:11px;overflow:auto;max-height:400px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(String(detail)) + '</pre></div>';
+      return;
+    }
+    _contactQueueRows = d.rows || [];
+    if (status) status.textContent = _contactQueueRows.length + ' record' + (_contactQueueRows.length === 1 ? '' : 's');
+    renderContactQueue(_contactQueueRows);
+  } catch (e) {
+    table.innerHTML = '<div class="tbl-empty">Network error: ' + escapeHtml(e.message || String(e)) + '</div>';
+  }
+}
+
+// Vergent's contact-queue field names aren't confirmed yet, so pluck
+// defensively across common variants; if none match we fall back to a
+// raw view so the data is still visible (and the field names surface).
+function _cqField(row, names) {
+  for (const n of names) {
+    if (row && row[n] != null && row[n] !== '') return row[n];
+  }
+  return '';
+}
+
+function renderContactQueue(rows) {
+  const table = document.getElementById('rpt-table');
+  if (!table) return;
+  const q = (document.getElementById('rpt-search')?.value || '').toLowerCase().trim();
+  let list = rows || [];
+  if (q) list = list.filter(r => JSON.stringify(r).toLowerCase().includes(q));
+  if (!list.length) { table.innerHTML = '<div class="tbl-empty">No records.</div>'; return; }
+
+  const probe = list[0] || {};
+  const nameProbe = _cqField(probe, ['CustomerName','customerName','FullName','fullName','Name','name','FirstName','firstName']);
+  const idProbe = _cqField(probe, ['LoanId','loanId','LoanNumber','loanNumber','HdrId','hdrId','LoanHeaderId']);
+  const amtProbe = _cqField(probe, ['AmountDue','amountDue','Amount','amount','Balance','balance','PaymentAmount','paymentAmount']);
+  if (!nameProbe && !idProbe && amtProbe === '') {
+    // Unknown shape — show raw fields so nothing is hidden.
+    const keys = Object.keys(probe).slice(0, 8);
+    const head = keys.map(k => '<th>' + escapeHtml(k) + '</th>').join('');
+    const body = list.slice(0, 300).map(r => '<tr>' + keys.map(k => '<td>' + escapeHtml(String(r[k] != null ? r[k] : '')) + '</td>').join('') + '</tr>').join('');
+    table.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Raw view — column names not mapped yet. Send your dev the field names above to finalize.</div><div class="tbl-card-scroll"><table class="tbl"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+    return;
+  }
+
+  const body = list.map(r => {
+    const name = _cqField(r, ['CustomerName','customerName','FullName','fullName','Name','name']) ||
+      ((_cqField(r, ['FirstName','firstName']) + ' ' + _cqField(r, ['LastName','lastName'])).trim());
+    const phone = _cqField(r, ['Phone','PhoneNumber','phone','phoneNumber','CellPhone','cellPhone','PrimaryPhone']);
+    const loanId = _cqField(r, ['LoanId','loanId','LoanNumber','loanNumber','HdrId','hdrId','LoanHeaderId']);
+    const amount = _cqField(r, ['AmountDue','amountDue','Amount','amount','Balance','balance','PaymentAmount','paymentAmount']);
+    const due = _cqField(r, ['DueDate','dueDate','AppointmentDate','appointmentDate','PaymentDueDate']);
+    const cid = _cqField(r, ['CustomerId','customerId','CustomerID']);
+    const dueFmt = due ? String(due).slice(0, 10) : '';
+    let amtFmt = '';
+    if (amount !== '' && !isNaN(Number(amount))) amtFmt = '$' + Number(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return '<tr>' +
+      '<td><div class="applicant-name">' + escapeHtml(name || 'Unknown') + '</div>' +
+        (cid ? '<div class="applicant-id">Cust #' + escapeHtml(String(cid)) + '</div>' : '') + '</td>' +
+      '<td>' + escapeHtml(String(phone || '—')) + '</td>' +
+      '<td>' + escapeHtml(String(loanId || '—')) + '</td>' +
+      '<td style="text-align:right;font-variant-numeric:tabular-nums">' + escapeHtml(amtFmt || '—') + '</td>' +
+      '<td>' + escapeHtml(dueFmt || '—') + '</td>' +
+    '</tr>';
+  }).join('');
+  table.innerHTML = '<div class="tbl-card-scroll"><table class="tbl"><thead><tr><th>Customer</th><th>Phone</th><th>Loan</th><th style="text-align:right">Amount</th><th>Due / Appt</th></tr></thead><tbody>' + body + '</tbody></table></div>';
 }
 
 async function loadPastDueReport() {
