@@ -6177,7 +6177,13 @@ function _todayMidnight() {
 function _filterUpcoming(rows, mode) {
   const today = _todayMidnight();
   const day = 24 * 60 * 60 * 1000;
+  // Active-only — same gate the past-due tab uses (skip paid-off
+  // loans where balance + amount-due are both 0, and skip closed
+  // statuses like Bought-Back / Paid-Off / Refinanced). Fixes the
+  // "Due Today shows 22 but Vergent has 7" mismatch: the 15 extras
+  // were already paid this morning.
   return (rows || []).filter(r => {
+    if (!_pastDueIsActive(r)) return false;
     const due = _localMidnight(r.DueDate);
     if (isNaN(due)) return false;
     if (mode === 'today')    return due === today;
