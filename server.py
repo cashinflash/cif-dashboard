@@ -1107,9 +1107,17 @@ _MESSAGES_PANEL_HTML = ("""
     if (host) host.innerHTML = phHtml();
   }
 
-  // Default Messages view = Vergent's full message inbox, embedded in the
-  // same iframe. Loads lazily (only when the tab is opened) so a normal
-  // dashboard page-load never hits Vergent.
+  // Default Messages view. Vergent's full inbox page sends
+  // X-Frame-Options, so it cannot be embedded in an iframe (the browser
+  // refuses with "refused to connect"). We therefore show a placeholder
+  // that opens the inbox in a popup window (top-level context, so the
+  // header doesn't apply) instead of trying — and failing — to frame it.
+  function openInboxWindow(){
+    var w = window.open(INBOX, 'cifVergentInbox', 'width=1200,height=860');
+    if (w) w.focus();
+    return w;
+  }
+  window.__cifMsgOpenInbox = openInboxWindow;
   function showInbox(){
     buildView();
     var host = document.getElementById('cifm-host');
@@ -1117,7 +1125,12 @@ _MESSAGES_PANEL_HTML = ("""
     var act = document.getElementById('cifm-actions');
     if (title) title.textContent = 'Messages';
     if (act) act.innerHTML = '<a class="cifm-btn" href="' + INBOX + '" target="_blank" rel="noopener">Open in new tab ↗</a>';
-    if (host) host.innerHTML = '<iframe id="cifMsgFrame" title="Vergent messages" src="' + esc(INBOX) + '"></iframe>';
+    if (host) host.innerHTML = '<div class="cifm-ph">'
+      + '<div>Vergent doesn\\u2019t allow its message inbox to be embedded here, so it opens in its own window. '
+      + 'You can also message a specific customer from their application using the '
+      + '<b>Message customer</b> button on the Vergent card.</div>'
+      + '<button class="cifm-btn" type="button" onclick="window.__cifMsgOpenInbox&&window.__cifMsgOpenInbox()">Open Vergent inbox \\u2197</button>'
+      + '</div>';
   }
   window.__cifMsgInbox = showInbox;
 
