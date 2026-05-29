@@ -6137,11 +6137,13 @@ function setReportTab(tab) {
   const activeAging = document.getElementById('rpt-active-aging');
   if (tab === 'pastdue') {
     if (aging) aging.style.display = '';
+    _stopUpcomingAuto();
     loadPastDueReport();
   } else {
     if (aging) aging.style.display = 'none';
     if (activeAging) activeAging.style.display = 'none';
     loadContactQueue(tab);
+    _startUpcomingAuto();
   }
 }
 
@@ -6155,7 +6157,29 @@ function filterReport(q) {
 // customercontact/* endpoints entirely.
 let _upcomingRows = null;     // cached superset (today..+30d)
 let _upcomingLoadedAt = 0;
-const _UPCOMING_TTL_MS = 60 * 1000;
+let _upcomingAutoTimer = null;
+// 30s cache so a payment landing in Vergent shows up within ~half a
+// minute, but flipping tabs in the same operator session doesn't burn
+// extra fetches. Set lower if you want it tighter — at the cost of more
+// Vergent calls.
+const _UPCOMING_TTL_MS = 30 * 1000;
+const _UPCOMING_AUTO_REFRESH_MS = 90 * 1000;  // background reload cadence
+
+function _stopUpcomingAuto() {
+  if (_upcomingAutoTimer) { clearInterval(_upcomingAutoTimer); _upcomingAutoTimer = null; }
+}
+function _startUpcomingAuto() {
+  _stopUpcomingAuto();
+  _upcomingAutoTimer = setInterval(() => {
+    // Only refresh if an upcoming tab is currently visible and the
+    // browser tab is in the foreground — no point burning calls on
+    // a backgrounded dashboard.
+    if (document.hidden) return;
+    if (_rptTab === 'pastdue' || !_CONTACT_QUEUE_LABELS[_rptTab]) return;
+    _upcomingLoadedAt = 0;       // invalidate cache so loadContactQueue refetches
+    loadContactQueue(_rptTab);
+  }, _UPCOMING_AUTO_REFRESH_MS);
+}
 const _CONTACT_QUEUE_FILTER = {
   paymentsduetoday:          'today',
   paymentsduetomorrow:       'tomorrow',
@@ -6177,13 +6201,17 @@ function _todayMidnight() {
 function _filterUpcoming(rows, mode) {
   const today = _todayMidnight();
   const day = 24 * 60 * 60 * 1000;
-  // Active-only — same gate the past-due tab uses (skip paid-off
-  // loans where balance + amount-due are both 0, and skip closed
-  // statuses like Bought-Back / Paid-Off / Refinanced). Fixes the
-  // "Due Today shows 22 but Vergent has 7" mismatch: the 15 extras
-  // were already paid this morning.
+  // Active-only — skip closed loans (Bought-Back / Paid-Off / etc.) +
+  // skip rows where the cycle's already been paid. The latter is the
+  // fix for "Due Today shows 16 but Vergent has 7": a loan paid today
+  // still carries a remaining principal Balance, but its AmountDue
+  // drops to 0 for the current cycle, which is exactly Vergent's
+  // "no longer due today" signal. _pastDueIsActive treats AmountDue
+  // OR Balance > 0 as active (correct for past-due aging), but for
+  // an UPCOMING list "did they pay this cycle yet" is the right cut.
   return (rows || []).filter(r => {
     if (!_pastDueIsActive(r)) return false;
+    if ((Number(r.AmountDue) || 0) <= 0) return false;
     const due = _localMidnight(r.DueDate);
     if (isNaN(due)) return false;
     if (mode === 'today')    return due === today;
