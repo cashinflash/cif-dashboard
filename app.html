@@ -1386,8 +1386,8 @@ button,input,select{font-family:inherit}
       <button class="tf-btn active" data-rpt-tab="pastdue" onclick="setReportTab('pastdue')">Past Due Contact List</button>
       <button class="tf-btn" data-rpt-tab="paymentsduetoday" onclick="setReportTab('paymentsduetoday')">Due Today</button>
       <button class="tf-btn" data-rpt-tab="paymentsduetomorrow" onclick="setReportTab('paymentsduetomorrow')">Due Tomorrow</button>
-      <button class="tf-btn" data-rpt-tab="pastduenotcontacted" onclick="setReportTab('pastduenotcontacted')">Not Yet Contacted</button>
-      <button class="tf-btn" data-rpt-tab="pastduemissedappointment" onclick="setReportTab('pastduemissedappointment')">Missed Appt</button>
+      <button class="tf-btn" data-rpt-tab="pastduenotcontacted" onclick="setReportTab('pastduenotcontacted')">Due This Week</button>
+      <button class="tf-btn" data-rpt-tab="pastduemissedappointment" onclick="setReportTab('pastduemissedappointment')">Due Next 30</button>
     </div>
     <div class="stats" id="rpt-stats" style="grid-template-columns:repeat(4,1fr)"></div>
     <!-- Aging bucket tiles — click to filter table to that bucket.
@@ -6124,8 +6124,8 @@ let _contactQueueRows = [];
 const _CONTACT_QUEUE_LABELS = {
   paymentsduetoday:          'Due Today',
   paymentsduetomorrow:       'Due Tomorrow',
-  pastduenotcontacted:       'Not Yet Contacted',
-  pastduemissedappointment:  'Missed Appointment',
+  pastduenotcontacted:       'Due This Week',
+  pastduemissedappointment:  'Due Next 30 Days',
 };
 
 function setReportTab(tab) {
@@ -6150,6 +6150,43 @@ function filterReport(q) {
   else renderContactQueue(_contactQueueRows);
 }
 
+// Categories now derive from a single PastDueContactList-with-future-
+// AsOfDate fetch + client-side DueDate filter. Avoids Vergent's broken
+// customercontact/* endpoints entirely.
+let _upcomingRows = null;     // cached superset (today..+30d)
+let _upcomingLoadedAt = 0;
+const _UPCOMING_TTL_MS = 60 * 1000;
+const _CONTACT_QUEUE_FILTER = {
+  paymentsduetoday:          'today',
+  paymentsduetomorrow:       'tomorrow',
+  pastduenotcontacted:       'thisweek',     // proxy: due within 7 days, treat as triage list
+  pastduemissedappointment:  'all',          // all 30 days, with "appointment" subtitle (best-effort until we have a real signal)
+};
+
+function _localMidnight(s) {
+  if (!s) return NaN;
+  const t = String(s).slice(0, 10);
+  const [y, m, d] = t.split('-').map(Number);
+  if (!y || !m || !d) return NaN;
+  return new Date(y, m - 1, d).getTime();
+}
+function _todayMidnight() {
+  const n = new Date();
+  return new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime();
+}
+function _filterUpcoming(rows, mode) {
+  const today = _todayMidnight();
+  const day = 24 * 60 * 60 * 1000;
+  return (rows || []).filter(r => {
+    const due = _localMidnight(r.DueDate);
+    if (isNaN(due)) return false;
+    if (mode === 'today')    return due === today;
+    if (mode === 'tomorrow') return due === today + day;
+    if (mode === 'thisweek') return due >= today && due <= today + 7 * day;
+    return due >= today && due <= today + 30 * day;
+  });
+}
+
 async function loadContactQueue(category) {
   const table = document.getElementById('rpt-table');
   const status = document.getElementById('rpt-status');
@@ -6157,20 +6194,28 @@ async function loadContactQueue(category) {
   if (table) table.innerHTML = '<div class="tbl-loading">Loading ' + escapeHtml(label) + '…</div>';
   if (status) status.textContent = '';
   try {
-    const r = await fetch('/api/vergent-contact-queue', {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category: category, numberOfRecords: 500 }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (_rptTab !== category) return;  // tab changed mid-flight
-    if (!r.ok || !d || d.ok === false) {
-      const detail = (d && (d.detail || d.error)) || ('HTTP ' + r.status);
-      table.innerHTML = '<div class="tbl-empty"><div style="margin-bottom:10px;color:var(--red);font-weight:700">Couldn\'t load ' + escapeHtml(label) + '</div><pre style="text-align:left;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;font-size:11px;overflow:auto;max-height:400px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(String(detail)) + '</pre></div>';
-      return;
+    // Cache the superset for 60s so flipping tabs doesn't re-fetch.
+    const fresh = _upcomingRows && (Date.now() - _upcomingLoadedAt) < _UPCOMING_TTL_MS;
+    if (!fresh) {
+      const r = await fetch('/api/vergent-report-upcoming', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ daysAhead: 30 }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (_rptTab !== category) return;
+      if (!r.ok || !d || d.ok === false) {
+        const detail = (d && (d.detail || d.error)) || ('HTTP ' + r.status);
+        table.innerHTML = '<div class="tbl-empty"><div style="margin-bottom:10px;color:var(--red);font-weight:700">Couldn\'t load ' + escapeHtml(label) + '</div><pre style="text-align:left;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;font-size:11px;overflow:auto;max-height:400px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(String(detail)) + '</pre></div>';
+        return;
+      }
+      _upcomingRows = d.rows || [];
+      _upcomingLoadedAt = Date.now();
     }
-    _contactQueueRows = d.rows || [];
-    if (status) status.textContent = _contactQueueRows.length + ' record' + (_contactQueueRows.length === 1 ? '' : 's');
+    if (_rptTab !== category) return;
+    const mode = _CONTACT_QUEUE_FILTER[category] || 'all';
+    _contactQueueRows = _filterUpcoming(_upcomingRows, mode);
+    if (status) status.textContent = _contactQueueRows.length + ' loan' + (_contactQueueRows.length === 1 ? '' : 's') + ' · ' + label;
     renderContactQueue(_contactQueueRows);
   } catch (e) {
     table.innerHTML = '<div class="tbl-empty">Network error: ' + escapeHtml(e.message || String(e)) + '</div>';
