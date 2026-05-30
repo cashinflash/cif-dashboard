@@ -307,9 +307,8 @@ button,input,select{font-family:inherit}
   /* col 8: phone → fourth row left */
   #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(8){grid-column:1;grid-row:4;font-size:13px;font-weight:600}
   /* col 9: appointments → fourth row right */
-  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(9){grid-column:2;grid-row:4;justify-self:end;font-size:11px;text-align:right;max-width:55%}
-  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(9) .tbl-time{font-size:11px}
-  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(9) .applicant-id{font-size:10.5px}
+  /* col 9 removed — was the Appointments column, replaced by the
+     focused popup on the 📅 badge. */
 }
 .tbl-sortable{cursor:pointer;user-select:none}
 .tbl-sortable:hover{background:#eef3ee !important}
@@ -1078,7 +1077,7 @@ button,input,select{font-family:inherit}
   <nav class="topnav-tabs">
     <button class="tnt active" data-route="dashboard"><svg class="icn"><use href="#i-dashboard"/></svg>Dashboard</button>
     <button class="tnt" data-route="queue"><svg class="icn"><use href="#i-list"/></svg>Applications</button>
-    <button class="tnt" data-route="reports"><svg class="icn"><use href="#i-chart"/></svg>Reports</button>
+    <button class="tnt" data-route="reports"><svg class="icn"><use href="#i-chart"/></svg>Servicing</button>
   </nav>
   <div class="topnav-spacer"></div>
   <div class="search-wrap">
@@ -1098,9 +1097,9 @@ button,input,select{font-family:inherit}
     </div>
     <div class="user-menu" id="user-menu">
       <button class="admin-only" data-route="customers" type="button" style="display:none"><svg class="icn"><use href="#i-list"/></svg>Customers</button>
-      <button data-route="connections" type="button"><svg class="icn"><use href="#i-bank"/></svg>Connections</button>
       <button data-route="if" type="button"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
-      <button data-route="reports" type="button"><svg class="icn"><use href="#i-chart"/></svg>Reports</button>
+      <button data-route="connections" type="button"><svg class="icn"><use href="#i-bank"/></svg>Connections</button>
+      <button data-route="reports" type="button"><svg class="icn"><use href="#i-chart"/></svg>Servicing</button>
       <hr>
       <!-- Alert sound toggle. State persists in localStorage as
            cif_alerts_sound_enabled. The label updates to reflect
@@ -1118,9 +1117,9 @@ button,input,select{font-family:inherit}
      from the Applications, Reports, Detail, and any other view. -->
 <nav class="mobile-subnav">
   <button class="subnav-link" data-route="dashboard"><svg class="icn"><use href="#i-overview"/></svg>Overview</button>
+  <button class="subnav-link" data-route="if"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
   <button class="subnav-link" data-route="connections"><svg class="icn"><use href="#i-bank"/></svg>Connections</button>
   <button class="subnav-link admin-only" data-route="customers" style="display:none"><svg class="icn"><use href="#i-list"/></svg>Customers</button>
-  <button class="subnav-link" data-route="if"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
 </nav>
 
 <!-- DASHBOARD -->
@@ -1130,14 +1129,9 @@ button,input,select{font-family:inherit}
       <div class="subnav-section">
         <div class="subnav-label">Insights</div>
         <button class="subnav-link active"><svg class="icn"><use href="#i-overview"/></svg>Overview</button>
+        <button class="subnav-link" data-route="if" style="position:relative"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding<span id="alertcount-if" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></button>
         <button class="subnav-link" data-route="connections" style="position:relative"><svg class="icn"><use href="#i-bank"/></svg>Connections<span id="alertcount-conn" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></button>
         <button class="subnav-link admin-only" data-route="customers" style="display:none"><svg class="icn"><use href="#i-list"/></svg>Customers</button>
-        <button class="subnav-link" data-route="if" style="position:relative"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding<span id="alertcount-if" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></button>
-      </div>
-      <div class="subnav-foot">
-        <a class="subnav-link" href="/app/legacy"><svg class="icn"><use href="#i-folder"/></svg>Reports</a>
-        <a class="subnav-link" href="/app/legacy"><svg class="icn"><use href="#i-download"/></svg>Exports</a>
-        <a class="subnav-link" href="/app/legacy"><svg class="icn"><use href="#i-settings"/></svg>Settings</a>
       </div>
     </aside>
     <div class="main">
@@ -1553,8 +1547,7 @@ button,input,select{font-family:inherit}
   <div class="main full">
     <div class="greet">
       <div>
-        <div class="greet-title">Reports</div>
-        <div class="greet-sub" id="rpt-sub">Every active loan, bucketed by Past Due / Due Today / Tomorrow / This Week / Next 30. Click an aging tile to focus the past-due section.</div>
+        <div class="greet-title">Servicing</div>
       </div>
       <div class="greet-actions">
         <button class="btn btn-ghost" id="rpt-refresh-btn"><svg class="icn"><use href="#i-refresh"/></svg>Refresh</button>
@@ -1580,8 +1573,6 @@ button,input,select{font-family:inherit}
     <!-- Toolbar — search, bulk actions, CSV export, auto-refresh, last-loaded. -->
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
       <input type="text" id="rpt-search" placeholder="Search by name, phone, loan id, store…" oninput="filterReport(this.value)" style="flex:1;min-width:240px;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
-      <button class="chip" onclick="exportPastDueCSV(false)" title="Download visible rows as CSV"><svg class="icn" style="width:13px;height:13px"><use href="#i-download"/></svg> Export CSV</button>
-      <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);cursor:pointer;padding:0 6px"><input type="checkbox" id="rpt-autorefresh" onchange="togglePastDueAutoRefresh(this.checked)" style="margin:0;cursor:pointer"> Auto-refresh</label>
       <span id="rpt-loaded-at" style="font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums"></span>
     </div>
     <!-- Bulk-action bar — only shown when rows are selected. -->
@@ -6953,13 +6944,19 @@ function setReportTab(tab) {
   }
   // Default: 'loansdue' — past-due + due today + tomorrow + this week + next 30
   // in one scrollable table with sticky section headers per bucket.
-  if (aging) aging.style.display = '';
-  if (stats) stats.style.display = '';
-  if (buckets) buckets.style.display = '';
-  if (tableDiv) tableDiv.style.display = '';
+  // Restore explicit display values (not just '') so the toggle from
+  // Appointments → Loans Due lands in a clean, predictable layout
+  // every time (was occasionally rendering with the wrong column
+  // widths / hidden bits).
+  if (aging) aging.style.display = 'none';        // legacy host, stays hidden
+  if (activeAging) activeAging.style.display = 'none';
+  if (stats) stats.style.display = 'grid';
+  if (buckets) buckets.style.display = 'block';
+  if (tableDiv) tableDiv.style.display = 'block';
   if (apptDiv) apptDiv.style.display = 'none';
   if (searchBar) searchBar.style.display = '';
   _startUpcomingAuto();
+  togglePastDueAutoRefresh(true);   // always on — Servicing should feel live
   loadLoansDueView();
 }
 
@@ -7646,7 +7643,6 @@ function renderLoansDueUnified() {
     { label: 'Due'       },
     { label: 'Next pay'  },
     { label: 'Phone'     },
-    { label: 'Days Past Due' },
   ];
   const headHtml = '<th class="tbl-checkbox"></th>' +
     headerCols.map(c => `<th>${escapeHtml(c.label)}</th>`).join('');
@@ -7657,10 +7653,10 @@ function renderLoansDueUnified() {
     const totalDue = rows.reduce((sum, r) => sum + (Number(r.AmountDue) || 0), 0);
     const meta = `${rows.length} loan${rows.length === 1 ? '' : 's'} · ${_rptFmtMoney(totalDue)}`;
     const rowsHtml = rows.map(_loansDueRowHtml).join('');
-    return `<tr class="lns-sec"><td colspan="9">${escapeHtml(s.label)}<span class="lns-sec-meta">${escapeHtml(meta)}</span></td></tr>${rowsHtml}`;
+    return `<tr class="lns-sec"><td colspan="8">${escapeHtml(s.label)}<span class="lns-sec-meta">${escapeHtml(meta)}</span></td></tr>${rowsHtml}`;
   }).join('');
 
-  table.innerHTML = `<div class="tbl-card-scroll"><table class="tbl"><thead><tr>${headHtml}</tr></thead><tbody>${sectionsHtml || '<tr><td colspan="9" class="tbl-empty">No active loans due in the next 30 days.</td></tr>'}</tbody></table></div>`;
+  table.innerHTML = `<div class="tbl-card-scroll"><table class="tbl"><thead><tr>${headHtml}</tr></thead><tbody>${sectionsHtml || '<tr><td colspan="8" class="tbl-empty">No active loans due in the next 30 days.</td></tr>'}</tbody></table></div>`;
 
   if (status) {
     const totalCount = allRows.length;
@@ -7717,7 +7713,6 @@ function _loansDueRowHtml(r) {
     <td><span class="tbl-time">${_rptFmtDate(r.DueDate)}</span></td>
     <td><span class="tbl-time">${_rptFmtDate(r.NextPayDate)}</span></td>
     <td>${phoneHtml}</td>
-    <td><span class="tbl-time" style="font-variant-numeric:tabular-nums${daysLate >= 1 ? ';color:var(--red);font-weight:700' : ';color:var(--muted)'}">${daysLate >= 1 ? daysLate : '—'}</span></td>
   </tr>`;
 }
 
