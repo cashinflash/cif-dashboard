@@ -6459,14 +6459,18 @@ function _renderApptOneModal(a) {
     + (a.notes ? row('Notes', escapeHtml(a.notes)) : '')
     + (phone ? row('Phone', `<a href="tel:${escapeHtml(a.phone)}" style="color:var(--green-dark);text-decoration:none">${escapeHtml(phone)}</a>`) : '')
     + (a.loanId ? row('Loan', escapeHtml(a.loanId)) : '');
-  // Edit + Delete buttons. apptId may be 0 for appointments not created
-  // through our admin (Vergent's GET list endpoint 404s in this tenant,
-  // see CLAUDE.md). In that case fall through to a friendly hint.
+  // Edit + Delete buttons. apptId may be 0 for appointments that
+  // weren't created through our admin (Vergent's GET list endpoint
+  // 404s in this tenant). Hide-from-list is always available so the
+  // operator can clean up rows they can't manage via Vergent's UI
+  // either (e.g. old test rows with no Subject).
   const canManage = a.apptId > 0;
+  const hideBtn = `<button onclick="_apptOneHide('${escapeHtml(a.id)}')" style="background:white;border:1px solid var(--border);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--muted);font-family:inherit" title="Hide from our admin only — leaves Vergent untouched">Hide from list</button>`;
   actEl.innerHTML = canManage
-    ? `<button onclick="closeApptOneModal();openEditApptById('${escapeHtml(a.id)}')" style="background:white;border:1px solid var(--border);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--text);font-family:inherit">Edit</button>
+    ? `${hideBtn}
+       <button onclick="closeApptOneModal();openEditApptById('${escapeHtml(a.id)}')" style="background:white;border:1px solid var(--border);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--text);font-family:inherit">Edit</button>
        <button onclick="_apptOneDelete('${escapeHtml(a.id)}')" style="background:#fef2f2;border:1px solid #fecaca;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--red);font-family:inherit">Delete</button>`
-    : `<div style="font-size:11.5px;color:var(--muted);align-self:center;text-align:right;max-width:300px;line-height:1.4">This appointment was created in Vergent, not from our admin — manage it in Vergent.</div>`;
+    : `<div style="font-size:11.5px;color:var(--muted);flex:1;line-height:1.4;align-self:center">Created in Vergent — can't be edited from here.</div>${hideBtn}`;
   overlay.style.display = 'flex';
 }
 
@@ -6482,6 +6486,38 @@ function closeApptOneModal() {
   const m = document.getElementById('appt-one-modal');
   if (m) m.style.display = 'none';
 }
+
+// Manually-hidden appointments. Stored in localStorage by synthetic
+// id (customer|hdr|datetime). Used to clean up old test rows that
+// exist in Vergent's DB but can't be deleted via API + can't be
+// clicked in Vergent UI (no subject). _allAppointments filters them.
+const _HIDDEN_APPTS_KEY = 'cif_hiddenAppts_v1';
+function _getHiddenAppts() {
+  try { return JSON.parse(localStorage.getItem(_HIDDEN_APPTS_KEY) || '[]'); }
+  catch (e) { return []; }
+}
+function _hideAppt(syntheticId) {
+  try {
+    const list = _getHiddenAppts();
+    if (!list.includes(syntheticId)) {
+      list.push(syntheticId);
+      localStorage.setItem(_HIDDEN_APPTS_KEY, JSON.stringify(list));
+    }
+  } catch (e) { /* ignore quota */ }
+}
+function _apptOneHide(syntheticId) {
+  if (!confirm('Hide this appointment from the admin? It will still exist in Vergent, but won\'t show here. Use this to clean up old test rows.')) return;
+  _hideAppt(syntheticId);
+  closeApptOneModal();
+  if (typeof loadPastDueReport === 'function') loadPastDueReport();
+}
+// Escape hatch for the operator: unhide everything via dev console
+// (`unhideAllAppointments()`) so a misclick can be undone.
+window.unhideAllAppointments = function() {
+  try { localStorage.removeItem(_HIDDEN_APPTS_KEY); } catch (e) {}
+  if (typeof loadPastDueReport === 'function') loadPastDueReport();
+  console.log('All hidden appointments restored.');
+};
 
 // Local cache of Vergent appointment ids keyed by customer|hdr|datetime
 // prefix. Filled in when our admin creates an appointment (Vergent's
@@ -7676,7 +7712,15 @@ function _allAppointments() {
   };
   (_pastDueRows || []).forEach(push);
   (_upcomingRows || []).forEach(push);
-  return Array.from(byKey.values());
+  // Filter out manually-hidden appointments. These are typically test
+  // rows the operator created before subject_id worked end-to-end —
+  // they still exist in Vergent's DB but their blank Subject makes
+  // them unclickable in Vergent's UI, so the operator can't clean
+  // them up there either. Hiding client-side keeps our admin tidy.
+  const hidden = _getHiddenAppts();
+  if (!hidden.length) return Array.from(byKey.values());
+  const hiddenSet = new Set(hidden);
+  return Array.from(byKey.values()).filter(a => !hiddenSet.has(a.id));
 }
 
 function _apptLocalDate(utcStr) {
