@@ -263,6 +263,11 @@ button,input,select{font-family:inherit}
    independently of tbody (Chromium), so headers drift off their
    data. A plain thead always shares column widths with tbody. */
 .tbl-card-scroll .tbl thead th{background:var(--surface2);box-shadow:inset 0 -1px 0 var(--border)}
+/* Section header rows used in the unified Loans Due table — sticky
+   under the thead, span the full row, distinct background so the
+   eye reads them as group dividers. */
+.tbl tr.lns-sec td{position:sticky;top:38px;z-index:1;background:linear-gradient(180deg,#eff7f3,#e3eee8);border-top:1px solid #cfe0d4;border-bottom:1px solid #cfe0d4;padding:8px 14px;font-size:11.5px;font-weight:800;color:var(--green-dark);text-transform:uppercase;letter-spacing:.06em}
+.tbl tr.lns-sec td .lns-sec-meta{float:right;font-weight:700;color:var(--muted);text-transform:none;letter-spacing:0;font-size:11.5px;font-variant-numeric:tabular-nums}
 .tbl-sortable{cursor:pointer;user-select:none}
 .tbl-sortable:hover{background:#eef3ee !important}
 .tbl-sort-ind{display:inline-block;width:9px;text-align:center;margin-left:4px;color:var(--muted);font-size:9px;line-height:1}
@@ -1372,18 +1377,15 @@ button,input,select{font-family:inherit}
     <div class="greet">
       <div>
         <div class="greet-title">Reports</div>
-        <div class="greet-sub" id="rpt-sub">Past-due collections — newest delinquencies first. Click a tile to focus on Due today, this week, or older.</div>
+        <div class="greet-sub" id="rpt-sub">Every active loan, bucketed by Past Due / Due Today / Tomorrow / This Week / Next 30. Click an aging tile to focus the past-due section.</div>
       </div>
       <div class="greet-actions">
         <button class="btn btn-ghost" id="rpt-refresh-btn"><svg class="icn"><use href="#i-refresh"/></svg>Refresh</button>
       </div>
     </div>
     <div class="conn-tabs" style="display:flex;gap:5px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;width:max-content;max-width:100%;flex-wrap:wrap;box-shadow:var(--shadow-xs)">
-      <button class="tf-btn active" data-rpt-tab="pastdue" onclick="setReportTab('pastdue')">Past Due Contact List</button>
-      <button class="tf-btn" data-rpt-tab="paymentsduetoday" onclick="setReportTab('paymentsduetoday')">Due Today</button>
-      <button class="tf-btn" data-rpt-tab="paymentsduetomorrow" onclick="setReportTab('paymentsduetomorrow')">Due Tomorrow</button>
-      <button class="tf-btn" data-rpt-tab="pastduenotcontacted" onclick="setReportTab('pastduenotcontacted')">Due This Week</button>
-      <button class="tf-btn" data-rpt-tab="pastduemissedappointment" onclick="setReportTab('pastduemissedappointment')">Due Next 30</button>
+      <button class="tf-btn active" data-rpt-tab="loansdue" onclick="setReportTab('loansdue')">Loans Due</button>
+      <button class="tf-btn" data-rpt-tab="appointments" onclick="setReportTab('appointments')">Appointments</button>
     </div>
     <div class="stats" id="rpt-stats" style="grid-template-columns:repeat(4,1fr)"></div>
     <!-- Aging bucket tiles — click to filter table to that bucket.
@@ -1413,6 +1415,9 @@ button,input,select{font-family:inherit}
     <div id="rpt-status" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
     <div id="rpt-table">
       <div class="tbl-loading">Click Refresh to load the report.</div>
+    </div>
+    <div id="rpt-appointments" style="display:none">
+      <div class="tbl-loading">Loading appointments…</div>
     </div>
   </div>
 </div>
@@ -6318,7 +6323,7 @@ function exportPastDueCSV(selectedOnly) {
 //     Missed Appt) — backed by Vergent's customercontact/* endpoints via
 //     /api/vergent-contact-queue. The Past Due Contact List tab stays
 //     exactly as it was; these are additive. ───
-let _rptTab = 'pastdue';
+let _rptTab = 'loansdue';
 let _contactQueueRows = [];
 const _CONTACT_QUEUE_LABELS = {
   paymentsduetoday:          'Due Today',
@@ -6331,24 +6336,37 @@ function setReportTab(tab) {
   _rptTab = tab;
   document.querySelectorAll('[data-rpt-tab]').forEach(b =>
     b.classList.toggle('active', b.getAttribute('data-rpt-tab') === tab));
-  // Aging tiles + active-aging label are past-due specific.
   const aging = document.getElementById('rpt-aging');
   const activeAging = document.getElementById('rpt-active-aging');
-  if (tab === 'pastdue') {
-    if (aging) aging.style.display = '';
-    _stopUpcomingAuto();
-    loadPastDueReport();
-  } else {
+  const stats = document.getElementById('rpt-stats');
+  const tableDiv = document.getElementById('rpt-table');
+  const apptDiv = document.getElementById('rpt-appointments');
+  const searchBar = document.getElementById('rpt-search');
+  if (tab === 'appointments') {
     if (aging) aging.style.display = 'none';
     if (activeAging) activeAging.style.display = 'none';
-    loadContactQueue(tab);
-    _startUpcomingAuto();
+    if (stats) stats.style.display = 'none';
+    if (tableDiv) tableDiv.style.display = 'none';
+    if (apptDiv) apptDiv.style.display = '';
+    if (searchBar) searchBar.style.display = 'none';
+    _stopUpcomingAuto();
+    loadAppointmentsView();
+    return;
   }
+  // Default: 'loansdue' — past-due + due today + tomorrow + this week + next 30
+  // in one scrollable table with sticky section headers per bucket.
+  if (aging) aging.style.display = '';
+  if (stats) stats.style.display = '';
+  if (tableDiv) tableDiv.style.display = '';
+  if (apptDiv) apptDiv.style.display = 'none';
+  if (searchBar) searchBar.style.display = '';
+  _startUpcomingAuto();
+  loadLoansDueView();
 }
 
 function filterReport(q) {
-  if (_rptTab === 'pastdue') filterPastDueReport(q);
-  else renderContactQueue(_contactQueueRows);
+  if (_rptTab === 'appointments') return;          // search is hidden on calendar
+  renderLoansDueUnified();
 }
 
 // Categories now derive from a single PastDueContactList-with-future-
@@ -6535,25 +6553,39 @@ function renderContactQueue(rows) {
 }
 
 async function loadPastDueReport() {
+  // Unified Loans-Due fetcher — pulls the past-due + upcoming (next 30
+  // days) lists in parallel, populates both row arrays, then hands off
+  // to renderLoansDueUnified which buckets and draws sticky-section
+  // headers per group. Callers (refresh button, auto-refresh, route
+  // handler, appointment-create modal) all still call this name.
   const table = document.getElementById('rpt-table');
   const status = document.getElementById('rpt-status');
-  if (table && !_pastDueLoadedAt) table.innerHTML = '<div class="tbl-loading">Loading report…</div>';
+  if (table && !_pastDueLoadedAt) table.innerHTML = '<div class="tbl-loading">Loading loans due…</div>';
   if (status) status.textContent = '';
   try {
-    const r = await fetch('/api/vergent-report-pastdue', {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ options: {} }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d || d.ok === false) {
-      const detail = (d && d.detail) || (d && d.error) || ('HTTP ' + r.status);
+    const [pdResp, upResp] = await Promise.all([
+      fetch('/api/vergent-report-pastdue', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ options: {} }),
+      }),
+      fetch('/api/vergent-report-upcoming', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ daysAhead: 30 }),
+      }),
+    ]);
+    const d = await pdResp.json().catch(() => ({}));
+    const ud = await upResp.json().catch(() => ({}));
+    if (!pdResp.ok || !d || d.ok === false) {
+      const detail = (d && d.detail) || (d && d.error) || ('HTTP ' + pdResp.status);
       table.innerHTML = `<div class="tbl-empty"><div style="margin-bottom:10px;color:var(--red);font-weight:700">Couldn't load report</div><pre style="text-align:left;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;font-size:11px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow:auto;max-height:400px;white-space:pre-wrap;word-break:break-word">${escapeHtml(String(detail))}</pre></div>`;
       return;
     }
     _pastDueRows = (d.rows || []).filter(r =>
       String(r.LoanStatus || '').toLowerCase() !== 'deleted'
     );
+    _upcomingRows = (ud && ud.rows) || [];
     _pastDueLoadedAt = Date.now();
     _pastDueUpdateLoadedAt();
     if (!_pastDueLoadedTickTimer) {
@@ -6566,6 +6598,14 @@ async function loadPastDueReport() {
 }
 
 function filterPastDueReport(q) {
+  // Unified Loans-Due render dispatches off the current rptTab. The
+  // legacy per-key sort/aging logic below still computes _pastDueRows,
+  // but is unused — renderLoansDueUnified consumes _pastDueRows +
+  // _upcomingRows directly and re-buckets by computed days-late.
+  if (typeof renderLoansDueUnified === 'function') {
+    renderLoansDueUnified();
+    return;
+  }
   // Always active-only — the All/Active toggle was removed.
   let rows = _pastDueRows.filter(_pastDueIsActive);
   if (_pastDueAging) {
@@ -6765,9 +6805,169 @@ function renderPastDueReport(rows) {
   _pastDueRefreshBulkBar();
 }
 
+// ── Unified Loans Due renderer ───────────────────────────────────
+// One scrollable table that buckets every active loan by computed
+// days-late: Past Due (>=1) · Due Today (0) · Due Tomorrow (-1) ·
+// Due This Week (-2..-7) · Due Next 30 (-8..-30). Sticky section
+// header rows announce each bucket with its count + total due. Row
+// styling matches the past-due tab exactly so operators keep their
+// muscle memory.
+const _LOANS_DUE_SECTIONS = [
+  { key: 'pastdue',  label: 'Past Due',      min: 1,    max: Infinity },
+  { key: 'today',    label: 'Due Today',     min: 0,    max: 0 },
+  { key: 'tomorrow', label: 'Due Tomorrow',  min: -1,   max: -1 },
+  { key: 'thisweek', label: 'Due This Week', min: -7,   max: -2 },
+  { key: 'next30',   label: 'Due Next 30',   min: -30,  max: -8 },
+];
+
+function renderLoansDueUnified() {
+  const table = document.getElementById('rpt-table');
+  const status = document.getElementById('rpt-status');
+  const stats = document.getElementById('rpt-stats');
+  if (!table) return;
+  // Combine past-due + upcoming, prefer the past-due record (richer
+  // fields like LastCallResult). Both endpoints occasionally echo the
+  // same loan; dedupe by LoanId.
+  const byId = new Map();
+  (_upcomingRows || []).forEach(r => { const id = String(r.LoanId || ''); if (id) byId.set(id, r); });
+  (_pastDueRows  || []).forEach(r => { const id = String(r.LoanId || ''); if (id) byId.set(id, r); });
+  const allRows = Array.from(byId.values()).filter(r =>
+    String(r.LoanStatus || '').trim().toLowerCase() === 'held' &&
+    (Number(r.AmountDue) || 0) > 0
+  );
+
+  // KPI cards — count the whole active book (past-due + upcoming).
+  if (stats) {
+    const totalDue   = allRows.reduce((s, r) => s + (Number(r.AmountDue) || 0), 0);
+    const pastDueCt  = allRows.filter(r => _pastDueComputedDaysLate(r) >= 1).length;
+    const upcomingCt = allRows.length - pastDueCt;
+    const sev31      = allRows.filter(r => _pastDueComputedDaysLate(r) >= 31).length;
+    const card = (label, val, cls) => `<div class="stat${cls?' '+cls:''}">
+      <div class="stat-label">${escapeHtml(label)}</div>
+      <div class="stat-value${cls==='dec'?' red':cls==='pen'?' amber':''}">${val}</div>
+    </div>`;
+    stats.innerHTML =
+        card('To collect', _rptFmtMoney(totalDue), 'pen')
+      + card('Loans', allRows.length, 'tot')
+      + card('Past due', pastDueCt, pastDueCt > 0 ? 'dec' : '')
+      + card('Upcoming · 30d', upcomingCt);
+  }
+
+  // Aging tiles: past-due slice (positive days late). Builders live in
+  // _pastDueRenderAging which already handles the click-to-filter UX.
+  const pastDueOnly = allRows.filter(r => _pastDueComputedDaysLate(r) >= 1);
+  _pastDueRenderAging(pastDueOnly);
+
+  // Search filter — same JSON-stringify check used by contact queue.
+  const q = (document.getElementById('rpt-search')?.value || '').toLowerCase().trim();
+  // Aging-tile click narrows the Past Due section to that bucket; other
+  // sections still render normally so operators don't lose sight of
+  // upcoming work.
+  const buckets = {};
+  _LOANS_DUE_SECTIONS.forEach(s => { buckets[s.key] = []; });
+  allRows.forEach(r => {
+    if (q && !JSON.stringify(r).toLowerCase().includes(q)) return;
+    const d = _pastDueComputedDaysLate(r);
+    for (const s of _LOANS_DUE_SECTIONS) {
+      if (d >= s.min && d <= s.max) {
+        if (s.key === 'pastdue' && _pastDueAging) {
+          const b = _pastDueBucket(r);
+          if (!b || b.key !== _pastDueAging) return;
+        }
+        buckets[s.key].push(r);
+        return;
+      }
+    }
+  });
+  // Sort: past-due by days desc (most late first), others by due date asc.
+  buckets.pastdue.sort((a, b) => _pastDueComputedDaysLate(b) - _pastDueComputedDaysLate(a));
+  ['today','tomorrow','thisweek','next30'].forEach(k => {
+    buckets[k].sort((a, b) =>
+      (_pastDueLocalMidnight(a.DueDate) || 0) - (_pastDueLocalMidnight(b.DueDate) || 0));
+  });
+
+  const headerCols = [
+    { label: 'Customer'  },
+    { label: 'Loan'      },
+    { label: 'Days'      },
+    { label: 'Balance'   },
+    { label: 'Due'       },
+    { label: 'Next pay'  },
+    { label: 'Phone'     },
+    { label: 'Appointments' },
+  ];
+  const headHtml = '<th class="tbl-checkbox"></th>' +
+    headerCols.map(c => `<th>${escapeHtml(c.label)}</th>`).join('');
+
+  const sectionsHtml = _LOANS_DUE_SECTIONS.map(s => {
+    const rows = buckets[s.key];
+    if (!rows.length) return '';
+    const totalDue = rows.reduce((sum, r) => sum + (Number(r.AmountDue) || 0), 0);
+    const meta = `${rows.length} loan${rows.length === 1 ? '' : 's'} · ${_rptFmtMoney(totalDue)}`;
+    const rowsHtml = rows.map(_loansDueRowHtml).join('');
+    return `<tr class="lns-sec"><td colspan="9">${escapeHtml(s.label)}<span class="lns-sec-meta">${escapeHtml(meta)}</span></td></tr>${rowsHtml}`;
+  }).join('');
+
+  table.innerHTML = `<div class="tbl-card-scroll"><table class="tbl"><thead><tr>${headHtml}</tr></thead><tbody>${sectionsHtml || '<tr><td colspan="9" class="tbl-empty">No active loans due in the next 30 days.</td></tr>'}</tbody></table></div>`;
+
+  if (status) {
+    const totalCount = allRows.length;
+    status.textContent = `${totalCount.toLocaleString()} active loan${totalCount === 1 ? '' : 's'}`;
+  }
+}
+
+function _loansDueRowHtml(r) {
+  const name = ((r.FirstName || '') + ' ' + (r.LastName || '')).trim() || '—';
+  const phoneRaw = (r.PrimaryPhoenNumber || r.PrimaryPhoneNumber || '').trim();
+  const phoneFmt = _fmtPhoneUS(phoneRaw);
+  const phoneHtml = phoneRaw
+    ? `<a href="tel:${escapeHtml(phoneRaw)}" style="color:var(--green-dark);text-decoration:none;font-variant-numeric:tabular-nums" onclick="event.stopPropagation()">${escapeHtml(phoneFmt)}</a>`
+    : '—';
+  const vergentLink = `https://shared.lms.vergentlms.com/customer/general?action=view&id=${encodeURIComponent(r.CustomerId || '')}`;
+  const cid = String(r.CustomerId || '');
+  const hdrId = String(r.HdrId || r.LoanId || '');
+  const apptsArr = Array.isArray(r.Appointments) ? r.Appointments : [];
+  let apptBadge = '';
+  if (apptsArr.length) {
+    const dates = apptsArr.map(a => _pastDueFmtApptTime(a)).filter(Boolean).join(' · ');
+    apptBadge = ` <span title="${escapeHtml(dates || 'Has appointment')}" style="display:inline-block;background:#fff5e6;color:#5a3300;border:1px solid #f59e0b;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;cursor:help">📅 Appt</span>`;
+  }
+  const daysLate = _pastDueComputedDaysLate(r);
+  const daysCellHtml = daysLate >= 1
+    ? _rptDaysLatePill(daysLate)
+    : daysLate === 0
+      ? '<span class="tbl-time" style="color:#b45309;font-weight:700">Today</span>'
+      : `<span class="tbl-time" style="color:var(--muted)">in ${Math.abs(daysLate)}d</span>`;
+  return `<tr>
+    <td class="tbl-checkbox"><button class="appt-add-btn" title="Create appointment" data-cid="${escapeHtml(cid)}" data-hdr="${escapeHtml(hdrId)}" data-name="${escapeHtml(name)}" onclick="event.stopPropagation();openApptModalFromBtn(this)">+ Appt</button></td>
+    <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" onclick="event.stopPropagation()">${escapeHtml(name)}</a>${apptBadge}</div></td>
+    <td><div class="app-info"><span class="app-type">${escapeHtml(r.LoanId || '—')}</span><span class="app-meta">${escapeHtml(r.LoanStatus || '')}${r.LoanSubStatus ? ' · ' + escapeHtml(r.LoanSubStatus) : ''}</span></div></td>
+    <td>${daysCellHtml}</td>
+    <td><span class="tbl-time" style="font-variant-numeric:tabular-nums">${_rptFmtMoney(r.Balance)}</span></td>
+    <td><span class="tbl-time">${_rptFmtDate(r.DueDate)}</span></td>
+    <td><span class="tbl-time">${_rptFmtDate(r.NextPayDate)}</span></td>
+    <td>${phoneHtml}</td>
+    <td>${apptsArr.length
+      ? `<div class="tbl-time" style="color:#b45309;font-weight:700">Appointment</div><div class="applicant-id" style="color:#5a3300" title="${escapeHtml((apptsArr[0].Notes || '').slice(0, 80))}">${escapeHtml(_pastDueFmtApptTime(apptsArr[0]))}</div>`
+      : `<div class="tbl-time">${_rptFmtDate(r.LastCallUtcDateTime)}</div><div class="applicant-id" title="${escapeHtml(r.LastCallNote || '')}">${escapeHtml((r.LastCallResult || '').slice(0, 40)) || '—'}</div>`
+    }</td>
+  </tr>`;
+}
+
+// Loans Due view — alias so setReportTab's two-tab dispatch reads cleanly.
+function loadLoansDueView() { return loadPastDueReport(); }
+
+// Placeholder — full calendar lands in the next PR.
+function loadAppointmentsView() {
+  const div = document.getElementById('rpt-appointments');
+  if (!div) return;
+  div.innerHTML = '<div class="tbl-empty" style="padding:48px 24px;text-align:center"><div style="font-size:14px;color:var(--muted);margin-bottom:6px">Appointments calendar coming next.</div><div style="font-size:11.5px;color:var(--muted)">For now, all of your existing appointments still show inline in the Loans Due tab\'s Appointments column, and you can create new ones from the + Appt button on any row.</div></div>';
+}
+
 document.addEventListener('click', e => {
   if (e.target && e.target.closest && e.target.closest('#rpt-refresh-btn')) {
-    loadPastDueReport();
+    if (_rptTab === 'appointments') loadAppointmentsView();
+    else loadPastDueReport();
   }
 });
 
