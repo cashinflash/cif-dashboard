@@ -818,13 +818,15 @@ button,input,select{font-family:inherit}
   .topnav-user-meta{display:none}
   /* Sidebar stacks above content on phones so Connections/Customers/IF
      stay reachable from the Dashboard view (the user-menu also exposes
-     them for direct access from any view). */
+     them for direct access from any view). Base .subnav inherits
+     height:calc(100vh - topnav) — has to be reset or the strip eats
+     the whole screen. */
   .shell{flex-direction:column}
-  .subnav{position:static;width:100%;flex-direction:row;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:8px 10px;gap:6px;border-right:none;border-bottom:1px solid var(--border);background:var(--surface)}
+  .subnav{position:static;width:100%;height:auto;min-height:0;flex-direction:row;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 10px;gap:6px;border-right:none;border-bottom:1px solid var(--border);background:var(--surface)}
   .subnav::-webkit-scrollbar{display:none}
-  .subnav-section,.subnav-foot{display:flex;flex-direction:row;gap:6px;padding:0;border:none}
+  .subnav-section,.subnav-foot{display:flex;flex-direction:row;gap:6px;padding:0;margin:0;border:none;flex:0 0 auto}
   .subnav-label{display:none}
-  .subnav-link{flex-shrink:0;padding:7px 12px;font-size:12.5px;white-space:nowrap;border-radius:8px}
+  .subnav-link{flex:0 0 auto;padding:7px 12px;font-size:12.5px;white-space:nowrap;border-radius:8px;width:auto}
   .main{padding:18px 14px 60px}
   .stats{grid-template-columns:repeat(2,1fr)}
   .quick-grid{grid-template-columns:repeat(2,1fr)}
