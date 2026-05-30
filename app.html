@@ -846,10 +846,11 @@ button,input,select{font-family:inherit}
 .appt-list-row-name a{color:inherit;text-decoration:none}
 .appt-list-row-name a:hover{color:var(--green-dark)}
 .appt-list-row-sub{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.45;word-wrap:break-word}
-.appt-row-actions{display:flex;gap:5px;flex:0 0 auto;align-self:center}
-.appt-row-actions button{background:transparent;border:1px solid var(--border);width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;color:var(--text);font-family:inherit;padding:0;transition:all .12s}
+.appt-row-actions{display:flex;gap:6px;flex:0 0 auto;align-self:center;flex-wrap:wrap;justify-content:flex-end}
+.appt-row-actions button{background:white;border:1px solid var(--border);padding:6px 11px;border-radius:8px;cursor:pointer;font-size:11.5px;font-weight:700;line-height:1;color:var(--text);font-family:inherit;transition:all .12s;min-height:32px}
 .appt-row-actions button:hover{background:var(--surface2);border-color:#cfe0d4}
-.appt-row-actions button.del:hover{background:#fde7e7;border-color:#fecaca;color:var(--red)}
+.appt-row-actions button.del{color:var(--red);border-color:#fecaca;background:#fef2f2}
+.appt-row-actions button.del:hover{background:#fde7e7;border-color:#fecaca}
 @media(max-width:600px){
   .appt-list-row-time{flex:0 0 60px;font-size:12px}
   .appt-list-row{padding:10px 12px;gap:10px}
@@ -6366,14 +6367,24 @@ function closeApptModal() {
   _apptModalCtx = null;
 }
 
+// Look up an appointment by the synthetic dedupe id we built in
+// _allAppointments (customer|hdr|datetime). Lets edit/delete buttons
+// reference rows even when Vergent's PastDueContactList response omits
+// a proper Appointment Id.
+function _apptByKey(syntheticId) {
+  return _allAppointments().find(x => x.id === syntheticId) || null;
+}
+
 // Open the create-appointment modal pre-filled for editing an existing
-// Vergent appointment. apptId is the Vergent Appointment row id; we
-// look the full record up via _allAppointments() so the modal's date /
-// time / amount / notes fields seed correctly.
-function openEditApptById(apptId) {
-  const all = _allAppointments();
-  const a = all.find(x => String(x.apptId) === String(apptId));
+// Vergent appointment.
+function openEditApptById(syntheticId) {
+  const a = _apptByKey(syntheticId);
   if (!a) { alert('Appointment not found.'); return; }
+  if (!a.apptId) {
+    const keys = Object.keys(a.rawAppt || {}).join(', ');
+    alert('Vergent didn\'t return an id for this appointment, so we can\'t target it for an edit. Available fields on the appointment: ' + (keys || '(none)') + '. Tell the dev which one is the row id.');
+    return;
+  }
   _apptModalCtx = {
     customerId: a.customerId,
     customerName: a.customerName,
@@ -6412,12 +6423,16 @@ function openEditApptById(apptId) {
   ov.style.display = 'flex';
 }
 
-async function deleteAppointmentById(apptId) {
-  const all = _allAppointments();
-  const a = all.find(x => String(x.apptId) === String(apptId));
+async function deleteAppointmentById(syntheticId) {
+  const a = _apptByKey(syntheticId);
   if (!a) return;
   const d = _apptLocalDate(a.dateTimeUtc);
   const when = d ? d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'this appointment';
+  if (!a.apptId) {
+    const keys = Object.keys(a.rawAppt || {}).join(', ');
+    alert('Vergent didn\'t return an id for this appointment, so we can\'t target it for a delete. Available fields on the appointment: ' + (keys || '(none)') + '. Tell the dev which one is the row id.');
+    return;
+  }
   if (!confirm(`Delete appointment for ${a.customerName}\n${when}?`)) return;
   try {
     const r = await fetch('/api/vergent-appointment-delete', {
@@ -6642,6 +6657,7 @@ function setReportTab(tab) {
   const aging = document.getElementById('rpt-aging');
   const activeAging = document.getElementById('rpt-active-aging');
   const stats = document.getElementById('rpt-stats');
+  const buckets = document.getElementById('rpt-buckets');
   const tableDiv = document.getElementById('rpt-table');
   const apptDiv = document.getElementById('rpt-appointments');
   const searchBar = document.getElementById('rpt-search');
@@ -6649,6 +6665,7 @@ function setReportTab(tab) {
     if (aging) aging.style.display = 'none';
     if (activeAging) activeAging.style.display = 'none';
     if (stats) stats.style.display = 'none';
+    if (buckets) buckets.style.display = 'none';   // Upcoming/Past Due cards are Loans-Due-only
     if (tableDiv) tableDiv.style.display = 'none';
     if (apptDiv) apptDiv.style.display = '';
     if (searchBar) searchBar.style.display = 'none';
@@ -6660,6 +6677,7 @@ function setReportTab(tab) {
   // in one scrollable table with sticky section headers per bucket.
   if (aging) aging.style.display = '';
   if (stats) stats.style.display = '';
+  if (buckets) buckets.style.display = '';
   if (tableDiv) tableDiv.style.display = '';
   if (apptDiv) apptDiv.style.display = 'none';
   if (searchBar) searchBar.style.display = '';
@@ -7443,9 +7461,21 @@ function _allAppointments() {
       if (!dt) return;
       const id = `${row.CustomerId || ''}|${a.HdrId || row.LoanId || ''}|${dt}`;
       if (byKey.has(id)) return;
+      // Vergent's appointment Id surfaces under inconsistent field names
+      // depending on which endpoint emitted the row. Try them all so the
+      // edit/delete buttons have a real id to work with; if still none,
+      // apptId stays 0 and the click handler shows a clear error.
+      let apptId = 0;
+      for (const k of Object.keys(a)) {
+        if (/^(id|appointmentid|appointmentrowid|rowid|aptid|appt_?id)$/i.test(k)) {
+          const v = Number(a[k]);
+          if (v > 0) { apptId = v; break; }
+        }
+      }
       byKey.set(id, {
         id,
-        apptId: Number(a.Id || a.AppointmentId || a.id || 0) || 0,
+        apptId,
+        rawAppt: a,
         customerId: row.CustomerId || '',
         customerName: ((row.FirstName || '') + ' ' + (row.LastName || '')).trim() || ('Customer #' + (row.CustomerId || '?')),
         phone: row.PrimaryPhoenNumber || row.PrimaryPhoneNumber || '',
@@ -7644,12 +7674,10 @@ function _apptListBodyHtml() {
         a.notes ? escapeHtml(a.notes.slice(0, 120)) : '',
         a.phone ? _fmtPhoneUS(a.phone) : '',
       ].filter(Boolean).join(' · ');
-      const actions = a.apptId
-        ? `<div class="appt-row-actions">
-            <button onclick="openEditApptById(${a.apptId})" title="Edit appointment">&#9998;</button>
-            <button class="del" onclick="deleteAppointmentById(${a.apptId})" title="Delete appointment">&times;</button>
-          </div>`
-        : '';
+      const actions = `<div class="appt-row-actions">
+          <button onclick="openEditApptById('${escapeHtml(a.id)}')" title="Edit appointment">Edit</button>
+          <button class="del" onclick="deleteAppointmentById('${escapeHtml(a.id)}')" title="Delete appointment">Delete</button>
+        </div>`;
       return `<div class="appt-list-row">
         <div class="appt-list-row-time">${escapeHtml(time)}</div>
         <div class="appt-list-row-meta">
@@ -7710,12 +7738,10 @@ function openApptDay(dayKey) {
           a.notes ? escapeHtml(a.notes.slice(0, 120)) : '',
           a.phone ? _fmtPhoneUS(a.phone) : '',
         ].filter(Boolean).join(' · ');
-        const actions = a.apptId
-          ? `<div class="appt-row-actions">
-              <button onclick="openEditApptById(${a.apptId})" title="Edit appointment">&#9998;</button>
-              <button class="del" onclick="deleteAppointmentById(${a.apptId})" title="Delete appointment">&times;</button>
-            </div>`
-          : '';
+        const actions = `<div class="appt-row-actions">
+            <button onclick="openEditApptById('${escapeHtml(a.id)}')" title="Edit appointment">Edit</button>
+            <button class="del" onclick="deleteAppointmentById('${escapeHtml(a.id)}')" title="Delete appointment">Delete</button>
+          </div>`;
         return `<div class="appt-day-row">
           <div class="appt-day-time">${escapeHtml(time)}</div>
           <div class="appt-day-meta">
