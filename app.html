@@ -268,6 +268,49 @@ button,input,select{font-family:inherit}
    eye reads them as group dividers. */
 .tbl tr.lns-sec td{position:sticky;top:38px;z-index:1;background:linear-gradient(180deg,#eff7f3,#e3eee8);border-top:1px solid #cfe0d4;border-bottom:1px solid #cfe0d4;padding:8px 14px;font-size:11.5px;font-weight:800;color:var(--green-dark);text-transform:uppercase;letter-spacing:.06em}
 .tbl tr.lns-sec td .lns-sec-meta{float:right;font-weight:700;color:var(--muted);text-transform:none;letter-spacing:0;font-size:11.5px;font-variant-numeric:tabular-nums}
+
+/* MOBILE — Loans Due table renders as stacked cards so every row reads
+   without horizontal scroll. The thead disappears; each <tr> becomes a
+   grid with name + days pill + balance pulled to corners, loan id and
+   due dates stacked, phone + appointments at the bottom. The + Appt
+   button sits in the upper-right of each card. */
+@media(max-width:600px){
+  #rpt-table .tbl-card-scroll{max-height:none;border-radius:10px;overflow:visible}
+  #rpt-table .tbl{display:block;width:100%;border-collapse:separate}
+  #rpt-table .tbl thead{display:none}
+  #rpt-table .tbl tbody{display:block}
+  #rpt-table .tbl tr.lns-sec{display:block;position:sticky;top:0;z-index:2}
+  #rpt-table .tbl tr.lns-sec td{position:static;display:block;background:linear-gradient(180deg,#eff7f3,#e3eee8);border-top:1px solid #cfe0d4;border-bottom:1px solid #cfe0d4;padding:7px 14px;font-size:11.5px;font-weight:800;color:var(--green-dark);text-transform:uppercase;letter-spacing:.06em}
+  #rpt-table .tbl tr.lns-sec td .lns-sec-meta{float:right}
+  /* Data rows = card grid */
+  #rpt-table .tbl tbody tr:not(.lns-sec){display:grid;grid-template-columns:1fr auto;column-gap:12px;row-gap:5px;padding:11px 14px;border-bottom:1px solid #f0f0f0;background:white;align-items:center}
+  #rpt-table .tbl tbody tr:not(.lns-sec)>td{display:block;padding:0;border:none;line-height:1.35}
+  /* col 1: + Appt btn → top-right */
+  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(1){grid-column:2;grid-row:1;justify-self:end}
+  /* col 2: customer name → top-left, bigger */
+  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(2){grid-column:1;grid-row:1;font-size:14.5px;font-weight:700;min-width:0}
+  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(2) .applicant-name{font-weight:700;font-size:14.5px}
+  /* col 3: loan id + status → second row left */
+  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(3){grid-column:1;grid-row:2;font-size:11px;color:var(--muted)}
+  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(3) .app-info{display:flex;gap:6px;align-items:center}
+  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(3) .app-type{font-weight:700;color:var(--text);font-size:11.5px}
+  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(3) .app-meta{font-size:10.5px;color:var(--muted)}
+  /* col 4: days pill → second row right */
+  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(4){grid-column:2;grid-row:2;justify-self:end}
+  /* col 5: balance → third row right, large */
+  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(5){grid-column:2;grid-row:3;justify-self:end;font-weight:700;font-size:14.5px;color:var(--text)}
+  /* col 6: due date → third row left */
+  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(6){grid-column:1;grid-row:3;font-size:11.5px;color:var(--muted)}
+  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(6)::before{content:"Due ";color:var(--muted);font-weight:700}
+  /* col 7: next pay → hide on phone to save room */
+  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(7){display:none}
+  /* col 8: phone → fourth row left */
+  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(8){grid-column:1;grid-row:4;font-size:13px;font-weight:600}
+  /* col 9: appointments → fourth row right */
+  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(9){grid-column:2;grid-row:4;justify-self:end;font-size:11px;text-align:right;max-width:55%}
+  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(9) .tbl-time{font-size:11px}
+  #rpt-table .tbl tbody tr:not(.lns-sec)>td:nth-child(9) .applicant-id{font-size:10.5px}
+}
 .tbl-sortable{cursor:pointer;user-select:none}
 .tbl-sortable:hover{background:#eef3ee !important}
 .tbl-sort-ind{display:inline-block;width:9px;text-align:center;margin-left:4px;color:var(--muted);font-size:9px;line-height:1}
