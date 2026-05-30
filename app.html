@@ -5832,12 +5832,13 @@ const _PASTDUE_BUCKETS = [
 ];
 
 function _pastDueIsActive(r) {
-  const balance = Number(r.Balance) || 0;
-  const amtDue  = Number(r.AmountDue) || 0;
-  if (balance === 0 && amtDue === 0) return false;
-  const status = String(r.LoanStatus || '').toLowerCase().trim();
-  if (_PASTDUE_CLOSED_STATUSES.has(status)) return false;
-  return true;
+  // Match Vergent's collections queue exactly: only LoanStatus="Held"
+  // is "active and currently collectable". Any other status (Returned,
+  // Bought Back, Deposited, Paid Off, etc.) is filtered out — even if
+  // they carry a positive balance, they're not on Vergent's collections
+  // queue and shouldn't be on ours either.
+  const status = String(r.LoanStatus || '').trim().toLowerCase();
+  return status === 'held';
 }
 
 function _pastDueBucket(r) {
