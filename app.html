@@ -7620,10 +7620,43 @@ function _apptListWrapHtml() {
   return `<div class="appt-list-wrap">
     <div class="appt-list-toolbar">
       <strong>Appointments list</strong>
-      <div class="appt-list-tabs">${tabsHtml}</div>
+      <div class="appt-list-tabs">${tabsHtml}<button class="chip" style="padding:5px 10px;font-size:11.5px" onclick="debugDumpAppointments()" title="Show Vergent's raw appointment list response — used to debug subject_id resolution">Diagnose</button></div>
     </div>
     <div>${_apptListBodyHtml()}</div>
   </div>`;
+}
+
+// One-shot diagnostic: fetch Vergent's GET /api/V1/customer/appointments
+// response for any customer (or globally), so we can see what shape
+// the data is in and figure out why subject_id fallback isn't picking
+// up a real value. Operator hits this when create-appointment still
+// produces blank-subject rows.
+async function debugDumpAppointments() {
+  const cid = prompt('Customer ID to look up (e.g., 592533). Leave blank to fetch all customers (may be large).', '');
+  if (cid === null) return;
+  const cidTrim = String(cid).trim();
+  try {
+    const r = await fetch('/api/vergent-debug-list-appointments', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customerId: cidTrim }),
+    });
+    const data = await r.json().catch(() => ({}));
+    console.warn('[vergent-debug-list-appointments]', data);
+    const tried = (data.candidatesTried || []).map(c =>
+      `${c.method || 'GET'} ${c.path} → ${c.status != null ? c.status : c.error}`).join('\n');
+    const sampleLines = (data.sample || []).map(s =>
+      `  id=${s.id} customerId=${s.customerId} subjectId=${s.subjectId} hdrId=${s.hdrId} date=${s.appointmentDate}`).join('\n');
+    alert(
+      `Vergent appointment list for customer ${cidTrim || '(all)'}\n` +
+      `ok=${data.ok}, status=${data.vergentStatus}, total=${data.totalReturned}\n\n` +
+      `URLs tried:\n${tried}\n\n` +
+      `Sample (first 10):\n${sampleLines || '(none)'}`
+    );
+  } catch (e) {
+    alert('Diagnose failed: ' + (e.message || String(e)));
+  }
 }
 
 function _apptListBodyHtml() {
