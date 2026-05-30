@@ -769,13 +769,62 @@ button,input,select{font-family:inherit}
 .sync-chip.off .sync-chip-dot{background:rgba(255,255,255,.5);animation:none;box-shadow:none}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
+/* APPOINTMENTS CALENDAR (Reports → Appointments tab) */
+.cal-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.cal-month-label{font-size:18px;font-weight:700;color:var(--text);min-width:160px;text-align:center}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:var(--shadow-xs)}
+.cal-head{background:var(--surface2);padding:8px 6px;font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;text-align:center}
+.cal-cell{background:var(--surface);padding:8px;min-height:88px;cursor:pointer;transition:background .12s;display:flex;flex-direction:column;gap:4px;position:relative}
+.cal-cell:hover{background:var(--surface2)}
+.cal-blank{background:#fafafa;cursor:default;pointer-events:none}
+.cal-cell.cal-today{outline:2px solid var(--green);outline-offset:-2px;background:#f1faf5}
+.cal-cell.cal-has{background:#ecfdf5}
+.cal-cell.cal-has:hover{background:#d1fae5}
+.cal-cell.cal-selected{outline:2px solid var(--green-dark);outline-offset:-2px}
+.cal-day-num{font-size:12.5px;font-weight:700;color:var(--text);line-height:1}
+.cal-count{font-size:10.5px;color:var(--green-dark);font-weight:700;background:#dcfce7;border-radius:999px;padding:2px 7px;align-self:flex-start;line-height:1.3}
+.cal-mini{font-size:10.5px;color:var(--text2);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appt-day-row{display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--border)}
+.appt-day-row:last-child{border-bottom:none}
+.appt-day-time{flex:0 0 84px;font-weight:700;color:var(--green-dark);font-variant-numeric:tabular-nums;font-size:13px}
+.appt-day-meta{flex:1;min-width:0}
+.appt-day-name{font-weight:700;color:var(--text);font-size:13.5px}
+.appt-day-name a{color:inherit;text-decoration:none}
+.appt-day-name a:hover{color:var(--green-dark)}
+.appt-day-sub{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.4}
+@media(max-width:768px){
+  .cal-cell{min-height:56px;padding:5px 4px}
+  .cal-head{padding:6px 2px;font-size:9.5px}
+  .cal-day-num{font-size:11.5px}
+  .cal-count{font-size:9.5px;padding:1px 5px}
+  .cal-mini{display:none}
+  .cal-month-label{font-size:15px;min-width:130px}
+  .cal-toolbar{gap:6px}
+  .appt-day-time{flex:0 0 68px;font-size:12px}
+}
+
 /* RESPONSIVE */
 @media(max-width:980px){
   .topnav{padding:0 14px;gap:10px}
-  .topnav-tabs{display:none}
-  .topnav-search{width:200px}
+  /* Top nav is just three tabs now (Dashboard · Applications · Reports)
+     so they fit on phone width; keep them visible. The icons drop on
+     phones so labels still read; user-menu dropdown remains for
+     Connections/Customers/Instant Funding. */
+  .topnav-tabs{display:flex;gap:4px;flex:0 0 auto;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .topnav-tabs::-webkit-scrollbar{display:none}
+  .topnav-tabs .tnt{padding:8px 10px;font-size:12.5px;white-space:nowrap}
+  .topnav-tabs .tnt .icn{display:none}
+  .topnav-search{width:180px}
   .topnav-user-meta{display:none}
-  .subnav{display:none}
+  /* Sidebar stacks above content on phones so Connections/Customers/IF
+     stay reachable from the Dashboard view (the user-menu also exposes
+     them for direct access from any view). */
+  .shell{flex-direction:column}
+  .subnav{position:static;width:100%;flex-direction:row;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:8px 10px;gap:6px;border-right:none;border-bottom:1px solid var(--border);background:var(--surface)}
+  .subnav::-webkit-scrollbar{display:none}
+  .subnav-section,.subnav-foot{display:flex;flex-direction:row;gap:6px;padding:0;border:none}
+  .subnav-label{display:none}
+  .subnav-link{flex-shrink:0;padding:7px 12px;font-size:12.5px;white-space:nowrap;border-radius:8px}
   .main{padding:18px 14px 60px}
   .stats{grid-template-columns:repeat(2,1fr)}
   .quick-grid{grid-template-columns:repeat(2,1fr)}
@@ -1419,6 +1468,21 @@ button,input,select{font-family:inherit}
     <div id="rpt-appointments" style="display:none">
       <div class="tbl-loading">Loading appointments…</div>
     </div>
+  </div>
+</div>
+
+<!-- Reports → Appointments: day-detail modal -->
+<div id="appt-day-modal" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.5);align-items:center;justify-content:center;padding:20px"
+     onclick="if(event.target.id==='appt-day-modal')closeApptDayModal()">
+  <div style="background:white;border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:16px 20px;border-bottom:1px solid var(--border);gap:10px">
+      <div>
+        <div id="appt-day-title" style="font-size:15px;font-weight:700;color:var(--text)"></div>
+        <div id="appt-day-count" style="font-size:11.5px;color:var(--muted);margin-top:3px"></div>
+      </div>
+      <button onclick="closeApptDayModal()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1" title="Close">&times;</button>
+    </div>
+    <div id="appt-day-list" style="padding:8px 20px;overflow-y:auto;flex:1"></div>
   </div>
 </div>
 
@@ -6598,10 +6662,15 @@ async function loadPastDueReport() {
 }
 
 function filterPastDueReport(q) {
-  // Unified Loans-Due render dispatches off the current rptTab. The
-  // legacy per-key sort/aging logic below still computes _pastDueRows,
-  // but is unused — renderLoansDueUnified consumes _pastDueRows +
-  // _upcomingRows directly and re-buckets by computed days-late.
+  // Unified render dispatches off the current rptTab. On the
+  // Appointments tab the loaded rows feed the calendar instead of the
+  // table. The legacy per-key sort/aging logic below still computes
+  // _pastDueRows, but is unused — renderLoansDueUnified consumes
+  // _pastDueRows + _upcomingRows directly and re-buckets by days-late.
+  if (_rptTab === 'appointments') {
+    if (typeof renderAppointmentsCalendar === 'function') renderAppointmentsCalendar();
+    return;
+  }
   if (typeof renderLoansDueUnified === 'function') {
     renderLoansDueUnified();
     return;
@@ -6957,11 +7026,251 @@ function _loansDueRowHtml(r) {
 // Loans Due view — alias so setReportTab's two-tab dispatch reads cleanly.
 function loadLoansDueView() { return loadPastDueReport(); }
 
-// Placeholder — full calendar lands in the next PR.
-function loadAppointmentsView() {
+// ── Appointments calendar (month grid + day drill-down) ─────────
+// Aggregates appointments from every loan row Vergent returned in
+// PastDueContactList — past-due + upcoming both carry Appointments[]
+// inline. New appointments created via the + Appt modal land here
+// automatically on the next loadPastDueReport() refresh that runs at
+// modal save-time.
+let _calMonth = null;   // {year, month0Indexed}
+let _calCachedAppts = null;
+let _calCacheStamp = 0;
+
+function _calEnsureMonth() {
+  if (_calMonth) return;
+  const n = new Date();
+  _calMonth = { year: n.getFullYear(), month: n.getMonth() };
+}
+function _calStep(delta) {
+  _calEnsureMonth();
+  _calMonth.month += delta;
+  while (_calMonth.month < 0)  { _calMonth.month += 12; _calMonth.year--; }
+  while (_calMonth.month > 11) { _calMonth.month -= 12; _calMonth.year++; }
+  renderAppointmentsCalendar();
+}
+function _calGoToday() {
+  const n = new Date();
+  _calMonth = { year: n.getFullYear(), month: n.getMonth() };
+  renderAppointmentsCalendar();
+}
+
+function _allAppointments() {
+  // Vergent returns the same appointment array on past-due and upcoming
+  // rows when they overlap; dedupe by a synthetic id (CustomerId +
+  // HdrId + ISO time). Missing date strings get dropped — they can't
+  // be placed on a calendar anyway.
+  const byKey = new Map();
+  const push = row => {
+    const appts = Array.isArray(row.Appointments) ? row.Appointments : [];
+    appts.forEach(a => {
+      const dt = a.AppointmentDateTime || a.AppointmentDate || '';
+      if (!dt) return;
+      const id = `${row.CustomerId || ''}|${a.HdrId || row.LoanId || ''}|${dt}`;
+      if (byKey.has(id)) return;
+      byKey.set(id, {
+        id,
+        customerId: row.CustomerId || '',
+        customerName: ((row.FirstName || '') + ' ' + (row.LastName || '')).trim() || ('Customer #' + (row.CustomerId || '?')),
+        phone: row.PrimaryPhoenNumber || row.PrimaryPhoneNumber || '',
+        loanId: row.LoanId || '',
+        hdrId: a.HdrId || row.LoanId || '',
+        dateTimeUtc: dt,
+        commitment: Number(a.CommitmentAmount) || 0,
+        notes: a.Notes || '',
+      });
+    });
+  };
+  (_pastDueRows || []).forEach(push);
+  (_upcomingRows || []).forEach(push);
+  return Array.from(byKey.values());
+}
+
+function _apptLocalDate(utcStr) {
+  if (!utcStr) return null;
+  let t = utcStr;
+  // Vergent returns UTC without Z suffix; append it so new Date()
+  // parses as UTC and toLocaleString converts to operator's local zone.
+  if (typeof t === 'string' && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(t)) t = t + 'Z';
+  const d = new Date(t);
+  return isNaN(d.getTime()) ? null : d;
+}
+function _apptDayKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+async function loadAppointmentsView() {
+  // The calendar reads from the same row arrays the Loans Due tab
+  // populates. If they're empty, run a fetch first so switching to
+  // Appointments cold doesn't show an empty calendar.
+  if (!(_pastDueRows && _pastDueRows.length) && !(_upcomingRows && _upcomingRows.length)) {
+    await loadPastDueReport();   // hydrates both arrays
+  }
+  renderAppointmentsCalendar();
+}
+
+function renderAppointmentsCalendar() {
   const div = document.getElementById('rpt-appointments');
   if (!div) return;
-  div.innerHTML = '<div class="tbl-empty" style="padding:48px 24px;text-align:center"><div style="font-size:14px;color:var(--muted);margin-bottom:6px">Appointments calendar coming next.</div><div style="font-size:11.5px;color:var(--muted)">For now, all of your existing appointments still show inline in the Loans Due tab\'s Appointments column, and you can create new ones from the + Appt button on any row.</div></div>';
+  _calEnsureMonth();
+  const appts = _allAppointments();
+
+  const byDay = {};
+  appts.forEach(a => {
+    const d = _apptLocalDate(a.dateTimeUtc);
+    if (!d) return;
+    const k = _apptDayKey(d);
+    (byDay[k] = byDay[k] || []).push(a);
+  });
+
+  const monthLabel = new Date(_calMonth.year, _calMonth.month, 1)
+    .toLocaleString(undefined, { month: 'long', year: 'numeric' });
+  const first = new Date(_calMonth.year, _calMonth.month, 1);
+  const firstDayWeekday = first.getDay();   // 0 = Sun
+  const daysInMonth = new Date(_calMonth.year, _calMonth.month + 1, 0).getDate();
+  const today = new Date();
+  const todayKey = _apptDayKey(today);
+
+  let cells = '';
+  for (let i = 0; i < firstDayWeekday; i++) cells += '<div class="cal-cell cal-blank"></div>';
+  for (let day = 1; day <= daysInMonth; day++) {
+    const d = new Date(_calMonth.year, _calMonth.month, day);
+    const k = _apptDayKey(d);
+    const apptsToday = (byDay[k] || []).slice().sort((a, b) =>
+      (_apptLocalDate(a.dateTimeUtc) || 0) - (_apptLocalDate(b.dateTimeUtc) || 0));
+    const isToday = k === todayKey;
+    const cls = 'cal-cell' + (isToday ? ' cal-today' : '') + (apptsToday.length ? ' cal-has' : '');
+    const mini = apptsToday.slice(0, 2).map(a => {
+      const ad = _apptLocalDate(a.dateTimeUtc);
+      const t = ad ? ad.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '';
+      const firstName = (a.customerName.split(' ')[0] || '').slice(0, 10);
+      return `<div class="cal-mini">${escapeHtml(t)} ${escapeHtml(firstName)}</div>`;
+    }).join('');
+    const more = apptsToday.length > 2 ? `<div class="cal-mini" style="color:var(--muted)">+${apptsToday.length - 2} more</div>` : '';
+    cells += `<div class="${cls}" onclick="openApptDay('${k}')">
+      <div class="cal-day-num">${day}</div>
+      ${apptsToday.length ? `<div class="cal-count">${apptsToday.length} appt${apptsToday.length === 1 ? '' : 's'}</div>` : ''}
+      ${mini}${more}
+    </div>`;
+  }
+
+  const monthApptCount = Object.keys(byDay).reduce((sum, k) => {
+    const d = new Date(k + 'T12:00:00');
+    return (d.getFullYear() === _calMonth.year && d.getMonth() === _calMonth.month)
+      ? sum + byDay[k].length : sum;
+  }, 0);
+
+  div.innerHTML = `
+    <div class="cal-toolbar">
+      <button class="chip" onclick="_calStep(-1)" title="Previous month">&lsaquo; Prev</button>
+      <strong class="cal-month-label">${escapeHtml(monthLabel)}</strong>
+      <button class="chip" onclick="_calStep(1)" title="Next month">Next &rsaquo;</button>
+      <button class="chip" onclick="_calGoToday()" title="Jump to today">Today</button>
+      <span style="font-size:11.5px;color:var(--muted);margin-left:auto;align-self:center">${monthApptCount} appointment${monthApptCount === 1 ? '' : 's'} this month</span>
+    </div>
+    <div class="cal-grid">
+      <div class="cal-head">Sun</div><div class="cal-head">Mon</div><div class="cal-head">Tue</div><div class="cal-head">Wed</div><div class="cal-head">Thu</div><div class="cal-head">Fri</div><div class="cal-head">Sat</div>
+      ${cells}
+    </div>
+  `;
+}
+
+function openApptDay(dayKey) {
+  const appts = _allAppointments().filter(a => {
+    const d = _apptLocalDate(a.dateTimeUtc);
+    return d && _apptDayKey(d) === dayKey;
+  });
+  appts.sort((a, b) =>
+    (_apptLocalDate(a.dateTimeUtc) || 0) - (_apptLocalDate(b.dateTimeUtc) || 0));
+  const dt = new Date(dayKey + 'T12:00:00');
+  const headTxt = dt.toLocaleDateString(undefined, {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+  });
+  const titleEl = document.getElementById('appt-day-title');
+  const countEl = document.getElementById('appt-day-count');
+  const listEl = document.getElementById('appt-day-list');
+  if (titleEl) titleEl.textContent = headTxt;
+  if (countEl) countEl.textContent = appts.length
+    ? `${appts.length} appointment${appts.length === 1 ? '' : 's'}`
+    : 'No appointments yet — schedule one below.';
+
+  // Build a "+ New on this day" button that opens the create modal
+  // pre-filled with this date and a generic prompt for the operator
+  // to pick the customer (since the calendar isn't customer-scoped).
+  const newBtnHtml = `<div style="padding:12px 0 4px"><button class="chip" style="background:var(--green);color:white;border:0;font-weight:700;padding:8px 14px" onclick="closeApptDayModal();_openApptModalForDay('${dayKey}')">+ New on this day</button></div>`;
+
+  if (listEl) {
+    if (!appts.length) {
+      listEl.innerHTML = newBtnHtml + '<div style="color:var(--muted);text-align:center;padding:20px 0;font-size:13px">Nothing scheduled.</div>';
+    } else {
+      const rows = appts.map(a => {
+        const ad = _apptLocalDate(a.dateTimeUtc);
+        const time = ad
+          ? ad.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+          : '—';
+        const profileUrl = a.customerId
+          ? `https://shared.lms.vergentlms.com/customer/general?action=view&id=${encodeURIComponent(a.customerId)}`
+          : '';
+        const nameHtml = profileUrl
+          ? `<a href="${profileUrl}" target="_blank" rel="noopener">${escapeHtml(a.customerName)}</a>`
+          : escapeHtml(a.customerName);
+        const sub = [
+          a.commitment ? '$' + a.commitment.toLocaleString() : '',
+          a.notes ? escapeHtml(a.notes.slice(0, 120)) : '',
+          a.phone ? _fmtPhoneUS(a.phone) : '',
+        ].filter(Boolean).join(' · ');
+        return `<div class="appt-day-row">
+          <div class="appt-day-time">${escapeHtml(time)}</div>
+          <div class="appt-day-meta">
+            <div class="appt-day-name">${nameHtml}</div>
+            <div class="appt-day-sub">${sub || '—'}</div>
+          </div>
+        </div>`;
+      }).join('');
+      listEl.innerHTML = newBtnHtml + rows;
+    }
+  }
+  const modal = document.getElementById('appt-day-modal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeApptDayModal() {
+  const m = document.getElementById('appt-day-modal');
+  if (m) m.style.display = 'none';
+}
+
+// Open the create-appointment modal seeded with a specific day. The
+// operator still needs to type the customer (the calendar isn't
+// per-customer); we surface that in the customer-id field.
+function _openApptModalForDay(dayKey) {
+  // Reuse the existing modal but skip the per-row context (no cid yet);
+  // the operator picks date/time as usual. We prefill date to the
+  // selected day. Customer-id requirement is enforced server-side.
+  _apptModalCtx = { customerId: '', hdrId: 0, customerName: '' };
+  const ov = document.getElementById('appt-modal');
+  if (!ov) return;
+  const cdiv = document.getElementById('appt-modal-customer');
+  if (cdiv) cdiv.innerHTML = `<input type="text" id="appt-cid-input" placeholder="Vergent Customer #" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;width:160px;font-family:inherit" oninput="_apptModalCtx.customerId = this.value.trim()">`;
+  const dEl = document.getElementById('appt-date');
+  const tEl = document.getElementById('appt-time');
+  const aEl = document.getElementById('appt-amount');
+  const nEl = document.getElementById('appt-notes');
+  const sEl = document.getElementById('appt-subject');
+  if (dEl) dEl.value = dayKey;
+  if (tEl) tEl.value = '10:00';
+  if (aEl) aEl.value = '';
+  if (nEl) nEl.value = '';
+  if (sEl) sEl.value = 'Promise to Pay';
+  const err = document.getElementById('appt-error');
+  if (err) {
+    err.style.display = 'none';
+    err.textContent = '';
+    err.style.background = '#fef2f2';
+    err.style.borderColor = '#fecaca';
+    err.style.color = 'var(--red)';
+  }
+  const btn = document.getElementById('appt-save-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Save appointment'; }
+  ov.style.display = 'flex';
 }
 
 document.addEventListener('click', e => {
