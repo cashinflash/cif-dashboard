@@ -6201,17 +6201,18 @@ function _todayMidnight() {
 function _filterUpcoming(rows, mode) {
   const today = _todayMidnight();
   const day = 24 * 60 * 60 * 1000;
-  // Use NextPayDate, NOT DueDate. PastDueContactList's DueDate is the
-  // ORIGINAL due date (frozen — e.g. 2025-10-31), but NextPayDate is
-  // the live "when the loan is next scheduled to be paid". For active
-  // past-due loans NextPayDate rolls forward to whenever the customer
-  // is now expected to pay. That's the field Vergent's own collections
-  // queue keys off, and it's why our Due Today count was 16 vs 7 — we
-  // were matching DueDate.day == today.day numerically across years.
+  // Active-only — skip closed loans (Bought-Back / Paid-Off / etc.) +
+  // skip rows where the cycle's already been paid. The latter is the
+  // fix for "Due Today shows 16 but Vergent has 7": a loan paid today
+  // still carries a remaining principal Balance, but its AmountDue
+  // drops to 0 for the current cycle, which is exactly Vergent's
+  // "no longer due today" signal. _pastDueIsActive treats AmountDue
+  // OR Balance > 0 as active (correct for past-due aging), but for
+  // an UPCOMING list "did they pay this cycle yet" is the right cut.
   return (rows || []).filter(r => {
     if (!_pastDueIsActive(r)) return false;
     if ((Number(r.AmountDue) || 0) <= 0) return false;
-    const due = _localMidnight(r.NextPayDate || r.DueDate);
+    const due = _localMidnight(r.DueDate);
     if (isNaN(due)) return false;
     if (mode === 'today')    return due === today;
     if (mode === 'tomorrow') return due === today + day;
@@ -6292,7 +6293,7 @@ function renderContactQueue(rows) {
     const phone = _cqField(r, ['Phone','PhoneNumber','phone','phoneNumber','CellPhone','cellPhone','PrimaryPhone']);
     const loanId = _cqField(r, ['LoanId','loanId','LoanNumber','loanNumber','HdrId','hdrId','LoanHeaderId']);
     const amount = _cqField(r, ['AmountDue','amountDue','Amount','amount','Balance','balance','PaymentAmount','paymentAmount']);
-    const due = _cqField(r, ['NextPayDate','nextPayDate','DueDate','dueDate','AppointmentDate','appointmentDate','PaymentDueDate']);
+    const due = _cqField(r, ['DueDate','dueDate','AppointmentDate','appointmentDate','PaymentDueDate']);
     const cid = _cqField(r, ['CustomerId','customerId','CustomerID']);
     const dueFmt = due ? String(due).slice(0, 10) : '';
     let amtFmt = '';
