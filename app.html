@@ -5856,8 +5856,15 @@ function _pastDueComputedDaysLate(r) {
 
 function _pastDueFmtApptTime(a) {
   if (!a) return '';
-  const t = a.AppointmentDateTime || a.AppointmentDate || '';
+  let t = a.AppointmentDateTime || a.AppointmentDate || '';
   if (!t) return '';
+  // Vergent returns AppointmentDateTime in UTC but WITHOUT a Z suffix.
+  // new Date() parses an ISO string without a timezone designator as
+  // LOCAL time, which puts the displayed value off by the local UTC
+  // offset (7 hours for PDT). Append Z if no timezone is present so
+  // the string is parsed as UTC; toLocaleString then converts to the
+  // operator's local zone correctly.
+  if (typeof t === 'string' && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(t)) t = t + 'Z';
   const d = new Date(t);
   if (isNaN(d.getTime())) return String(t).slice(0, 16).replace('T', ' ');
   return d.toLocaleString(undefined, {
@@ -6346,12 +6353,7 @@ function renderContactQueue(rows) {
       // Vergent uses AppointmentDateTime (verified from PastDueContactList
       // response). The other names were guesses for the swagger CRUD
       // endpoints; this is the field the report actually returns.
-      const dates = appts.map(a => {
-        const d = a.AppointmentDateTime || a.appointmentDateTime
-                || a.AppointmentDate    || a.appointmentDate
-                || a.LocalAppointmentDate || a.localAppointmentDate || '';
-        return d ? String(d).slice(0, 16).replace('T', ' ') : '';
-      }).filter(Boolean).join('\n');
+      const dates = appts.map(a => _pastDueFmtApptTime(a)).filter(Boolean).join('\n');
       apptBadge = ' <span title="' + escapeHtml(dates || 'Has appointment') + '" style="display:inline-block;background:#fff5e6;color:#5a3300;border:1px solid #f59e0b;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;cursor:help">📅 Appt</span>';
     }
     return '<tr>' +
@@ -6555,10 +6557,7 @@ function renderPastDueReport(rows) {
     const apptsArr = Array.isArray(r.Appointments) ? r.Appointments : [];
     let apptBadge = '';
     if (apptsArr.length) {
-      const dates = apptsArr.map(a => {
-        const d = a.AppointmentDateTime || a.AppointmentDate || '';
-        return d ? String(d).slice(0, 16).replace('T', ' ') : '';
-      }).filter(Boolean).join(' · ');
+      const dates = apptsArr.map(a => _pastDueFmtApptTime(a)).filter(Boolean).join(' · ');
       apptBadge = ` <span title="${escapeHtml(dates || 'Has appointment')}" style="display:inline-block;background:#fff5e6;color:#5a3300;border:1px solid #f59e0b;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;cursor:help">📅 Appt</span>`;
     }
     return `<tr${rowCls?` class="${rowCls}"`:''}>
