@@ -6663,15 +6663,12 @@ function renderPastDueReport(rows) {
       + card('31+ days late', sev31, 'dec');
   }
 
-  // Aging tiles ignore loans with scheduled appointments — Vergent's
-  // collections workflow drops them from the queue once an appointment
-  // is made (the customer's already committed; they're not a fresh
-  // collection target). Match that behavior so 1-day-late etc. counts
-  // line up with Vergent's admin. The table below still shows them so
-  // the operator can see everything in one place.
-  const tilesSet = _pastDueRows.filter(r =>
-    _pastDueIsActive(r) && !(Array.isArray(r.Appointments) && r.Appointments.length > 0)
-  );
+  // Aging tiles and due-chips show counts for the WHOLE active book,
+  // including loans that already have appointments scheduled — the
+  // operator wants "total due today" to mean total, not "total minus
+  // people who already committed". The row-level Appointment badge
+  // still flags them so the operator doesn't re-contact.
+  const tilesSet = _pastDueRows.filter(_pastDueIsActive);
   _pastDueRenderAging(tilesSet);
   // Due-chip counts use the show-all-filtered set so each chip
   // shows the total population for its window regardless of which
