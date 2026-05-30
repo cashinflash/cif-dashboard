@@ -1937,7 +1937,8 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path in ('/api/vergent-appointment-update', '/api/vergent-appointment-delete',
-                    '/api/vergent-debug-list-appointments'):
+                    '/api/vergent-debug-list-appointments',
+                    '/api/vergent-debug-option-classes'):
             try:
                 body = json.loads(raw) if raw else {}
                 payload = json.dumps(body).encode()

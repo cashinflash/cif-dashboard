@@ -7620,7 +7620,7 @@ function _apptListWrapHtml() {
   return `<div class="appt-list-wrap">
     <div class="appt-list-toolbar">
       <strong>Appointments list</strong>
-      <div class="appt-list-tabs">${tabsHtml}<button class="chip" style="padding:5px 10px;font-size:11.5px" onclick="debugDumpAppointments()" title="Show Vergent's raw appointment list response — used to debug subject_id resolution">Diagnose</button></div>
+      <div class="appt-list-tabs">${tabsHtml}<button class="chip" style="padding:5px 10px;font-size:11.5px" onclick="debugDumpAppointments()" title="Show Vergent's raw appointment list response">List appts</button><button class="chip" style="padding:5px 10px;font-size:11.5px" onclick="debugDumpOptionClasses()" title="Show Vergent's option-class catalog — used to find Subject ids">Subject ids</button></div>
     </div>
     <div>${_apptListBodyHtml()}</div>
   </div>`;
@@ -7656,6 +7656,46 @@ async function debugDumpAppointments() {
     );
   } catch (e) {
     alert('Diagnose failed: ' + (e.message || String(e)));
+  }
+}
+
+// Pull Vergent's full option-class catalog and show classes that look
+// related to appointments / subjects. The Subject id we need
+// (Promise to Pay, etc.) lives somewhere in here.
+async function debugDumpOptionClasses() {
+  try {
+    const r = await fetch('/api/vergent-debug-option-classes', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    const data = await r.json().catch(() => ({}));
+    console.warn('[vergent-debug-option-classes]', data);
+    const classes = data.classes || [];
+    if (!classes.length) {
+      alert(`No option classes returned.\nok=${data.ok}, error=${data.error || ''}`);
+      return;
+    }
+    // Filter to classes whose name or items mention subject/appointment/
+    // promise/callback so the relevant ids surface first.
+    const focus = classes.filter(c => {
+      const n = (c.className || '').toLowerCase();
+      if (/subject|appoint|promise|callback|reason/.test(n)) return true;
+      return (c.items || []).some(it => /promise|callback|visit|approved/i.test(it.label || ''));
+    });
+    const renderClass = c => {
+      const items = (c.items || []).slice(0, 12)
+        .map(it => `    ${it.id} → ${it.label}`).join('\n');
+      return `${c.className}\n${items}${(c.items || []).length > 12 ? '\n    ...' : ''}`;
+    };
+    const focusTxt = focus.length
+      ? 'Likely subject classes:\n\n' + focus.map(renderClass).join('\n\n')
+      : 'No obvious subject classes. All class names:\n\n' +
+        classes.map(c => c.className).join('\n');
+    alert(`${classes.length} option classes total.\n\n${focusTxt}\n\nFull data in console.`);
+  } catch (e) {
+    alert('Option-classes fetch failed: ' + (e.message || String(e)));
   }
 }
 
