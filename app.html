@@ -847,8 +847,10 @@ button,input,select{font-family:inherit}
 .appt-list-row-name a:hover{color:var(--green-dark)}
 .appt-list-row-sub{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.45;word-wrap:break-word}
 .appt-row-actions{display:flex;gap:6px;flex:0 0 auto;align-self:center;flex-wrap:wrap;justify-content:flex-end}
-.appt-row-actions a{display:inline-flex;align-items:center;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:6px 11px;border-radius:8px;font-size:11.5px;font-weight:700;line-height:1;font-family:inherit;text-decoration:none;transition:all .12s;min-height:32px;white-space:nowrap}
-.appt-row-actions a:hover{background:#d6e9f2;border-color:#4a90c2}
+.appt-row-actions button{background:white;border:1px solid var(--border);padding:6px 11px;border-radius:8px;cursor:pointer;font-size:11.5px;font-weight:700;line-height:1;color:var(--text);font-family:inherit;transition:all .12s;min-height:32px}
+.appt-row-actions button:hover{background:var(--surface2);border-color:#cfe0d4}
+.appt-row-actions button.del{color:var(--red);border-color:#fecaca;background:#fef2f2}
+.appt-row-actions button.del:hover{background:#fde7e7;border-color:#fecaca}
 @media(max-width:600px){
   .appt-list-row-time{flex:0 0 60px;font-size:12px}
   .appt-list-row{padding:10px 12px;gap:10px}
@@ -7690,7 +7692,8 @@ function _apptListBodyHtml() {
         a.phone ? _fmtPhoneUS(a.phone) : '',
       ].filter(Boolean).join(' · ');
       const actions = `<div class="appt-row-actions">
-          <a href="https://shared.lms.vergentlms.com/customer/general?action=view&amp;id=${encodeURIComponent(a.customerId)}" target="_blank" rel="noopener" title="Open in Vergent to edit or delete">Open in Vergent &rsaquo;</a>
+          <button onclick="openEditApptById('${escapeHtml(a.id)}')" title="Edit appointment">Edit</button>
+          <button class="del" onclick="deleteAppointmentById('${escapeHtml(a.id)}')" title="Delete appointment">Delete</button>
         </div>`;
       return `<div class="appt-list-row">
         <div class="appt-list-row-time">${escapeHtml(time)}</div>
@@ -7753,7 +7756,8 @@ function openApptDay(dayKey) {
           a.phone ? _fmtPhoneUS(a.phone) : '',
         ].filter(Boolean).join(' · ');
         const actions = `<div class="appt-row-actions">
-            <a href="https://shared.lms.vergentlms.com/customer/general?action=view&amp;id=${encodeURIComponent(a.customerId)}" target="_blank" rel="noopener" title="Open in Vergent to edit or delete">Open in Vergent &rsaquo;</a>
+            <button onclick="openEditApptById('${escapeHtml(a.id)}')" title="Edit appointment">Edit</button>
+            <button class="del" onclick="deleteAppointmentById('${escapeHtml(a.id)}')" title="Delete appointment">Delete</button>
           </div>`;
         return `<div class="appt-day-row">
           <div class="appt-day-time">${escapeHtml(time)}</div>
