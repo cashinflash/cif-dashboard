@@ -1615,6 +1615,24 @@ button,input,select{font-family:inherit}
   </div>
 </div>
 
+<!-- Loans Due: single-appointment focused modal, opened from a row's
+     📅 Appt badge so the operator sees just that customer's appointment
+     details (not the whole day's roster) with Edit + Delete inline. -->
+<div id="appt-one-modal" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.5);align-items:center;justify-content:center;padding:20px"
+     onclick="if(event.target.id==='appt-one-modal')closeApptOneModal()">
+  <div style="background:white;border-radius:14px;width:100%;max-width:440px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:16px 20px;border-bottom:1px solid var(--border);gap:10px">
+      <div style="min-width:0">
+        <div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Appointment</div>
+        <div id="appt-one-name" style="font-size:15px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.3"></div>
+      </div>
+      <button onclick="closeApptOneModal()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1" title="Close">&times;</button>
+    </div>
+    <div id="appt-one-body" style="padding:14px 20px;overflow-y:auto;flex:1"></div>
+    <div id="appt-one-actions" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid var(--border)"></div>
+  </div>
+</div>
+
 <!-- Loans Due: custom date-range modal (one of two sections, Upcoming
      or Past Due, filters to operator-picked from/to dates) -->
 <div id="rng-modal" onclick="if(event.target.id==='rng-modal')closeRangeModal()">
@@ -6376,15 +6394,93 @@ function _apptByKey(syntheticId) {
   return _allAppointments().find(x => x.id === syntheticId) || null;
 }
 
-// Loans Due row's 📅 Appt badge click → opens the day-detail modal for
-// the appointment's day, where Edit + Delete already live.
-function _openApptFromBadge(encodedDateTime) {
+// Loans Due row's 📅 Appt badge click → opens a focused modal scoped
+// to JUST that customer's appointment (not the whole day). Lookups
+// happen against _allAppointments so we get the same edit/delete
+// affordances as the calendar tab.
+const _SUBJECT_LABELS = {
+  '59419': 'Promise to Pay',
+  '59424': 'Payment Plan Requested',
+  '59411': 'No answer - left message',
+  '61902': 'Schedule Payment (Pay Date)',
+  '61908': 'Send to Collections Dept.',
+};
+function _subjectLabelFromId(id) {
+  const s = String(id || '');
+  return _SUBJECT_LABELS[s] || (s && s !== '0' ? `Subject #${s}` : '—');
+}
+
+function _openApptFromBadge(encodedCid, encodedDateTime) {
   try {
-    const dt = decodeURIComponent(encodedDateTime || '');
-    const d = _apptLocalDate(dt);
-    if (!d) return;
-    openApptDay(_apptDayKey(d));
+    const wantCid = decodeURIComponent(encodedCid || '');
+    const wantDt  = decodeURIComponent(encodedDateTime || '');
+    const wantPrefix = String(wantDt).replace('Z', '').slice(0, 16);
+    const all = _allAppointments();
+    const a = all.find(x =>
+      String(x.customerId) === String(wantCid) &&
+      String(x.dateTimeUtc || '').replace('Z', '').slice(0, 16) === wantPrefix
+    ) || all.find(x => String(x.customerId) === String(wantCid));
+    if (!a) {
+      alert('Appointment not found in current data — try refreshing the report.');
+      return;
+    }
+    _renderApptOneModal(a);
   } catch (e) { /* no-op */ }
+}
+
+function _renderApptOneModal(a) {
+  const nameEl = document.getElementById('appt-one-name');
+  const bodyEl = document.getElementById('appt-one-body');
+  const actEl  = document.getElementById('appt-one-actions');
+  const overlay = document.getElementById('appt-one-modal');
+  if (!overlay) return;
+  const d = _apptLocalDate(a.dateTimeUtc);
+  const when = d
+    ? d.toLocaleString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : '—';
+  const subjectLabel = _subjectLabelFromId(a.subjectId);
+  const phone = a.phone ? _fmtPhoneUS(a.phone) : '';
+  const profileUrl = a.customerId
+    ? `https://shared.lms.vergentlms.com/customer/general?action=view&id=${encodeURIComponent(a.customerId)}`
+    : '';
+  if (nameEl) {
+    nameEl.innerHTML = profileUrl
+      ? `<a href="${profileUrl}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${escapeHtml(a.customerName)}</a>`
+      : escapeHtml(a.customerName);
+  }
+  const row = (label, value) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:13px">
+    <div style="color:var(--muted);font-weight:600;flex:0 0 auto">${escapeHtml(label)}</div>
+    <div style="color:var(--text);text-align:right;min-width:0;word-wrap:break-word">${value}</div>
+  </div>`;
+  bodyEl.innerHTML =
+      row('Subject', escapeHtml(subjectLabel))
+    + row('When', escapeHtml(when))
+    + (a.commitment ? row('Commitment', '$' + Number(a.commitment).toLocaleString()) : '')
+    + (a.notes ? row('Notes', escapeHtml(a.notes)) : '')
+    + (phone ? row('Phone', `<a href="tel:${escapeHtml(a.phone)}" style="color:var(--green-dark);text-decoration:none">${escapeHtml(phone)}</a>`) : '')
+    + (a.loanId ? row('Loan', escapeHtml(a.loanId)) : '');
+  // Edit + Delete buttons. apptId may be 0 for appointments not created
+  // through our admin (Vergent's GET list endpoint 404s in this tenant,
+  // see CLAUDE.md). In that case fall through to a friendly hint.
+  const canManage = a.apptId > 0;
+  actEl.innerHTML = canManage
+    ? `<button onclick="closeApptOneModal();openEditApptById('${escapeHtml(a.id)}')" style="background:white;border:1px solid var(--border);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--text);font-family:inherit">Edit</button>
+       <button onclick="_apptOneDelete('${escapeHtml(a.id)}')" style="background:#fef2f2;border:1px solid #fecaca;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--red);font-family:inherit">Delete</button>`
+    : `<div style="font-size:11.5px;color:var(--muted);align-self:center;text-align:right;max-width:300px;line-height:1.4">This appointment was created in Vergent, not from our admin — manage it in Vergent.</div>`;
+  overlay.style.display = 'flex';
+}
+
+async function _apptOneDelete(syntheticId) {
+  // Close the one-appt modal first so the confirm prompt + later
+  // success render are unobstructed; then delegate to the existing
+  // delete handler.
+  closeApptOneModal();
+  await deleteAppointmentById(syntheticId);
+}
+
+function closeApptOneModal() {
+  const m = document.getElementById('appt-one-modal');
+  if (m) m.style.display = 'none';
 }
 
 // Local cache of Vergent appointment ids keyed by customer|hdr|datetime
@@ -7469,14 +7565,14 @@ function _loansDueRowHtml(r) {
   let apptBadge = '';
   if (apptsArr.length) {
     const dates = apptsArr.map(a => _pastDueFmtApptTime(a)).filter(Boolean).join(' · ');
-    // Clickable badge: opens the day-detail modal for the first
-    // appointment's day, which renders the row with Edit + Delete
-    // buttons. encodeURIComponent so apostrophes in customer names
-    // can't break the onclick attribute.
+    // Clickable badge: opens the single-appointment focused modal
+    // scoped to THIS row's customer + appointment (not the whole
+    // day). encodeURIComponent so apostrophes etc. can't break the
+    // onclick attribute.
     const a0 = apptsArr[0] || {};
     const dt0 = a0.AppointmentDateTime || a0.AppointmentDate || '';
     const badgeOnClick = dt0
-      ? `event.preventDefault();event.stopPropagation();_openApptFromBadge('${encodeURIComponent(dt0)}')`
+      ? `event.preventDefault();event.stopPropagation();_openApptFromBadge('${encodeURIComponent(cid)}','${encodeURIComponent(dt0)}')`
       : '';
     apptBadge = ` <span title="${escapeHtml(dates || 'Has appointment')}" onclick="${badgeOnClick}" style="display:inline-block;background:#fff5e6;color:#5a3300;border:1px solid #f59e0b;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;cursor:pointer">📅 Appt</span>`;
   }
