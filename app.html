@@ -907,14 +907,7 @@ button,input,select{font-family:inherit}
   <nav class="topnav-tabs">
     <button class="tnt active" data-route="dashboard"><svg class="icn"><use href="#i-dashboard"/></svg>Dashboard</button>
     <button class="tnt" data-route="queue"><svg class="icn"><use href="#i-list"/></svg>Applications</button>
-    <button class="tnt" data-route="connections" style="position:relative"><svg class="icn"><use href="#i-bank"/></svg>Connections<span id="alertcount-conn" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></button>
-    <button class="tnt" data-route="if" style="position:relative"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding<span id="alertcount-if" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></button>
     <button class="tnt" data-route="reports"><svg class="icn"><use href="#i-chart"/></svg>Reports</button>
-    <!-- Customers tab — admin-only. Revealed when /api/me reports
-         role==='admin' (see role-gating block where #user-role text
-         is set). Lets an operator search the portal customer base
-         for support / impersonation. -->
-    <button class="tnt admin-only" data-route="customers" style="display:none"><svg class="icn"><use href="#i-list"/></svg>Customers</button>
   </nav>
   <div class="topnav-spacer"></div>
   <div class="search-wrap">
@@ -955,9 +948,9 @@ button,input,select{font-family:inherit}
       <div class="subnav-section">
         <div class="subnav-label">Insights</div>
         <button class="subnav-link active"><svg class="icn"><use href="#i-overview"/></svg>Overview</button>
-        <button class="subnav-link" data-route="queue"><svg class="icn"><use href="#i-pipeline"/></svg>Pipeline</button>
-        <a class="subnav-link" href="/app/legacy#analyze"><svg class="icn"><use href="#i-chart"/></svg>Analytics</a>
-        <a class="subnav-link" href="/app/legacy"><svg class="icn"><use href="#i-alert-bell"/></svg>Alerts</a>
+        <button class="subnav-link" data-route="connections" style="position:relative"><svg class="icn"><use href="#i-bank"/></svg>Connections<span id="alertcount-conn" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></button>
+        <button class="subnav-link admin-only" data-route="customers" style="display:none"><svg class="icn"><use href="#i-list"/></svg>Customers</button>
+        <button class="subnav-link" data-route="if" style="position:relative"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding<span id="alertcount-if" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></button>
       </div>
       <div class="subnav-foot">
         <a class="subnav-link" href="/app/legacy"><svg class="icn"><use href="#i-folder"/></svg>Reports</a>
