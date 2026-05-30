@@ -6380,16 +6380,14 @@ function _apptByKey(syntheticId) {
 function openEditApptById(syntheticId) {
   const a = _apptByKey(syntheticId);
   if (!a) { alert('Appointment not found.'); return; }
-  if (!a.apptId) {
-    const keys = Object.keys(a.rawAppt || {}).join(', ');
-    alert('Vergent didn\'t return an id for this appointment, so we can\'t target it for an edit. Available fields on the appointment: ' + (keys || '(none)') + '. Tell the dev which one is the row id.');
-    return;
-  }
+  // Stash the original datetime so submitNewAppt can include it as a
+  // matcher when the row id isn't known — backend resolves it.
   _apptModalCtx = {
     customerId: a.customerId,
     customerName: a.customerName,
     hdrId: a.hdrId,
     apptId: a.apptId,
+    originalDateTimeUtc: a.dateTimeUtc,
   };
   const ov = document.getElementById('appt-modal');
   if (!ov) return;
@@ -6428,18 +6426,21 @@ async function deleteAppointmentById(syntheticId) {
   if (!a) return;
   const d = _apptLocalDate(a.dateTimeUtc);
   const when = d ? d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'this appointment';
-  if (!a.apptId) {
-    const keys = Object.keys(a.rawAppt || {}).join(', ');
-    alert('Vergent didn\'t return an id for this appointment, so we can\'t target it for a delete. Available fields on the appointment: ' + (keys || '(none)') + '. Tell the dev which one is the row id.');
-    return;
-  }
   if (!confirm(`Delete appointment for ${a.customerName}\n${when}?`)) return;
   try {
+    // Send appointmentId when we have it; otherwise the matcher fields
+    // (customerId + hdrId + appointmentDateTime). Backend resolves the
+    // id from Vergent's per-customer appointment list when missing.
     const r = await fetch('/api/vergent-appointment-delete', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customerId: a.customerId, appointmentId: a.apptId }),
+      body: JSON.stringify({
+        customerId: a.customerId,
+        appointmentId: a.apptId || 0,
+        hdrId: a.hdrId || 0,
+        appointmentDateTime: a.dateTimeUtc || '',
+      }),
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok || !data.ok) {
@@ -6470,11 +6471,14 @@ async function submitNewAppt() {
   const utcIso = local.toISOString();
   if (errEl) errEl.style.display = 'none';
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
-  // Edit mode: ctx carries an existing appointmentId. Hits the update
-  // proxy which routes to Vergent's V1 create endpoint with id != 0
-  // (upsert semantics).
+  // Edit mode: ctx carries either an apptId OR an originalDateTimeUtc
+  // matcher. Either is enough for the backend to target the existing
+  // row. New-appointment path leaves both blank and hits the create
+  // proxy.
   const editId = Number(_apptModalCtx.apptId) || 0;
-  const endpoint = editId > 0 ? '/api/vergent-appointment-update' : '/api/vergent-appointment-create';
+  const origDt = _apptModalCtx.originalDateTimeUtc || '';
+  const isEdit = editId > 0 || !!origDt;
+  const endpoint = isEdit ? '/api/vergent-appointment-update' : '/api/vergent-appointment-create';
   try {
     const r = await fetch(endpoint, {
       method: 'POST',
@@ -6483,6 +6487,7 @@ async function submitNewAppt() {
         customerId: _apptModalCtx.customerId,
         hdrId: _apptModalCtx.hdrId,
         appointmentId: editId,
+        originalAppointmentDateTime: origDt,
         appointmentDateTime: utcIso,
         commitmentAmount: Number(amtStr) || 0,
         notes: notes,
