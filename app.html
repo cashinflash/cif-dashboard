@@ -803,8 +803,20 @@ button,input,select{font-family:inherit}
   .appt-day-time{flex:0 0 68px;font-size:12px}
 }
 
+/* MOBILE SUB-NAV — sticky strip under the topnav across every view */
+.mobile-subnav{display:none}
+
 /* RESPONSIVE */
 @media(max-width:980px){
+  /* Sticky global sub-nav on phones: same z-stack as the topnav so it
+     pins right below it as the operator scrolls any page. */
+  .mobile-subnav{display:flex;position:sticky;top:var(--topnav-h);z-index:90;background:var(--surface);border-bottom:1px solid var(--border);padding:6px 10px;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;align-items:center}
+  .mobile-subnav::-webkit-scrollbar{display:none}
+  .mobile-subnav .subnav-link{flex:0 0 auto;width:auto;padding:7px 12px;font-size:12.5px;white-space:nowrap;border-radius:8px}
+  .mobile-subnav .subnav-link.active{background:#dcfce7;color:var(--green-dark)}
+  /* In-dashboard rail is hidden on mobile — the sticky global strip
+     above takes its place across all views. */
+  .subnav{display:none}
   .topnav{padding:0 14px;gap:10px}
   /* Top nav is just three tabs now (Dashboard · Applications · Reports)
      so they fit on phone width; keep them visible. The icons drop on
@@ -854,19 +866,22 @@ button,input,select{font-family:inherit}
   .dv-main{padding:14px 13px 18px}
   .dv-rail{padding:14px 13px}
   .dv-tabs{padding:8px 6px}
-  /* Top nav on phones — bigger logo + search per operator request. The
-     bell + user avatar still fit because we trim other slots (sync-chip
-     hidden, sub-name hidden) and the search box flexes to fill. */
+  /* Top nav on phones — three tabs (Dashboard · Applications · Reports)
+     get priority since this is the operator's primary nav. Search is
+     dropped because every in-page table already has its own search
+     bar, and the topnav search hogged the row otherwise. */
   .topnav{padding:0 10px;gap:8px;height:64px}
-  .topnav-search{width:0;flex:1;min-width:140px;max-width:none;padding:9px 14px;border-radius:11px}
-  .topnav-search input{font-size:14px}
-  .topnav-search .icn{width:17px;height:17px}
-  .brand{gap:8px}
+  .search-wrap,.topnav-search{display:none}
+  .topnav-spacer{display:none}           /* let topnav-tabs claim the row */
+  .topnav-tabs{flex:1 1 auto;min-width:0;justify-content:flex-end}
+  .topnav-tabs .tnt{padding:7px 10px;font-size:12.5px}
+  .brand{gap:8px;flex:0 0 auto}
   .brand-icon{width:34px;height:34px;border-radius:8px}
-  .brand-img{display:block;height:22px;max-width:130px}  /* bigger wordmark */
+  .brand-img{display:block;height:20px;max-width:96px}
   .brand-name{display:none}
-  .topnav-user-meta{display:none}        /* free up width for the search */
-  .sync-chip{display:none}        /* free up nav width on phones */
+  .topnav-user-meta{display:none}        /* free up width for tabs */
+  .sync-chip{display:none}
+  .tnav-icon-btn{display:none}           /* bell — moved to user-menu on mobile */
   /* Detail action bar — wrap into 2 rows on phones, compact buttons */
   /* Detail action bar — wrap into 2 rows on phones, compact buttons.
      Sticky positioning is dropped on mobile; with the bar wrapping to
@@ -996,6 +1011,17 @@ button,input,select{font-family:inherit}
     </div>
   </div>
 </header>
+
+<!-- Mobile sub-nav: sticky under the topnav on every view (hidden on
+     desktop where the dashboard's left rail handles this). Keeps
+     Overview / Connections / Customers / Instant Funding one tap away
+     from the Applications, Reports, Detail, and any other view. -->
+<nav class="mobile-subnav">
+  <button class="subnav-link" data-route="dashboard"><svg class="icn"><use href="#i-overview"/></svg>Overview</button>
+  <button class="subnav-link" data-route="connections"><svg class="icn"><use href="#i-bank"/></svg>Connections</button>
+  <button class="subnav-link admin-only" data-route="customers" style="display:none"><svg class="icn"><use href="#i-list"/></svg>Customers</button>
+  <button class="subnav-link" data-route="if"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
+</nav>
 
 <!-- DASHBOARD -->
 <div class="view active" id="view-dashboard">
@@ -1884,6 +1910,9 @@ function toast(msg, kind, opts) {
 function setRoute(name, fbId) {
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
   document.querySelectorAll('.tnt[data-route]').forEach(t => t.classList.toggle('active', t.getAttribute('data-route') === name));
+  // Mirror the active state onto the mobile sticky sub-nav so the
+  // current destination is visibly highlighted there too.
+  document.querySelectorAll('.mobile-subnav .subnav-link[data-route]').forEach(t => t.classList.toggle('active', t.getAttribute('data-route') === name));
   if (name === 'detail' && fbId) renderDetail(fbId);
   if (name === 'queue') renderQueue();
   if (name === 'dashboard') renderDashboard();
