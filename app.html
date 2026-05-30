@@ -1669,6 +1669,9 @@ button,input,select{font-family:inherit}
           <option value="Other">Other</option>
         </select>
       </label>
+      <label style="font-size:12px;color:var(--muted);font-weight:600" title="Vergent's V1 API in this tenant doesn't expose the Subject id mapping — enter a number here (try 1, 2, 3, 4...) to test which one is Promise to Pay. Leave blank for auto.">Subject ID override (experimental)
+        <input type="number" id="appt-subject-id" step="1" min="0" placeholder="leave blank for auto" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit">
+      </label>
       <label style="font-size:12px;color:var(--muted);font-weight:600">Commitment amount ($)
         <input type="number" id="appt-amount" step="1" min="0" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit">
       </label>
@@ -6347,6 +6350,8 @@ function openApptModal(customerId, hdrId, customerName) {
   if (nEl) nEl.value = '';
   const sEl = document.getElementById('appt-subject');
   if (sEl) sEl.value = 'Promise to Pay';
+  const sidEl = document.getElementById('appt-subject-id');
+  if (sidEl) sidEl.value = '';
   const err = document.getElementById('appt-error');
   if (err) {
     err.style.display = 'none';
@@ -6479,6 +6484,8 @@ async function submitNewAppt() {
   const amtStr = (document.getElementById('appt-amount') || {}).value || '';
   const notes = (document.getElementById('appt-notes') || {}).value || '';
   const subject = (document.getElementById('appt-subject') || {}).value || 'Promise to Pay';
+  const subjectIdOverrideRaw = (document.getElementById('appt-subject-id') || {}).value || '';
+  const subjectIdOverride = subjectIdOverrideRaw === '' ? 0 : (Number(subjectIdOverrideRaw) || 0);
   const errEl = document.getElementById('appt-error');
   const btn = document.getElementById('appt-save-btn');
   const showErr = m => { if (errEl) { errEl.textContent = m; errEl.style.display = 'block'; } };
@@ -6511,6 +6518,7 @@ async function submitNewAppt() {
         commitmentAmount: Number(amtStr) || 0,
         notes: notes,
         subject: subject,
+        subjectIdOverride: subjectIdOverride,
       }),
     });
     const data = await r.json().catch(() => ({}));
