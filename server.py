@@ -1936,7 +1936,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
-        if path in ('/api/vergent-appointment-update', '/api/vergent-appointment-delete'):
+        if path in ('/api/vergent-appointment-update', '/api/vergent-appointment-delete',
+                    '/api/vergent-debug-list-appointments'):
             try:
                 body = json.loads(raw) if raw else {}
                 payload = json.dumps(body).encode()
