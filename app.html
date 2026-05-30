@@ -6289,7 +6289,7 @@ function renderContactQueue(rows) {
     const phone = _cqField(r, ['Phone','PhoneNumber','phone','phoneNumber','CellPhone','cellPhone','PrimaryPhone']);
     const loanId = _cqField(r, ['LoanId','loanId','LoanNumber','loanNumber','HdrId','hdrId','LoanHeaderId']);
     const amount = _cqField(r, ['AmountDue','amountDue','Amount','amount','Balance','balance','PaymentAmount','paymentAmount']);
-    const due = _cqField(r, ['DueDate','dueDate','AppointmentDate','appointmentDate','PaymentDueDate']);
+    const due = _cqField(r, ['NextPayDate','nextPayDate','DueDate','dueDate','AppointmentDate','appointmentDate','PaymentDueDate']);
     const cid = _cqField(r, ['CustomerId','customerId','CustomerID']);
     const dueFmt = due ? String(due).slice(0, 10) : '';
     let amtFmt = '';
