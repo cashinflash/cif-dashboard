@@ -6158,12 +6158,11 @@ function filterReport(q) {
 let _upcomingRows = null;     // cached superset (today..+30d)
 let _upcomingLoadedAt = 0;
 let _upcomingAutoTimer = null;
-// 30s cache so a payment landing in Vergent shows up within ~half a
-// minute, but flipping tabs in the same operator session doesn't burn
-// extra fetches. Set lower if you want it tighter — at the cost of more
-// Vergent calls.
-const _UPCOMING_TTL_MS = 30 * 1000;
-const _UPCOMING_AUTO_REFRESH_MS = 90 * 1000;  // background reload cadence
+// 0s cache TTL — fetch fresh every time the tab is opened so the
+// instant a customer pays in Vergent, switching back here drops them.
+// Background auto-refresh (below) also fetches every 60s.
+const _UPCOMING_TTL_MS = 0;
+const _UPCOMING_AUTO_REFRESH_MS = 60 * 1000;  // background reload cadence
 
 function _stopUpcomingAuto() {
   if (_upcomingAutoTimer) { clearInterval(_upcomingAutoTimer); _upcomingAutoTimer = null; }
@@ -6201,16 +6200,13 @@ function _todayMidnight() {
 function _filterUpcoming(rows, mode) {
   const today = _todayMidnight();
   const day = 24 * 60 * 60 * 1000;
-  // Active-only — skip closed loans (Bought-Back / Paid-Off / etc.) +
-  // skip rows where the cycle's already been paid. The latter is the
-  // fix for "Due Today shows 16 but Vergent has 7": a loan paid today
-  // still carries a remaining principal Balance, but its AmountDue
-  // drops to 0 for the current cycle, which is exactly Vergent's
-  // "no longer due today" signal. _pastDueIsActive treats AmountDue
-  // OR Balance > 0 as active (correct for past-due aging), but for
-  // an UPCOMING list "did they pay this cycle yet" is the right cut.
+  // Match Vergent's collections queue exactly: only LoanStatus="Held"
+  // is "active and currently collectable". Statuses like Returned (NSF),
+  // Bought Back (ACH pending), Deposited, Paid Off, Deleted all carry
+  // a balance but go through different operational flows — including
+  // them was why our Due Today / Tomorrow counts were way over Vergent's.
   return (rows || []).filter(r => {
-    if (!_pastDueIsActive(r)) return false;
+    if (String(r.LoanStatus || '').trim().toLowerCase() !== 'held') return false;
     if ((Number(r.AmountDue) || 0) <= 0) return false;
     const due = _localMidnight(r.DueDate);
     if (isNaN(due)) return false;
