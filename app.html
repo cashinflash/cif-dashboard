@@ -6953,10 +6953,13 @@ function renderLoansDueUnified() {
       + card('Upcoming · 30d', upcomingCt);
   }
 
-  // Aging tiles: past-due slice (positive days late). Builders live in
-  // _pastDueRenderAging which already handles the click-to-filter UX.
-  const pastDueOnly = allRows.filter(r => _pastDueComputedDaysLate(r) >= 1);
-  _pastDueRenderAging(pastDueOnly);
+  // Aging tiles: feed ALL active rows. _pastDueBucket already skips
+  // rows with daysLate < 0 (the upcoming-only slice that doesn't
+  // belong to any bucket); the daysLate == 0 rows correctly land in
+  // the "Due today" tile. Pre-filtering to >= 1 here was dropping
+  // those — operator reported the Due Today tile showing 0 while
+  // the Due Today section below had 2 loans.
+  _pastDueRenderAging(allRows);
 
   // Search filter — same JSON-stringify check used by contact queue.
   const q = (document.getElementById('rpt-search')?.value || '').toLowerCase().trim();
