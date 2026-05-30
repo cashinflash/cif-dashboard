@@ -1031,220 +1031,12 @@ _PHASE2_PANEL_HTML = ("""
 """).encode("utf-8")
 
 
-# OmniaText 2-way SMS messaging panel — iframe embed of Vergent's
-# conversation UI, wired for the Concept-8 /app. Vergent has no outbound
-# SMS API; comm.aspx?cid=...&embedded=1 is a chrome-less conversation
-# view that embeds in an iframe and rides on the operator's Vergent
-# session. Adds a data-route="messages" nav tab (plugs into Concept-8's
-# setRoute), a view-messages panel, and a "Message customer" button on
-# the #vg-card. Injected on /app via inject_messages_panel().
-_MESSAGES_PANEL_HTML = ("""
-<style>
-  #view-messages.view.active{position:fixed;top:var(--topnav-h,60px);left:0;right:0;bottom:0;background:#fff;z-index:50;}
-  #view-messages .cifm-wrap{display:flex;flex-direction:column;height:100%;font-family:inherit;background:#fff;}
-  #view-messages .cifm-bar{padding:10px 16px;border-bottom:1px solid #e2e8f0;background:#f7fafc;display:flex;align-items:center;justify-content:space-between;gap:12px;}
-  #view-messages .cifm-title{font-size:14px;font-weight:700;color:#1a4d6b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  #view-messages .cifm-btn{font-size:12px;color:#1a4d6b;text-decoration:none;background:#e8f3f8;border:1px solid #6cb1e2;padding:6px 12px;border-radius:8px;white-space:nowrap;cursor:pointer;}
-  #view-messages .cifm-host{flex:1;display:flex;min-height:0;}
-  #view-messages #cifMsgFrame{flex:1;width:100%;height:100%;border:0;}
-  #view-messages .cifm-ph{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#718096;font-size:14px;gap:14px;padding:40px;text-align:center;line-height:1.6;}
-</style>
-<script>
-(function(){
-  if (window.__cifMessagesInit) return;
-  window.__cifMessagesInit = true;
-
-  // Vergent's chrome-less conversation view embeds in an iframe and rides
-  // on the operator's existing Vergent session. (Vergent has no outbound
-  // SMS API; comm.aspx?cid=...&embedded=1 is the only path that works.)
-  var CONV  = 'https://shared.vergentlms.com/customer/comm.aspx';
-  var INBOX = 'https://shared.lms.vergentlms.com/comm?rid=0&did=0&sid=0';
-
-  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-  function phHtml(){
-    return '<div class="cifm-ph"><div>Open a customer conversation from their application using the '
-      + '<b>Message customer</b> button on the Vergent card, or open the full Vergent inbox to browse '
-      + 'all conversations.</div>'
-      + '<a class="cifm-btn" href="' + INBOX + '" target="_blank" rel="noopener">Open full Vergent inbox ↗</a></div>';
-  }
-
-  function buildView(){
-    if (document.getElementById('view-messages')) return;
-    var v = document.createElement('div');
-    v.id = 'view-messages';
-    v.className = 'view';
-    v.innerHTML = '<div class="cifm-wrap"><div class="cifm-bar">'
-      + '<span class="cifm-title" id="cifm-title">Messages</span>'
-      + '<span id="cifm-actions"><a class="cifm-btn" href="' + INBOX + '" target="_blank" rel="noopener">Open full Vergent inbox ↗</a></span>'
-      + '</div><div class="cifm-host" id="cifm-host">' + phHtml() + '</div></div>';
-    document.body.appendChild(v);
-  }
-
-  function showConversation(cid, name){
-    buildView();
-    var host = document.getElementById('cifm-host');
-    var title = document.getElementById('cifm-title');
-    var act = document.getElementById('cifm-actions');
-    if (!host) return;
-    if (title) title.textContent = 'Conversation — ' + (name || ('Customer #' + cid));
-    var embed = CONV + '?cid=' + encodeURIComponent(cid) + '&embedded=1';
-    var tab   = CONV + '?cid=' + encodeURIComponent(cid) + '&embedded=0';
-    if (act) act.innerHTML = '<button class="cifm-btn" type="button" onclick="window.__cifMsgInbox&&window.__cifMsgInbox()">← All messages</button> '
-      + '<a class="cifm-btn" href="' + esc(tab) + '" target="_blank" rel="noopener">Open in new tab ↗</a>';
-    // If Vergent blocks framing (X-Frame-Options) the iframe is blank; the
-    // "Open in new tab" link in the bar is the always-works escape hatch.
-    host.innerHTML = '<iframe id="cifMsgFrame" title="Vergent conversation" src="' + esc(embed) + '"></iframe>';
-  }
-
-  function showPlaceholder(){
-    buildView();
-    var host = document.getElementById('cifm-host');
-    var title = document.getElementById('cifm-title');
-    var act = document.getElementById('cifm-actions');
-    if (title) title.textContent = 'Messages';
-    if (act) act.innerHTML = '<a class="cifm-btn" href="' + INBOX + '" target="_blank" rel="noopener">Open full Vergent inbox ↗</a>';
-    if (host) host.innerHTML = phHtml();
-  }
-
-  // Default Messages view. Vergent's full inbox page sends
-  // X-Frame-Options, so it cannot be embedded in an iframe (the browser
-  // refuses with "refused to connect"). We therefore show a placeholder
-  // that opens the inbox in a popup window (top-level context, so the
-  // header doesn't apply) instead of trying — and failing — to frame it.
-  function openInboxWindow(){
-    var w = window.open(INBOX, 'cifVergentInbox', 'width=1200,height=860');
-    if (w) w.focus();
-    return w;
-  }
-  window.__cifMsgOpenInbox = openInboxWindow;
-  function showInbox(){
-    buildView();
-    var host = document.getElementById('cifm-host');
-    var title = document.getElementById('cifm-title');
-    var act = document.getElementById('cifm-actions');
-    if (title) title.textContent = 'Messages';
-    if (act) act.innerHTML = '<a class="cifm-btn" href="' + INBOX + '" target="_blank" rel="noopener">Open in new tab ↗</a>';
-    if (host) host.innerHTML = '<div class="cifm-ph">'
-      + '<div>Vergent doesn\\u2019t allow its message inbox to be embedded here, so it opens in its own window. '
-      + 'You can also message a specific customer from their application using the '
-      + '<b>Message customer</b> button on the Vergent card.</div>'
-      + '<button class="cifm-btn" type="button" onclick="window.__cifMsgOpenInbox&&window.__cifMsgOpenInbox()">Open Vergent inbox \\u2197</button>'
-      + '</div>';
-  }
-  window.__cifMsgInbox = showInbox;
-
-  // Load the inbox when the Messages tab is opened — unless a specific
-  // conversation iframe is already showing (don't clobber it).
-  function ensureMessagesView(){
-    var host = document.getElementById('cifm-host');
-    if (!host){ buildView(); host = document.getElementById('cifm-host'); }
-    if (host && !host.querySelector('iframe')) showInbox();
-  }
-
-  // Concept-8 routes via setRoute(name) and has no 'messages' branch, so
-  // wrap it to mount the inbox on entry. Wrapping leaves the tab's own
-  // active-state handling (setRoute line ~1772) intact.
-  (function patchSetRoute(){
-    if (window.__cifMsgSetRoutePatched) return;
-    if (typeof window.setRoute !== 'function'){ setTimeout(patchSetRoute, 150); return; }
-    var orig = window.setRoute;
-    window.setRoute = function(name, fbId){
-      orig.apply(this, arguments);
-      if (name === 'messages') ensureMessagesView();
-    };
-    window.__cifMsgSetRoutePatched = true;
-  })();
-
-  // Public entry used by the per-applicant "Message customer" button.
-  window.cifOpenMessages = function(cid, name){
-    if (!cid) return;
-    showConversation(String(cid), name || '');
-    if (typeof window.setRoute === 'function') window.setRoute('messages');
-  };
-
-  // Build the view eagerly so Concept-8's setRoute('messages') (from a
-  // #messages hash on reload, or the nav tab) has something to show.
-  buildView();
-
-  // Concept-8's hashchange handler (app.html) re-derives the route from
-  // the URL via readRouteFromHash(), which doesn't know '#messages' and
-  // falls through to 'dashboard' — that bounced the Messages tab right
-  // back off itself. Teach it the route so setRoute('messages') sticks.
-  (function patchHashRoute(){
-    if (window.__cifMsgHashPatched) return;
-    if (typeof window.readRouteFromHash !== 'function'){ setTimeout(patchHashRoute, 150); return; }
-    var orig = window.readRouteFromHash;
-    window.readRouteFromHash = function(){
-      if ((location.hash || '') === '#messages') return ['messages', null];
-      return orig.apply(this, arguments);
-    };
-    window.__cifMsgHashPatched = true;
-    // Honor a #messages deep-link / reload that booted before this patch.
-    if ((location.hash || '') === '#messages' && typeof window.setRoute === 'function') window.setRoute('messages');
-  })();
-
-  // ── Messages nav tab ──
-  // data-route="messages" plugs straight into Concept-8's global
-  // click->setRoute handler, which toggles view-messages .active and
-  // marks the tab active. No app.html edit needed.
-  function injectNavTab(){
-    if (document.getElementById('cifm-tab')) return;
-    var nav = document.querySelector('nav.topnav-tabs');
-    if (!nav) return;
-    var b = document.createElement('button');
-    b.className = 'tnt';
-    b.id = 'cifm-tab';
-    b.setAttribute('data-route', 'messages');
-    b.innerHTML = '<svg class="icn"><use href="#i-message"/></svg>Messages';
-    var reports = nav.querySelector('.tnt[data-route="reports"]');
-    if (reports) nav.insertBefore(b, reports); else nav.appendChild(b);
-  }
-
-  // ── Per-applicant "Message customer" button ──
-  // Anchored under the Vergent card (#vg-card) in the detail view.
-  // Resolves the customer id from the report (vergentCustomerId, else
-  // vergentMatch.customerId) and opens that conversation.
-  function injectDetailBtn(){
-    var card = document.getElementById('vg-card');
-    if (!card || !card.parentNode) return;
-    if (document.getElementById('cifm-detail-btn')) return;
-    var b = document.createElement('button');
-    b.id = 'cifm-detail-btn';
-    b.type = 'button';
-    b.innerHTML = '<svg class="icn" style="vertical-align:-2px;margin-right:4px"><use href="#i-message"/></svg>Message customer';
-    b.style.cssText = 'margin-top:8px;width:100%;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;'
-      + 'padding:9px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;';
-    b.addEventListener('click', function(){
-      var fbId = document.body.dataset.firebaseId || '';
-      if (!fbId) return;
-      b.disabled = true;
-      fetch('/fb/reports/' + encodeURIComponent(fbId) + '/vergentCustomerId.json', {credentials:'same-origin'})
-        .then(function(r){ return r.json(); })
-        .then(function(cid){
-          if (cid) return cid;
-          return fetch('/fb/reports/' + encodeURIComponent(fbId) + '/vergentMatch/customerId.json', {credentials:'same-origin'})
-            .then(function(r){ return r.json(); }).catch(function(){ return null; });
-        })
-        .then(function(cid){
-          b.disabled = false;
-          if (!cid) { alert('No Vergent customer ID on this applicant yet. Use the Vergent card above to match or create the customer first.'); return; }
-          fetch('/fb/reports/' + encodeURIComponent(fbId) + '/name.json', {credentials:'same-origin'})
-            .then(function(r){ return r.json(); }).catch(function(){ return ''; })
-            .then(function(nm){ window.cifOpenMessages(String(cid), nm || ''); });
-        })
-        .catch(function(){ b.disabled = false; });
-    });
-    card.parentNode.insertBefore(b, card.nextSibling);
-  }
-
-  setTimeout(injectNavTab, 400);
-  setInterval(injectNavTab, 1500);
-  setTimeout(injectDetailBtn, 800);
-  setInterval(injectDetailBtn, 1500);
-})();
-</script>
-""").encode("utf-8")
+# Messages panel removed 2026-05-30. Vergent has no working partner API
+# for outbound SMS, no working read endpoint, and X-Frame-Options blocks
+# embedding their UI. Per-applicant SMS work pauses until Vergent fixes
+# their /api/V1/customer/{cid}/communication/messagehistory/{cell}/get
+# endpoint (currently throws SolByText UriFormatException). When that
+# lands, restore the panel + injector from PRs #88, #89, #90, #91.
 
 
 def inject_phase2_panel(html_bytes: bytes) -> bytes:
@@ -1256,22 +1048,8 @@ def inject_phase2_panel(html_bytes: bytes) -> bytes:
     closing = b'</body>'
     idx = html_bytes.rfind(closing)
     if idx < 0:
-        return html_bytes + _PHASE2_PANEL_HTML + _MESSAGES_PANEL_HTML
-    return html_bytes[:idx] + _PHASE2_PANEL_HTML + _MESSAGES_PANEL_HTML + html_bytes[idx:]
-
-
-def inject_messages_panel(html_bytes: bytes) -> bytes:
-    """Inject ONLY the Messages panel (iframe embed of Vergent's
-    conversation UI) before </body>. Used on the Concept-8 /app, which
-    renders its own Vergent card — so we do NOT inject the Phase 2
-    badge here (that would duplicate the inline #vg-card)."""
-    if not html_bytes:
-        return html_bytes
-    closing = b'</body>'
-    idx = html_bytes.rfind(closing)
-    if idx < 0:
-        return html_bytes + _MESSAGES_PANEL_HTML
-    return html_bytes[:idx] + _MESSAGES_PANEL_HTML + html_bytes[idx:]
+        return html_bytes + _PHASE2_PANEL_HTML
+    return html_bytes[:idx] + _PHASE2_PANEL_HTML + html_bytes[idx:]
 
 
 # CORS: restrict to same-origin. The dashboard is a single app; there's no
@@ -1365,11 +1143,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             data = read_file(os.path.join(DIR, 'app.html'))
-            # Concept-8 renders its own inline Vergent card, so we inject ONLY
-            # the Messages panel here (iframe embed of Vergent's conversation
-            # UI) — not the Phase 2 badge. /app/legacy still gets the full
-            # inject below.
-            data = inject_messages_panel(data) if data else data
+            # Concept-8 renders its own inline Vergent card in the right
+            # rail (#vg-card), so we do NOT inject the Phase 2 floating
+            # badge here. /app/legacy still gets the full inject below.
             self.send_html(200, data or b'App not found')
             return
 
