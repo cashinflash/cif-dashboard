@@ -6158,12 +6158,11 @@ function filterReport(q) {
 let _upcomingRows = null;     // cached superset (today..+30d)
 let _upcomingLoadedAt = 0;
 let _upcomingAutoTimer = null;
-// 30s cache so a payment landing in Vergent shows up within ~half a
-// minute, but flipping tabs in the same operator session doesn't burn
-// extra fetches. Set lower if you want it tighter — at the cost of more
-// Vergent calls.
-const _UPCOMING_TTL_MS = 30 * 1000;
-const _UPCOMING_AUTO_REFRESH_MS = 90 * 1000;  // background reload cadence
+// 0s cache TTL — fetch fresh every time the tab is opened so the
+// instant a customer pays in Vergent, switching back here drops them.
+// Background auto-refresh (below) also fetches every 60s.
+const _UPCOMING_TTL_MS = 0;
+const _UPCOMING_AUTO_REFRESH_MS = 60 * 1000;  // background reload cadence
 
 function _stopUpcomingAuto() {
   if (_upcomingAutoTimer) { clearInterval(_upcomingAutoTimer); _upcomingAutoTimer = null; }
@@ -6201,17 +6200,15 @@ function _todayMidnight() {
 function _filterUpcoming(rows, mode) {
   const today = _todayMidnight();
   const day = 24 * 60 * 60 * 1000;
-  // Use NextPayDate, NOT DueDate. PastDueContactList's DueDate is the
-  // ORIGINAL due date (frozen — e.g. 2025-10-31), but NextPayDate is
-  // the live "when the loan is next scheduled to be paid". For active
-  // past-due loans NextPayDate rolls forward to whenever the customer
-  // is now expected to pay. That's the field Vergent's own collections
-  // queue keys off, and it's why our Due Today count was 16 vs 7 — we
-  // were matching DueDate.day == today.day numerically across years.
+  // Match Vergent's collections queue exactly: only LoanStatus="Held"
+  // is "active and currently collectable". Statuses like Returned (NSF),
+  // Bought Back (ACH pending), Deposited, Paid Off, Deleted all carry
+  // a balance but go through different operational flows — including
+  // them was why our Due Today / Tomorrow counts were way over Vergent's.
   return (rows || []).filter(r => {
-    if (!_pastDueIsActive(r)) return false;
+    if (String(r.LoanStatus || '').trim().toLowerCase() !== 'held') return false;
     if ((Number(r.AmountDue) || 0) <= 0) return false;
-    const due = _localMidnight(r.NextPayDate || r.DueDate);
+    const due = _localMidnight(r.DueDate);
     if (isNaN(due)) return false;
     if (mode === 'today')    return due === today;
     if (mode === 'tomorrow') return due === today + day;
