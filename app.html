@@ -6505,7 +6505,20 @@ function _apptOneHide(syntheticId) {
   if (!confirm('Hide this appointment from the admin? It will still exist in Vergent, but won\'t show here. Use this to clean up old test rows.')) return;
   _hideAppt(syntheticId);
   closeApptOneModal();
-  if (typeof loadPastDueReport === 'function') loadPastDueReport();
+  // If the day-detail modal is currently open (bulk-hide flow from the
+  // Appointments calendar), re-render it in place so the row drops
+  // out without forcing the operator to close + reopen.
+  const dayModal = document.getElementById('appt-day-modal');
+  if (dayModal && dayModal.style.display === 'flex' && _currentApptDayKey) {
+    openApptDay(_currentApptDayKey);
+  }
+  // Also refresh the loans-due table + list view so the badge/row
+  // drops out everywhere immediately, without waiting for the next
+  // auto-refresh.
+  if (typeof renderLoansDueUnified === 'function') renderLoansDueUnified();
+  if (typeof renderAppointmentsCalendar === 'function' && _rptTab === 'appointments') {
+    renderAppointmentsCalendar();
+  }
 }
 // Escape hatch for the operator: unhide everything via dev console
 // (`unhideAllAppointments()`) so a misclick can be undone.
@@ -7990,6 +8003,7 @@ function _apptListBodyHtml() {
         a.phone ? _fmtPhoneUS(a.phone) : '',
       ].filter(Boolean).join(' · ');
       const actions = `<div class="appt-row-actions">
+          <button onclick="_apptOneHide('${escapeHtml(a.id)}')" title="Hide from our admin only — leaves Vergent untouched">Hide</button>
           <button onclick="openEditApptById('${escapeHtml(a.id)}')" title="Edit appointment">Edit</button>
           <button class="del" onclick="deleteAppointmentById('${escapeHtml(a.id)}')" title="Delete appointment">Delete</button>
         </div>`;
@@ -8009,7 +8023,9 @@ function _apptListBodyHtml() {
   }).join('');
 }
 
+let _currentApptDayKey = null;
 function openApptDay(dayKey) {
+  _currentApptDayKey = dayKey;
   const appts = _allAppointments().filter(a => {
     const d = _apptLocalDate(a.dateTimeUtc);
     return d && _apptDayKey(d) === dayKey;
@@ -8054,6 +8070,7 @@ function openApptDay(dayKey) {
           a.phone ? _fmtPhoneUS(a.phone) : '',
         ].filter(Boolean).join(' · ');
         const actions = `<div class="appt-row-actions">
+            <button onclick="_apptOneHide('${escapeHtml(a.id)}')" title="Hide from our admin only — leaves Vergent untouched">Hide</button>
             <button onclick="openEditApptById('${escapeHtml(a.id)}')" title="Edit appointment">Edit</button>
             <button class="del" onclick="deleteAppointmentById('${escapeHtml(a.id)}')" title="Delete appointment">Delete</button>
           </div>`;
@@ -8076,6 +8093,7 @@ function openApptDay(dayKey) {
 function closeApptDayModal() {
   const m = document.getElementById('appt-day-modal');
   if (m) m.style.display = 'none';
+  _currentApptDayKey = null;
 }
 
 // Open the create-appointment modal seeded with a specific day. The
