@@ -6376,6 +6376,17 @@ function _apptByKey(syntheticId) {
   return _allAppointments().find(x => x.id === syntheticId) || null;
 }
 
+// Loans Due row's 📅 Appt badge click → opens the day-detail modal for
+// the appointment's day, where Edit + Delete already live.
+function _openApptFromBadge(encodedDateTime) {
+  try {
+    const dt = decodeURIComponent(encodedDateTime || '');
+    const d = _apptLocalDate(dt);
+    if (!d) return;
+    openApptDay(_apptDayKey(d));
+  } catch (e) { /* no-op */ }
+}
+
 // Local cache of Vergent appointment ids keyed by customer|hdr|datetime
 // prefix. Filled in when our admin creates an appointment (Vergent's
 // create response carries the new id but its GET appointments endpoint
@@ -7458,7 +7469,16 @@ function _loansDueRowHtml(r) {
   let apptBadge = '';
   if (apptsArr.length) {
     const dates = apptsArr.map(a => _pastDueFmtApptTime(a)).filter(Boolean).join(' · ');
-    apptBadge = ` <span title="${escapeHtml(dates || 'Has appointment')}" style="display:inline-block;background:#fff5e6;color:#5a3300;border:1px solid #f59e0b;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;cursor:help">📅 Appt</span>`;
+    // Clickable badge: opens the day-detail modal for the first
+    // appointment's day, which renders the row with Edit + Delete
+    // buttons. encodeURIComponent so apostrophes in customer names
+    // can't break the onclick attribute.
+    const a0 = apptsArr[0] || {};
+    const dt0 = a0.AppointmentDateTime || a0.AppointmentDate || '';
+    const badgeOnClick = dt0
+      ? `event.preventDefault();event.stopPropagation();_openApptFromBadge('${encodeURIComponent(dt0)}')`
+      : '';
+    apptBadge = ` <span title="${escapeHtml(dates || 'Has appointment')}" onclick="${badgeOnClick}" style="display:inline-block;background:#fff5e6;color:#5a3300;border:1px solid #f59e0b;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;cursor:pointer">📅 Appt</span>`;
   }
   const daysLate = _pastDueComputedDaysLate(r);
   const daysCellHtml = daysLate >= 1
