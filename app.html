@@ -6478,23 +6478,94 @@ function closeApptOneModal() {
   if (m) m.style.display = 'none';
 }
 
-// Manually-hidden appointments. Stored in localStorage by synthetic
-// id (customer|hdr|datetime). Used to clean up old test rows that
-// exist in Vergent's DB but can't be deleted via API + can't be
-// clicked in Vergent UI (no subject). _allAppointments filters them.
-const _HIDDEN_APPTS_KEY = 'cif_hiddenAppts_v1';
+// Firebase-backed appointment state — shared across all devices.
+// Replaces the old localStorage caches so an appointment created on
+// desktop is editable + deletable from the iPhone, and test rows
+// hidden on one device stay hidden on all of them.
+//
+// Shape on Firebase (/dashboardState/appointments.json):
+//   { ids: { "cid|hdr|dtPrefix": appointmentId, ... },
+//     hidden: { "cid|hdr|dtPrefix": true, ... } }
+//
+// Hydrated once per page load (or on demand) via _hydrateApptState.
+// Writes go through _persistApptState which PATCHes the node so we
+// don't blow away another device's writes between this device's
+// read and write.
+const _LEGACY_HIDDEN_APPTS_KEY = 'cif_hiddenAppts_v1';
+let _apptState = { ids: {}, hidden: {} };
+let _apptStateHydrated = false;
+let _apptStatePromise = null;
+
+async function _hydrateApptState() {
+  if (_apptStateHydrated) return _apptState;
+  if (_apptStatePromise) return _apptStatePromise;
+  _apptStatePromise = (async () => {
+    try {
+      const r = await fetch('/fb/dashboardState/appointments.json', {
+        credentials: 'include',
+      });
+      const remote = (await r.json().catch(() => null)) || {};
+      _apptState.ids = remote.ids || {};
+      _apptState.hidden = remote.hidden || {};
+      const migrated = _migrateLocalStorageToApptState();
+      if (migrated) await _persistApptState();
+      _apptStateHydrated = true;
+    } catch (e) {
+      console.warn('[appt-state] hydration failed', e);
+    }
+    return _apptState;
+  })();
+  return _apptStatePromise;
+}
+
+async function _persistApptState() {
+  try {
+    await fetch('/fb/dashboardState/appointments.json', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-Method': 'PATCH' },
+      body: JSON.stringify({ ids: _apptState.ids, hidden: _apptState.hidden }),
+    });
+  } catch (e) {
+    console.warn('[appt-state] persist failed', e);
+  }
+}
+
+function _migrateLocalStorageToApptState() {
+  let changed = false;
+  // Hidden list — legacy localStorage entries.
+  try {
+    const legacy = JSON.parse(localStorage.getItem(_LEGACY_HIDDEN_APPTS_KEY) || '[]');
+    for (const id of legacy) {
+      if (id && !_apptState.hidden[id]) {
+        _apptState.hidden[id] = true;
+        changed = true;
+      }
+    }
+  } catch (e) { /* ignore */ }
+  // Cached appointment ids — legacy vergentApptId:* keys.
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith('vergentApptId:')) continue;
+      const k = key.slice('vergentApptId:'.length);
+      const v = Number(localStorage.getItem(key)) || 0;
+      if (v > 0 && !_apptState.ids[k]) {
+        _apptState.ids[k] = v;
+        changed = true;
+      }
+    }
+  } catch (e) { /* ignore */ }
+  return changed;
+}
+
 function _getHiddenAppts() {
-  try { return JSON.parse(localStorage.getItem(_HIDDEN_APPTS_KEY) || '[]'); }
-  catch (e) { return []; }
+  return Object.keys(_apptState.hidden).filter(k => _apptState.hidden[k]);
 }
 function _hideAppt(syntheticId) {
-  try {
-    const list = _getHiddenAppts();
-    if (!list.includes(syntheticId)) {
-      list.push(syntheticId);
-      localStorage.setItem(_HIDDEN_APPTS_KEY, JSON.stringify(list));
-    }
-  } catch (e) { /* ignore quota */ }
+  if (!syntheticId || _apptState.hidden[syntheticId]) return;
+  _apptState.hidden[syntheticId] = true;
+  _persistApptState();
 }
 function _apptOneHide(syntheticId) {
   if (!confirm('Hide this appointment from the admin? It will still exist in Vergent, but won\'t show here. Use this to clean up old test rows.')) return;
@@ -6523,34 +6594,29 @@ window.unhideAllAppointments = function() {
   console.log('All hidden appointments restored.');
 };
 
-// Local cache of Vergent appointment ids keyed by customer|hdr|datetime
-// prefix. Filled in when our admin creates an appointment (Vergent's
-// create response carries the new id but its GET appointments endpoint
-// 404s in this tenant, so we have to cache client-side or we'd lose the
-// id between page loads). Used by _allAppointments to augment rows so
-// delete + edit can target a real appointment id.
-function _apptCacheKey(customerId, hdrId, dateTimeIso) {
-  // Trim ISO to YYYY-MM-DDTHH:MM so we match Vergent's PastDueContactList
-  // output (which may strip seconds + Z) against our local toISOString
-  // (which doesn't).
+// (Legacy localStorage-based cache helpers were here. The new
+// Firebase-backed equivalents — _apptCacheRawKey, _getCachedApptId,
+// _setCachedApptId, _clearCachedApptId — live above next to
+// _hydrateApptState.)
+function _apptCacheRawKey(customerId, hdrId, dateTimeIso) {
   const dt = String(dateTimeIso || '').replace('Z', '').slice(0, 16);
-  return `vergentApptId:${String(customerId || '')}|${String(hdrId || '')}|${dt}`;
+  return `${String(customerId || '')}|${String(hdrId || '')}|${dt}`;
 }
 function _getCachedApptId(customerId, hdrId, dateTimeIso) {
-  try {
-    const v = localStorage.getItem(_apptCacheKey(customerId, hdrId, dateTimeIso));
-    return v ? Number(v) || 0 : 0;
-  } catch (e) { return 0; }
+  const k = _apptCacheRawKey(customerId, hdrId, dateTimeIso);
+  return Number(_apptState.ids[k] || 0) || 0;
 }
 function _setCachedApptId(customerId, hdrId, dateTimeIso, apptId) {
-  try {
-    localStorage.setItem(_apptCacheKey(customerId, hdrId, dateTimeIso), String(apptId));
-  } catch (e) { /* ignore quota errors */ }
+  const k = _apptCacheRawKey(customerId, hdrId, dateTimeIso);
+  _apptState.ids[k] = Number(apptId) || 0;
+  _persistApptState();
 }
 function _clearCachedApptId(customerId, hdrId, dateTimeIso) {
-  try {
-    localStorage.removeItem(_apptCacheKey(customerId, hdrId, dateTimeIso));
-  } catch (e) { /* ignore */ }
+  const k = _apptCacheRawKey(customerId, hdrId, dateTimeIso);
+  if (_apptState.ids[k]) {
+    delete _apptState.ids[k];
+    _persistApptState();
+  }
 }
 
 // Open the create-appointment modal pre-filled for editing an existing
@@ -7091,6 +7157,10 @@ async function loadPastDueReport() {
   // to renderLoansDueUnified which buckets and draws sticky-section
   // headers per group. Callers (refresh button, auto-refresh, route
   // handler, appointment-create modal) all still call this name.
+  // Hydrate the cross-device appointment state cache (hidden rows +
+  // cached Vergent appointment ids) before anything renders, so the
+  // first paint reflects the same hidden / id data on every device.
+  await _hydrateApptState();
   const table = document.getElementById('rpt-table');
   const status = document.getElementById('rpt-status');
   if (table && !_pastDueLoadedAt) table.innerHTML = '<div class="tbl-loading">Loading loans due…</div>';
