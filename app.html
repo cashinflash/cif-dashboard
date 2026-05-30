@@ -222,7 +222,10 @@ button,input,select{font-family:inherit}
 .tbl tbody tr{cursor:pointer;transition:background .12s}
 .tbl tbody tr:hover td{background:var(--surface2)}
 .tbl tbody tr:last-child td{border-bottom:none}
-.tbl-checkbox{width:32px}
+.tbl-checkbox{width:64px}
+.appt-add-btn{background:#ecfdf5;color:var(--green-dark);border:1px solid #a7f3d0;border-radius:999px;padding:4px 10px;font-size:11.5px;font-weight:700;cursor:pointer;line-height:1.4;white-space:nowrap;transition:background .12s,border-color .12s}
+.appt-add-btn:hover{background:#d1fae5;border-color:#34d399}
+.appt-add-btn:active{background:#a7f3d0}
 
 .applicant{display:flex;align-items:center;gap:10px}
 .av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0;background:linear-gradient(135deg,#34d399,#16a34a)}
@@ -1417,6 +1420,41 @@ button,input,select{font-family:inherit}
     <div id="rpt-status" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
     <div id="rpt-table">
       <div class="tbl-loading">Click Refresh to load the report.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Past-Due Reports: create-appointment modal -->
+<div id="appt-modal" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.5);align-items:center;justify-content:center;padding:20px"
+     onclick="if(event.target.id==='appt-modal')closeApptModal()">
+  <div style="background:white;border-radius:14px;width:100%;max-width:480px;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:16px 20px;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:15px;font-weight:700;color:var(--text)">Create appointment</div>
+        <div id="appt-modal-customer" style="font-size:12.5px;color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums"></div>
+      </div>
+      <button onclick="closeApptModal()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1" title="Close">&times;</button>
+    </div>
+    <div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;gap:10px">
+        <label style="flex:1;font-size:12px;color:var(--muted);font-weight:600">Date
+          <input type="date" id="appt-date" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit">
+        </label>
+        <label style="flex:1;font-size:12px;color:var(--muted);font-weight:600">Time
+          <input type="time" id="appt-time" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit">
+        </label>
+      </div>
+      <label style="font-size:12px;color:var(--muted);font-weight:600">Commitment amount ($)
+        <input type="number" id="appt-amount" step="1" min="0" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit">
+      </label>
+      <label style="font-size:12px;color:var(--muted);font-weight:600">Notes
+        <textarea id="appt-notes" rows="3" placeholder="Promise to pay, callback, etc." style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;resize:vertical"></textarea>
+      </label>
+      <div id="appt-error" style="display:none;color:var(--red);font-size:12.5px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 10px"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--border)">
+      <button onclick="closeApptModal()" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:13.5px;font-weight:600;color:var(--text);cursor:pointer">Cancel</button>
+      <button id="appt-save-btn" onclick="submitNewAppt()" style="background:var(--green);color:white;border:0;border-radius:8px;padding:8px 16px;font-size:13.5px;font-weight:700;cursor:pointer">Save appointment</button>
     </div>
   </div>
 </div>
@@ -5879,6 +5917,17 @@ function _pastDueBucket(r) {
   return _PASTDUE_BUCKETS.find(b => d >= b.min && d <= b.max) || null;
 }
 
+// US phone formatter — accepts any string, returns "(XXX) XXX-XXXX" when
+// we have exactly 10 digits (or 11 with a leading 1). Falls back to the
+// raw value when the input doesn't look like a US number.
+function _fmtPhoneUS(p) {
+  if (!p) return '';
+  const digits = String(p).replace(/\D/g, '');
+  const ten = (digits.length === 11 && digits[0] === '1') ? digits.slice(1) : digits;
+  if (ten.length === 10) return `(${ten.slice(0,3)}) ${ten.slice(3,6)}-${ten.slice(6)}`;
+  return String(p);
+}
+
 function _pastDueDaysSince(iso) {
   if (!iso) return 999;
   const t = Date.parse(iso);
@@ -6025,6 +6074,99 @@ function _pastDueRefreshBulkBar() {
   const n = _pastDueSelected.size;
   bar.style.display = n ? 'flex' : 'none';
   if (ct) ct.textContent = `${n} selected`;
+}
+
+// ── Appointment-create modal ─────────────────────────────────────
+// Operators open this from the "+ Appt" button on each past-due row.
+// On save we POST to /api/vergent-appointment-create (proxied to
+// cif-apply's run_server, which calls Vergent's V1 endpoint), then
+// refresh the past-due view so the new appointment shows inline.
+let _apptModalCtx = null;
+
+function openApptModalFromBtn(btn) {
+  if (!btn) return;
+  openApptModal(btn.dataset.cid, btn.dataset.hdr, btn.dataset.name);
+}
+
+function openApptModal(customerId, hdrId, customerName) {
+  _apptModalCtx = {
+    customerId: String(customerId || '').trim(),
+    hdrId: hdrId || 0,
+    customerName: customerName || '',
+  };
+  const ov = document.getElementById('appt-modal');
+  if (!ov) return;
+  const cdiv = document.getElementById('appt-modal-customer');
+  if (cdiv) cdiv.textContent = (_apptModalCtx.customerName
+    ? _apptModalCtx.customerName + ' · Customer #' + _apptModalCtx.customerId
+    : 'Customer #' + _apptModalCtx.customerId);
+  // Default: tomorrow at 10:00 local.
+  const tmw = new Date();
+  tmw.setDate(tmw.getDate() + 1);
+  const yyyy = tmw.getFullYear();
+  const mm = String(tmw.getMonth() + 1).padStart(2, '0');
+  const dd = String(tmw.getDate()).padStart(2, '0');
+  const dEl = document.getElementById('appt-date');
+  const tEl = document.getElementById('appt-time');
+  const aEl = document.getElementById('appt-amount');
+  const nEl = document.getElementById('appt-notes');
+  if (dEl) dEl.value = `${yyyy}-${mm}-${dd}`;
+  if (tEl) tEl.value = '10:00';
+  if (aEl) aEl.value = '';
+  if (nEl) nEl.value = '';
+  const err = document.getElementById('appt-error');
+  if (err) { err.style.display = 'none'; err.textContent = ''; }
+  const btn = document.getElementById('appt-save-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Save appointment'; }
+  ov.style.display = 'flex';
+}
+
+function closeApptModal() {
+  const ov = document.getElementById('appt-modal');
+  if (ov) ov.style.display = 'none';
+  _apptModalCtx = null;
+}
+
+async function submitNewAppt() {
+  if (!_apptModalCtx) return;
+  const dt = (document.getElementById('appt-date') || {}).value;
+  const tm = (document.getElementById('appt-time') || {}).value;
+  const amtStr = (document.getElementById('appt-amount') || {}).value || '';
+  const notes = (document.getElementById('appt-notes') || {}).value || '';
+  const errEl = document.getElementById('appt-error');
+  const btn = document.getElementById('appt-save-btn');
+  const showErr = m => { if (errEl) { errEl.textContent = m; errEl.style.display = 'block'; } };
+  if (!dt || !tm) { showErr('Pick a date and time.'); return; }
+  // Treat the picker values as local wall-clock; convert to UTC ISO so
+  // Vergent stores the right instant.
+  const local = new Date(`${dt}T${tm}:00`);
+  if (isNaN(local.getTime())) { showErr('Invalid date/time.'); return; }
+  const utcIso = local.toISOString();
+  if (errEl) errEl.style.display = 'none';
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    const r = await fetch('/api/vergent-appointment-create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customerId: _apptModalCtx.customerId,
+        hdrId: _apptModalCtx.hdrId,
+        appointmentDateTime: utcIso,
+        commitmentAmount: Number(amtStr) || 0,
+        notes: notes,
+      }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.ok) {
+      const body = data.vergentBody || data.error || (`HTTP ${r.status}`);
+      throw new Error(String(body).slice(0, 220));
+    }
+    closeApptModal();
+    if (typeof loadPastDueReport === 'function') loadPastDueReport();
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Save appointment'; }
+    showErr('Could not save: ' + e.message);
+  }
 }
 
 function resetPastDueView() {
@@ -6539,7 +6681,7 @@ function renderPastDueReport(rows) {
     { key: 'due',      label: 'Due'       },
     { key: 'nextpay',  label: 'Next pay'  },
     { key: 'phone',    label: 'Phone'     },
-    { key: 'lastcall', label: 'Last call' },
+    { key: 'lastcall', label: 'Appointments' },
   ];
   const headHtml = headerCols.map(c =>
     `<th class="tbl-sortable" onclick="setPastDueSort('${c.key}')">${c.label}${sortInd(c.key)}</th>`
@@ -6548,15 +6690,17 @@ function renderPastDueReport(rows) {
 
   const body = sorted.map(r => {
     const name = ((r.FirstName || '') + ' ' + (r.LastName || '')).trim() || '—';
-    const phone = (r.PrimaryPhoenNumber || r.PrimaryPhoneNumber || '').trim();
-    const phoneHtml = phone
-      ? `<a href="tel:${escapeHtml(phone)}" style="color:var(--green-dark);text-decoration:none;font-variant-numeric:tabular-nums" onclick="event.stopPropagation()">${escapeHtml(phone)}</a>`
+    const phoneRaw = (r.PrimaryPhoenNumber || r.PrimaryPhoneNumber || '').trim();
+    const phoneFmt = _fmtPhoneUS(phoneRaw);
+    const phoneHtml = phoneRaw
+      ? `<a href="tel:${escapeHtml(phoneRaw)}" style="color:var(--green-dark);text-decoration:none;font-variant-numeric:tabular-nums" onclick="event.stopPropagation()">${escapeHtml(phoneFmt)}</a>`
       : '—';
     const vergentLink = `https://shared.lms.vergentlms.com/customer/general?action=view&id=${encodeURIComponent(r.CustomerId || '')}`;
     const bucket = _pastDueBucket(r);
     const rowCls = bucket ? bucket.cls : '';
     const loanId = String(r.LoanId || '');
-    const checked = _pastDueSelected.has(loanId) ? 'checked' : '';
+    const cid = String(r.CustomerId || '');
+    const hdrId = String(r.HdrId || r.LoanId || '');
     // 📅 Appt badge — Vergent's PastDueContactList returns each row's
     // appointments inline; if any exist, mark the row so the operator
     // doesn't re-contact someone who's already committed. Tooltip shows
@@ -6568,8 +6712,8 @@ function renderPastDueReport(rows) {
       apptBadge = ` <span title="${escapeHtml(dates || 'Has appointment')}" style="display:inline-block;background:#fff5e6;color:#5a3300;border:1px solid #f59e0b;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;cursor:help">📅 Appt</span>`;
     }
     return `<tr${rowCls?` class="${rowCls}"`:''}>
-      <td class="tbl-checkbox"><input type="checkbox" class="rpt-rowchk" data-loanid="${escapeHtml(loanId)}" ${checked} onclick="event.stopPropagation();togglePastDueRow('${escapeHtml(loanId)}')"></td>
-      <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" onclick="event.stopPropagation()">${escapeHtml(name)}</a>${apptBadge}</div><div class="applicant-id">#${escapeHtml(String(r.CustomerId || '—'))} · ${escapeHtml(r.StoreNumber || '—')}</div></td>
+      <td class="tbl-checkbox"><button class="appt-add-btn" title="Create appointment" data-cid="${escapeHtml(cid)}" data-hdr="${escapeHtml(hdrId)}" data-name="${escapeHtml(name)}" onclick="event.stopPropagation();openApptModalFromBtn(this)">+ Appt</button></td>
+      <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" onclick="event.stopPropagation()">${escapeHtml(name)}</a>${apptBadge}</div></td>
       <td><div class="app-info"><span class="app-type">${escapeHtml(r.LoanId || '—')}</span><span class="app-meta">${escapeHtml(r.LoanStatus || '')}${r.LoanSubStatus ? ' · ' + escapeHtml(r.LoanSubStatus) : ''}</span></div></td>
       <td>${_rptDaysLatePill(_pastDueComputedDaysLate(r))}</td>
       <td><span class="tbl-time" style="font-variant-numeric:tabular-nums">${_rptFmtMoney(r.Balance)}</span></td>
@@ -6585,7 +6729,7 @@ function renderPastDueReport(rows) {
 
   table.innerHTML = `<div class="tbl-card-scroll"><table class="tbl">
     <thead><tr>
-      <th class="tbl-checkbox"><input type="checkbox" id="rpt-headchk" ${allChecked?'checked':''} onclick="togglePastDueAllVisible(this)"></th>
+      <th class="tbl-checkbox"></th>
       ${headHtml}
     </tr></thead>
     <tbody>${body}</tbody>

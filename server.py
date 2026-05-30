@@ -2141,6 +2141,25 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        if path == '/api/vergent-appointment-create':
+            try:
+                body = json.loads(raw) if raw else {}
+                payload = json.dumps(body).encode()
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/vergent-appointment-create',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=30) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[VERGENT-APPOINTMENT-CREATE ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         if path == '/api/vergent-customer-docs':
             try:
                 body = json.loads(raw)
