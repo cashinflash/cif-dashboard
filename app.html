@@ -1663,14 +1663,12 @@ button,input,select{font-family:inherit}
       </div>
       <label style="font-size:12px;color:var(--muted);font-weight:600">Subject
         <select id="appt-subject" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;background:white">
-          <option value="Promise to Pay">Promise to Pay</option>
-          <option value="Callback">Callback</option>
-          <option value="Visit">Visit</option>
-          <option value="Other">Other</option>
+          <option value="59419" data-label="Promise to Pay">Promise to Pay</option>
+          <option value="59424" data-label="Payment Plan Requested">Payment Plan Requested</option>
+          <option value="59411" data-label="No answer - left message">No answer - left message</option>
+          <option value="61902" data-label="Schedule Payment (Pay Date)">Schedule Payment (Pay Date)</option>
+          <option value="61908" data-label="Send to Collections Dept.">Send to Collections Dept.</option>
         </select>
-      </label>
-      <label style="font-size:12px;color:var(--muted);font-weight:600" title="Vergent's V1 API in this tenant doesn't expose the Subject id mapping — enter a number here (try 1, 2, 3, 4...) to test which one is Promise to Pay. Leave blank for auto.">Subject ID override (experimental)
-        <input type="number" id="appt-subject-id" step="1" min="0" placeholder="leave blank for auto" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit">
       </label>
       <label style="font-size:12px;color:var(--muted);font-weight:600">Commitment amount ($)
         <input type="number" id="appt-amount" step="1" min="0" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit">
@@ -6349,9 +6347,7 @@ function openApptModal(customerId, hdrId, customerName) {
   if (aEl) aEl.value = '';
   if (nEl) nEl.value = '';
   const sEl = document.getElementById('appt-subject');
-  if (sEl) sEl.value = 'Promise to Pay';
-  const sidEl = document.getElementById('appt-subject-id');
-  if (sidEl) sidEl.value = '';
+  if (sEl) sEl.value = '59419';   // Promise to Pay (Vergent SubjectId)
   const err = document.getElementById('appt-error');
   if (err) {
     err.style.display = 'none';
@@ -6412,7 +6408,7 @@ function openEditApptById(syntheticId) {
   if (tEl && d) tEl.value = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
   if (aEl) aEl.value = a.commitment || '';
   if (nEl) nEl.value = a.notes || '';
-  if (sEl) sEl.value = 'Promise to Pay';
+  if (sEl) sEl.value = '59419';   // Promise to Pay (Vergent SubjectId)
   const err = document.getElementById('appt-error');
   if (err) {
     err.style.display = 'none';
@@ -6483,9 +6479,14 @@ async function submitNewAppt() {
   const tm = (document.getElementById('appt-time') || {}).value;
   const amtStr = (document.getElementById('appt-amount') || {}).value || '';
   const notes = (document.getElementById('appt-notes') || {}).value || '';
-  const subject = (document.getElementById('appt-subject') || {}).value || 'Promise to Pay';
-  const subjectIdOverrideRaw = (document.getElementById('appt-subject-id') || {}).value || '';
-  const subjectIdOverride = subjectIdOverrideRaw === '' ? 0 : (Number(subjectIdOverrideRaw) || 0);
+  // Subject dropdown's value is the Vergent SubjectId integer
+  // (discovered from Vergent UI source — see commit msg). The visible
+  // label comes from data-label so we can still send a friendly subject
+  // string to the backend for logging/fallback purposes.
+  const subjEl = document.getElementById('appt-subject');
+  const subjectIdOverride = Number((subjEl && subjEl.value) || 0) || 0;
+  const subjectOpt = subjEl && subjEl.options && subjEl.options[subjEl.selectedIndex];
+  const subject = (subjectOpt && subjectOpt.getAttribute('data-label')) || 'Promise to Pay';
   const errEl = document.getElementById('appt-error');
   const btn = document.getElementById('appt-save-btn');
   const showErr = m => { if (errEl) { errEl.textContent = m; errEl.style.display = 'block'; } };
@@ -7882,7 +7883,7 @@ function _openApptModalForDay(dayKey) {
   if (tEl) tEl.value = '10:00';
   if (aEl) aEl.value = '';
   if (nEl) nEl.value = '';
-  if (sEl) sEl.value = 'Promise to Pay';
+  if (sEl) sEl.value = '59419';   // Promise to Pay (Vergent SubjectId)
   const err = document.getElementById('appt-error');
   if (err) {
     err.style.display = 'none';
