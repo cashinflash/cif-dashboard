@@ -6318,8 +6318,13 @@ function renderContactQueue(rows) {
     // Tooltip shows the appointment date(s).
     let apptBadge = '';
     if (appts.length) {
+      // Vergent uses AppointmentDateTime (verified from PastDueContactList
+      // response). The other names were guesses for the swagger CRUD
+      // endpoints; this is the field the report actually returns.
       const dates = appts.map(a => {
-        const d = a.AppointmentDate || a.appointmentDate || a.LocalAppointmentDate || a.localAppointmentDate || '';
+        const d = a.AppointmentDateTime || a.appointmentDateTime
+                || a.AppointmentDate    || a.appointmentDate
+                || a.LocalAppointmentDate || a.localAppointmentDate || '';
         return d ? String(d).slice(0, 16).replace('T', ' ') : '';
       }).filter(Boolean).join('\n');
       apptBadge = ' <span title="' + escapeHtml(dates || 'Has appointment') + '" style="display:inline-block;background:#fff5e6;color:#5a3300;border:1px solid #f59e0b;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;cursor:help">📅 Appt</span>';
@@ -6451,7 +6456,15 @@ function renderPastDueReport(rows) {
       + card('31+ days late', sev31, 'dec');
   }
 
-  const tilesSet = _pastDueRows.filter(_pastDueIsActive);
+  // Aging tiles ignore loans with scheduled appointments — Vergent's
+  // collections workflow drops them from the queue once an appointment
+  // is made (the customer's already committed; they're not a fresh
+  // collection target). Match that behavior so 1-day-late etc. counts
+  // line up with Vergent's admin. The table below still shows them so
+  // the operator can see everything in one place.
+  const tilesSet = _pastDueRows.filter(r =>
+    _pastDueIsActive(r) && !(Array.isArray(r.Appointments) && r.Appointments.length > 0)
+  );
   _pastDueRenderAging(tilesSet);
   // Due-chip counts use the show-all-filtered set so each chip
   // shows the total population for its window regardless of which
@@ -6510,9 +6523,22 @@ function renderPastDueReport(rows) {
     const rowCls = bucket ? bucket.cls : '';
     const loanId = String(r.LoanId || '');
     const checked = _pastDueSelected.has(loanId) ? 'checked' : '';
+    // 📅 Appt badge — Vergent's PastDueContactList returns each row's
+    // appointments inline; if any exist, mark the row so the operator
+    // doesn't re-contact someone who's already committed. Tooltip shows
+    // the appointment time(s).
+    const apptsArr = Array.isArray(r.Appointments) ? r.Appointments : [];
+    let apptBadge = '';
+    if (apptsArr.length) {
+      const dates = apptsArr.map(a => {
+        const d = a.AppointmentDateTime || a.AppointmentDate || '';
+        return d ? String(d).slice(0, 16).replace('T', ' ') : '';
+      }).filter(Boolean).join(' · ');
+      apptBadge = ` <span title="${escapeHtml(dates || 'Has appointment')}" style="display:inline-block;background:#fff5e6;color:#5a3300;border:1px solid #f59e0b;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;cursor:help">📅 Appt</span>`;
+    }
     return `<tr${rowCls?` class="${rowCls}"`:''}>
       <td class="tbl-checkbox"><input type="checkbox" class="rpt-rowchk" data-loanid="${escapeHtml(loanId)}" ${checked} onclick="event.stopPropagation();togglePastDueRow('${escapeHtml(loanId)}')"></td>
-      <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" onclick="event.stopPropagation()">${escapeHtml(name)}</a></div><div class="applicant-id">#${escapeHtml(String(r.CustomerId || '—'))} · ${escapeHtml(r.StoreNumber || '—')}</div></td>
+      <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" onclick="event.stopPropagation()">${escapeHtml(name)}</a>${apptBadge}</div><div class="applicant-id">#${escapeHtml(String(r.CustomerId || '—'))} · ${escapeHtml(r.StoreNumber || '—')}</div></td>
       <td><div class="app-info"><span class="app-type">${escapeHtml(r.LoanId || '—')}</span><span class="app-meta">${escapeHtml(r.LoanStatus || '')}${r.LoanSubStatus ? ' · ' + escapeHtml(r.LoanSubStatus) : ''}</span></div></td>
       <td>${_rptDaysLatePill(r.DaysLate)}</td>
       <td><span class="tbl-time" style="font-variant-numeric:tabular-nums">${_rptFmtMoney(r.Balance)}</span></td>
