@@ -6459,18 +6459,14 @@ function _renderApptOneModal(a) {
     + (a.notes ? row('Notes', escapeHtml(a.notes)) : '')
     + (phone ? row('Phone', `<a href="tel:${escapeHtml(a.phone)}" style="color:var(--green-dark);text-decoration:none">${escapeHtml(phone)}</a>`) : '')
     + (a.loanId ? row('Loan', escapeHtml(a.loanId)) : '');
-  // Edit + Delete buttons. apptId may be 0 for appointments that
-  // weren't created through our admin (Vergent's GET list endpoint
-  // 404s in this tenant). Hide-from-list is always available so the
-  // operator can clean up rows they can't manage via Vergent's UI
-  // either (e.g. old test rows with no Subject).
-  const canManage = a.apptId > 0;
-  const hideBtn = `<button onclick="_apptOneHide('${escapeHtml(a.id)}')" style="background:white;border:1px solid var(--border);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--muted);font-family:inherit" title="Hide from our admin only — leaves Vergent untouched">Hide from list</button>`;
-  actEl.innerHTML = canManage
-    ? `${hideBtn}
-       <button onclick="closeApptOneModal();openEditApptById('${escapeHtml(a.id)}')" style="background:white;border:1px solid var(--border);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--text);font-family:inherit">Edit</button>
-       <button onclick="_apptOneDelete('${escapeHtml(a.id)}')" style="background:#fef2f2;border:1px solid #fecaca;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--red);font-family:inherit">Delete</button>`
-    : `<div style="font-size:11.5px;color:var(--muted);flex:1;line-height:1.4;align-self:center">Created in Vergent — can't be edited from here.</div>${hideBtn}`;
+  // Always render Hide / Edit / Delete. apptId may be 0 for older
+  // appointments not created via our admin — Edit/Delete still
+  // surface clean errors from the backend in that case, and Hide
+  // is the operator's escape hatch.
+  actEl.innerHTML =
+    `<button onclick="_apptOneHide('${escapeHtml(a.id)}')" style="background:white;border:1px solid var(--border);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--muted);font-family:inherit" title="Hide from our admin only — leaves Vergent untouched">Hide</button>
+     <button onclick="closeApptOneModal();openEditApptById('${escapeHtml(a.id)}')" style="background:white;border:1px solid var(--border);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--text);font-family:inherit">Edit</button>
+     <button onclick="_apptOneDelete('${escapeHtml(a.id)}')" style="background:#fef2f2;border:1px solid #fecaca;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--red);font-family:inherit">Delete</button>`;
   overlay.style.display = 'flex';
 }
 
