@@ -6286,19 +6286,48 @@ function renderContactQueue(rows) {
   const body = list.map(r => {
     const name = _cqField(r, ['CustomerName','customerName','FullName','fullName','Name','name']) ||
       ((_cqField(r, ['FirstName','firstName']) + ' ' + _cqField(r, ['LastName','lastName'])).trim());
-    const phone = _cqField(r, ['Phone','PhoneNumber','phone','phoneNumber','CellPhone','cellPhone','PrimaryPhone']);
+    const phone = _cqField(r, ['Phone','PhoneNumber','phone','phoneNumber','CellPhone','cellPhone','PrimaryPhone','PrimaryPhoenNumber','PrimaryPhoneNumber']);
     const loanId = _cqField(r, ['LoanId','loanId','LoanNumber','loanNumber','HdrId','hdrId','LoanHeaderId']);
     const amount = _cqField(r, ['AmountDue','amountDue','Amount','amount','Balance','balance','PaymentAmount','paymentAmount']);
     const due = _cqField(r, ['NextPayDate','nextPayDate','DueDate','dueDate','AppointmentDate','appointmentDate','PaymentDueDate']);
     const cid = _cqField(r, ['CustomerId','customerId','CustomerID']);
+    const hdrId = _cqField(r, ['HdrId','hdrId','LoanHeaderId','loanHeaderId']);
+    const appts = Array.isArray(r.Appointments) ? r.Appointments : [];
     const dueFmt = due ? String(due).slice(0, 10) : '';
     let amtFmt = '';
     if (amount !== '' && !isNaN(Number(amount))) amtFmt = '$' + Number(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // Customer name → Vergent profile in new tab (same URL pattern the
+    // past-due tab already uses).
+    const profileUrl = cid
+      ? 'https://shared.lms.vergentlms.com/customer/general?action=view&id=' + encodeURIComponent(cid)
+      : '';
+    const nameCell = profileUrl
+      ? '<a href="' + profileUrl + '" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;font-weight:700" title="Open in Vergent">' + escapeHtml(name || 'Unknown') + '</a>'
+      : escapeHtml(name || 'Unknown');
+    // Loan id → Vergent loan page (same /customer/general entry point
+    // with the loan's HdrId, which Vergent routes to the loan view).
+    const loanUrl = (cid && hdrId)
+      ? 'https://shared.lms.vergentlms.com/customer/general?action=view&id=' + encodeURIComponent(cid) + '&hdrId=' + encodeURIComponent(hdrId)
+      : '';
+    const loanCell = loanUrl
+      ? '<a href="' + loanUrl + '" target="_blank" rel="noopener" style="color:var(--green-dark);text-decoration:none;font-weight:600" title="Open loan in Vergent">' + escapeHtml(String(loanId || '—')) + '</a>'
+      : escapeHtml(String(loanId || '—'));
+    // Appointment badge — when a row has appointments scheduled, mark
+    // it so the operator knows why Vergent's own queue might hide it.
+    // Tooltip shows the appointment date(s).
+    let apptBadge = '';
+    if (appts.length) {
+      const dates = appts.map(a => {
+        const d = a.AppointmentDate || a.appointmentDate || a.LocalAppointmentDate || a.localAppointmentDate || '';
+        return d ? String(d).slice(0, 16).replace('T', ' ') : '';
+      }).filter(Boolean).join('\n');
+      apptBadge = ' <span title="' + escapeHtml(dates || 'Has appointment') + '" style="display:inline-block;background:#fff5e6;color:#5a3300;border:1px solid #f59e0b;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;cursor:help">📅 Appt</span>';
+    }
     return '<tr>' +
-      '<td><div class="applicant-name">' + escapeHtml(name || 'Unknown') + '</div>' +
+      '<td><div class="applicant-name">' + nameCell + apptBadge + '</div>' +
         (cid ? '<div class="applicant-id">Cust #' + escapeHtml(String(cid)) + '</div>' : '') + '</td>' +
       '<td>' + escapeHtml(String(phone || '—')) + '</td>' +
-      '<td>' + escapeHtml(String(loanId || '—')) + '</td>' +
+      '<td>' + loanCell + '</td>' +
       '<td style="text-align:right;font-variant-numeric:tabular-nums">' + escapeHtml(amtFmt || '—') + '</td>' +
       '<td>' + escapeHtml(dueFmt || '—') + '</td>' +
     '</tr>';
