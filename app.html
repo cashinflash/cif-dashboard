@@ -803,6 +803,32 @@ button,input,select{font-family:inherit}
   .appt-day-time{flex:0 0 68px;font-size:12px}
 }
 
+/* LOANS DUE — Upcoming + Past Due bucket cards (each section gets
+   four interactive tiles + a custom-range button) */
+.rpt-bucket-section{margin-bottom:14px}
+.rpt-bucket-section + .rpt-bucket-section{margin-top:4px}
+.rpt-bucket-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:10px;flex-wrap:wrap}
+.rpt-bucket-title{font-size:12px;font-weight:800;color:var(--text);text-transform:uppercase;letter-spacing:.08em}
+.rpt-bucket-range{font-size:11.5px;color:var(--muted);margin-left:8px;font-weight:600}
+.rpt-bucket-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.bktile{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 12px 10px;cursor:pointer;transition:all .12s;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:3px;min-width:0;box-shadow:var(--shadow-xs)}
+.bktile:hover{border-color:#cfe0d4;background:#f7faf8}
+.bktile.active{background:#ecfdf5;border-color:var(--green);box-shadow:0 0 0 1px var(--green)}
+.bktile-band{position:absolute;left:0;top:0;bottom:0;width:3px}
+.bktile-label{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding-left:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bktile-count{font-size:22px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.1;padding-left:7px}
+.bktile-amt{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;padding-left:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:768px){
+  .rpt-bucket-cards{grid-template-columns:repeat(2,1fr);gap:7px}
+  .bktile{padding:9px 10px 8px}
+  .bktile-count{font-size:18px}
+}
+
+/* Custom-range modal (Loans Due tab) */
+#rng-modal{display:none;position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.5);align-items:center;justify-content:center;padding:20px}
+#rng-modal.open{display:flex}
+#rng-modal .rng-card{background:white;border-radius:14px;width:100%;max-width:420px;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden}
+
 /* MOBILE SUB-NAV — sticky strip under the topnav across every view */
 .mobile-subnav{display:none}
 
@@ -1468,7 +1494,8 @@ button,input,select{font-family:inherit}
     <!-- Aging bucket tiles — click to filter table to that bucket.
          Counts + dollar exposure rendered by JS from the same row set
          the table sees, so totals always agree with what's on screen. -->
-    <div id="rpt-aging" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px"></div>
+    <div id="rpt-buckets" style="margin-bottom:14px"></div>
+    <div id="rpt-aging" style="display:none"></div>
     <!-- Always shows ACTIVE past-due loans only (non-zero balance /
          amount-due, status not Bought-Back/Paid-Off/etc.). The aging
          tiles above are the segmentation control. -->
@@ -1511,6 +1538,32 @@ button,input,select{font-family:inherit}
       <button onclick="closeApptDayModal()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1" title="Close">&times;</button>
     </div>
     <div id="appt-day-list" style="padding:8px 20px;overflow-y:auto;flex:1"></div>
+  </div>
+</div>
+
+<!-- Loans Due: custom date-range modal (one of two sections, Upcoming
+     or Past Due, filters to operator-picked from/to dates) -->
+<div id="rng-modal" onclick="if(event.target.id==='rng-modal')closeRangeModal()">
+  <div class="rng-card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:16px 20px;border-bottom:1px solid var(--border);gap:10px">
+      <div>
+        <div id="rng-modal-title" style="font-size:15px;font-weight:700;color:var(--text)">Custom date range</div>
+        <div id="rng-modal-sub" style="font-size:12px;color:var(--muted);margin-top:3px"></div>
+      </div>
+      <button onclick="closeRangeModal()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1" title="Close">&times;</button>
+    </div>
+    <div style="padding:18px 20px;display:flex;flex-direction:column;gap:12px">
+      <label style="font-size:12px;font-weight:700;color:var(--text)">From
+        <input type="date" id="rng-from" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit">
+      </label>
+      <label style="font-size:12px;font-weight:700;color:var(--text)">To
+        <input type="date" id="rng-to" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit">
+      </label>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--border)">
+      <button class="chip" onclick="closeRangeModal()">Cancel</button>
+      <button id="rng-apply-btn" onclick="applyCustomRange()" style="background:var(--green);color:white;border:0;border-radius:8px;padding:8px 16px;font-size:13.5px;font-weight:700;cursor:pointer">Apply</button>
+    </div>
   </div>
 </div>
 
@@ -6297,6 +6350,8 @@ function resetPastDueView() {
   _pastDueShowAll = false;
   _pastDueAging = null;
   _pastDueDueFilter = null;
+  _bucketFilter = null;
+  _customRange = null;
   _pastDueSortKey = 'priority';
   _pastDueSortDir = 'desc';
   clearPastDueSelection();
@@ -6920,6 +6975,143 @@ const _LOANS_DUE_SECTIONS = [
   { key: 'next30',   label: 'Due Next 30',   min: -30,  max: -8 },
 ];
 
+// Bucket-card tiles — two stacked groups under the KPI strip. Each
+// card click sets _bucketFilter which narrows the table below.
+const _UPCOMING_TILES = [
+  { key: 'up-today',    label: 'Due Today',      dfnMin: 0, dfnMax: 0,  color: '#16a34a' },
+  { key: 'up-tomorrow', label: 'Due Tomorrow',   dfnMin: 1, dfnMax: 1,  color: '#10b981' },
+  { key: 'up-week',     label: 'Due This Week',  dfnMin: 2, dfnMax: 7,  color: '#22c55e' },
+  { key: 'up-month',    label: 'Due This Month', dfnMin: 8, dfnMax: 30, color: '#84cc16' },
+];
+const _PASTDUE_TILES = [
+  { key: 'pd-1day',  label: '1 Day Late',     min: 1,  max: 1,   color: '#fbbf24' },
+  { key: 'pd-2to7',  label: '2-7 Days Late',  min: 2,  max: 7,   color: '#f59e0b' },
+  { key: 'pd-8to30', label: '8-30 Days Late', min: 8,  max: 30,  color: '#f97316' },
+  { key: 'pd-31',    label: '31+ Days Late',  min: 31, max: 1e9, color: '#dc2626' },
+];
+let _bucketFilter = null;     // tile key or null
+let _customRange  = null;     // { kind: 'upcoming'|'pastdue', start: ms, end: ms } or null
+let _rngKind      = 'upcoming';   // last-opened range modal section
+
+function _rowMatchesBucket(r, key) {
+  const d = _pastDueComputedDaysLate(r);
+  const up = _UPCOMING_TILES.find(t => t.key === key);
+  if (up) { const dfn = -d; return dfn >= up.dfnMin && dfn <= up.dfnMax; }
+  const pd = _PASTDUE_TILES.find(t => t.key === key);
+  if (pd) { return d >= pd.min && d <= pd.max; }
+  return true;
+}
+function _rowInCustomRange(r) {
+  if (!_customRange) return true;
+  const dd = _pastDueLocalMidnight(r.DueDate);
+  if (!dd) return false;
+  return dd >= _customRange.start && dd <= _customRange.end;
+}
+
+function setBucketFilter(key) {
+  _bucketFilter = (_bucketFilter === key) ? null : key;
+  _customRange = null;
+  renderLoansDueUnified();
+}
+
+function _renderBucketCards(allRows) {
+  const host = document.getElementById('rpt-buckets');
+  if (!host) return;
+  // Tally counts + balances per tile in one pass.
+  const counts = {}, bal = {};
+  allRows.forEach(r => {
+    const d = _pastDueComputedDaysLate(r);
+    const dfn = -d;
+    const amt = Number(r.Balance) || 0;
+    _UPCOMING_TILES.forEach(t => {
+      if (dfn >= t.dfnMin && dfn <= t.dfnMax) {
+        counts[t.key] = (counts[t.key] || 0) + 1;
+        bal[t.key]    = (bal[t.key]    || 0) + amt;
+      }
+    });
+    _PASTDUE_TILES.forEach(t => {
+      if (d >= t.min && d <= t.max) {
+        counts[t.key] = (counts[t.key] || 0) + 1;
+        bal[t.key]    = (bal[t.key]    || 0) + amt;
+      }
+    });
+  });
+  const tileHtml = t => {
+    const ct = counts[t.key] || 0;
+    const amt = bal[t.key] || 0;
+    const active = _bucketFilter === t.key;
+    return `<div class="bktile${active ? ' active' : ''}" onclick="setBucketFilter('${t.key}')">
+      <div class="bktile-band" style="background:${t.color}"></div>
+      <div class="bktile-label">${escapeHtml(t.label)}</div>
+      <div class="bktile-count">${ct.toLocaleString()}</div>
+      <div class="bktile-amt">${_rptFmtMoney(amt)}</div>
+    </div>`;
+  };
+  const rangeLbl = kind => {
+    if (!_customRange || _customRange.kind !== kind) return '';
+    const fmt = ms => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return `<span class="rpt-bucket-range">${escapeHtml(fmt(_customRange.start))} – ${escapeHtml(fmt(_customRange.end))} <a href="javascript:void(0)" onclick="event.stopPropagation();clearCustomRange()" style="color:var(--green-dark);font-weight:700">Clear</a></span>`;
+  };
+  host.innerHTML = `
+    <div class="rpt-bucket-section">
+      <div class="rpt-bucket-head">
+        <div><span class="rpt-bucket-title">Upcoming</span>${rangeLbl('upcoming')}</div>
+        <button class="chip" onclick="openCustomRange('upcoming')">Custom range</button>
+      </div>
+      <div class="rpt-bucket-cards">${_UPCOMING_TILES.map(tileHtml).join('')}</div>
+    </div>
+    <div class="rpt-bucket-section">
+      <div class="rpt-bucket-head">
+        <div><span class="rpt-bucket-title">Past Due</span>${rangeLbl('pastdue')}</div>
+        <button class="chip" onclick="openCustomRange('pastdue')">Custom range</button>
+      </div>
+      <div class="rpt-bucket-cards">${_PASTDUE_TILES.map(tileHtml).join('')}</div>
+    </div>
+  `;
+}
+
+function openCustomRange(kind) {
+  _rngKind = kind;
+  const modal = document.getElementById('rng-modal');
+  const titleEl = document.getElementById('rng-modal-title');
+  const subEl = document.getElementById('rng-modal-sub');
+  if (titleEl) titleEl.textContent = kind === 'upcoming' ? 'Custom upcoming range' : 'Custom past-due range';
+  if (subEl) subEl.textContent = kind === 'upcoming'
+    ? 'Show loans whose due date falls between these dates.'
+    : 'Show past-due loans whose due date falls between these dates.';
+  // Seed inputs from current state or sensible defaults.
+  const today = new Date();
+  const todayISO = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const fromEl = document.getElementById('rng-from');
+  const toEl   = document.getElementById('rng-to');
+  if (fromEl && !fromEl.value) fromEl.value = todayISO;
+  if (toEl && !toEl.value) {
+    const d = new Date(); d.setDate(d.getDate() + (kind === 'upcoming' ? 30 : -30));
+    toEl.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    if (kind === 'pastdue') { const t = fromEl.value; fromEl.value = toEl.value; toEl.value = t; }
+  }
+  if (modal) modal.classList.add('open');
+}
+function closeRangeModal() {
+  document.getElementById('rng-modal')?.classList.remove('open');
+}
+function applyCustomRange() {
+  const from = document.getElementById('rng-from')?.value;
+  const to   = document.getElementById('rng-to')?.value;
+  if (!from || !to) { closeRangeModal(); return; }
+  const s = _pastDueLocalMidnight(from);
+  const e = _pastDueLocalMidnight(to);
+  if (isNaN(s) || isNaN(e) || e < s) { closeRangeModal(); return; }
+  _customRange = { kind: _rngKind, start: s, end: e };
+  _bucketFilter = null;
+  closeRangeModal();
+  renderLoansDueUnified();
+}
+function clearCustomRange() {
+  _customRange = null;
+  renderLoansDueUnified();
+}
+
 function renderLoansDueUnified() {
   const table = document.getElementById('rpt-table');
   const status = document.getElementById('rpt-status');
@@ -6953,30 +7145,27 @@ function renderLoansDueUnified() {
       + card('Upcoming · 30d', upcomingCt);
   }
 
-  // Aging tiles: feed ALL active rows. _pastDueBucket already skips
-  // rows with daysLate < 0 (the upcoming-only slice that doesn't
-  // belong to any bucket); the daysLate == 0 rows correctly land in
-  // the "Due today" tile. Pre-filtering to >= 1 here was dropping
-  // those — operator reported the Due Today tile showing 0 while
-  // the Due Today section below had 2 loans.
+  // Bucket cards (Upcoming + Past Due sections) — replaces the old
+  // single-row aging tile strip. Each card shows count + total $ for
+  // its bucket; clicking narrows the table to that bucket. The legacy
+  // _pastDueRenderAging is no-op'd since the host #rpt-aging div is
+  // hidden, but we still flow through it to update the active-label
+  // state for back-compat.
+  _renderBucketCards(allRows);
   _pastDueRenderAging(allRows);
 
   // Search filter — same JSON-stringify check used by contact queue.
   const q = (document.getElementById('rpt-search')?.value || '').toLowerCase().trim();
-  // Aging-tile click narrows the Past Due section to that bucket; other
-  // sections still render normally so operators don't lose sight of
-  // upcoming work.
+  // Card click + custom-range filter narrow what flows into sections.
   const buckets = {};
   _LOANS_DUE_SECTIONS.forEach(s => { buckets[s.key] = []; });
   allRows.forEach(r => {
     if (q && !JSON.stringify(r).toLowerCase().includes(q)) return;
+    if (_bucketFilter && !_rowMatchesBucket(r, _bucketFilter)) return;
+    if (_customRange && !_rowInCustomRange(r)) return;
     const d = _pastDueComputedDaysLate(r);
     for (const s of _LOANS_DUE_SECTIONS) {
       if (d >= s.min && d <= s.max) {
-        if (s.key === 'pastdue' && _pastDueAging) {
-          const b = _pastDueBucket(r);
-          if (!b || b.key !== _pastDueAging) return;
-        }
         buckets[s.key].push(r);
         return;
       }
