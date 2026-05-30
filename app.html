@@ -5841,8 +5841,33 @@ function _pastDueIsActive(r) {
   return status === 'held';
 }
 
+function _pastDueComputedDaysLate(r) {
+  // Compute days-late from DueDate in the OPERATOR'S local time. Don't
+  // trust Vergent's DaysLate field — Vergent computes it in UTC, which
+  // means a loan due 2026-05-29 in Pacific time is marked DaysLate=1
+  // starting at 5 PM PST on 05/29 (the moment UTC ticks to 05/30).
+  // For an ops queue we want California's day boundaries, not UTC's.
+  if (!r.DueDate) return Number(r.DaysLate) || 0;
+  const due = _pastDueLocalMidnight(r.DueDate);
+  if (isNaN(due)) return Number(r.DaysLate) || 0;
+  const today = _todayMidnight();
+  return Math.round((today - due) / (24 * 60 * 60 * 1000));
+}
+
+function _pastDueFmtApptTime(a) {
+  if (!a) return '';
+  const t = a.AppointmentDateTime || a.AppointmentDate || '';
+  if (!t) return '';
+  const d = new Date(t);
+  if (isNaN(d.getTime())) return String(t).slice(0, 16).replace('T', ' ');
+  return d.toLocaleString(undefined, {
+    month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  });
+}
+
 function _pastDueBucket(r) {
-  const d = Number(r.DaysLate) || 0;
+  const d = _pastDueComputedDaysLate(r);
   if (d < 0) return null;   // 0 = "Due today" bucket; only negatives have no bucket
   return _PASTDUE_BUCKETS.find(b => d >= b.min && d <= b.max) || null;
 }
@@ -5859,7 +5884,7 @@ function _pastDueDaysSince(iso) {
 // list" is what the operator sees at the top.
 function _pastDuePriorityScore(r) {
   const bal = Number(r.Balance) || 0;
-  const dl  = Math.max(0, Number(r.DaysLate) || 0);
+  const dl  = Math.max(0, _pastDueComputedDaysLate(r));
   const stale = _pastDueDaysSince(r.LastCallUtcDateTime);
   return bal * Math.sqrt(dl + 1) * (1 + Math.min(stale, 30) / 10);
 }
@@ -6017,7 +6042,7 @@ function _pastDueApplySort(rows) {
     priority: r => _pastDuePriorityScore(r),
     name:     r => ((r.LastName || '') + ' ' + (r.FirstName || '')).toLowerCase(),
     loan:     r => String(r.LoanId || '').toLowerCase(),
-    days:     r => Number(r.DaysLate) || 0,
+    days:     r => _pastDueComputedDaysLate(r),
     amtdue:   r => Number(r.AmountDue) || 0,
     balance:  r => Number(r.Balance) || 0,
     due:      r => Date.parse(r.DueDate || '') || 0,
@@ -6443,8 +6468,8 @@ function renderPastDueReport(rows) {
 
   if (stats) {
     const totalDue = rows.reduce((s, r) => s + (Number(r.AmountDue) || 0), 0);
-    const newCt    = rows.filter(r => { const d = Number(r.DaysLate) || 0; return d >= 0 && d <= 7; }).length;
-    const sev31    = rows.filter(r => (Number(r.DaysLate) || 0) >= 31).length;
+    const newCt    = rows.filter(r => { const d = _pastDueComputedDaysLate(r); return d >= 0 && d <= 7; }).length;
+    const sev31    = rows.filter(r => _pastDueComputedDaysLate(r) >= 31).length;
     const card = (label, val, cls) => `<div class="stat${cls?' '+cls:''}">
       <div class="stat-label">${escapeHtml(label)}</div>
       <div class="stat-value${cls==='dec'?' red':cls==='pen'?' amber':''}">${val}</div>
@@ -6540,12 +6565,15 @@ function renderPastDueReport(rows) {
       <td class="tbl-checkbox"><input type="checkbox" class="rpt-rowchk" data-loanid="${escapeHtml(loanId)}" ${checked} onclick="event.stopPropagation();togglePastDueRow('${escapeHtml(loanId)}')"></td>
       <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" onclick="event.stopPropagation()">${escapeHtml(name)}</a>${apptBadge}</div><div class="applicant-id">#${escapeHtml(String(r.CustomerId || '—'))} · ${escapeHtml(r.StoreNumber || '—')}</div></td>
       <td><div class="app-info"><span class="app-type">${escapeHtml(r.LoanId || '—')}</span><span class="app-meta">${escapeHtml(r.LoanStatus || '')}${r.LoanSubStatus ? ' · ' + escapeHtml(r.LoanSubStatus) : ''}</span></div></td>
-      <td>${_rptDaysLatePill(r.DaysLate)}</td>
+      <td>${_rptDaysLatePill(_pastDueComputedDaysLate(r))}</td>
       <td><span class="tbl-time" style="font-variant-numeric:tabular-nums">${_rptFmtMoney(r.Balance)}</span></td>
       <td><span class="tbl-time">${_rptFmtDate(r.DueDate)}</span></td>
       <td><span class="tbl-time">${_rptFmtDate(r.NextPayDate)}</span></td>
       <td>${phoneHtml}</td>
-      <td><div class="tbl-time">${_rptFmtDate(r.LastCallUtcDateTime)}</div><div class="applicant-id" title="${escapeHtml(r.LastCallNote || '')}">${escapeHtml((r.LastCallResult || '').slice(0, 40)) || '—'}</div></td>
+      <td>${apptsArr.length
+        ? `<div class="tbl-time" style="color:#b45309;font-weight:700">Appointment</div><div class="applicant-id" style="color:#5a3300" title="${escapeHtml((apptsArr[0].Notes || '').slice(0, 80))}">${escapeHtml(_pastDueFmtApptTime(apptsArr[0]))}</div>`
+        : `<div class="tbl-time">${_rptFmtDate(r.LastCallUtcDateTime)}</div><div class="applicant-id" title="${escapeHtml(r.LastCallNote || '')}">${escapeHtml((r.LastCallResult || '').slice(0, 40)) || '—'}</div>`
+      }</td>
     </tr>`;
   }).join('');
 
