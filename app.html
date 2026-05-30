@@ -6115,7 +6115,14 @@ function openApptModal(customerId, hdrId, customerName) {
   if (aEl) aEl.value = '';
   if (nEl) nEl.value = '';
   const err = document.getElementById('appt-error');
-  if (err) { err.style.display = 'none'; err.textContent = ''; }
+  if (err) {
+    err.style.display = 'none';
+    err.textContent = '';
+    // Reset to default red error styling; submit success may have flipped it green.
+    err.style.background = '#fef2f2';
+    err.style.borderColor = '#fecaca';
+    err.style.color = 'var(--red)';
+  }
   const btn = document.getElementById('appt-save-btn');
   if (btn) { btn.disabled = false; btn.textContent = 'Save appointment'; }
   ov.style.display = 'flex';
@@ -6161,8 +6168,20 @@ async function submitNewAppt() {
       const body = data.vergentBody || data.error || (`HTTP ${r.status}`);
       throw new Error(String(body).slice(0, 220));
     }
-    closeApptModal();
+    // Surface Vergent's response so we can see what it actually stored
+    // (or didn't). The modal stays open just long enough to flash a
+    // confirmation; refresh fires immediately so the badge updates.
+    const respBody = (data.vergentBody || '').toString();
+    if (btn) { btn.disabled = false; btn.textContent = 'Saved ✓'; }
+    if (errEl) {
+      errEl.style.display = 'block';
+      errEl.style.background = '#e8f5ee';
+      errEl.style.borderColor = '#a7e8c2';
+      errEl.style.color = '#1a6b3c';
+      errEl.textContent = `Vergent HTTP ${data.vergentStatus || r.status} · ${respBody.slice(0, 220) || '(empty body)'}`;
+    }
     if (typeof loadPastDueReport === 'function') loadPastDueReport();
+    setTimeout(closeApptModal, 1800);
   } catch (e) {
     if (btn) { btn.disabled = false; btn.textContent = 'Save appointment'; }
     showErr('Could not save: ' + e.message);
