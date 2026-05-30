@@ -803,6 +803,10 @@ button,input,select{font-family:inherit}
 .appt-list-row-name a{color:inherit;text-decoration:none}
 .appt-list-row-name a:hover{color:var(--green-dark)}
 .appt-list-row-sub{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.45;word-wrap:break-word}
+.appt-row-actions{display:flex;gap:5px;flex:0 0 auto;align-self:center}
+.appt-row-actions button{background:transparent;border:1px solid var(--border);width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;color:var(--text);font-family:inherit;padding:0;transition:all .12s}
+.appt-row-actions button:hover{background:var(--surface2);border-color:#cfe0d4}
+.appt-row-actions button.del:hover{background:#fde7e7;border-color:#fecaca;color:var(--red)}
 @media(max-width:600px){
   .appt-list-row-time{flex:0 0 60px;font-size:12px}
   .appt-list-row{padding:10px 12px;gap:10px}
@@ -1599,7 +1603,7 @@ button,input,select{font-family:inherit}
   <div style="background:white;border-radius:14px;width:100%;max-width:480px;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25)">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:16px 20px;border-bottom:1px solid var(--border)">
       <div>
-        <div style="font-size:15px;font-weight:700;color:var(--text)">Create appointment</div>
+        <div id="appt-modal-title" style="font-size:15px;font-weight:700;color:var(--text)">Create appointment</div>
         <div id="appt-modal-customer" style="font-size:12.5px;color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums"></div>
       </div>
       <button onclick="closeApptModal()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1" title="Close">&times;</button>
@@ -6273,9 +6277,12 @@ function openApptModal(customerId, hdrId, customerName) {
     customerId: String(customerId || '').trim(),
     hdrId: hdrId || 0,
     customerName: customerName || '',
+    apptId: 0,
   };
   const ov = document.getElementById('appt-modal');
   if (!ov) return;
+  const titleEl = document.getElementById('appt-modal-title');
+  if (titleEl) titleEl.textContent = 'Create appointment';
   const cdiv = document.getElementById('appt-modal-customer');
   if (cdiv) cdiv.textContent = (_apptModalCtx.customerName
     ? _apptModalCtx.customerName + ' · Customer #' + _apptModalCtx.customerId
@@ -6316,6 +6323,77 @@ function closeApptModal() {
   _apptModalCtx = null;
 }
 
+// Open the create-appointment modal pre-filled for editing an existing
+// Vergent appointment. apptId is the Vergent Appointment row id; we
+// look the full record up via _allAppointments() so the modal's date /
+// time / amount / notes fields seed correctly.
+function openEditApptById(apptId) {
+  const all = _allAppointments();
+  const a = all.find(x => String(x.apptId) === String(apptId));
+  if (!a) { alert('Appointment not found.'); return; }
+  _apptModalCtx = {
+    customerId: a.customerId,
+    customerName: a.customerName,
+    hdrId: a.hdrId,
+    apptId: a.apptId,
+  };
+  const ov = document.getElementById('appt-modal');
+  if (!ov) return;
+  const titleEl = document.getElementById('appt-modal-title');
+  if (titleEl) titleEl.textContent = 'Edit appointment';
+  const cdiv = document.getElementById('appt-modal-customer');
+  if (cdiv) cdiv.textContent = (a.customerName
+    ? a.customerName + ' · Customer #' + a.customerId
+    : 'Customer #' + a.customerId);
+  const d = _apptLocalDate(a.dateTimeUtc);
+  const dEl = document.getElementById('appt-date');
+  const tEl = document.getElementById('appt-time');
+  const aEl = document.getElementById('appt-amount');
+  const nEl = document.getElementById('appt-notes');
+  const sEl = document.getElementById('appt-subject');
+  if (dEl && d) dEl.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  if (tEl && d) tEl.value = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  if (aEl) aEl.value = a.commitment || '';
+  if (nEl) nEl.value = a.notes || '';
+  if (sEl) sEl.value = 'Promise to Pay';
+  const err = document.getElementById('appt-error');
+  if (err) {
+    err.style.display = 'none';
+    err.textContent = '';
+    err.style.background = '#fef2f2';
+    err.style.borderColor = '#fecaca';
+    err.style.color = 'var(--red)';
+  }
+  const btn = document.getElementById('appt-save-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Save changes'; }
+  ov.style.display = 'flex';
+}
+
+async function deleteAppointmentById(apptId) {
+  const all = _allAppointments();
+  const a = all.find(x => String(x.apptId) === String(apptId));
+  if (!a) return;
+  const d = _apptLocalDate(a.dateTimeUtc);
+  const when = d ? d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'this appointment';
+  if (!confirm(`Delete appointment for ${a.customerName}\n${when}?`)) return;
+  try {
+    const r = await fetch('/api/vergent-appointment-delete', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customerId: a.customerId, appointmentId: a.apptId }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.ok) {
+      throw new Error((data && (data.vergentBody || data.error)) || ('HTTP ' + r.status));
+    }
+    closeApptDayModal();
+    if (typeof loadPastDueReport === 'function') loadPastDueReport();
+  } catch (e) {
+    alert('Could not delete: ' + String(e.message || e).slice(0, 240));
+  }
+}
+
 async function submitNewAppt() {
   if (!_apptModalCtx) return;
   const dt = (document.getElementById('appt-date') || {}).value;
@@ -6334,13 +6412,19 @@ async function submitNewAppt() {
   const utcIso = local.toISOString();
   if (errEl) errEl.style.display = 'none';
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  // Edit mode: ctx carries an existing appointmentId. Hits the update
+  // proxy which routes to Vergent's V1 create endpoint with id != 0
+  // (upsert semantics).
+  const editId = Number(_apptModalCtx.apptId) || 0;
+  const endpoint = editId > 0 ? '/api/vergent-appointment-update' : '/api/vergent-appointment-create';
   try {
-    const r = await fetch('/api/vergent-appointment-create', {
+    const r = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         customerId: _apptModalCtx.customerId,
         hdrId: _apptModalCtx.hdrId,
+        appointmentId: editId,
         appointmentDateTime: utcIso,
         commitmentAmount: Number(amtStr) || 0,
         notes: notes,
@@ -7318,11 +7402,13 @@ function _allAppointments() {
       if (byKey.has(id)) return;
       byKey.set(id, {
         id,
+        apptId: Number(a.Id || a.AppointmentId || a.id || 0) || 0,
         customerId: row.CustomerId || '',
         customerName: ((row.FirstName || '') + ' ' + (row.LastName || '')).trim() || ('Customer #' + (row.CustomerId || '?')),
         phone: row.PrimaryPhoenNumber || row.PrimaryPhoneNumber || '',
         loanId: row.LoanId || '',
         hdrId: a.HdrId || row.LoanId || '',
+        subjectId: Number(a.SubjectId || 0) || 0,
         dateTimeUtc: dt,
         commitment: Number(a.CommitmentAmount) || 0,
         notes: a.Notes || '',
@@ -7515,12 +7601,19 @@ function _apptListBodyHtml() {
         a.notes ? escapeHtml(a.notes.slice(0, 120)) : '',
         a.phone ? _fmtPhoneUS(a.phone) : '',
       ].filter(Boolean).join(' · ');
+      const actions = a.apptId
+        ? `<div class="appt-row-actions">
+            <button onclick="openEditApptById(${a.apptId})" title="Edit appointment">&#9998;</button>
+            <button class="del" onclick="deleteAppointmentById(${a.apptId})" title="Delete appointment">&times;</button>
+          </div>`
+        : '';
       return `<div class="appt-list-row">
         <div class="appt-list-row-time">${escapeHtml(time)}</div>
         <div class="appt-list-row-meta">
           <div class="appt-list-row-name">${nameHtml}</div>
           <div class="appt-list-row-sub">${sub || '—'}</div>
         </div>
+        ${actions}
       </div>`;
     }).join('');
     return `<div class="appt-list-section">
@@ -7574,12 +7667,19 @@ function openApptDay(dayKey) {
           a.notes ? escapeHtml(a.notes.slice(0, 120)) : '',
           a.phone ? _fmtPhoneUS(a.phone) : '',
         ].filter(Boolean).join(' · ');
+        const actions = a.apptId
+          ? `<div class="appt-row-actions">
+              <button onclick="openEditApptById(${a.apptId})" title="Edit appointment">&#9998;</button>
+              <button class="del" onclick="deleteAppointmentById(${a.apptId})" title="Delete appointment">&times;</button>
+            </div>`
+          : '';
         return `<div class="appt-day-row">
           <div class="appt-day-time">${escapeHtml(time)}</div>
           <div class="appt-day-meta">
             <div class="appt-day-name">${nameHtml}</div>
             <div class="appt-day-sub">${sub || '—'}</div>
           </div>
+          ${actions}
         </div>`;
       }).join('');
       listEl.innerHTML = newBtnHtml + rows;
