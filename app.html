@@ -7295,8 +7295,15 @@ function renderPastDueReport(rows) {
     // 📅 Appt badge — Vergent's PastDueContactList returns each row's
     // appointments inline; if any exist, mark the row so the operator
     // doesn't re-contact someone who's already committed. Tooltip shows
-    // the appointment time(s).
-    const apptsArr = Array.isArray(r.Appointments) ? r.Appointments : [];
+    // the appointment time(s). Honour the hide-list for parity with
+    // the unified loans-due renderer + the calendar.
+    const apptsArrRaw = Array.isArray(r.Appointments) ? r.Appointments : [];
+    const hiddenAppts = new Set(_getHiddenAppts());
+    const apptsArr = apptsArrRaw.filter(a => {
+      const dt = a.AppointmentDateTime || a.AppointmentDate || '';
+      const syntheticId = `${r.CustomerId || ''}|${a.HdrId || r.LoanId || ''}|${dt}`;
+      return !hiddenAppts.has(syntheticId);
+    });
     let apptBadge = '';
     if (apptsArr.length) {
       const dates = apptsArr.map(a => _pastDueFmtApptTime(a)).filter(Boolean).join(' · ');
@@ -7593,7 +7600,16 @@ function _loansDueRowHtml(r) {
   const vergentLink = `https://shared.lms.vergentlms.com/customer/general?action=view&id=${encodeURIComponent(r.CustomerId || '')}`;
   const cid = String(r.CustomerId || '');
   const hdrId = String(r.HdrId || r.LoanId || '');
-  const apptsArr = Array.isArray(r.Appointments) ? r.Appointments : [];
+  // Strip appointments the operator has Hidden so the badge + the
+  // Appointments column on this row stay in sync with the calendar +
+  // list views (both of which already honour the hide-list).
+  const apptsArrRaw = Array.isArray(r.Appointments) ? r.Appointments : [];
+  const hiddenAppts = new Set(_getHiddenAppts());
+  const apptsArr = apptsArrRaw.filter(a => {
+    const dt = a.AppointmentDateTime || a.AppointmentDate || '';
+    const syntheticId = `${r.CustomerId || ''}|${a.HdrId || r.LoanId || ''}|${dt}`;
+    return !hiddenAppts.has(syntheticId);
+  });
   let apptBadge = '';
   if (apptsArr.length) {
     const dates = apptsArr.map(a => _pastDueFmtApptTime(a)).filter(Boolean).join(' · ');
