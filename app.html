@@ -6469,16 +6469,23 @@ function renderPastDueReport(rows) {
   if (!table) return;
 
   if (stats) {
-    const totalDue = rows.reduce((s, r) => s + (Number(r.AmountDue) || 0), 0);
-    const newCt    = rows.filter(r => { const d = _pastDueComputedDaysLate(r); return d >= 0 && d <= 7; }).length;
-    const sev31    = rows.filter(r => _pastDueComputedDaysLate(r) >= 31).length;
+    // KPI cards always show totals across ALL active (Held) loans,
+    // including ones with appointments. This is the "the whole book"
+    // view at the top; the aging tiles below break it down. We
+    // intentionally don't narrow by the selected aging tile here — the
+    // operator can see "we have 50 customers to collect from in total"
+    // even while focused on, say, the 1-day-late slice.
+    const allActive = _pastDueRows.filter(_pastDueIsActive);
+    const totalDue = allActive.reduce((s, r) => s + (Number(r.AmountDue) || 0), 0);
+    const newCt    = allActive.filter(r => { const d = _pastDueComputedDaysLate(r); return d >= 0 && d <= 7; }).length;
+    const sev31    = allActive.filter(r => _pastDueComputedDaysLate(r) >= 31).length;
     const card = (label, val, cls) => `<div class="stat${cls?' '+cls:''}">
       <div class="stat-label">${escapeHtml(label)}</div>
       <div class="stat-value${cls==='dec'?' red':cls==='pen'?' amber':''}">${val}</div>
     </div>`;
     stats.innerHTML =
         card('To collect', _rptFmtMoney(totalDue), 'pen')
-      + card('Customers', rows.length, 'tot')
+      + card('Customers', allActive.length, 'tot')
       + card('New · ≤7 days', newCt)
       + card('31+ days late', sev31, 'dec');
   }
