@@ -7576,7 +7576,7 @@ function renderLoansDueUnified() {
     { label: 'Due'       },
     { label: 'Next pay'  },
     { label: 'Phone'     },
-    { label: 'Appointments' },
+    { label: 'Days Past Due' },
   ];
   const headHtml = '<th class="tbl-checkbox"></th>' +
     headerCols.map(c => `<th>${escapeHtml(c.label)}</th>`).join('');
@@ -7647,10 +7647,7 @@ function _loansDueRowHtml(r) {
     <td><span class="tbl-time">${_rptFmtDate(r.DueDate)}</span></td>
     <td><span class="tbl-time">${_rptFmtDate(r.NextPayDate)}</span></td>
     <td>${phoneHtml}</td>
-    <td>${apptsArr.length
-      ? `<div class="tbl-time" style="color:#b45309;font-weight:700">Appointment</div><div class="applicant-id" style="color:#5a3300" title="${escapeHtml((apptsArr[0].Notes || '').slice(0, 80))}">${escapeHtml(_pastDueFmtApptTime(apptsArr[0]))}</div>`
-      : `<div class="tbl-time">${_rptFmtDate(r.LastCallUtcDateTime)}</div><div class="applicant-id" title="${escapeHtml(r.LastCallNote || '')}">${escapeHtml((r.LastCallResult || '').slice(0, 40)) || '—'}</div>`
-    }</td>
+    <td><span class="tbl-time" style="font-variant-numeric:tabular-nums${daysLate >= 1 ? ';color:var(--red);font-weight:700' : ';color:var(--muted)'}">${daysLate >= 1 ? daysLate : '—'}</span></td>
   </tr>`;
 }
 
