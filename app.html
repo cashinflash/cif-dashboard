@@ -6376,6 +6376,36 @@ function _apptByKey(syntheticId) {
   return _allAppointments().find(x => x.id === syntheticId) || null;
 }
 
+// Local cache of Vergent appointment ids keyed by customer|hdr|datetime
+// prefix. Filled in when our admin creates an appointment (Vergent's
+// create response carries the new id but its GET appointments endpoint
+// 404s in this tenant, so we have to cache client-side or we'd lose the
+// id between page loads). Used by _allAppointments to augment rows so
+// delete + edit can target a real appointment id.
+function _apptCacheKey(customerId, hdrId, dateTimeIso) {
+  // Trim ISO to YYYY-MM-DDTHH:MM so we match Vergent's PastDueContactList
+  // output (which may strip seconds + Z) against our local toISOString
+  // (which doesn't).
+  const dt = String(dateTimeIso || '').replace('Z', '').slice(0, 16);
+  return `vergentApptId:${String(customerId || '')}|${String(hdrId || '')}|${dt}`;
+}
+function _getCachedApptId(customerId, hdrId, dateTimeIso) {
+  try {
+    const v = localStorage.getItem(_apptCacheKey(customerId, hdrId, dateTimeIso));
+    return v ? Number(v) || 0 : 0;
+  } catch (e) { return 0; }
+}
+function _setCachedApptId(customerId, hdrId, dateTimeIso, apptId) {
+  try {
+    localStorage.setItem(_apptCacheKey(customerId, hdrId, dateTimeIso), String(apptId));
+  } catch (e) { /* ignore quota errors */ }
+}
+function _clearCachedApptId(customerId, hdrId, dateTimeIso) {
+  try {
+    localStorage.removeItem(_apptCacheKey(customerId, hdrId, dateTimeIso));
+  } catch (e) { /* ignore */ }
+}
+
 // Open the create-appointment modal pre-filled for editing an existing
 // Vergent appointment.
 function openEditApptById(syntheticId) {
@@ -6466,6 +6496,9 @@ async function deleteAppointmentById(syntheticId) {
       }
       throw new Error((data && (data.vergentBody || data.error)) || ('HTTP ' + r.status));
     }
+    // Drop the cache entry so next refresh doesn't try to delete the
+    // same id again.
+    _clearCachedApptId(a.customerId, a.hdrId, a.dateTimeUtc);
     closeApptDayModal();
     if (typeof loadPastDueReport === 'function') loadPastDueReport();
   } catch (e) {
@@ -6532,6 +6565,12 @@ async function submitNewAppt() {
     // calendar + list. No confirmation toast, no flash of the Vergent
     // response body. Operator sees the row appear and that's the
     // confirmation.
+    // Cache Vergent's appointment id keyed by customer|hdr|datetime
+    // so delete/edit can target it later — Vergent's GET appointments
+    // endpoint 404s in this tenant so we can't look it up otherwise.
+    if (data.appointmentId && Number(data.appointmentId) > 0) {
+      _setCachedApptId(_apptModalCtx.customerId, _apptModalCtx.hdrId, utcIso, Number(data.appointmentId));
+    }
     closeApptModal();
     if (typeof loadPastDueReport === 'function') loadPastDueReport();
   } catch (e) {
@@ -7489,14 +7528,19 @@ function _allAppointments() {
       if (byKey.has(id)) return;
       // Vergent's appointment Id surfaces under inconsistent field names
       // depending on which endpoint emitted the row. Try them all so the
-      // edit/delete buttons have a real id to work with; if still none,
-      // apptId stays 0 and the click handler shows a clear error.
+      // edit/delete buttons have a real id to work with. PastDueContact
+      // List strips the id, so for appointments we created from our
+      // admin we also check the local cache (filled in by submitNewAppt
+      // from the create response).
       let apptId = 0;
       for (const k of Object.keys(a)) {
         if (/^(id|appointmentid|appointmentrowid|rowid|aptid|appt_?id)$/i.test(k)) {
           const v = Number(a[k]);
           if (v > 0) { apptId = v; break; }
         }
+      }
+      if (!apptId) {
+        apptId = _getCachedApptId(row.CustomerId, a.HdrId || row.LoanId, dt);
       }
       byKey.set(id, {
         id,
