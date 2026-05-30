@@ -6444,6 +6444,25 @@ async function deleteAppointmentById(syntheticId) {
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok || !data.ok) {
+      // Diagnostic mode: when the backend returns Vergent endpoint
+      // attempts, dump them to console + offer a copy-able alert so
+      // we can iterate on the right URL.
+      if (data && data.diagnostics) {
+        console.warn('[appt-delete] diagnostics', data.diagnostics);
+        console.warn('[appt-delete] requested', a);
+        const tried = (data.diagnostics.candidates_tried || []).map(c =>
+          `${c.method || 'GET'} ${c.path} → ${c.status != null ? c.status : c.error}`).join('\n');
+        const sample = data.diagnostics.sample_appointment
+          ? '\n\nSample appointment Vergent returned:\n' + JSON.stringify(data.diagnostics.sample_appointment).slice(0, 400)
+          : '';
+        alert(
+          'Could not delete in Vergent.\n\n' +
+          `Vergent appointments returned: ${data.diagnostics.appointments_returned}\n` +
+          `Matcher: hdrId=${data.diagnostics.matcher_hdr_id}, dt=${data.diagnostics.matcher_dt_prefix}\n\n` +
+          `URLs tried:\n${tried}` + sample
+        );
+        return;
+      }
       throw new Error((data && (data.vergentBody || data.error)) || ('HTTP ' + r.status));
     }
     closeApptDayModal();
