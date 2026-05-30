@@ -6459,13 +6459,8 @@ function _renderApptOneModal(a) {
     + (a.notes ? row('Notes', escapeHtml(a.notes)) : '')
     + (phone ? row('Phone', `<a href="tel:${escapeHtml(a.phone)}" style="color:var(--green-dark);text-decoration:none">${escapeHtml(phone)}</a>`) : '')
     + (a.loanId ? row('Loan', escapeHtml(a.loanId)) : '');
-  // Always render Hide / Edit / Delete. apptId may be 0 for older
-  // appointments not created via our admin — Edit/Delete still
-  // surface clean errors from the backend in that case, and Hide
-  // is the operator's escape hatch.
   actEl.innerHTML =
-    `<button onclick="_apptOneHide('${escapeHtml(a.id)}')" style="background:white;border:1px solid var(--border);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--muted);font-family:inherit" title="Hide from our admin only — leaves Vergent untouched">Hide</button>
-     <button onclick="closeApptOneModal();openEditApptById('${escapeHtml(a.id)}')" style="background:white;border:1px solid var(--border);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--text);font-family:inherit">Edit</button>
+    `<button onclick="closeApptOneModal();openEditApptById('${escapeHtml(a.id)}')" style="background:white;border:1px solid var(--border);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--text);font-family:inherit">Edit</button>
      <button onclick="_apptOneDelete('${escapeHtml(a.id)}')" style="background:#fef2f2;border:1px solid #fecaca;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--red);font-family:inherit">Delete</button>`;
   overlay.style.display = 'flex';
 }
@@ -8003,7 +7998,6 @@ function _apptListBodyHtml() {
         a.phone ? _fmtPhoneUS(a.phone) : '',
       ].filter(Boolean).join(' · ');
       const actions = `<div class="appt-row-actions">
-          <button onclick="_apptOneHide('${escapeHtml(a.id)}')" title="Hide from our admin only — leaves Vergent untouched">Hide</button>
           <button onclick="openEditApptById('${escapeHtml(a.id)}')" title="Edit appointment">Edit</button>
           <button class="del" onclick="deleteAppointmentById('${escapeHtml(a.id)}')" title="Delete appointment">Delete</button>
         </div>`;
@@ -8070,7 +8064,6 @@ function openApptDay(dayKey) {
           a.phone ? _fmtPhoneUS(a.phone) : '',
         ].filter(Boolean).join(' · ');
         const actions = `<div class="appt-row-actions">
-            <button onclick="_apptOneHide('${escapeHtml(a.id)}')" title="Hide from our admin only — leaves Vergent untouched">Hide</button>
             <button onclick="openEditApptById('${escapeHtml(a.id)}')" title="Edit appointment">Edit</button>
             <button class="del" onclick="deleteAppointmentById('${escapeHtml(a.id)}')" title="Delete appointment">Delete</button>
           </div>`;
