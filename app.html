@@ -1444,6 +1444,14 @@ button,input,select{font-family:inherit}
           <input type="time" id="appt-time" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit">
         </label>
       </div>
+      <label style="font-size:12px;color:var(--muted);font-weight:600">Subject
+        <select id="appt-subject" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;background:white">
+          <option value="Promise to Pay">Promise to Pay</option>
+          <option value="Callback">Callback</option>
+          <option value="Visit">Visit</option>
+          <option value="Other">Other</option>
+        </select>
+      </label>
       <label style="font-size:12px;color:var(--muted);font-weight:600">Commitment amount ($)
         <input type="number" id="appt-amount" step="1" min="0" placeholder="0" style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit">
       </label>
@@ -6114,6 +6122,8 @@ function openApptModal(customerId, hdrId, customerName) {
   if (tEl) tEl.value = '10:00';
   if (aEl) aEl.value = '';
   if (nEl) nEl.value = '';
+  const sEl = document.getElementById('appt-subject');
+  if (sEl) sEl.value = 'Promise to Pay';
   const err = document.getElementById('appt-error');
   if (err) {
     err.style.display = 'none';
@@ -6140,6 +6150,7 @@ async function submitNewAppt() {
   const tm = (document.getElementById('appt-time') || {}).value;
   const amtStr = (document.getElementById('appt-amount') || {}).value || '';
   const notes = (document.getElementById('appt-notes') || {}).value || '';
+  const subject = (document.getElementById('appt-subject') || {}).value || 'Promise to Pay';
   const errEl = document.getElementById('appt-error');
   const btn = document.getElementById('appt-save-btn');
   const showErr = m => { if (errEl) { errEl.textContent = m; errEl.style.display = 'block'; } };
@@ -6161,6 +6172,7 @@ async function submitNewAppt() {
         appointmentDateTime: utcIso,
         commitmentAmount: Number(amtStr) || 0,
         notes: notes,
+        subject: subject,
       }),
     });
     const data = await r.json().catch(() => ({}));
