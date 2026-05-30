@@ -7505,15 +7505,7 @@ function _allAppointments() {
   };
   (_pastDueRows || []).forEach(push);
   (_upcomingRows || []).forEach(push);
-  // Hide appointments missing both a SubjectId and a CommitmentAmount —
-  // these are the leftover test rows from before the create flow was
-  // wired up properly. They're invisible in Vergent's UI (no clickable
-  // subject link) and can't be edited or deleted programmatically
-  // (Vergent V1 has no list/delete endpoint), so showing them here just
-  // adds noise.
-  return Array.from(byKey.values()).filter(a =>
-    a.subjectId > 0 || a.commitment > 0
-  );
+  return Array.from(byKey.values());
 }
 
 function _apptLocalDate(utcStr) {
