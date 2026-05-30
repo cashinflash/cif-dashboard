@@ -6516,22 +6516,15 @@ async function submitNewAppt() {
       const body = data.vergentBody || data.error || (`HTTP ${r.status}`);
       throw new Error(String(body).slice(0, 220));
     }
-    // Surface Vergent's response so we can see what it actually stored
-    // (or didn't). The modal stays open just long enough to flash a
-    // confirmation; refresh fires immediately so the badge updates.
-    const respBody = (data.vergentBody || '').toString();
-    if (btn) { btn.disabled = false; btn.textContent = 'Saved ✓'; }
-    if (errEl) {
-      errEl.style.display = 'block';
-      errEl.style.background = '#e8f5ee';
-      errEl.style.borderColor = '#a7e8c2';
-      errEl.style.color = '#1a6b3c';
-      errEl.textContent = `Vergent HTTP ${data.vergentStatus || r.status} · ${respBody.slice(0, 220) || '(empty body)'}`;
-    }
+    // Success — close the modal immediately and refresh the report in
+    // the background so the new/updated appointment shows up in the
+    // calendar + list. No confirmation toast, no flash of the Vergent
+    // response body. Operator sees the row appear and that's the
+    // confirmation.
+    closeApptModal();
     if (typeof loadPastDueReport === 'function') loadPastDueReport();
-    setTimeout(closeApptModal, 1800);
   } catch (e) {
-    if (btn) { btn.disabled = false; btn.textContent = 'Save appointment'; }
+    if (btn) { btn.disabled = false; btn.textContent = isEdit ? 'Save changes' : 'Save appointment'; }
     showErr('Could not save: ' + e.message);
   }
 }
@@ -7512,7 +7505,15 @@ function _allAppointments() {
   };
   (_pastDueRows || []).forEach(push);
   (_upcomingRows || []).forEach(push);
-  return Array.from(byKey.values());
+  // Hide appointments missing both a SubjectId and a CommitmentAmount —
+  // these are the leftover test rows from before the create flow was
+  // wired up properly. They're invisible in Vergent's UI (no clickable
+  // subject link) and can't be edited or deleted programmatically
+  // (Vergent V1 has no list/delete endpoint), so showing them here just
+  // adds noise.
+  return Array.from(byKey.values()).filter(a =>
+    a.subjectId > 0 || a.commitment > 0
+  );
 }
 
 function _apptLocalDate(utcStr) {
