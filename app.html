@@ -974,12 +974,18 @@ button,input,select{font-family:inherit}
   .dv-main{padding:14px 13px 18px}
   .dv-rail{padding:14px 13px}
   .dv-tabs{padding:8px 6px}
-  /* Top nav on phones — three tabs (Dashboard · Applications · Reports)
-     get priority since this is the operator's primary nav. Search is
-     dropped because every in-page table already has its own search
-     bar, and the topnav search hogged the row otherwise. */
-  .topnav{padding:0 10px;gap:8px;height:64px}
-  .search-wrap,.topnav-search{display:none}
+  /* Top nav on phones — three tabs (Dashboard · Applications · Servicing)
+     get priority since this is the operator's primary nav. Search lives
+     in a dedicated strip right under the topnav (fixed-positioned) so it
+     stays one tap away without crowding the tab row. --topnav-h is
+     bumped to 116px on mobile so .shell / .main.full / .mobile-subnav
+     all offset below the combined topnav + search-bar height. */
+  :root{--topnav-h:116px}
+  .topnav{padding:0 10px;gap:8px;height:60px}
+  .search-wrap{display:block;position:fixed;top:60px;left:0;right:0;z-index:91;background:var(--surface);padding:7px 10px;border-bottom:1px solid var(--border);box-shadow:0 1px 0 rgba(0,0,0,.04)}
+  .topnav-search{display:flex;width:100%;max-width:none;background:#f7faf8;border:1px solid var(--border);box-shadow:none;padding:9px 12px;border-radius:10px}
+  .topnav-search input{font-size:14px;color:var(--text)}
+  .topnav-search .icn{width:16px;height:16px;color:var(--muted)}
   .topnav-spacer{display:none}           /* let topnav-tabs claim the row */
   .topnav-tabs{flex:1 1 auto;min-width:0;justify-content:flex-end}
   .topnav-tabs .tnt{padding:7px 10px;font-size:12.5px}
