@@ -1594,6 +1594,14 @@ button,input,select{font-family:inherit}
          the table sees, so totals always agree with what's on screen. -->
     <div id="rpt-buckets" style="margin-bottom:14px"></div>
     <div id="rpt-aging" style="display:none"></div>
+    <!-- Quick-filter chips: segment the whole view by scope (all,
+         past-due only, upcoming only) plus a 31+ days shortcut. -->
+    <div id="rpt-quick-filters" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+      <button class="chip rpt-qf active" data-rpt-scope="all" onclick="setServicingScope('all')">All</button>
+      <button class="chip rpt-qf" data-rpt-scope="pastdue" onclick="setServicingScope('pastdue')">Past Due Only</button>
+      <button class="chip rpt-qf" data-rpt-scope="upcoming" onclick="setServicingScope('upcoming')">Upcoming Only</button>
+      <button class="chip rpt-qf" data-rpt-scope="severe31" onclick="setServicingScope('severe31')">31+ Days Late</button>
+    </div>
     <!-- Always shows ACTIVE past-due loans only (non-zero balance /
          amount-due, status not Bought-Back/Paid-Off/etc.). The aging
          tiles above are the segmentation control. -->
@@ -6930,6 +6938,8 @@ function resetPastDueView() {
   _pastDueDueFilter = null;
   _bucketFilter = null;
   _customRange = null;
+  if (typeof _servicingScope !== 'undefined') _servicingScope = 'all';
+  if (typeof _sortKey !== 'undefined') { _sortKey = null; _sortDir = 'desc'; }
   _pastDueSortKey = 'priority';
   _pastDueSortDir = 'desc';
   clearPastDueSelection();
@@ -7609,11 +7619,67 @@ function _rowInCustomRange(r) {
 function setBucketFilter(key) {
   _bucketFilter = (_bucketFilter === key) ? null : key;
   _customRange = null;
+  // Per-bucket clicks reset the scope chip back to "All" so the new
+  // filter shows clearly in the active-filter pill instead of fighting
+  // the scope.
+  _servicingScope = 'all';
   renderLoansDueUnified();
   // After the re-render lands the matching section header in the DOM,
   // scroll the table to it so the operator's eye lands where they
   // clicked without manual scrolling.
   _scrollToBucketSection(_bucketFilter);
+}
+
+// Quick-filter chips above the search bar segment the view by scope.
+// 'all'      → show every section
+// 'pastdue'  → hide upcoming sections (only Past Due shows)
+// 'upcoming' → hide past-due section
+// 'severe31' → 31+ days late only (sets bucket filter + auto-scroll)
+let _servicingScope = 'all';
+function setServicingScope(scope) {
+  if (scope === 'severe31') {
+    _servicingScope = 'all';
+    _bucketFilter = 'pd-31';
+    _customRange = null;
+    renderLoansDueUnified();
+    _scrollToBucketSection('pd-31');
+  } else {
+    _servicingScope = scope || 'all';
+    _bucketFilter = null;
+    _customRange = null;
+    renderLoansDueUnified();
+  }
+}
+function _updateQuickFilterChips() {
+  // Highlight the chip matching the current scope. severe31 maps onto
+  // bucketFilter=pd-31 (scope stays 'all'), so check both.
+  document.querySelectorAll('.rpt-qf').forEach(b => {
+    const s = b.getAttribute('data-rpt-scope');
+    const active = (s === 'severe31') ? (_bucketFilter === 'pd-31')
+      : (s === _servicingScope && _bucketFilter !== 'pd-31');
+    b.classList.toggle('active', active);
+  });
+}
+
+// Sortable table headers. _sortKey null = use the default per-section
+// sort (past-due by days desc, others by due date asc).
+let _sortKey = null;
+let _sortDir = 'desc';
+function setSortKey(key) {
+  if (_sortKey === key) {
+    if (_sortDir === 'desc') _sortDir = 'asc';
+    else { _sortKey = null; _sortDir = 'desc'; }
+  } else {
+    _sortKey = key;
+    _sortDir = 'desc';
+  }
+  renderLoansDueUnified();
+}
+function _sortValue(r, key) {
+  if (key === 'days')    return _pastDueComputedDaysLate(r);
+  if (key === 'balance') return Number(r.Balance) || 0;
+  if (key === 'due')     return _pastDueLocalMidnight(r.DueDate) || 0;
+  return 0;
 }
 
 // Map a bucket-card key (up-today / pd-1day / etc.) onto the table
@@ -7833,26 +7899,47 @@ function renderLoansDueUnified() {
       }
     }
   });
-  // Sort: past-due by days desc (most late first), others by due date asc.
-  buckets.pastdue.sort((a, b) => _pastDueComputedDaysLate(b) - _pastDueComputedDaysLate(a));
-  ['today','tomorrow','thisweek','next30'].forEach(k => {
-    buckets[k].sort((a, b) =>
-      (_pastDueLocalMidnight(a.DueDate) || 0) - (_pastDueLocalMidnight(b.DueDate) || 0));
-  });
+  // Sort each bucket. If the operator picked a header to sort by,
+  // use that (cross-bucket consistent direction). Otherwise fall
+  // back to the per-bucket defaults: past-due by days desc, others
+  // by due date asc.
+  if (_sortKey) {
+    const mul = _sortDir === 'desc' ? -1 : 1;
+    Object.keys(buckets).forEach(k => {
+      buckets[k].sort((a, b) => mul * (_sortValue(a, _sortKey) - _sortValue(b, _sortKey)));
+    });
+  } else {
+    buckets.pastdue.sort((a, b) => _pastDueComputedDaysLate(b) - _pastDueComputedDaysLate(a));
+    ['today','tomorrow','thisweek','next30'].forEach(k => {
+      buckets[k].sort((a, b) =>
+        (_pastDueLocalMidnight(a.DueDate) || 0) - (_pastDueLocalMidnight(b.DueDate) || 0));
+    });
+  }
 
   const headerCols = [
     { label: 'Customer'  },
     { label: 'Loan'      },
-    { label: 'Days'      },
-    { label: 'Balance'   },
-    { label: 'Due'       },
+    { label: 'Days',    sortKey: 'days'    },
+    { label: 'Balance', sortKey: 'balance' },
+    { label: 'Due',     sortKey: 'due'     },
     { label: 'Next pay'  },
     { label: 'Phone'     },
   ];
+  const sortInd = key => {
+    if (_sortKey !== key) return '<span style="color:var(--muted);opacity:.5;margin-left:4px">↕</span>';
+    return `<span style="color:var(--green-dark);margin-left:4px">${_sortDir === 'desc' ? '▼' : '▲'}</span>`;
+  };
   const headHtml = '<th class="tbl-checkbox"></th>' +
-    headerCols.map(c => `<th>${escapeHtml(c.label)}</th>`).join('');
+    headerCols.map(c => c.sortKey
+      ? `<th class="tbl-sortable" onclick="setSortKey('${c.sortKey}')">${escapeHtml(c.label)}${sortInd(c.sortKey)}</th>`
+      : `<th>${escapeHtml(c.label)}</th>`
+    ).join('');
 
-  const sectionsHtml = _LOANS_DUE_SECTIONS.map(s => {
+  const sectionsHtml = _LOANS_DUE_SECTIONS.filter(s => {
+    if (_servicingScope === 'pastdue') return s.key === 'pastdue';
+    if (_servicingScope === 'upcoming') return s.key !== 'pastdue';
+    return true;
+  }).map(s => {
     const rows = buckets[s.key];
     if (!rows.length) return '';
     const totalDue = rows.reduce((sum, r) => sum + (Number(r.AmountDue) || 0), 0);
@@ -7868,6 +7955,7 @@ function renderLoansDueUnified() {
     status.textContent = `${totalCount.toLocaleString()} active loan${totalCount === 1 ? '' : 's'}`;
   }
   _updateActiveFilterPill();
+  _updateQuickFilterChips();
 }
 
 function _loansDueRowHtml(r) {
