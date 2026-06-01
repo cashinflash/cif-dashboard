@@ -7829,17 +7829,24 @@ function _loanHistRender(cid, name) {
   const rows = top.map(l => {
     const balLine  = Number(l.balance) > 0 ? `<span style="color:var(--text);font-weight:700">${fmtMoney(l.balance)} bal</span>` : '';
     // Days-late readout — shown for every loan so the operator can
-    // scan the customer's late history at a glance. Prefer Vergent's
-    // verbatim days_late_label (matches the profile-loans table at
-    // line 3559); fall back to a numeric "Nd late" or "On time".
-    const dl = Number(l.days_late) || 0;
-    const dlRaw = (l.days_late_label && String(l.days_late_label).trim()) || '';
+    // scan the customer's late history at a glance. For closed/paid
+    // loans, the live "days_late" is 0 because the loan is no longer
+    // outstanding; max_days_late carries the worst-ever delinquency
+    // figure from the historical record. Use whichever is greater so
+    // active past-due loans still show their current days-late.
+    const dlCur  = Number(l.days_late) || 0;
+    const dlMax  = Number(l.max_days_late) || 0;
+    const dl     = Math.max(dlCur, dlMax);
+    const dlRaw  = (l.days_late_label && String(l.days_late_label).trim()) || '';
     const dlIsZeroLabel = dlRaw && (dlRaw.toLowerCase() === 'not late' || dlRaw === '0' || dlRaw === '—');
+    // Tag historical late status so the operator can distinguish "30 days
+    // late right now" from "was 30 days late at some point".
+    const histTag = dl > 0 && dlCur === 0 ? ' <span style="color:var(--muted);font-weight:600">(prior)</span>' : '';
     let dlText, dlColor;
     if (dl >= 31)     { dlText = dlRaw && !dlIsZeroLabel ? dlRaw : `${dl}d late`; dlColor = 'var(--red)'; }
     else if (dl >= 1) { dlText = dlRaw && !dlIsZeroLabel ? dlRaw : `${dl}d late`; dlColor = 'var(--amber-700)'; }
     else              { dlText = 'On time';                                       dlColor = 'var(--green-dark)'; }
-    const lateLine = `<span style="color:${dlColor};font-weight:700">${escapeHtml(dlText)}</span>`;
+    const lateLine = `<span style="color:${dlColor};font-weight:700">${escapeHtml(dlText)}</span>${histTag}`;
     const right = [balLine, lateLine].filter(Boolean).join('<br>');
     return `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border-soft);font-variant-numeric:tabular-nums">
       <div style="min-width:0">
