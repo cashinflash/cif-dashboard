@@ -286,6 +286,22 @@ button,input,select{font-family:inherit}
    eye reads them as group dividers. */
 .tbl tr.lns-sec td{position:sticky;top:38px;z-index:1;background:linear-gradient(180deg,#eff7f3,#e3eee8);border-top:1px solid #cfe0d4;border-bottom:1px solid #cfe0d4;padding:8px 14px;font-size:11.5px;font-weight:800;color:var(--green-dark);text-transform:uppercase;letter-spacing:.06em}
 .tbl tr.lns-sec td .lns-sec-meta{float:right;font-weight:700;color:var(--muted);text-transform:none;letter-spacing:0;font-size:11.5px;font-variant-numeric:tabular-nums}
+/* Row severity tinting — very subtle so it reads as scannable
+   gradient, not alarming. Today + upcoming rows stay white. */
+.tbl tr.lns-sev-1{background:#fffef5}
+.tbl tr.lns-sev-2{background:#fffaeb}
+.tbl tr.lns-sev-8{background:#fff5e0}
+.tbl tr.lns-sev-31{background:#fdecee}
+.tbl tr.lns-sev-1:hover{background:#fffbe0}
+.tbl tr.lns-sev-2:hover{background:#fff5d8}
+.tbl tr.lns-sev-8:hover{background:#feedc4}
+.tbl tr.lns-sev-31:hover{background:#fbd9dc}
+/* Density toggle — Compact tightens row padding for power-users
+   scanning lots of rows on big screens. */
+#rpt-table .tbl.compact td,#rpt-table .tbl.compact th{padding:6px 10px;font-size:12px}
+#rpt-table .tbl.compact .applicant-name{font-size:13px}
+#rpt-table .tbl.compact .app-info{font-size:11.5px}
+#rpt-table .tbl.compact .tbl-time{font-size:11.5px}
 
 /* MOBILE — Loans Due table renders as stacked cards so every row reads
    without horizontal scroll. The thead disappears; each <tr> becomes a
@@ -1614,6 +1630,14 @@ button,input,select{font-family:inherit}
       <input type="text" id="rpt-search" placeholder="Search by name, phone, loan id, store…" oninput="filterReport(this.value)" style="flex:1;min-width:240px;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
       <span id="rpt-active-filter" style="display:none;align-items:center;gap:6px;background:#ecfdf5;color:var(--green-dark);border:1px solid #a7e8c2;border-radius:999px;padding:6px 6px 6px 12px;font-size:12px;font-weight:700"><span>Showing: <span id="rpt-active-filter-label" style="font-weight:700"></span></span><button onclick="_clearActiveFilter()" title="Clear filter" style="background:white;border:1px solid #a7e8c2;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--green-dark);padding:0;font-size:14px;line-height:1;font-family:inherit">&times;</button></span>
       <span id="rpt-loaded-at" style="font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums"></span>
+      <!-- Density toggle — operator preference, persisted to localStorage.
+           Compact tightens row padding for power-users scanning lots of
+           loans on big screens. Hidden when the Appointments tab is
+           active (setReportTab handles the toggle). -->
+      <span id="rpt-density-wrap" role="group" aria-label="Row density" style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:white">
+        <button type="button" id="rpt-density-comfy" onclick="setRptDensity('comfy')" title="Comfortable rows" style="background:transparent;border:0;padding:6px 11px;font-family:inherit;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer">Comfy</button>
+        <button type="button" id="rpt-density-compact" onclick="setRptDensity('compact')" title="Compact rows" style="background:transparent;border:0;padding:6px 11px;font-family:inherit;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer;border-left:1px solid var(--border)">Compact</button>
+      </span>
     </div>
     <!-- Bulk-action bar — only shown when rows are selected. -->
     <div id="rpt-bulkbar" style="display:none;align-items:center;gap:10px;margin-bottom:12px;padding:8px 12px;background:#eef6ff;border:1px solid #c8def0;border-radius:10px">
@@ -7081,6 +7105,7 @@ function setReportTab(tab) {
   const tableDiv = document.getElementById('rpt-table');
   const apptDiv = document.getElementById('rpt-appointments');
   const searchBar = document.getElementById('rpt-search');
+  const densityWrap = document.getElementById('rpt-density-wrap');
   if (tab === 'appointments') {
     if (aging) aging.style.display = 'none';
     if (activeAging) activeAging.style.display = 'none';
@@ -7089,6 +7114,7 @@ function setReportTab(tab) {
     if (tableDiv) tableDiv.style.display = 'none';
     if (apptDiv) apptDiv.style.display = '';
     if (searchBar) searchBar.style.display = 'none';
+    if (densityWrap) densityWrap.style.display = 'none';
     _stopUpcomingAuto();
     loadAppointmentsView();
     return;
@@ -7106,6 +7132,7 @@ function setReportTab(tab) {
   if (tableDiv) tableDiv.style.display = 'block';
   if (apptDiv) apptDiv.style.display = 'none';
   if (searchBar) searchBar.style.display = '';
+  if (densityWrap) densityWrap.style.display = 'inline-flex';
   _startUpcomingAuto();
   togglePastDueAutoRefresh(true);   // always on — Servicing should feel live
   loadLoansDueView();
@@ -7713,6 +7740,34 @@ function _clearActiveFilter() {
   _customRange = null;
   renderLoansDueUnified();
 }
+
+// Density toggle — operator preference, persists across reloads so
+// power-users keep their Compact view. Applied by toggling .compact on
+// the rendered table; the CSS rules at the top of the stylesheet do
+// the actual padding/font tightening.
+let _rptDensity = 'comfy';
+try {
+  const _savedDensity = localStorage.getItem('rpt-density');
+  if (_savedDensity === 'compact' || _savedDensity === 'comfy') _rptDensity = _savedDensity;
+} catch (e) {}
+function setRptDensity(mode) {
+  if (mode !== 'compact' && mode !== 'comfy') return;
+  _rptDensity = mode;
+  try { localStorage.setItem('rpt-density', mode); } catch (e) {}
+  _applyRptDensity();
+}
+function _applyRptDensity() {
+  document.querySelectorAll('#rpt-table .tbl').forEach(t =>
+    t.classList.toggle('compact', _rptDensity === 'compact'));
+  const paint = (id, active) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.background = active ? 'var(--green-dark)' : 'transparent';
+    el.style.color      = active ? 'white'             : 'var(--muted)';
+  };
+  paint('rpt-density-comfy',   _rptDensity === 'comfy');
+  paint('rpt-density-compact', _rptDensity === 'compact');
+}
 function _updateActiveFilterPill() {
   const pill = document.getElementById('rpt-active-filter');
   const label = document.getElementById('rpt-active-filter-label');
@@ -7948,7 +8003,19 @@ function renderLoansDueUnified() {
     return `<tr class="lns-sec" data-section-key="${escapeHtml(s.key)}"><td colspan="8">${escapeHtml(s.label)}<span class="lns-sec-meta">${escapeHtml(meta)}</span></td></tr>${rowsHtml}`;
   }).join('');
 
-  table.innerHTML = `<div class="tbl-card-scroll"><table class="tbl"><thead><tr>${headHtml}</tr></thead><tbody>${sectionsHtml || '<tr><td colspan="8" class="tbl-empty">No active loans due in the next 30 days.</td></tr>'}</tbody></table></div>`;
+  // Empty state — if any filter is active (search, bucket, custom range,
+  // or non-default scope) we show "No matches" + a Clear button so the
+  // operator can recover in one click. Otherwise the genuine empty
+  // state: there are no active loans at all.
+  const hasActiveFilter = !!q || !!_bucketFilter || !!_customRange || _servicingScope !== 'all';
+  const emptyHtml = hasActiveFilter
+    ? `<tr><td colspan="8" class="tbl-empty" style="padding:48px 20px">
+         <div style="font-size:13.5px;color:var(--text2);font-weight:600;margin-bottom:4px">No loans match the current filter.</div>
+         <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Try clearing search, bucket, or scope chips.</div>
+         <button class="chip" onclick="resetPastDueView()" style="border-color:var(--green);color:var(--green-dark);background:white;font-weight:700">Clear all filters</button>
+       </td></tr>`
+    : '<tr><td colspan="8" class="tbl-empty">No active loans due in the next 30 days.</td></tr>';
+  table.innerHTML = `<div class="tbl-card-scroll"><table class="tbl"><thead><tr>${headHtml}</tr></thead><tbody>${sectionsHtml || emptyHtml}</tbody></table></div>`;
 
   if (status) {
     const totalCount = allRows.length;
@@ -7956,6 +8023,7 @@ function renderLoansDueUnified() {
   }
   _updateActiveFilterPill();
   _updateQuickFilterChips();
+  _applyRptDensity();
 }
 
 function _loansDueRowHtml(r) {
@@ -7998,7 +8066,15 @@ function _loansDueRowHtml(r) {
     : daysLate === 0
       ? '<span class="tbl-time" style="color:#b45309;font-weight:700">Today</span>'
       : `<span class="tbl-time" style="color:var(--muted)">in ${Math.abs(daysLate)}d</span>`;
-  return `<tr>
+  // Severity-tinted row: subtle background by days-late bucket so the
+  // eye scans past-due weight at a glance without overpowering the
+  // table chrome. Today + upcoming rows stay white.
+  let rowSev = '';
+  if (daysLate >= 31)     rowSev = 'lns-sev-31';
+  else if (daysLate >= 8) rowSev = 'lns-sev-8';
+  else if (daysLate >= 2) rowSev = 'lns-sev-2';
+  else if (daysLate >= 1) rowSev = 'lns-sev-1';
+  return `<tr class="lns-row${rowSev ? ' ' + rowSev : ''}">
     <td class="tbl-checkbox"><button class="appt-add-btn" title="Create appointment" data-cid="${escapeHtml(cid)}" data-hdr="${escapeHtml(hdrId)}" data-name="${escapeHtml(name)}" onclick="event.stopPropagation();openApptModalFromBtn(this)">+ Appt</button></td>
     <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" onclick="event.stopPropagation()">${escapeHtml(name)}</a>${apptBadge}</div></td>
     <td><div class="app-info"><span class="app-type">${escapeHtml(r.LoanId || '—')}</span><span class="app-meta">${escapeHtml(r.LoanStatus || '')}${r.LoanSubStatus ? ' · ' + escapeHtml(r.LoanSubStatus) : ''}</span></div></td>
