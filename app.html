@@ -158,7 +158,8 @@ button,input,select{font-family:inherit}
 /* ANALYTICS OVERVIEW — small cards beneath the donut showing
    Servicing snapshot (Due Today / Tomorrow / This Week / Past Due) */
 .analytics-overview{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 22px 22px;border-top:1px solid var(--border-soft);padding-top:18px;margin-top:4px}
-.analytics-ov-cell{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 12px 12px;text-align:center}
+.analytics-ov-cell{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 12px 12px;text-align:center;cursor:pointer;transition:all .12s}
+.analytics-ov-cell:hover{background:#ecfdf5;border-color:#a7e8c2;transform:translateY(-1px);box-shadow:0 2px 8px rgba(15,40,30,.06)}
 .analytics-ov-label{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .analytics-ov-value{font-size:22px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;margin-top:6px;line-height:1.05}
 .analytics-ov-value.pastdue{color:var(--red)}
@@ -1199,10 +1200,10 @@ button,input,select{font-family:inherit}
           <!-- Payments overview under the donut. Populated by
                renderAnalyticsOverview() from the Servicing data. -->
           <div class="analytics-overview">
-            <div class="analytics-ov-cell"><div class="analytics-ov-label">Due Today</div><div class="analytics-ov-value" id="ov-due-today">—</div></div>
-            <div class="analytics-ov-cell"><div class="analytics-ov-label">Due Tomorrow</div><div class="analytics-ov-value" id="ov-due-tomorrow">—</div></div>
-            <div class="analytics-ov-cell"><div class="analytics-ov-label">Due This Week</div><div class="analytics-ov-value" id="ov-due-week">—</div></div>
-            <div class="analytics-ov-cell"><div class="analytics-ov-label">Past Due</div><div class="analytics-ov-value pastdue" id="ov-past-due">—</div></div>
+            <div class="analytics-ov-cell" onclick="_openServicingBucket('up-today')"><div class="analytics-ov-label">Due Today</div><div class="analytics-ov-value" id="ov-due-today">—</div></div>
+            <div class="analytics-ov-cell" onclick="_openServicingBucket('up-tomorrow')"><div class="analytics-ov-label">Due Tomorrow</div><div class="analytics-ov-value" id="ov-due-tomorrow">—</div></div>
+            <div class="analytics-ov-cell" onclick="_openServicingBucket('up-week')"><div class="analytics-ov-label">Due This Week</div><div class="analytics-ov-value" id="ov-due-week">—</div></div>
+            <div class="analytics-ov-cell" onclick="_openServicingBucket(null)"><div class="analytics-ov-label">Past Due</div><div class="analytics-ov-value pastdue" id="ov-past-due">—</div></div>
           </div>
         </div>
 
@@ -2356,6 +2357,18 @@ function _bucketCounts(list) {
 // don't hammer Vergent on every state change.
 let _analyticsOverviewLoadedAt = 0;
 let _analyticsOverviewInFlight = null;
+// Click handler for the four Analytics overview cells on the Dashboard.
+// Pre-sets the Servicing bucket filter, then routes — when the
+// renderLoansDueUnified runs on landing it reads _bucketFilter and
+// narrows the table. Null clears the filter so "Past Due" lands on
+// the full Past Due section without forcing a specific aging sub-bucket.
+function _openServicingBucket(bucketKey) {
+  if (typeof _bucketFilter !== 'undefined') _bucketFilter = bucketKey || null;
+  if (typeof _customRange !== 'undefined') _customRange = null;
+  if (typeof _rptTab !== 'undefined') _rptTab = 'loansdue';
+  setRoute('reports');
+}
+
 async function renderAnalyticsOverview() {
   if (_analyticsOverviewInFlight) return _analyticsOverviewInFlight;
   if (Date.now() - _analyticsOverviewLoadedAt < 60000 && _pastDueRows && _upcomingRows) {
