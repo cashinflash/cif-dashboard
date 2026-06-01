@@ -276,15 +276,19 @@ button,input,select{font-family:inherit}
    .tbl-card uses overflow:hidden which would break position:sticky on
    thead, so reports get a dedicated wrapper. */
 .tbl-card-scroll{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-xs);overflow:auto;max-height:calc(100vh - 380px)}
-/* NOTE: no position:sticky on this thead. Sticky thead inside an
-   overflow:auto container makes the header size its columns
-   independently of tbody (Chromium), so headers drift off their
-   data. A plain thead always shares column widths with tbody. */
-.tbl-card-scroll .tbl thead th{background:var(--surface2);box-shadow:inset 0 -1px 0 var(--border)}
+/* Sticky thead — pinning is applied to each <th> (NOT the <thead>
+   element). Putting `position:sticky` on <thead> in Chromium makes the
+   header size its columns independently of tbody and they drift off
+   their data; per-<th> sticky stays column-aligned because the table
+   still owns layout. --thead-h is read by the section-header rule
+   below so it pins just under the column row regardless of density. */
+#rpt-table .tbl-card-scroll{--thead-h:38px}
+#rpt-table .tbl.compact{--thead-h:29px}
+.tbl-card-scroll .tbl thead th{background:var(--surface2);box-shadow:inset 0 -1px 0 var(--border);position:sticky;top:0;z-index:2}
 /* Section header rows used in the unified Loans Due table — sticky
    under the thead, span the full row, distinct background so the
    eye reads them as group dividers. */
-.tbl tr.lns-sec td{position:sticky;top:38px;z-index:1;background:linear-gradient(180deg,#eff7f3,#e3eee8);border-top:1px solid #cfe0d4;border-bottom:1px solid #cfe0d4;padding:8px 14px;font-size:11.5px;font-weight:800;color:var(--green-dark);text-transform:uppercase;letter-spacing:.06em}
+.tbl tr.lns-sec td{position:sticky;top:var(--thead-h,38px);z-index:1;background:linear-gradient(180deg,#eff7f3,#e3eee8);border-top:1px solid #cfe0d4;border-bottom:1px solid #cfe0d4;padding:8px 14px;font-size:11.5px;font-weight:800;color:var(--green-dark);text-transform:uppercase;letter-spacing:.06em}
 .tbl tr.lns-sec td .lns-sec-meta{float:right;font-weight:700;color:var(--muted);text-transform:none;letter-spacing:0;font-size:11.5px;font-variant-numeric:tabular-nums}
 /* Row severity tinting — very subtle so it reads as scannable
    gradient, not alarming. Today + upcoming rows stay white. */
@@ -302,6 +306,10 @@ button,input,select{font-family:inherit}
 #rpt-table .tbl.compact .applicant-name{font-size:13px}
 #rpt-table .tbl.compact .app-info{font-size:11.5px}
 #rpt-table .tbl.compact .tbl-time{font-size:11.5px}
+/* Loan-history hover icon — instant CSS feedback before the popup
+   loads, plus tap-only hover doesn't work on phones so hide there. */
+.lns-hist-icn:hover{color:var(--green-dark) !important;background:var(--green-50) !important}
+@media(max-width:600px){.lns-hist-icn{display:none !important}}
 
 /* MOBILE — Loans Due table renders as stacked cards so every row reads
    without horizontal scroll. The thead disappears; each <tr> becomes a
@@ -7741,6 +7749,135 @@ function _clearActiveFilter() {
   renderLoansDueUnified();
 }
 
+// Loan-history hover popup — hovering the small history icon next to
+// a customer's name on the Loans Due table pops a card with the prior
+// loans for that Vergent customer. Cached per-cid for 60s to avoid
+// API thrashing when the operator skims the table. The icon is its
+// own element so clicking the name link still opens Vergent — the
+// hover is decoupled from the click target by design.
+let _loanHistCache = {};       // cid -> {loans, count, fetchedAt, error, loading}
+let _loanHistHideTimer = null;
+function _loanHistEnsurePopup() {
+  let pop = document.getElementById('lns-hist-pop');
+  if (pop) return pop;
+  pop = document.createElement('div');
+  pop.id = 'lns-hist-pop';
+  pop.style.cssText = 'position:fixed;z-index:10005;display:none;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.18);padding:12px 14px;width:380px;max-width:90vw;font-size:12px;color:var(--text);max-height:60vh;overflow:auto';
+  pop.addEventListener('mouseenter', _loanHistCancelHide);
+  pop.addEventListener('mouseleave', _loanHistHide);
+  document.body.appendChild(pop);
+  return pop;
+}
+function _loanHistShow(el) {
+  _loanHistCancelHide();
+  const cid = el.getAttribute('data-cid') || '';
+  const name = el.getAttribute('data-name') || '';
+  if (!cid) return;
+  const pop = _loanHistEnsurePopup();
+  pop.dataset.cid = cid;
+  pop.dataset.name = name;
+  // Anchor below the icon, nudge left if the popup would overflow.
+  const r = el.getBoundingClientRect();
+  const popW = 380;
+  const left = Math.max(8, Math.min(r.left, window.innerWidth - popW - 8));
+  const top  = Math.min(r.bottom + 6, window.innerHeight - 220);
+  pop.style.top  = `${top}px`;
+  pop.style.left = `${left}px`;
+  pop.style.display = 'block';
+  pop.innerHTML = _loanHistRender(cid, name);
+  // Highlight the icon while popup is visible.
+  el.style.color = 'var(--green-dark)';
+  el.style.background = 'var(--green-50)';
+  pop.dataset.anchorEl = '1';
+  pop._anchor = el;
+  const c = _loanHistCache[cid];
+  if (!c || (!c.loading && Date.now() - c.fetchedAt > 60000)) {
+    _loanHistFetch(cid, name);
+  }
+}
+function _loanHistCancelHide() {
+  if (_loanHistHideTimer) { clearTimeout(_loanHistHideTimer); _loanHistHideTimer = null; }
+}
+function _loanHistHide() {
+  _loanHistCancelHide();
+  _loanHistHideTimer = setTimeout(() => {
+    const pop = document.getElementById('lns-hist-pop');
+    if (!pop) return;
+    pop.style.display = 'none';
+    if (pop._anchor) {
+      pop._anchor.style.color = 'var(--muted)';
+      pop._anchor.style.background = 'transparent';
+      pop._anchor = null;
+    }
+  }, 180);
+}
+async function _loanHistFetch(cid, name) {
+  const prev = _loanHistCache[cid] || { loans: [], count: 0, fetchedAt: 0, error: null };
+  _loanHistCache[cid] = { ...prev, loading: true };
+  _loanHistMaybeRerender(cid);
+  try {
+    const r = await fetch('/api/vergent-loans', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customer_id: cid })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.ok) {
+      _loanHistCache[cid] = { loans: d.loans || [], count: d.count || 0, fetchedAt: Date.now(), error: null, loading: false };
+    } else {
+      const msg = d.detail || d.error || ('HTTP ' + r.status);
+      _loanHistCache[cid] = { loans: [], count: 0, fetchedAt: Date.now(), error: msg, loading: false };
+    }
+  } catch (e) {
+    _loanHistCache[cid] = { loans: [], count: 0, fetchedAt: Date.now(), error: e.message || 'network error', loading: false };
+  }
+  _loanHistMaybeRerender(cid);
+}
+function _loanHistMaybeRerender(cid) {
+  const pop = document.getElementById('lns-hist-pop');
+  if (!pop || pop.style.display === 'none') return;
+  if (pop.dataset.cid !== cid) return;
+  pop.innerHTML = _loanHistRender(cid, pop.dataset.name || '');
+}
+function _loanHistRender(cid, name) {
+  const c = _loanHistCache[cid];
+  const vlink = `https://shared.lms.vergentlms.com/customer/general?action=view&id=${encodeURIComponent(cid)}`;
+  const head = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)">
+    <div style="font-weight:700;font-size:13px;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(name || ('Customer ' + cid))}</div>
+    <a href="${vlink}" target="_blank" rel="noopener" style="font-size:11px;color:var(--green-dark);font-weight:700;text-decoration:none;flex-shrink:0">Open in Vergent →</a>
+  </div>`;
+  if (!c || c.loading) return head + '<div style="color:var(--muted);padding:6px 0">Loading loan history…</div>';
+  if (c.error)         return head + `<div style="color:var(--red);padding:6px 0">Couldn't load history. <span style="color:var(--muted);font-size:11px">(${escapeHtml(c.error)})</span></div>`;
+  if (!c.loans.length) return head + '<div style="color:var(--muted);padding:6px 0">No prior loans on file.</div>';
+  const fmtDate = iso => { try { const d = new Date(iso); return isNaN(d) ? (iso || '—') : d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); } catch (e) { return iso || '—'; } };
+  const fmtMoney = n => { const v = Number(n) || 0; return '$' + v.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0}); };
+  const statusColor = s => {
+    const t = (s || '').toLowerCase();
+    if (t.includes('paid') || t.includes('closed') || t.includes('bought')) return 'var(--green-dark)';
+    if (t.includes('held') || t.includes('active') || t.includes('open'))   return 'var(--amber-700)';
+    if (t.includes('write') || t.includes('default') || t.includes('charge')) return 'var(--red)';
+    return 'var(--muted)';
+  };
+  const sorted = c.loans.slice().sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0));
+  const top = sorted.slice(0, 6);
+  const more = sorted.length - top.length;
+  const rows = top.map(l => {
+    const balLine  = Number(l.balance) > 0 ? `<span style="color:var(--text);font-weight:700">${fmtMoney(l.balance)} bal</span>` : '';
+    const dl = Number(l.days_late) || 0;
+    const lateLine = dl >= 1 ? `<span style="color:var(--red);font-weight:700">${dl}d late</span>` : '';
+    const right = [balLine, lateLine].filter(Boolean).join('<br>') || '<span style="color:var(--muted)">—</span>';
+    return `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border-soft);font-variant-numeric:tabular-nums">
+      <div style="min-width:0">
+        <div style="font-weight:700;color:var(--text);font-size:12.5px">${escapeHtml(fmtDate(l.date))} · ${fmtMoney(l.amount)}</div>
+        <div style="color:${statusColor(l.status)};font-size:11px;font-weight:700">${escapeHtml(l.status || '—')}</div>
+      </div>
+      <div style="text-align:right;font-size:11px;white-space:nowrap">${right}</div>
+    </div>`;
+  }).join('');
+  const moreFoot = more > 0 ? `<div style="font-size:11px;color:var(--muted);padding:6px 0 0;text-align:center">+ ${more} more in Vergent</div>` : '';
+  return `${head}<div style="font-size:11px;color:var(--muted);margin-bottom:6px">${c.count.toLocaleString()} loan${c.count === 1 ? '' : 's'} on file</div>${rows}${moreFoot}`;
+}
+
 // Density toggle — operator preference, persists across reloads so
 // power-users keep their Compact view. Applied by toggling .compact on
 // the rendered table; the CSS rules at the top of the stylesheet do
@@ -8076,7 +8213,7 @@ function _loansDueRowHtml(r) {
   else if (daysLate >= 1) rowSev = 'lns-sev-1';
   return `<tr class="lns-row${rowSev ? ' ' + rowSev : ''}">
     <td class="tbl-checkbox"><button class="appt-add-btn" title="Create appointment" data-cid="${escapeHtml(cid)}" data-hdr="${escapeHtml(hdrId)}" data-name="${escapeHtml(name)}" onclick="event.stopPropagation();openApptModalFromBtn(this)">+ Appt</button></td>
-    <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" onclick="event.stopPropagation()">${escapeHtml(name)}</a>${apptBadge}</div></td>
+    <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" onclick="event.stopPropagation()">${escapeHtml(name)}</a><span class="lns-hist-icn" data-cid="${escapeHtml(cid)}" data-name="${escapeHtml(name)}" onmouseenter="_loanHistShow(this)" onmouseleave="_loanHistHide()" title="Loan history" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;color:var(--muted);cursor:default;margin-left:6px;vertical-align:middle"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><polyline points="3 4 3 9 8 9"/><path d="M12 7v5l3 2"/></svg></span>${apptBadge}</div></td>
     <td><div class="app-info"><span class="app-type">${escapeHtml(r.LoanId || '—')}</span><span class="app-meta">${escapeHtml(r.LoanStatus || '')}${r.LoanSubStatus ? ' · ' + escapeHtml(r.LoanSubStatus) : ''}</span></div></td>
     <td>${daysCellHtml}</td>
     <td><span class="tbl-time" style="font-variant-numeric:tabular-nums">${_rptFmtMoney(r.Balance)}</span></td>
