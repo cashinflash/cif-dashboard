@@ -8239,7 +8239,14 @@ function renderLoansDueUnified() {
   _updateActiveFilterPill();
   _updateQuickFilterChips();
   _applyRptDensity();
-  _loadSchedPmtsForVisibleRows();
+  // HOTFIX 2026-06-01: the per-row scheduled-payments fetch was firing
+  // N requests on every table render, saturating cif-apply and tripping
+  // Vergent rate limits — which then 502'd legitimate loan-history
+  // requests. Disabled here until the icon can be re-introduced behind
+  // an explicit hover (one request per inspection) or with a smarter
+  // viewport-aware loader. The icon stays hidden meanwhile because the
+  // <span class="lns-card-icn"> placeholder defaults to display:none.
+  // _loadSchedPmtsForVisibleRows();
 }
 
 function _loansDueRowHtml(r) {
