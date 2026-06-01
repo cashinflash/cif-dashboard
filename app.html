@@ -7868,6 +7868,94 @@ function _loanHistRender(cid, name) {
   return `${head}<div style="font-size:11px;color:var(--muted);margin-bottom:6px">${c.count.toLocaleString()} loan${c.count === 1 ? '' : 's'} on file</div>${rows}${moreFoot}`;
 }
 
+// Scheduled-payment indicator — small card icon next to a customer's
+// name on the Loans Due table when Vergent has a card payment on the
+// loan's schedule. Lets the operator see at-a-glance who already has
+// a debit set up vs. who needs one created.
+//
+// Per-row data is fetched lazily after the table renders, with a
+// concurrency cap (6 in flight) so we don't bombard Vergent. Cache is
+// keyed by hdrId and lives for 5 min — table re-renders within that
+// window reuse the cached result without refetching.
+let _schedPmtsCache = {};   // hdrId -> {has_card, next_card, fetchedAt, error}
+const _SCHED_PMTS_TTL_MS = 5 * 60 * 1000;
+const _SCHED_PMTS_PARALLEL = 6;
+let _schedPmtsInFlight = 0;
+const _schedPmtsQueue = [];
+function _kickSchedPmtsQueue() {
+  while (_schedPmtsInFlight < _SCHED_PMTS_PARALLEL && _schedPmtsQueue.length) {
+    const hdrId = _schedPmtsQueue.shift();
+    _schedPmtsInFlight++;
+    _fetchSchedPmts(hdrId).finally(() => {
+      _schedPmtsInFlight--;
+      _kickSchedPmtsQueue();
+    });
+  }
+}
+async function _fetchSchedPmts(hdrId) {
+  try {
+    const r = await fetch('/api/vergent-scheduled-payments', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hdr_id: hdrId })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.ok) {
+      _schedPmtsCache[hdrId] = {
+        has_card:   !!d.has_card_scheduled,
+        next_card:  d.next_card_payment || null,
+        fetchedAt:  Date.now(),
+        error:      null,
+      };
+    } else {
+      _schedPmtsCache[hdrId] = { has_card: false, next_card: null, fetchedAt: Date.now(), error: (d.detail || d.error || 'fetch failed') };
+    }
+  } catch (e) {
+    _schedPmtsCache[hdrId] = { has_card: false, next_card: null, fetchedAt: Date.now(), error: e.message || 'network' };
+  }
+  _renderCardIconForHdr(hdrId);
+}
+function _renderCardIconForHdr(hdrId) {
+  const c = _schedPmtsCache[hdrId];
+  if (!c) return;
+  document.querySelectorAll(`.lns-card-icn[data-hdr="${(window.CSS && CSS.escape) ? CSS.escape(hdrId) : hdrId}"]`).forEach(el => {
+    if (!c.has_card || !c.next_card) {
+      el.style.display = 'none';
+      el.innerHTML = '';
+      return;
+    }
+    const dt   = c.next_card.date || '';
+    const amt  = Number(c.next_card.amount) || 0;
+    const meth = c.next_card.method || 'Card';
+    let dateLabel = dt;
+    try {
+      const d = new Date(dt);
+      if (!isNaN(d)) dateLabel = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    } catch (e) {}
+    const amtLabel = amt > 0 ? '$' + amt.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '';
+    const tipBits = [meth, dateLabel, amtLabel].filter(Boolean).join(' · ');
+    el.title = `Card payment scheduled — ${tipBits}`;
+    el.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;color:#1d4ed8;background:#dbeafe;margin-left:6px;vertical-align:middle;cursor:default';
+    el.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>';
+  });
+}
+function _loadSchedPmtsForVisibleRows() {
+  const slots = document.querySelectorAll('#rpt-table .lns-card-icn[data-hdr]');
+  const now = Date.now();
+  slots.forEach(el => {
+    const hdrId = el.getAttribute('data-hdr') || '';
+    if (!hdrId) return;
+    const c = _schedPmtsCache[hdrId];
+    if (c && (now - c.fetchedAt) < _SCHED_PMTS_TTL_MS) {
+      _renderCardIconForHdr(hdrId);   // already cached — just paint
+      return;
+    }
+    if (_schedPmtsQueue.includes(hdrId)) return;   // already queued
+    _schedPmtsQueue.push(hdrId);
+  });
+  _kickSchedPmtsQueue();
+}
+
 // Density toggle — operator preference, persists across reloads so
 // power-users keep their Compact view. Applied by toggling .compact on
 // the rendered table; the CSS rules at the top of the stylesheet do
@@ -8151,6 +8239,7 @@ function renderLoansDueUnified() {
   _updateActiveFilterPill();
   _updateQuickFilterChips();
   _applyRptDensity();
+  _loadSchedPmtsForVisibleRows();
 }
 
 function _loansDueRowHtml(r) {
@@ -8203,7 +8292,7 @@ function _loansDueRowHtml(r) {
   else if (daysLate >= 1) rowSev = 'lns-sev-1';
   return `<tr class="lns-row${rowSev ? ' ' + rowSev : ''}">
     <td class="tbl-checkbox"><button class="appt-add-btn" title="Create appointment" data-cid="${escapeHtml(cid)}" data-hdr="${escapeHtml(hdrId)}" data-name="${escapeHtml(name)}" onclick="event.stopPropagation();openApptModalFromBtn(this)">+ Appt</button></td>
-    <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" onclick="event.stopPropagation()">${escapeHtml(name)}</a><span class="lns-hist-icn" data-cid="${escapeHtml(cid)}" data-name="${escapeHtml(name)}" onmouseenter="_loanHistShow(this)" onmouseleave="_loanHistHide()" title="Loan history" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;color:var(--muted);cursor:default;margin-left:6px;vertical-align:middle"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><polyline points="3 4 3 9 8 9"/><path d="M12 7v5l3 2"/></svg></span>${apptBadge}</div></td>
+    <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" onclick="event.stopPropagation()">${escapeHtml(name)}</a><span class="lns-hist-icn" data-cid="${escapeHtml(cid)}" data-name="${escapeHtml(name)}" onmouseenter="_loanHistShow(this)" onmouseleave="_loanHistHide()" title="Loan history" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;color:var(--muted);cursor:default;margin-left:6px;vertical-align:middle"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><polyline points="3 4 3 9 8 9"/><path d="M12 7v5l3 2"/></svg></span><span class="lns-card-icn" data-hdr="${escapeHtml(hdrId)}" style="display:none"></span>${apptBadge}</div></td>
     <td><div class="app-info"><span class="app-type">${escapeHtml(r.LoanId || '—')}</span><span class="app-meta">${escapeHtml(r.LoanStatus || '')}${r.LoanSubStatus ? ' · ' + escapeHtml(r.LoanSubStatus) : ''}</span></div></td>
     <td>${daysCellHtml}</td>
     <td><span class="tbl-time" style="font-variant-numeric:tabular-nums">${_rptFmtMoney(r.Balance)}</span></td>

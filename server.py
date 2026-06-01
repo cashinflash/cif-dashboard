@@ -1857,6 +1857,30 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        # Vergent scheduled payments — proxies to cif-apply's
+        # /api/vergent-scheduled-payments. Body: {hdr_id}. Used by the
+        # Loans Due table to show a card icon when a scheduled card
+        # payment exists for a row.
+        if path == '/api/vergent-scheduled-payments':
+            try:
+                body = json.loads(raw) if raw else {}
+                payload = json.dumps(body).encode()
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/vergent-scheduled-payments',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=20) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[VERGENT-SCHED-PMTS UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[VERGENT-SCHED-PMTS ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         if path == '/api/vergent-report-pastdue':
             try:
                 body = json.loads(raw) if raw else {}
