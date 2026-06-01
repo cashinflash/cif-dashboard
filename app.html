@@ -1144,9 +1144,8 @@ button,input,select{font-family:inherit}
       <div class="topnav-user-role" id="user-role">…</div>
     </div>
     <div class="user-menu" id="user-menu">
-      <button class="admin-only" data-route="customers" type="button" style="display:none"><svg class="icn"><use href="#i-list"/></svg>Customers</button>
+      <button data-route="customers" type="button"><svg class="icn"><use href="#i-list"/></svg>Customers</button>
       <button data-route="if" type="button"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
-      <button data-route="connections" type="button"><svg class="icn"><use href="#i-bank"/></svg>Connections</button>
       <button data-route="reports" type="button"><svg class="icn"><use href="#i-chart"/></svg>Servicing</button>
       <hr>
       <!-- Alert sound toggle. State persists in localStorage as
@@ -1161,13 +1160,12 @@ button,input,select{font-family:inherit}
 
 <!-- Mobile sub-nav: sticky under the topnav on every view (hidden on
      desktop where the dashboard's left rail handles this). Keeps
-     Overview / Connections / Customers / Instant Funding one tap away
-     from the Applications, Reports, Detail, and any other view. -->
+     Overview / Customers / Instant Funding one tap away from
+     Applications, Servicing, Detail, and any other view. -->
 <nav class="mobile-subnav">
   <button class="subnav-link" data-route="dashboard"><svg class="icn"><use href="#i-overview"/></svg>Overview</button>
   <button class="subnav-link" data-route="if"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
-  <button class="subnav-link" data-route="connections"><svg class="icn"><use href="#i-bank"/></svg>Connections</button>
-  <button class="subnav-link admin-only" data-route="customers" style="display:none"><svg class="icn"><use href="#i-list"/></svg>Customers</button>
+  <button class="subnav-link" data-route="customers"><svg class="icn"><use href="#i-list"/></svg>Customers</button>
 </nav>
 
 <!-- DASHBOARD -->
@@ -1178,8 +1176,7 @@ button,input,select{font-family:inherit}
         <div class="subnav-label">Insights</div>
         <button class="subnav-link active" data-route="dashboard"><svg class="icn"><use href="#i-overview"/></svg>Overview</button>
         <button class="subnav-link" data-route="if" style="position:relative"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding<span id="alertcount-if" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></button>
-        <button class="subnav-link" data-route="connections" style="position:relative"><svg class="icn"><use href="#i-bank"/></svg>Connections<span id="alertcount-conn" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></button>
-        <button class="subnav-link admin-only" data-route="customers" style="display:none"><svg class="icn"><use href="#i-list"/></svg>Customers</button>
+        <button class="subnav-link" data-route="customers" style="position:relative"><svg class="icn"><use href="#i-list"/></svg>Customers<span id="alertcount-conn" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></button>
       </div>
     </aside>
     <div class="main">
@@ -1778,44 +1775,6 @@ button,input,select{font-family:inherit}
   </div>
 </div>
 
-<!-- CONNECTIONS — App Links + Portal Links unified. Sub-tabs inside the
-     page choose which panel shows. All inner IDs (plaid-list, plaid-search,
-     portal-plaid-list, portal-plaid-search) are preserved so the JS that
-     drives the loaders/filters keeps working unchanged. -->
-<div class="view" id="view-connections">
-  <div class="main full">
-    <div class="greet">
-      <div>
-        <div class="greet-title">Connections</div>
-        <div class="greet-sub" id="conn-sub">Plaid connections from cif-apply applications — re-run reports anytime</div>
-      </div>
-    </div>
-    <!-- Sub-tab strip; mirrors the time-range pill chrome. -->
-    <div class="conn-tabs" style="display:flex;gap:5px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;width:max-content;max-width:100%;flex-wrap:wrap;box-shadow:var(--shadow-xs)">
-      <button class="tf-btn active" data-conn-tab="applinks" onclick="setConnTab('applinks')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-bank"/></svg>App Links</button>
-      <button class="tf-btn" data-conn-tab="portallinks" onclick="setConnTab('portallinks')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-bank"/></svg>Portal Links</button>
-    </div>
-
-    <div class="conn-panel" id="conn-panel-applinks">
-      <div style="margin-bottom:14px">
-        <input type="text" id="plaid-search" placeholder="Search by name, phone or email..." oninput="filterPlaidCustomers(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
-      </div>
-      <div id="plaid-list">
-        <div class="tbl-loading">Loading…</div>
-      </div>
-    </div>
-
-    <div class="conn-panel" id="conn-panel-portallinks" style="display:none">
-      <div style="margin-bottom:14px">
-        <input type="text" id="portal-plaid-search" placeholder="Search by name, email, customer id, bank, or source…" oninput="filterPortalPlaid(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
-      </div>
-      <div id="portal-plaid-list">
-        <div class="tbl-loading">Loading…</div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- Drawer for one customer's Portal Plaid Items -->
 <div id="portal-plaid-drawer" style="display:none;position:fixed;inset:0;z-index:9999">
   <div onclick="closePortalPlaidDrawer()" style="position:absolute;inset:0;background:rgba(0,0,0,.45)"></div>
@@ -1885,11 +1844,16 @@ button,input,select{font-family:inherit}
   </div>
 </div>
 
-<!-- CUSTOMERS — admin search of the portal customer base. Looks up by
-     customerId / email / last name via cif-portal's
-     /api/admin/customers/search endpoint. Used to find a customer for
-     support (and later, in Phase 3, to impersonate). Admin-only:
-     #user-role gating reveals the tab + view at boot. -->
+<!-- CUSTOMERS — unified hub. Three panels:
+       • Portal Support — admin search of the portal customer base
+         (Cognito-sourced via cif-portal /api/admin/customers/search).
+       • App Links — Plaid connections from cif-apply applications.
+       • Portal Links — Plaid items connected through the customer portal.
+     App Links + Portal Links were previously their own "Connections"
+     route; consolidated here so operators have one customer hub.
+     Inner element IDs (plaid-list, plaid-search, portal-plaid-list,
+     portal-plaid-search) are preserved so the existing loaders /
+     filters keep working byte-for-byte. -->
 <div class="view" id="view-customers">
   <div class="main full">
     <div class="greet">
@@ -1899,15 +1863,14 @@ button,input,select{font-family:inherit}
       </div>
     </div>
 
-    <!-- Inner tab strip — pattern matches the Connections sub-tabs.
-         Switching panels also switches which data source the search
-         hits (portal = Cognito; vergent = Vergent v1). -->
+    <!-- Inner tab strip — Portal Support · App Links · Portal Links. -->
     <div class="conn-tabs" style="display:flex;gap:5px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;width:max-content;max-width:100%;flex-wrap:wrap;box-shadow:var(--shadow-xs)">
-      <button class="tf-btn active" data-cust-tab="portal" onclick="setCustTab('portal')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-bolt"/></svg>Portal Customers</button>
-      <button class="tf-btn" data-cust-tab="vergent" onclick="setCustTab('vergent')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-list"/></svg>Vergent Customers</button>
+      <button class="tf-btn active" data-cust-tab="portal" onclick="setCustTab('portal')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-bolt"/></svg>Portal Support</button>
+      <button class="tf-btn" data-cust-tab="applinks" onclick="setCustTab('applinks')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-bank"/></svg>App Links</button>
+      <button class="tf-btn" data-cust-tab="portallinks" onclick="setCustTab('portallinks')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-bank"/></svg>Portal Links</button>
     </div>
 
-    <!-- Portal Customers panel (Cognito-sourced) -->
+    <!-- Portal Support panel (Cognito-sourced) — was "Portal Customers". -->
     <div id="cust-panel-portal">
       <div style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <form id="cust-portal-form" onsubmit="event.preventDefault(); doCustomerSearch('portal');" style="display:flex;gap:10px;align-items:center;flex:1 1 240px;min-width:0;flex-wrap:wrap">
@@ -1924,16 +1887,24 @@ button,input,select{font-family:inherit}
       <div id="cust-portal-results" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
 
-    <!-- Vergent Customers panel (Vergent v1-sourced) -->
-    <div id="cust-panel-vergent" style="display:none">
-      <div style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <form id="cust-vergent-form" onsubmit="event.preventDefault(); doCustomerSearch('vergent');" style="display:flex;gap:10px;align-items:center;flex:1 1 240px;min-width:0;flex-wrap:wrap">
-          <input id="cust-vergent-q" type="text" autocomplete="off" placeholder="Customer ID (e.g. 601488), email, or last name" style="flex:1 1 200px;min-width:0;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
-          <button type="submit" class="btn btn-primary" style="padding:10px 18px">Search</button>
-        </form>
+    <!-- App Links panel (Plaid connections from cif-apply applications). -->
+    <div id="cust-panel-applinks" style="display:none">
+      <div style="margin-bottom:14px">
+        <input type="text" id="plaid-search" placeholder="Search by name, phone or email..." oninput="filterPlaidCustomers(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
       </div>
-      <div id="cust-vergent-meta" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
-      <div id="cust-vergent-results" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div id="plaid-list">
+        <div class="tbl-loading">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Portal Links panel (Plaid items connected through the customer portal). -->
+    <div id="cust-panel-portallinks" style="display:none">
+      <div style="margin-bottom:14px">
+        <input type="text" id="portal-plaid-search" placeholder="Search by name, email, customer id, bank, or source…" oninput="filterPortalPlaid(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+      </div>
+      <div id="portal-plaid-list">
+        <div class="tbl-loading">Loading…</div>
+      </div>
     </div>
   </div>
 </div>
@@ -2122,7 +2093,7 @@ function toast(msg, kind, opts) {
 function _ensureSidebarInExternalViews() {
   const src = document.querySelector('#view-dashboard > .shell > .subnav');
   if (!src) return;
-  ['view-connections', 'view-customers', 'view-if'].forEach(id => {
+  ['view-customers', 'view-if'].forEach(id => {
     const v = document.getElementById(id);
     if (!v || v.querySelector(':scope > .shell')) return;   // already wired
     const main = v.querySelector(':scope > .main');
@@ -2159,23 +2130,24 @@ function setRoute(name, fbId) {
   if (name === 'detail' && fbId) renderDetail(fbId);
   if (name === 'queue') renderQueue();
   if (name === 'dashboard') renderDashboard();
-  if (name === 'connections') {
-    // setRoute('connections', 'applinks' | 'portallinks') honors the
-    // requested inner tab; otherwise stays on whichever was last shown.
-    if (fbId === 'applinks' || fbId === 'portallinks') setConnTab(fbId);
-    else setConnTab(_connInnerTab || 'applinks');
-  }
   if (name === 'if') loadIFSubmissions();
   if (name === 'reports') loadPastDueReport();
-  if (name === 'customers') loadCustomers();
+  if (name === 'customers') {
+    // setRoute('customers', 'applinks' | 'portallinks' | 'portal')
+    // honors the requested inner tab; otherwise loadCustomers picks
+    // whichever was last shown (defaults to 'portal' = Portal Support).
+    const innerTab = (fbId === 'applinks' || fbId === 'portallinks' || fbId === 'portal') ? fbId : null;
+    if (innerTab) setCustTab(innerTab);
+    else loadCustomers();
+  }
   document.body.dataset.firebaseId = (name === 'detail' && fbId) ? fbId : '';
   if (name === 'detail' && fbId) {
     location.hash = '#fb=' + encodeURIComponent(fbId);
-  } else if (name === 'connections') {
+  } else if (name === 'customers') {
     // Preserve which sub-tab is active in the URL so back/forward and
-    // bookmarks both restore correctly. #applinks / #portallinks both
-    // route to view-connections via readRouteFromHash().
-    location.hash = '#' + (_connInnerTab || 'applinks');
+    // bookmarks both restore correctly. #applinks / #portallinks /
+    // #customers all route to view-customers via readRouteFromHash().
+    location.hash = '#' + (_custTab || 'customers');
   } else if (name !== 'detail') {
     location.hash = '#' + name;
   }
@@ -2191,11 +2163,14 @@ function readRouteFromHash() {
   if (h === '#queue' || h === '#applications') return ['queue', null];
   if (h === '#if' || h === '#instant-funding') return ['if', null];
   if (h === '#reports') return ['reports', null];
-  // All Connections-related hashes resolve to the unified view; the
-  // 2nd tuple element selects the inner sub-tab.
-  if (h === '#connections' || h === '#applinks' || h === '#plaid') return ['connections', 'applinks'];
-  if (h === '#portallinks' || h === '#portal-plaid') return ['connections', 'portallinks'];
-  if (h === '#customers') return ['customers', null];
+  // All Customers-related hashes resolve to the unified view; the
+  // 2nd tuple element selects the inner sub-tab. Legacy Connections
+  // hashes (#connections, #applinks, #plaid, #portallinks, #portal-plaid)
+  // redirect into view-customers so existing bookmarks still land in
+  // the right place.
+  if (h === '#applinks' || h === '#plaid' || h === '#connections') return ['customers', 'applinks'];
+  if (h === '#portallinks' || h === '#portal-plaid') return ['customers', 'portallinks'];
+  if (h === '#customers' || h === '#portal-support' || h === '#portal') return ['customers', 'portal'];
   return ['dashboard', null];
 }
 
@@ -5006,7 +4981,10 @@ function initAlerts() {
     window._alertsRouteHooked = true;
     const orig = window.setRoute;
     window.setRoute = function (name, fbId) {
-      if (name === 'connections') clearAlertCount('conn');
+      // Connections was folded into Customers; the alert badge still
+      // lives on the Customers nav item (id="alertcount-conn"), so
+      // visiting Customers clears it.
+      if (name === 'customers') clearAlertCount('conn');
       if (name === 'if') clearAlertCount('if');
       return orig.apply(this, arguments);
     };
@@ -5162,42 +5140,16 @@ document.addEventListener('keydown', (e) => {
 init();
 
 // ─────────────────────────────────────────────────────────────────────
-// CONNECTIONS — App Links + Portal Links
+// CUSTOMERS — App Links + Portal Links loaders (formerly Connections)
 // Ported from app-legacy.html (lines 4539-5224). All HTTP endpoints,
 // Firebase paths, and Plaid-token reads are byte-identical to the
-// classic flow so no Plaid tokens are at risk during the port.
-// Aliases bridge the legacy helper names (_esc, _fmtDate, openModal,
-// allPlaidCustomers) to their current-app equivalents.
+// classic flow so no Plaid tokens are at risk during the port. The
+// view was renamed from Connections to Customers and now lives inside
+// view-customers as the App Links + Portal Links sub-tabs. Aliases
+// bridge the legacy helper names (_esc, _fmtDate, openModal,
+// allPlaidCustomers) to their current-app equivalents. setCustTab
+// (defined further down) drives which panel is active.
 // ─────────────────────────────────────────────────────────────────────
-// Which Connections sub-tab is active. Persisted across route changes
-// so reopening Connections lands on whichever panel was last visible.
-let _connInnerTab = 'applinks';
-
-// Toggle between the App Links and Portal Links panels inside the
-// unified Connections view. Activates the relevant tab button, swaps
-// the visible panel, kicks off the loader for whichever tab is now
-// active, and updates the URL hash so back/forward + bookmarks work.
-function setConnTab(name) {
-  if (name !== 'applinks' && name !== 'portallinks') name = 'applinks';
-  _connInnerTab = name;
-  document.querySelectorAll('[data-conn-tab]').forEach(b =>
-    b.classList.toggle('active', b.getAttribute('data-conn-tab') === name));
-  const a = document.getElementById('conn-panel-applinks');
-  const p = document.getElementById('conn-panel-portallinks');
-  if (a) a.style.display = name === 'applinks' ? '' : 'none';
-  if (p) p.style.display = name === 'portallinks' ? '' : 'none';
-  const sub = document.getElementById('conn-sub');
-  if (sub) {
-    sub.textContent = name === 'applinks'
-      ? 'Plaid connections from cif-apply applications — re-run reports anytime'
-      : 'Plaid connections from the customer portal — re-pull data anytime';
-  }
-  if (name === 'applinks') loadPlaidCustomers();
-  else if (name === 'portallinks') loadPortalPlaid();
-  // Mirror the active sub-tab in the hash so the URL is shareable.
-  const target = '#' + name;
-  if (location.hash !== target) location.hash = target;
-}
 
 const _esc = escapeHtml;
 function _fmtDate(iso) {
@@ -5802,14 +5754,19 @@ async function _fbDeleteRaw(path) {
   if (!r.ok) throw new Error('HTTP ' + r.status);
 }
 
-// ───────── Customers (admin-only) ─────────
-// Two tabs share the same UI scaffolding — only the data source
-// differs:
-//   portal:  cif-portal /api/admin/customers/search?source=portal
-//            → Cognito User Pool (only customers who registered
-//              for the portal at apply.cashinflash.com)
-//   vergent: cif-portal /api/admin/customers/search?source=vergent
-//            → Vergent v1 (the LMS's full historical customer base)
+// ───────── Customers (unified hub) ─────────
+// Three tabs share the page:
+//   portal:      cif-portal /api/admin/customers/search?source=portal
+//                → Cognito User Pool (only customers who registered for
+//                the portal at apply.cashinflash.com). Renamed "Portal
+//                Support" in the UI; admin-gated server-side.
+//   applinks:    Plaid connections from cif-apply applications (loader
+//                lives further up at loadPlaidCustomers).
+//   portallinks: Plaid items connected via the customer portal (loader
+//                lives further up at loadPortalPlaid).
+// The App Links + Portal Links tabs were previously a separate
+// Connections route; consolidated here so operators have one customer
+// hub.
 let _custTab = 'portal';
 let _custPortalLoaded = false;
 
@@ -5818,56 +5775,64 @@ function loadCustomers() {
 }
 
 function setCustTab(name) {
-  if (name !== 'portal' && name !== 'vergent') name = 'portal';
+  if (name !== 'portal' && name !== 'applinks' && name !== 'portallinks') name = 'portal';
   _custTab = name;
   document.querySelectorAll('[data-cust-tab]').forEach(function(b) {
     b.classList.toggle('active', b.getAttribute('data-cust-tab') === name);
   });
-  const portalPanel = document.getElementById('cust-panel-portal');
-  const vergentPanel = document.getElementById('cust-panel-vergent');
-  if (portalPanel) portalPanel.style.display = name === 'portal' ? '' : 'none';
-  if (vergentPanel) vergentPanel.style.display = name === 'vergent' ? '' : 'none';
+  const panels = {
+    portal:      document.getElementById('cust-panel-portal'),
+    applinks:    document.getElementById('cust-panel-applinks'),
+    portallinks: document.getElementById('cust-panel-portallinks'),
+  };
+  Object.keys(panels).forEach(function(k) {
+    if (panels[k]) panels[k].style.display = (k === name) ? '' : 'none';
+  });
   const sub = document.getElementById('cust-greet-sub');
   if (sub) {
     sub.innerHTML = name === 'portal'
       ? 'Customers who registered at <b>apply.cashinflash.com</b>. Search by customer ID, email, or last name — or browse the full list below.'
-      : 'All customers in <b>Vergent</b> (LMS\'s full base, regardless of portal account). Search by customer ID, email, or last name.';
+      : name === 'applinks'
+        ? 'Plaid connections from <b>cif-apply</b> applications — open a row to re-run reports or push to Vergent.'
+        : 'Plaid items connected through the <b>customer portal</b> — view balances and re-pull data anytime.';
   }
-  const input = document.getElementById('cust-' + name + '-q');
-  if (input) input.focus();
-  // Portal tab auto-loads the full list on first activation so the
-  // operator sees every registered customer without having to type.
-  // Subsequent switches don't re-fetch — search results (or refreshes
-  // via the empty-q "Show all" form submit) replace the panel.
-  if (name === 'portal' && !_custPortalLoaded) {
-    _custPortalLoaded = true;
-    doCustomerSearch('portal');  // empty-q → list-all from backend
-  } else if (name === 'vergent') {
-    const meta = document.getElementById('cust-vergent-meta');
-    if (meta && !meta.textContent) {
-      meta.textContent = 'Type something above and click Search.';
+  // Portal Support tab auto-loads the full list on first activation so
+  // the operator sees every registered customer without having to type.
+  // App Links / Portal Links kick off their own loaders here so the
+  // panel content is ready by the time the tab is visible.
+  if (name === 'portal') {
+    const input = document.getElementById('cust-portal-q');
+    if (input) input.focus();
+    if (!_custPortalLoaded) {
+      _custPortalLoaded = true;
+      doCustomerSearch('portal');  // empty-q → list-all from backend
     }
+  } else if (name === 'applinks') {
+    loadPlaidCustomers();
+  } else if (name === 'portallinks') {
+    loadPortalPlaid();
   }
+  // Mirror the active sub-tab in the hash so the URL is shareable.
+  const target = '#' + (name === 'portal' ? 'customers' : name);
+  if (location.hash !== target) location.hash = target;
 }
 
 async function doCustomerSearch(source) {
-  if (source !== 'portal' && source !== 'vergent') source = 'portal';
-  const qEl = document.getElementById('cust-' + source + '-q');
-  const meta = document.getElementById('cust-' + source + '-meta');
-  const results = document.getElementById('cust-' + source + '-results');
+  // Portal Support is the only remaining customer source; the legacy
+  // "vergent" branch was removed when the Vergent Customers tab was
+  // dropped. The source param is accepted for back-compat with callers
+  // but always coerced to 'portal'.
+  source = 'portal';
+  const qEl = document.getElementById('cust-portal-q');
+  const meta = document.getElementById('cust-portal-meta');
+  const results = document.getElementById('cust-portal-results');
   const q = (qEl && qEl.value || '').trim();
-  // Empty q is allowed for portal (returns the list-all view) but
-  // not for vergent (the LMS's full base would be ~50k rows).
-  if (!q && source === 'vergent') {
-    if (meta) meta.textContent = 'Type something to search.';
-    return;
-  }
   if (meta) meta.textContent = q ? 'Searching…' : 'Loading all portal customers…';
   if (results) results.innerHTML = '';
   try {
     const url = '/api/portal-customers/search'
       + '?q=' + encodeURIComponent(q)
-      + '&source=' + encodeURIComponent(source);
+      + '&source=portal';
     const r = await fetch(url, { credentials: 'include' });
     const d = await r.json();
     if (!r.ok) {
