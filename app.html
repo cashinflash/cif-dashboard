@@ -7828,9 +7828,19 @@ function _loanHistRender(cid, name) {
   const more = sorted.length - top.length;
   const rows = top.map(l => {
     const balLine  = Number(l.balance) > 0 ? `<span style="color:var(--text);font-weight:700">${fmtMoney(l.balance)} bal</span>` : '';
+    // Days-late readout — shown for every loan so the operator can
+    // scan the customer's late history at a glance. Prefer Vergent's
+    // verbatim days_late_label (matches the profile-loans table at
+    // line 3559); fall back to a numeric "Nd late" or "On time".
     const dl = Number(l.days_late) || 0;
-    const lateLine = dl >= 1 ? `<span style="color:var(--red);font-weight:700">${dl}d late</span>` : '';
-    const right = [balLine, lateLine].filter(Boolean).join('<br>') || '<span style="color:var(--muted)">—</span>';
+    const dlRaw = (l.days_late_label && String(l.days_late_label).trim()) || '';
+    const dlIsZeroLabel = dlRaw && (dlRaw.toLowerCase() === 'not late' || dlRaw === '0' || dlRaw === '—');
+    let dlText, dlColor;
+    if (dl >= 31)     { dlText = dlRaw && !dlIsZeroLabel ? dlRaw : `${dl}d late`; dlColor = 'var(--red)'; }
+    else if (dl >= 1) { dlText = dlRaw && !dlIsZeroLabel ? dlRaw : `${dl}d late`; dlColor = 'var(--amber-700)'; }
+    else              { dlText = 'On time';                                       dlColor = 'var(--green-dark)'; }
+    const lateLine = `<span style="color:${dlColor};font-weight:700">${escapeHtml(dlText)}</span>`;
+    const right = [balLine, lateLine].filter(Boolean).join('<br>');
     return `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border-soft);font-variant-numeric:tabular-nums">
       <div style="min-width:0">
         <div style="font-weight:700;color:var(--text);font-size:12.5px">${escapeHtml(fmtDate(l.date))} · ${fmtMoney(l.amount)}</div>
