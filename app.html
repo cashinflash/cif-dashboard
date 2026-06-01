@@ -128,6 +128,12 @@ button,input,select{font-family:inherit}
 .stat-trend.up{color:var(--green)}.stat-trend.down{color:var(--red)}.stat-trend.flat{color:var(--muted)}
 .stat-trend .icn{width:11px;height:11px;stroke-width:2.5}
 .stat-trend-sub{color:var(--muted);font-weight:500;margin-left:5px}
+/* "To collect" hero card — gradient bg + larger value so it draws the
+   eye first across the Servicing KPI row. */
+.stat-hero{background:linear-gradient(135deg,#f0fdf6 0%,#e7f7ee 100%);border-color:#bde5cc;box-shadow:0 1px 0 rgba(16,163,74,.06),0 4px 12px rgba(16,163,74,.06)}
+.stat-hero .stat-value{font-size:36px;color:var(--green-dark);font-weight:800;letter-spacing:-.03em}
+.stat-hero-sub{font-size:11.5px;color:var(--green-dark);font-weight:600;margin-top:6px;opacity:.85}
+@media(max-width:600px){.stat-hero .stat-value{font-size:28px}}
 
 /* CARD */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-xs);overflow:hidden}
@@ -163,6 +169,8 @@ button,input,select{font-family:inherit}
 .analytics-ov-label{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .analytics-ov-value{font-size:22px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;margin-top:6px;line-height:1.05}
 .analytics-ov-value.pastdue{color:var(--red)}
+.analytics-ov-amt{font-size:11.5px;color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums;font-weight:600}
+.analytics-ov-amt.pastdue{color:#a5252b}
 @media(max-width:600px){.analytics-overview{grid-template-columns:repeat(2,1fr);padding:14px 14px 16px}.analytics-ov-value{font-size:18px}}
 
 /* ACTIVITY */
@@ -1200,10 +1208,10 @@ button,input,select{font-family:inherit}
           <!-- Payments overview under the donut. Populated by
                renderAnalyticsOverview() from the Servicing data. -->
           <div class="analytics-overview">
-            <div class="analytics-ov-cell" onclick="_openServicingBucket('up-today')"><div class="analytics-ov-label">Due Today</div><div class="analytics-ov-value" id="ov-due-today">—</div></div>
-            <div class="analytics-ov-cell" onclick="_openServicingBucket('up-tomorrow')"><div class="analytics-ov-label">Due Tomorrow</div><div class="analytics-ov-value" id="ov-due-tomorrow">—</div></div>
-            <div class="analytics-ov-cell" onclick="_openServicingBucket('up-week')"><div class="analytics-ov-label">Due This Week</div><div class="analytics-ov-value" id="ov-due-week">—</div></div>
-            <div class="analytics-ov-cell" onclick="_openServicingBucket(null)"><div class="analytics-ov-label">Past Due</div><div class="analytics-ov-value pastdue" id="ov-past-due">—</div></div>
+            <div class="analytics-ov-cell" onclick="_openServicingBucket('up-today')"><div class="analytics-ov-label">Due Today</div><div class="analytics-ov-value" id="ov-due-today">—</div><div class="analytics-ov-amt" id="ov-due-today-amt">$0</div></div>
+            <div class="analytics-ov-cell" onclick="_openServicingBucket('up-tomorrow')"><div class="analytics-ov-label">Due Tomorrow</div><div class="analytics-ov-value" id="ov-due-tomorrow">—</div><div class="analytics-ov-amt" id="ov-due-tomorrow-amt">$0</div></div>
+            <div class="analytics-ov-cell" onclick="_openServicingBucket('up-week')"><div class="analytics-ov-label">Due This Week</div><div class="analytics-ov-value" id="ov-due-week">—</div><div class="analytics-ov-amt" id="ov-due-week-amt">$0</div></div>
+            <div class="analytics-ov-cell" onclick="_openServicingBucket(null)"><div class="analytics-ov-label">Past Due</div><div class="analytics-ov-value pastdue" id="ov-past-due">—</div><div class="analytics-ov-amt pastdue" id="ov-past-due-amt">$0</div></div>
           </div>
         </div>
 
@@ -1596,6 +1604,7 @@ button,input,select{font-family:inherit}
     <!-- Toolbar — search, bulk actions, CSV export, auto-refresh, last-loaded. -->
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
       <input type="text" id="rpt-search" placeholder="Search by name, phone, loan id, store…" oninput="filterReport(this.value)" style="flex:1;min-width:240px;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+      <span id="rpt-active-filter" style="display:none;align-items:center;gap:6px;background:#ecfdf5;color:var(--green-dark);border:1px solid #a7e8c2;border-radius:999px;padding:6px 6px 6px 12px;font-size:12px;font-weight:700"><span>Showing: <span id="rpt-active-filter-label" style="font-weight:700"></span></span><button onclick="_clearActiveFilter()" title="Clear filter" style="background:white;border:1px solid #a7e8c2;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--green-dark);padding:0;font-size:14px;line-height:1;font-family:inherit">&times;</button></span>
       <span id="rpt-loaded-at" style="font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums"></span>
     </div>
     <!-- Bulk-action bar — only shown when rows are selected. -->
@@ -2403,18 +2412,24 @@ function _paintAnalyticsOverview() {
     (Number(r.AmountDue) || 0) > 0
   );
   let today = 0, tomorrow = 0, week = 0, pastDue = 0;
+  let todayAmt = 0, tomorrowAmt = 0, weekAmt = 0, pastDueAmt = 0;
   rows.forEach(r => {
     const d = _pastDueComputedDaysLate(r);
-    if (d >= 1) pastDue++;
-    else if (d === 0) today++;
-    else if (d === -1) tomorrow++;
-    else if (d <= -2 && d >= -7) week++;
+    const amt = Number(r.AmountDue) || 0;
+    if (d >= 1) { pastDue++; pastDueAmt += amt; }
+    else if (d === 0) { today++; todayAmt += amt; }
+    else if (d === -1) { tomorrow++; tomorrowAmt += amt; }
+    else if (d <= -2 && d >= -7) { week++; weekAmt += amt; }
   });
-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v.toLocaleString(); };
-  set('ov-due-today', today);
-  set('ov-due-tomorrow', tomorrow);
-  set('ov-due-week', week);
-  set('ov-past-due', pastDue);
+  const setCt  = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v.toLocaleString(); };
+  const setAmt = (id, v) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = v > 0 ? '$' + Math.round(v).toLocaleString() : '$0';
+  };
+  setCt('ov-due-today', today);     setAmt('ov-due-today-amt', todayAmt);
+  setCt('ov-due-tomorrow', tomorrow); setAmt('ov-due-tomorrow-amt', tomorrowAmt);
+  setCt('ov-due-week', week);       setAmt('ov-due-week-amt', weekAmt);
+  setCt('ov-past-due', pastDue);    setAmt('ov-past-due-amt', pastDueAmt);
 }
 
 function renderDashboard() {
@@ -7595,6 +7610,63 @@ function setBucketFilter(key) {
   _bucketFilter = (_bucketFilter === key) ? null : key;
   _customRange = null;
   renderLoansDueUnified();
+  // After the re-render lands the matching section header in the DOM,
+  // scroll the table to it so the operator's eye lands where they
+  // clicked without manual scrolling.
+  _scrollToBucketSection(_bucketFilter);
+}
+
+// Map a bucket-card key (up-today / pd-1day / etc.) onto the table
+// section it belongs to, so a card click can auto-scroll there.
+const _BUCKET_TO_SECTION = {
+  'up-today': 'today',
+  'up-tomorrow': 'tomorrow',
+  'up-week': 'thisweek',
+  'up-month': 'next30',
+  'pd-1day': 'pastdue',
+  'pd-2to7': 'pastdue',
+  'pd-8to30': 'pastdue',
+  'pd-31': 'pastdue',
+};
+function _scrollToBucketSection(bucketKey) {
+  if (!bucketKey) return;
+  const sectionKey = _BUCKET_TO_SECTION[bucketKey];
+  if (!sectionKey) return;
+  // Defer one frame so the freshly-rendered DOM is laid out before
+  // we query offsets.
+  requestAnimationFrame(() => {
+    const target = document.querySelector(`tr.lns-sec[data-section-key="${sectionKey}"]`);
+    if (target && typeof target.scrollIntoView === 'function') {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+}
+
+function _clearActiveFilter() {
+  _bucketFilter = null;
+  _customRange = null;
+  renderLoansDueUnified();
+}
+function _updateActiveFilterPill() {
+  const pill = document.getElementById('rpt-active-filter');
+  const label = document.getElementById('rpt-active-filter-label');
+  if (!pill || !label) return;
+  let txt = '';
+  if (_bucketFilter) {
+    const all = (typeof _UPCOMING_TILES !== 'undefined' ? _UPCOMING_TILES : [])
+      .concat(typeof _PASTDUE_TILES !== 'undefined' ? _PASTDUE_TILES : []);
+    const t = all.find(x => x.key === _bucketFilter);
+    txt = t ? t.label : _bucketFilter;
+  } else if (_customRange) {
+    const fmt = ms => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    txt = `${fmt(_customRange.start)} – ${fmt(_customRange.end)}`;
+  }
+  if (txt) {
+    label.textContent = txt;
+    pill.style.display = 'inline-flex';
+  } else {
+    pill.style.display = 'none';
+  }
 }
 
 function _renderBucketCards(allRows) {
@@ -7721,11 +7793,18 @@ function renderLoansDueUnified() {
       <div class="stat-label">${escapeHtml(label)}</div>
       <div class="stat-value${cls==='dec'?' red':cls==='pen'?' amber':''}">${val}</div>
     </div>`;
+    // "To collect" is the headline number — set it apart with an
+    // emerald accent + larger value so the eye lands on it first.
+    const hero = (label, val, sub) => `<div class="stat stat-hero">
+      <div class="stat-label">${escapeHtml(label)}</div>
+      <div class="stat-value">${val}</div>
+      <div class="stat-hero-sub">${escapeHtml(sub)}</div>
+    </div>`;
     stats.innerHTML =
-        card('To collect', _rptFmtMoney(totalDue), 'pen')
-      + card('Loans', allRows.length, 'tot')
+        hero('To collect', _rptFmtMoney(totalDue), `${allRows.length.toLocaleString()} active loan${allRows.length === 1 ? '' : 's'}`)
       + card('Past due', pastDueCt, pastDueCt > 0 ? 'dec' : '')
-      + card('Upcoming · 30d', upcomingCt);
+      + card('Upcoming · 30d', upcomingCt)
+      + card('31+ days late', sev31, sev31 > 0 ? 'dec' : '');
   }
 
   // Bucket cards (Upcoming + Past Due sections) — replaces the old
@@ -7779,7 +7858,7 @@ function renderLoansDueUnified() {
     const totalDue = rows.reduce((sum, r) => sum + (Number(r.AmountDue) || 0), 0);
     const meta = `${rows.length} loan${rows.length === 1 ? '' : 's'} · ${_rptFmtMoney(totalDue)}`;
     const rowsHtml = rows.map(_loansDueRowHtml).join('');
-    return `<tr class="lns-sec"><td colspan="8">${escapeHtml(s.label)}<span class="lns-sec-meta">${escapeHtml(meta)}</span></td></tr>${rowsHtml}`;
+    return `<tr class="lns-sec" data-section-key="${escapeHtml(s.key)}"><td colspan="8">${escapeHtml(s.label)}<span class="lns-sec-meta">${escapeHtml(meta)}</span></td></tr>${rowsHtml}`;
   }).join('');
 
   table.innerHTML = `<div class="tbl-card-scroll"><table class="tbl"><thead><tr>${headHtml}</tr></thead><tbody>${sectionsHtml || '<tr><td colspan="8" class="tbl-empty">No active loans due in the next 30 days.</td></tr>'}</tbody></table></div>`;
@@ -7788,6 +7867,7 @@ function renderLoansDueUnified() {
     const totalCount = allRows.length;
     status.textContent = `${totalCount.toLocaleString()} active loan${totalCount === 1 ? '' : 's'}`;
   }
+  _updateActiveFilterPill();
 }
 
 function _loansDueRowHtml(r) {
