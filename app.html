@@ -7877,8 +7877,10 @@ function _loanHistRender(cid, name) {
 //   • Concurrency = 1 (was 6) — single in-flight request at a time.
 //   • 300 ms gap between requests so a 30-row table trickles over
 //     ~10 s instead of bursting in parallel.
-//   • IntersectionObserver — only rows visible in the scroll viewport
-//     get queued. Scrolling triggers more.
+//   • Drains every row on the rendered page, not just viewport-visible
+//     ones (an earlier attempt used IntersectionObserver but the icon
+//     placeholders are display:none, so the observer never fired and
+//     zero icons ever loaded — see #154).
 //   • 1-hour per-hdrId cache so re-renders within an operator's
 //     session don't refetch.
 //   • _schedPmtsRenderToken cancels the previous queue when the table
@@ -7887,7 +7889,6 @@ let _schedPmtsCache = {};   // hdrId -> {has_card, next_card, fetchedAt, error}
 const _SCHED_PMTS_TTL_MS = 60 * 60 * 1000;   // 1h
 const _SCHED_PMTS_GAP_MS = 300;
 let _schedPmtsRenderToken = 0;
-let _schedPmtsObserver = null;
 async function _fetchSchedPmts(hdrId) {
   try {
     const r = await fetch('/api/vergent-scheduled-payments', {
@@ -7955,56 +7956,30 @@ async function _drainSchedPmtsQueue(queue, myToken) {
 function _loadSchedPmtsForVisibleRows() {
   // Increment token: any previously running drain will notice and stop.
   const myToken = ++_schedPmtsRenderToken;
-  // Paint any cached results immediately so the icon shows on
-  // re-renders without waiting for the trickle.
-  document.querySelectorAll('#rpt-table .lns-card-icn[data-hdr]').forEach(el => {
-    const hdrId = el.getAttribute('data-hdr') || '';
-    if (!hdrId) return;
-    const c = _schedPmtsCache[hdrId];
-    if (c && (Date.now() - c.fetchedAt) < _SCHED_PMTS_TTL_MS) {
-      _renderCardIconForHdr(hdrId);
-    }
-  });
-  // Tear down the previous observer (rows from the prior render are
-  // gone anyway) and rebuild one for the current row set.
-  if (_schedPmtsObserver) { _schedPmtsObserver.disconnect(); _schedPmtsObserver = null; }
-  const queue = [];
-  const enqueueIfNeeded = (hdrId) => {
-    if (!hdrId) return;
-    const c = _schedPmtsCache[hdrId];
-    if (c && (Date.now() - c.fetchedAt) < _SCHED_PMTS_TTL_MS) return;
-    if (queue.includes(hdrId)) return;
-    queue.push(hdrId);
-  };
   const slots = document.querySelectorAll('#rpt-table .lns-card-icn[data-hdr]');
   if (!slots.length) return;
-  if (typeof IntersectionObserver !== 'undefined') {
-    // Viewport-aware: enqueue only rows the operator is actually
-    // looking at. Scrolling triggers more. rootMargin gives a small
-    // buffer so just-off-screen rows preload before being scrolled to.
-    _schedPmtsObserver = new IntersectionObserver(entries => {
-      let added = false;
-      entries.forEach(en => {
-        if (!en.isIntersecting) return;
-        const hdrId = en.target.getAttribute('data-hdr') || '';
-        const before = queue.length;
-        enqueueIfNeeded(hdrId);
-        if (queue.length !== before) added = true;
-        _schedPmtsObserver.unobserve(en.target);
-      });
-      if (added && myToken === _schedPmtsRenderToken) {
-        // Drain the new additions on the same trickle. If a drain
-        // is already running for this token it will pick them up.
-        _drainSchedPmtsQueue(queue.splice(0), myToken);
-      }
-    }, { rootMargin: '100px 0px' });
-    slots.forEach(el => _schedPmtsObserver.observe(el));
-  } else {
-    // No IntersectionObserver (rare) — fall back to enqueuing all
-    // rows but still trickle them sequentially.
-    slots.forEach(el => enqueueIfNeeded(el.getAttribute('data-hdr') || ''));
-    _drainSchedPmtsQueue(queue.splice(0), myToken);
-  }
+  // Paint any cached results immediately so the icon shows on
+  // re-renders without waiting for the trickle.
+  const queue = [];
+  const seen = new Set();
+  const now = Date.now();
+  slots.forEach(el => {
+    const hdrId = el.getAttribute('data-hdr') || '';
+    if (!hdrId || seen.has(hdrId)) return;
+    seen.add(hdrId);
+    const c = _schedPmtsCache[hdrId];
+    if (c && (now - c.fetchedAt) < _SCHED_PMTS_TTL_MS) {
+      _renderCardIconForHdr(hdrId);
+      return;
+    }
+    queue.push(hdrId);
+  });
+  // Sequential trickle. NOT viewport-gated — IntersectionObserver
+  // doesn't fire for display:none placeholders, which is what our
+  // icon spans are by default, so we always drain every row in
+  // render order. Concurrency is still 1 with a 300 ms gap so the
+  // pacing is gentle on cif-apply / Vergent.
+  if (queue.length) _drainSchedPmtsQueue(queue, myToken);
 }
 
 // Density toggle — operator preference, persists across reloads so
