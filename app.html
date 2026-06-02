@@ -7873,25 +7873,21 @@ function _loanHistRender(cid, name) {
 // loan's schedule. Lets the operator see at-a-glance who already has
 // a debit set up vs. who needs one created.
 //
-// Per-row data is fetched lazily after the table renders, with a
-// concurrency cap (6 in flight) so we don't bombard Vergent. Cache is
-// keyed by hdrId and lives for 5 min — table re-renders within that
-// window reuse the cached result without refetching.
+// Loader is GENTLE on the backend (rewritten after #152 hotfix):
+//   • Concurrency = 1 (was 6) — single in-flight request at a time.
+//   • 300 ms gap between requests so a 30-row table trickles over
+//     ~10 s instead of bursting in parallel.
+//   • IntersectionObserver — only rows visible in the scroll viewport
+//     get queued. Scrolling triggers more.
+//   • 1-hour per-hdrId cache so re-renders within an operator's
+//     session don't refetch.
+//   • _schedPmtsRenderToken cancels the previous queue when the table
+//     re-renders, so we don't keep loading stale rows.
 let _schedPmtsCache = {};   // hdrId -> {has_card, next_card, fetchedAt, error}
-const _SCHED_PMTS_TTL_MS = 5 * 60 * 1000;
-const _SCHED_PMTS_PARALLEL = 6;
-let _schedPmtsInFlight = 0;
-const _schedPmtsQueue = [];
-function _kickSchedPmtsQueue() {
-  while (_schedPmtsInFlight < _SCHED_PMTS_PARALLEL && _schedPmtsQueue.length) {
-    const hdrId = _schedPmtsQueue.shift();
-    _schedPmtsInFlight++;
-    _fetchSchedPmts(hdrId).finally(() => {
-      _schedPmtsInFlight--;
-      _kickSchedPmtsQueue();
-    });
-  }
-}
+const _SCHED_PMTS_TTL_MS = 60 * 60 * 1000;   // 1h
+const _SCHED_PMTS_GAP_MS = 300;
+let _schedPmtsRenderToken = 0;
+let _schedPmtsObserver = null;
 async function _fetchSchedPmts(hdrId) {
   try {
     const r = await fetch('/api/vergent-scheduled-payments', {
@@ -7939,21 +7935,76 @@ function _renderCardIconForHdr(hdrId) {
     el.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>';
   });
 }
+// Sequential, cancellable trickle. Each call increments the render
+// token; if the token changes mid-run (table re-rendered), the loop
+// aborts and lets the new run take over. Sleeps between requests so
+// we don't burst Vergent's V1 API.
+async function _drainSchedPmtsQueue(queue, myToken) {
+  for (const hdrId of queue) {
+    if (myToken !== _schedPmtsRenderToken) return;   // superseded
+    const c = _schedPmtsCache[hdrId];
+    if (c && (Date.now() - c.fetchedAt) < _SCHED_PMTS_TTL_MS) {
+      _renderCardIconForHdr(hdrId);
+      continue;
+    }
+    await _fetchSchedPmts(hdrId);
+    if (myToken !== _schedPmtsRenderToken) return;
+    await new Promise(r => setTimeout(r, _SCHED_PMTS_GAP_MS));
+  }
+}
 function _loadSchedPmtsForVisibleRows() {
-  const slots = document.querySelectorAll('#rpt-table .lns-card-icn[data-hdr]');
-  const now = Date.now();
-  slots.forEach(el => {
+  // Increment token: any previously running drain will notice and stop.
+  const myToken = ++_schedPmtsRenderToken;
+  // Paint any cached results immediately so the icon shows on
+  // re-renders without waiting for the trickle.
+  document.querySelectorAll('#rpt-table .lns-card-icn[data-hdr]').forEach(el => {
     const hdrId = el.getAttribute('data-hdr') || '';
     if (!hdrId) return;
     const c = _schedPmtsCache[hdrId];
-    if (c && (now - c.fetchedAt) < _SCHED_PMTS_TTL_MS) {
-      _renderCardIconForHdr(hdrId);   // already cached — just paint
-      return;
+    if (c && (Date.now() - c.fetchedAt) < _SCHED_PMTS_TTL_MS) {
+      _renderCardIconForHdr(hdrId);
     }
-    if (_schedPmtsQueue.includes(hdrId)) return;   // already queued
-    _schedPmtsQueue.push(hdrId);
   });
-  _kickSchedPmtsQueue();
+  // Tear down the previous observer (rows from the prior render are
+  // gone anyway) and rebuild one for the current row set.
+  if (_schedPmtsObserver) { _schedPmtsObserver.disconnect(); _schedPmtsObserver = null; }
+  const queue = [];
+  const enqueueIfNeeded = (hdrId) => {
+    if (!hdrId) return;
+    const c = _schedPmtsCache[hdrId];
+    if (c && (Date.now() - c.fetchedAt) < _SCHED_PMTS_TTL_MS) return;
+    if (queue.includes(hdrId)) return;
+    queue.push(hdrId);
+  };
+  const slots = document.querySelectorAll('#rpt-table .lns-card-icn[data-hdr]');
+  if (!slots.length) return;
+  if (typeof IntersectionObserver !== 'undefined') {
+    // Viewport-aware: enqueue only rows the operator is actually
+    // looking at. Scrolling triggers more. rootMargin gives a small
+    // buffer so just-off-screen rows preload before being scrolled to.
+    _schedPmtsObserver = new IntersectionObserver(entries => {
+      let added = false;
+      entries.forEach(en => {
+        if (!en.isIntersecting) return;
+        const hdrId = en.target.getAttribute('data-hdr') || '';
+        const before = queue.length;
+        enqueueIfNeeded(hdrId);
+        if (queue.length !== before) added = true;
+        _schedPmtsObserver.unobserve(en.target);
+      });
+      if (added && myToken === _schedPmtsRenderToken) {
+        // Drain the new additions on the same trickle. If a drain
+        // is already running for this token it will pick them up.
+        _drainSchedPmtsQueue(queue.splice(0), myToken);
+      }
+    }, { rootMargin: '100px 0px' });
+    slots.forEach(el => _schedPmtsObserver.observe(el));
+  } else {
+    // No IntersectionObserver (rare) — fall back to enqueuing all
+    // rows but still trickle them sequentially.
+    slots.forEach(el => enqueueIfNeeded(el.getAttribute('data-hdr') || ''));
+    _drainSchedPmtsQueue(queue.splice(0), myToken);
+  }
 }
 
 // Density toggle — operator preference, persists across reloads so
@@ -8239,14 +8290,11 @@ function renderLoansDueUnified() {
   _updateActiveFilterPill();
   _updateQuickFilterChips();
   _applyRptDensity();
-  // HOTFIX 2026-06-01: the per-row scheduled-payments fetch was firing
-  // N requests on every table render, saturating cif-apply and tripping
-  // Vergent rate limits — which then 502'd legitimate loan-history
-  // requests. Disabled here until the icon can be re-introduced behind
-  // an explicit hover (one request per inspection) or with a smarter
-  // viewport-aware loader. The icon stays hidden meanwhile because the
-  // <span class="lns-card-icn"> placeholder defaults to display:none.
-  // _loadSchedPmtsForVisibleRows();
+  // Re-enabled after #152 hotfix with a much gentler loader: single
+  // in-flight request, 300ms gap, viewport-only (IntersectionObserver),
+  // 1h cache, and cancels itself on re-render. See _loadSchedPmts...
+  // implementation above.
+  _loadSchedPmtsForVisibleRows();
 }
 
 function _loansDueRowHtml(r) {
