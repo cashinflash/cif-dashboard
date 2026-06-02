@@ -307,9 +307,14 @@ button,input,select{font-family:inherit}
 #rpt-table .tbl.compact .app-info{font-size:11.5px}
 #rpt-table .tbl.compact .tbl-time{font-size:11.5px}
 /* Loan-history hover icon — instant CSS feedback before the popup
-   loads, plus tap-only hover doesn't work on phones so hide there. */
+   loads. Mobile devices fire the click handler (tap-to-toggle) so
+   the icon stays visible on phones too. */
 .lns-hist-icn:hover{color:var(--green-dark) !important;background:var(--green-50) !important}
-@media(max-width:600px){.lns-hist-icn{display:none !important}}
+.lns-card-icn{cursor:pointer !important}
+@media(max-width:600px){
+  .lns-hist-icn,.lns-card-icn{width:22px !important;height:22px !important}
+  #lns-hist-pop{width:calc(100vw - 24px) !important;max-width:calc(100vw - 24px) !important;left:12px !important;right:12px !important}
+}
 
 /* MOBILE — Loans Due table renders as stacked cards so every row reads
    without horizontal scroll. The thead disappears; each <tr> becomes a
@@ -7722,6 +7727,9 @@ function _clearActiveFilter() {
 // hover is decoupled from the click target by design.
 let _loanHistCache = {};       // cid -> {loans, count, fetchedAt, error, loading}
 let _loanHistHideTimer = null;
+let _loanHistLastShownAt = 0;  // ms; used to suppress the mobile
+                               // mouseenter→click sequence from
+                               // immediately closing what just opened.
 function _loanHistEnsurePopup() {
   let pop = document.getElementById('lns-hist-pop');
   if (pop) return pop;
@@ -7742,12 +7750,15 @@ function _loanHistShow(el) {
   pop.dataset.cid = cid;
   pop.dataset.name = name;
   // Anchor below the icon, nudge left if the popup would overflow.
+  // On phones the mobile CSS pins width to 100vw so the position math
+  // can be coarser — the CSS owns the layout there.
   const r = el.getBoundingClientRect();
   const popW = 380;
   const left = Math.max(8, Math.min(r.left, window.innerWidth - popW - 8));
   const top  = Math.min(r.bottom + 6, window.innerHeight - 220);
   pop.style.top  = `${top}px`;
   pop.style.left = `${left}px`;
+  pop.style.width = '380px';   // reset (card-icon popup uses 240px)
   pop.style.display = 'block';
   pop.innerHTML = _loanHistRender(cid, name);
   // Highlight the icon while popup is visible.
@@ -7755,10 +7766,53 @@ function _loanHistShow(el) {
   el.style.background = 'var(--green-50)';
   pop.dataset.anchorEl = '1';
   pop._anchor = el;
+  _loanHistLastShownAt = Date.now();
+  // Tap-outside-to-close (mobile-friendly). Attached on next tick so
+  // the click that opened the popup doesn't immediately close it.
+  // Removed in _loanHistHide / _loanHistDocClick after firing.
+  setTimeout(() => {
+    document.addEventListener('click', _loanHistDocClick, true);
+  }, 0);
   const c = _loanHistCache[cid];
   if (!c || (!c.loading && Date.now() - c.fetchedAt > 60000)) {
     _loanHistFetch(cid, name);
   }
+}
+function _loanHistToggle(el) {
+  const pop = document.getElementById('lns-hist-pop');
+  // If popup is open for THIS icon, close it. Otherwise (different
+  // row or not open), open for this one. Mobile devices fire
+  // mouseenter→click in quick succession when tapping; if the
+  // popup was JUST shown (<500ms ago) treat this click as a no-op
+  // so the tap doesn't immediately close what mouseenter opened.
+  if (pop && pop.style.display === 'block' && pop._anchor === el) {
+    if (Date.now() - _loanHistLastShownAt < 500) return;
+    _loanHistHideImmediate();
+  } else {
+    _loanHistShow(el);
+  }
+}
+function _loanHistDocClick(e) {
+  const pop = document.getElementById('lns-hist-pop');
+  if (!pop || pop.style.display !== 'block') {
+    document.removeEventListener('click', _loanHistDocClick, true);
+    return;
+  }
+  if (pop.contains(e.target)) return;              // click inside popup
+  if (e.target.closest && (e.target.closest('.lns-hist-icn') ||
+                            e.target.closest('.lns-card-icn'))) return;
+  _loanHistHideImmediate();
+}
+function _loanHistHideImmediate() {
+  const pop = document.getElementById('lns-hist-pop');
+  if (!pop) return;
+  pop.style.display = 'none';
+  if (pop._anchor) {
+    pop._anchor.style.color = 'var(--muted)';
+    pop._anchor.style.background = 'transparent';
+    pop._anchor = null;
+  }
+  document.removeEventListener('click', _loanHistDocClick, true);
 }
 function _loanHistCancelHide() {
   if (_loanHistHideTimer) { clearTimeout(_loanHistHideTimer); _loanHistHideTimer = null; }
@@ -7873,21 +7927,21 @@ function _loanHistRender(cid, name) {
 // loan's schedule. Lets the operator see at-a-glance who already has
 // a debit set up vs. who needs one created.
 //
-// Loader is GENTLE on the backend (rewritten after #152 hotfix):
-//   • Concurrency = 1 (was 6) — single in-flight request at a time.
-//   • 300 ms gap between requests so a 30-row table trickles over
-//     ~10 s instead of bursting in parallel.
-//   • Drains every row on the rendered page, not just viewport-visible
-//     ones (an earlier attempt used IntersectionObserver but the icon
-//     placeholders are display:none, so the observer never fired and
-//     zero icons ever loaded — see #154).
+// Loader is GENTLE on the backend but tuned for snappiness:
+//   • Concurrency = 3 (a 30-row table now finishes in ~1.5 s vs 10 s).
+//     Still well under the burst that melted us in #152 (which was
+//     unbounded parallel × N rows).
+//   • 150 ms gap between requests — same conservative pacing per
+//     worker, just 3 workers in parallel.
+//   • Drains every row on the rendered page in render order.
 //   • 1-hour per-hdrId cache so re-renders within an operator's
 //     session don't refetch.
 //   • _schedPmtsRenderToken cancels the previous queue when the table
 //     re-renders, so we don't keep loading stale rows.
 let _schedPmtsCache = {};   // hdrId -> {has_card, next_card, fetchedAt, error}
 const _SCHED_PMTS_TTL_MS = 60 * 60 * 1000;   // 1h
-const _SCHED_PMTS_GAP_MS = 300;
+const _SCHED_PMTS_GAP_MS = 150;
+const _SCHED_PMTS_PARALLEL = 3;
 let _schedPmtsRenderToken = 0;
 async function _fetchSchedPmts(hdrId) {
   try {
@@ -7932,26 +7986,84 @@ function _renderCardIconForHdr(hdrId) {
     const amtLabel = amt > 0 ? '$' + amt.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '';
     const tipBits = [meth, dateLabel, amtLabel].filter(Boolean).join(' · ');
     el.title = `Card payment scheduled — ${tipBits}`;
-    el.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;color:#1d4ed8;background:#dbeafe;margin-left:6px;vertical-align:middle;cursor:default';
+    // Stash the parts on the element so the mobile tap popup can
+    // render without re-deriving from the cache.
+    el.dataset.tipMethod = meth;
+    el.dataset.tipDate = dateLabel;
+    el.dataset.tipAmount = amtLabel;
+    el.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;color:#1d4ed8;background:#dbeafe;margin-left:6px;vertical-align:middle;cursor:pointer';
     el.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>';
+    if (!el.dataset.tapBound) {
+      el.dataset.tapBound = '1';
+      el.addEventListener('click', _schedCardIconClick);
+    }
   });
 }
-// Sequential, cancellable trickle. Each call increments the render
-// token; if the token changes mid-run (table re-rendered), the loop
-// aborts and lets the new run take over. Sleeps between requests so
-// we don't burst Vergent's V1 API.
-async function _drainSchedPmtsQueue(queue, myToken) {
-  for (const hdrId of queue) {
-    if (myToken !== _schedPmtsRenderToken) return;   // superseded
-    const c = _schedPmtsCache[hdrId];
-    if (c && (Date.now() - c.fetchedAt) < _SCHED_PMTS_TTL_MS) {
-      _renderCardIconForHdr(hdrId);
-      continue;
-    }
-    await _fetchSchedPmts(hdrId);
-    if (myToken !== _schedPmtsRenderToken) return;
-    await new Promise(r => setTimeout(r, _SCHED_PMTS_GAP_MS));
+// Card-icon tap → small popup with method · date · amount. Reuses the
+// loan-history popup element so we have just one floating panel to
+// manage. Tap-outside-to-close is wired via the same _loanHistDocClick
+// (which already ignores clicks on .lns-card-icn and inside the popup).
+function _schedCardIconClick(e) {
+  e.stopPropagation();
+  const el = e.currentTarget;
+  const pop = _loanHistEnsurePopup();
+  // Already open for this icon? Close.
+  if (pop.style.display === 'block' && pop._anchor === el) {
+    if (Date.now() - _loanHistLastShownAt < 500) return;
+    _loanHistHideImmediate();
+    return;
   }
+  const meth = el.dataset.tipMethod || 'Card';
+  const date = el.dataset.tipDate   || '';
+  const amt  = el.dataset.tipAmount || '';
+  const lineBits = [date, amt].filter(Boolean).join(' · ');
+  pop.dataset.cid = '';
+  pop.dataset.name = 'Card payment scheduled';
+  pop.innerHTML = `<div style="display:flex;flex-direction:column;gap:4px">
+    <div style="font-weight:700;font-size:13px;color:var(--text)">Card payment scheduled</div>
+    <div style="font-size:12.5px;color:var(--text2);font-weight:600">${escapeHtml(meth)}</div>
+    <div style="font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums">${escapeHtml(lineBits || '—')}</div>
+  </div>`;
+  const r = el.getBoundingClientRect();
+  const popW = 240;
+  const left = Math.max(8, Math.min(r.left, window.innerWidth - popW - 8));
+  const top  = Math.min(r.bottom + 6, window.innerHeight - 120);
+  pop.style.width = '240px';
+  pop.style.top  = `${top}px`;
+  pop.style.left = `${left}px`;
+  pop.style.display = 'block';
+  pop._anchor = el;
+  _loanHistLastShownAt = Date.now();
+  setTimeout(() => {
+    document.addEventListener('click', _loanHistDocClick, true);
+  }, 0);
+}
+// Cancellable trickle with N parallel workers pulling from a shared
+// queue. Each call increments the render token; if the token changes
+// mid-run (table re-rendered), workers notice and stop. The per-worker
+// sleep means total request rate is N × (1 / gap) — with N=3, gap=150
+// that's ~20 req/s peak, still well under the 6-parallel-unbounded
+// burst that melted us in #152.
+async function _drainSchedPmtsQueue(queue, myToken) {
+  const sharedQ = queue.slice();
+  async function worker() {
+    while (sharedQ.length) {
+      if (myToken !== _schedPmtsRenderToken) return;
+      const hdrId = sharedQ.shift();
+      if (!hdrId) return;
+      const c = _schedPmtsCache[hdrId];
+      if (c && (Date.now() - c.fetchedAt) < _SCHED_PMTS_TTL_MS) {
+        _renderCardIconForHdr(hdrId);
+        continue;
+      }
+      await _fetchSchedPmts(hdrId);
+      if (myToken !== _schedPmtsRenderToken) return;
+      await new Promise(r => setTimeout(r, _SCHED_PMTS_GAP_MS));
+    }
+  }
+  const workers = [];
+  for (let i = 0; i < _SCHED_PMTS_PARALLEL; i++) workers.push(worker());
+  await Promise.all(workers);
 }
 function _loadSchedPmtsForVisibleRows() {
   // Increment token: any previously running drain will notice and stop.
@@ -8322,7 +8434,7 @@ function _loansDueRowHtml(r) {
   else if (daysLate >= 1) rowSev = 'lns-sev-1';
   return `<tr class="lns-row${rowSev ? ' ' + rowSev : ''}">
     <td class="tbl-checkbox"><button class="appt-add-btn" title="Create appointment" data-cid="${escapeHtml(cid)}" data-hdr="${escapeHtml(hdrId)}" data-name="${escapeHtml(name)}" onclick="event.stopPropagation();openApptModalFromBtn(this)">+ Appt</button></td>
-    <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" onclick="event.stopPropagation()">${escapeHtml(name)}</a><span class="lns-hist-icn" data-cid="${escapeHtml(cid)}" data-name="${escapeHtml(name)}" onmouseenter="_loanHistShow(this)" onmouseleave="_loanHistHide()" title="Loan history" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;color:var(--muted);cursor:default;margin-left:6px;vertical-align:middle"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><polyline points="3 4 3 9 8 9"/><path d="M12 7v5l3 2"/></svg></span><span class="lns-card-icn" data-hdr="${escapeHtml(hdrId)}" style="display:none"></span>${apptBadge}</div></td>
+    <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" onclick="event.stopPropagation()">${escapeHtml(name)}</a><span class="lns-hist-icn" data-cid="${escapeHtml(cid)}" data-name="${escapeHtml(name)}" onmouseenter="_loanHistShow(this)" onmouseleave="_loanHistHide()" onclick="event.stopPropagation();_loanHistToggle(this)" title="Loan history" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;color:var(--muted);cursor:pointer;margin-left:6px;vertical-align:middle"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><polyline points="3 4 3 9 8 9"/><path d="M12 7v5l3 2"/></svg></span><span class="lns-card-icn" data-hdr="${escapeHtml(hdrId)}" style="display:none"></span>${apptBadge}</div></td>
     <td><div class="app-info"><span class="app-type">${escapeHtml(r.LoanId || '—')}</span><span class="app-meta">${escapeHtml(r.LoanStatus || '')}${r.LoanSubStatus ? ' · ' + escapeHtml(r.LoanSubStatus) : ''}</span></div></td>
     <td>${daysCellHtml}</td>
     <td><span class="tbl-time" style="font-variant-numeric:tabular-nums">${_rptFmtMoney(r.Balance)}</span></td>
