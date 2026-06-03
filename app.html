@@ -1103,6 +1103,7 @@ button,input,select{font-family:inherit}
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></symbol>
     <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></symbol>
     <symbol id="i-zap" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
+    <symbol id="i-card" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="10" x2="22" y2="10"/></symbol>
     <symbol id="i-warning" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
     <symbol id="i-arrow-left" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></symbol>
     <symbol id="i-arrow-right" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></symbol>
@@ -1151,6 +1152,7 @@ button,input,select{font-family:inherit}
     <div class="user-menu" id="user-menu">
       <button data-route="customers" type="button"><svg class="icn"><use href="#i-list"/></svg>Customers</button>
       <button data-route="if" type="button"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
+      <button data-route="payments" type="button"><svg class="icn"><use href="#i-card"/></svg>Payments</button>
       <button data-route="reports" type="button"><svg class="icn"><use href="#i-chart"/></svg>Servicing</button>
       <hr>
       <!-- Alert sound toggle. State persists in localStorage as
@@ -1170,6 +1172,7 @@ button,input,select{font-family:inherit}
 <nav class="mobile-subnav">
   <button class="subnav-link" data-route="dashboard"><svg class="icn"><use href="#i-overview"/></svg>Overview</button>
   <button class="subnav-link" data-route="if"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
+  <button class="subnav-link" data-route="payments"><svg class="icn"><use href="#i-card"/></svg>Payments</button>
   <button class="subnav-link" data-route="customers"><svg class="icn"><use href="#i-list"/></svg>Customers</button>
 </nav>
 
@@ -1181,6 +1184,7 @@ button,input,select{font-family:inherit}
         <div class="subnav-label">Insights</div>
         <button class="subnav-link active" data-route="dashboard"><svg class="icn"><use href="#i-overview"/></svg>Overview</button>
         <button class="subnav-link" data-route="if" style="position:relative"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding<span id="alertcount-if" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></button>
+        <button class="subnav-link" data-route="payments"><svg class="icn"><use href="#i-card"/></svg>Payments</button>
         <button class="subnav-link" data-route="customers" style="position:relative"><svg class="icn"><use href="#i-list"/></svg>Customers<span id="alertcount-conn" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></button>
       </div>
     </aside>
@@ -1593,6 +1597,59 @@ button,input,select{font-family:inherit}
     <div id="if-status" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
     <div id="if-table">
       <div class="tbl-loading">Loading submissions…</div>
+    </div>
+  </div>
+</div>
+
+<!-- PAYMENTS — Vergent Credit/Debit Card History report (scraped from
+     the ASPX page since Vergent has no JSON API for this). Shows all
+     customer payments + IF disbursements for a date range with
+     approved/declined breakdown, decline reasons, and filtering. -->
+<div class="view" id="view-payments">
+  <div class="main full">
+    <div class="greet">
+      <div>
+        <div class="greet-title">Payments</div>
+        <div class="greet-sub">Vergent credit/debit card history — customer payments + instant funding disbursements with approval status and decline reasons</div>
+      </div>
+      <div class="greet-actions">
+        <button id="pay-refresh" class="btn btn-ghost" onclick="loadPayments()" title="Refresh from Vergent"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-refresh"/></svg>Refresh</button>
+        <button id="pay-export" class="btn btn-ghost" onclick="exportPaymentsCSV()" title="Download as CSV"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-chart"/></svg>Export CSV</button>
+      </div>
+    </div>
+
+    <!-- Date range picker + preset chips -->
+    <div class="chips" style="margin-bottom:14px;align-items:center;flex-wrap:wrap;gap:6px">
+      <button class="chip" data-pay-preset="today"     onclick="setPayPreset('today')">Today</button>
+      <button class="chip" data-pay-preset="yesterday" onclick="setPayPreset('yesterday')">Yesterday</button>
+      <button class="chip" data-pay-preset="thisweek"  onclick="setPayPreset('thisweek')">This Week</button>
+      <button class="chip" data-pay-preset="last7"     onclick="setPayPreset('last7')">Last 7 Days</button>
+      <button class="chip" data-pay-preset="last30"    onclick="setPayPreset('last30')">Last 30 Days</button>
+      <span style="margin-left:8px;display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:11.5px;color:var(--muted);font-weight:600">Custom:</span>
+        <input type="date" id="pay-start" style="border:1px solid var(--border);border-radius:8px;padding:5px 8px;font-size:12.5px;font-family:inherit">
+        <span style="color:var(--muted);font-size:11.5px">to</span>
+        <input type="date" id="pay-end"   style="border:1px solid var(--border);border-radius:8px;padding:5px 8px;font-size:12.5px;font-family:inherit">
+        <button class="chip" onclick="setPayPreset('custom')">Apply</button>
+      </span>
+      <span id="pay-loaded-at" style="margin-left:auto;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums"></span>
+    </div>
+
+    <!-- KPI cards -->
+    <div class="stats" id="pay-stats" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px"></div>
+
+    <!-- Filter chips -->
+    <div class="chips" style="margin-bottom:12px">
+      <button class="chip active" data-pay-status="all"      onclick="setPayStatusFilter('all')">All</button>
+      <button class="chip"        data-pay-status="approved" onclick="setPayStatusFilter('approved')">Approved</button>
+      <button class="chip"        data-pay-status="declined" onclick="setPayStatusFilter('declined')">Declined</button>
+      <button class="chip"        data-pay-status="funding"  onclick="setPayStatusFilter('funding')">Funding</button>
+      <input type="text" id="pay-search" placeholder="Search customer, loan id, employee…" oninput="renderPayments()" style="margin-left:8px;flex:1;min-width:240px;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;font-family:inherit;outline:none">
+    </div>
+
+    <div id="pay-status" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
+    <div id="pay-table">
+      <div class="tbl-loading">Loading payments…</div>
     </div>
   </div>
 </div>
@@ -2098,7 +2155,7 @@ function toast(msg, kind, opts) {
 function _ensureSidebarInExternalViews() {
   const src = document.querySelector('#view-dashboard > .shell > .subnav');
   if (!src) return;
-  ['view-customers', 'view-if'].forEach(id => {
+  ['view-customers', 'view-if', 'view-payments'].forEach(id => {
     const v = document.getElementById(id);
     if (!v || v.querySelector(':scope > .shell')) return;   // already wired
     const main = v.querySelector(':scope > .main');
@@ -2137,6 +2194,7 @@ function setRoute(name, fbId) {
   if (name === 'dashboard') renderDashboard();
   if (name === 'if') loadIFSubmissions();
   if (name === 'reports') loadPastDueReport();
+  if (name === 'payments') loadPayments();
   if (name === 'customers') {
     // setRoute('customers', 'applinks' | 'portallinks' | 'portal')
     // honors the requested inner tab; otherwise loadCustomers picks
@@ -2168,6 +2226,7 @@ function readRouteFromHash() {
   if (h === '#queue' || h === '#applications') return ['queue', null];
   if (h === '#if' || h === '#instant-funding') return ['if', null];
   if (h === '#reports') return ['reports', null];
+  if (h === '#payments') return ['payments', null];
   // All Customers-related hashes resolve to the unified view; the
   // 2nd tuple element selects the inner sub-tab. Legacy Connections
   // hashes (#connections, #applinks, #plaid, #portallinks, #portal-plaid)
@@ -7302,6 +7361,257 @@ function renderContactQueue(rows) {
     '</tr>';
   }).join('');
   table.innerHTML = '<div class="tbl-card-scroll"><table class="tbl"><thead><tr><th>Customer</th><th>Phone</th><th>Loan</th><th style="text-align:right">Amount</th><th>Due / Appt</th></tr></thead><tbody>' + body + '</tbody></table></div>';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PAYMENTS — Vergent Credit/Debit Card History
+// ═══════════════════════════════════════════════════════════════
+// Backend: POST /api/vergent-card-payments {start_date, end_date}
+// Returns: { ok, rows[], totals, detail }
+// rows[i]: {store, customer, customer_id, loan_id, employee,
+//          business_date, real_date, amount, status, kind,
+//          decline_reason, funding_auth_code, funding_txn_id}
+//
+// Vergent doesn't expose this as a JSON API, so cif-apply scrapes the
+// ASPX report page (~5-10s per fetch). We cache the most recent fetch
+// and avoid re-querying on filter changes — only Refresh / date change
+// hits the backend.
+let _payCache = null;          // { rows, totals, fetchedAt, start, end }
+let _payStatusFilter = 'all';  // all | approved | declined | funding
+let _payCurrentRange = null;   // { start, end } as YYYY-MM-DD
+
+function _payIsoDate(d) {
+  // YYYY-MM-DD in local TZ
+  const tz = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tz).toISOString().slice(0, 10);
+}
+function _payFmtMoney(n) {
+  return '$' + (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function _payFmtMoneyShort(n) {
+  const v = Number(n) || 0;
+  return '$' + v.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+function _payFmtTime(rdate) {
+  if (!rdate) return '—';
+  try {
+    const d = new Date(rdate);
+    if (isNaN(d)) return rdate;
+    return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  } catch (e) { return rdate; }
+}
+function _payRangeForPreset(preset) {
+  const today = new Date();
+  const todayStr = _payIsoDate(today);
+  if (preset === 'today')     return { start: todayStr, end: todayStr };
+  if (preset === 'yesterday') {
+    const y = new Date(today); y.setDate(y.getDate() - 1);
+    const s = _payIsoDate(y); return { start: s, end: s };
+  }
+  if (preset === 'thisweek') {
+    const y = new Date(today);
+    y.setDate(today.getDate() - today.getDay());  // Sunday
+    return { start: _payIsoDate(y), end: todayStr };
+  }
+  if (preset === 'last7') {
+    const y = new Date(today); y.setDate(y.getDate() - 6);
+    return { start: _payIsoDate(y), end: todayStr };
+  }
+  if (preset === 'last30') {
+    const y = new Date(today); y.setDate(y.getDate() - 29);
+    return { start: _payIsoDate(y), end: todayStr };
+  }
+  if (preset === 'custom') {
+    const s = (document.getElementById('pay-start')?.value || '').trim();
+    const e = (document.getElementById('pay-end')?.value   || '').trim();
+    if (s && e) return { start: s, end: e };
+  }
+  return { start: todayStr, end: todayStr };
+}
+
+function setPayPreset(preset) {
+  const range = _payRangeForPreset(preset);
+  document.querySelectorAll('[data-pay-preset]').forEach(b =>
+    b.classList.toggle('active', b.getAttribute('data-pay-preset') === preset));
+  // Sync the custom date inputs so they show the chosen range
+  const si = document.getElementById('pay-start'); if (si) si.value = range.start;
+  const ei = document.getElementById('pay-end');   if (ei) ei.value = range.end;
+  _payCurrentRange = range;
+  loadPayments();
+}
+function setPayStatusFilter(status) {
+  _payStatusFilter = status;
+  document.querySelectorAll('[data-pay-status]').forEach(b =>
+    b.classList.toggle('active', b.getAttribute('data-pay-status') === status));
+  renderPayments();
+}
+
+async function loadPayments() {
+  if (!_payCurrentRange) {
+    _payCurrentRange = _payRangeForPreset('today');
+    const si = document.getElementById('pay-start'); if (si) si.value = _payCurrentRange.start;
+    const ei = document.getElementById('pay-end');   if (ei) ei.value = _payCurrentRange.end;
+    // Mark "Today" chip active by default
+    document.querySelectorAll('[data-pay-preset]').forEach(b =>
+      b.classList.toggle('active', b.getAttribute('data-pay-preset') === 'today'));
+  }
+  const range = _payCurrentRange;
+  const tbl = document.getElementById('pay-table');
+  const status = document.getElementById('pay-status');
+  const loaded = document.getElementById('pay-loaded-at');
+  if (tbl) tbl.innerHTML = '<div class="tbl-loading">Loading payments from Vergent… (this may take 5-10 seconds)</div>';
+  if (status) status.textContent = '';
+  try {
+    const r = await fetch('/api/vergent-card-payments', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ start_date: range.start, end_date: range.end }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) {
+      const msg = d.detail || d.error || ('HTTP ' + r.status);
+      if (tbl) tbl.innerHTML = `<div class="tbl-empty" style="padding:40px 20px">
+        <div style="font-size:14px;color:var(--red);font-weight:700;margin-bottom:6px">Couldn't load payments.</div>
+        <div style="font-size:12px;color:var(--muted)">${escapeHtml(msg)}</div></div>`;
+      return;
+    }
+    _payCache = { rows: d.rows || [], totals: d.totals || {}, fetchedAt: Date.now(), start: range.start, end: range.end };
+    if (loaded) loaded.textContent = `Loaded ${new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+    renderPayments();
+  } catch (e) {
+    if (tbl) tbl.innerHTML = `<div class="tbl-empty" style="padding:40px 20px;color:var(--red)">Network error: ${escapeHtml(e.message || 'unknown')}</div>`;
+  }
+}
+
+function renderPayments() {
+  if (!_payCache) return;
+  const { rows, totals } = _payCache;
+
+  // KPI cards
+  const statsEl = document.getElementById('pay-stats');
+  if (statsEl) {
+    const approvedAmt = totals.total_approved_amount || 0;
+    const declinedAmt = totals.total_declined_amount || 0;
+    const fundingAmt  = totals.total_funding_amount  || 0;
+    const approvedCt  = totals.total_approved_count  || 0;
+    const declinedCt  = totals.total_declined_count  || 0;
+    const fundingCt   = totals.total_funding_count   || 0;
+    const totalAttempts = approvedCt + declinedCt;
+    const approvalRate = totalAttempts ? Math.round((approvedCt / totalAttempts) * 100) : 0;
+    const card = (label, big, sub, cls) => `<div class="stat ${cls || ''}" style="background:white;border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-xs)">
+      <div class="stat-label" style="font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">${escapeHtml(label)}</div>
+      <div class="stat-value" style="font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--text);font-variant-numeric:tabular-nums">${big}</div>
+      <div class="stat-sub" style="font-size:11.5px;color:var(--muted);font-weight:500;margin-top:4px">${sub || ''}</div>
+    </div>`;
+    statsEl.innerHTML =
+        card('Approved',     _payFmtMoneyShort(approvedAmt), `${approvedCt} payment${approvedCt === 1 ? '' : 's'}`)
+      + card('Declined',     _payFmtMoneyShort(declinedAmt), `${declinedCt} payment${declinedCt === 1 ? '' : 's'}`)
+      + card('Approval Rate', approvalRate + '%',             totalAttempts ? `${approvedCt} of ${totalAttempts}` : 'No attempts')
+      + card('Instant Funded', _payFmtMoneyShort(fundingAmt),  `${fundingCt} disbursement${fundingCt === 1 ? '' : 's'}`)
+      + card('Total Items',    (totals.total_items || 0).toLocaleString(), `${_payCache.start} → ${_payCache.end}`);
+  }
+
+  // Filter + search
+  const q = (document.getElementById('pay-search')?.value || '').toLowerCase().trim();
+  const filtered = rows.filter(r => {
+    if (_payStatusFilter === 'approved' && !(r.status === 'approved' && r.kind === 'payment')) return false;
+    if (_payStatusFilter === 'declined' && r.status !== 'declined') return false;
+    if (_payStatusFilter === 'funding'  && r.kind !== 'funding') return false;
+    if (q) {
+      const hay = `${r.customer} ${r.loan_id} ${r.employee} ${r.store} ${r.decline_reason || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const tbl = document.getElementById('pay-table');
+  const statusEl = document.getElementById('pay-status');
+  if (statusEl) statusEl.textContent = `${filtered.length} of ${rows.length} row${rows.length === 1 ? '' : 's'}`;
+
+  if (!filtered.length) {
+    tbl.innerHTML = `<div class="tbl-card-scroll" style="padding:48px 20px;text-align:center">
+      <div style="font-size:13px;color:var(--muted)">No payments match this filter.</div>
+    </div>`;
+    return;
+  }
+
+  // Sort: most-recent first
+  const sorted = filtered.slice().sort((a, b) => {
+    const ta = new Date(a.real_date || 0).getTime();
+    const tb = new Date(b.real_date || 0).getTime();
+    return tb - ta;
+  });
+
+  const statusPill = (r) => {
+    if (r.kind === 'funding') {
+      return '<span style="display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-size:11px;font-weight:700;letter-spacing:.04em">FUNDED</span>';
+    }
+    if (r.status === 'approved') {
+      return '<span style="display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;background:#dcfce7;color:#15803d;font-size:11px;font-weight:700;letter-spacing:.04em">APPROVED</span>';
+    }
+    if (r.status === 'declined') {
+      return '<span style="display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;background:#fee2e2;color:#b91c1c;font-size:11px;font-weight:700;letter-spacing:.04em">DECLINED</span>';
+    }
+    return `<span style="display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;background:#f3f4f6;color:#6b7280;font-size:11px;font-weight:700;letter-spacing:.04em">${escapeHtml((r.status || '?').toUpperCase())}</span>`;
+  };
+
+  const rowHtml = (r) => {
+    const cid = r.customer_id || '';
+    const vlink = cid ? `https://shared.lms.vergentlms.com/customer/general?action=view&id=${encodeURIComponent(cid)}` : '';
+    const customerCell = cid
+      ? `<a href="${vlink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;font-weight:700" onclick="event.stopPropagation()">${escapeHtml(r.customer || '—')}</a>`
+      : `<span style="font-weight:700;color:var(--text)">${escapeHtml(r.customer || '—')}</span>`;
+    const declineHtml = r.decline_reason
+      ? `<div style="font-size:11px;color:var(--red);font-weight:600;margin-top:3px;line-height:1.3">${escapeHtml(r.decline_reason)}</div>`
+      : '';
+    const fundingHtml = r.kind === 'funding' && r.funding_txn_id
+      ? `<div style="font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:2px">auth ${escapeHtml(r.funding_auth_code || '')} · txn ${escapeHtml(r.funding_txn_id || '')}</div>`
+      : '';
+    return `<tr>
+      <td style="white-space:nowrap;font-variant-numeric:tabular-nums">${escapeHtml(_payFmtTime(r.real_date))}</td>
+      <td>${customerCell}<div style="font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:2px">${escapeHtml(r.loan_id || '')}</div></td>
+      <td style="font-variant-numeric:tabular-nums;font-weight:700">${_payFmtMoney(r.amount)}</td>
+      <td>${statusPill(r)}${declineHtml}${fundingHtml}</td>
+      <td><span class="tbl-time">${escapeHtml(r.employee || '')}</span></td>
+      <td><span class="tbl-time" style="font-size:11.5px">${escapeHtml(r.store || '')}</span></td>
+    </tr>`;
+  };
+
+  tbl.innerHTML = `<div class="tbl-card-scroll">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:90px">Time</th>
+          <th>Customer · Loan</th>
+          <th style="width:110px;text-align:right">Amount</th>
+          <th>Status</th>
+          <th style="width:140px">Employee</th>
+          <th style="width:130px">Store</th>
+        </tr>
+      </thead>
+      <tbody>${sorted.map(rowHtml).join('')}</tbody>
+    </table>
+  </div>`;
+}
+
+function exportPaymentsCSV() {
+  if (!_payCache || !_payCache.rows.length) return;
+  const rows = _payCache.rows;
+  const hdr = ['Time','Customer','CustomerId','LoanId','Employee','Store','Amount','Status','Kind','DeclineReason','FundingAuthCode','FundingTxnId'];
+  const escape = v => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const lines = [hdr.join(',')];
+  rows.forEach(r => lines.push([
+    r.real_date, r.customer, r.customer_id, r.loan_id, r.employee, r.store,
+    r.amount, r.status, r.kind, r.decline_reason || '', r.funding_auth_code || '', r.funding_txn_id || ''
+  ].map(escape).join(',')));
+  const csv = lines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `vergent-card-payments-${_payCache.start}-to-${_payCache.end}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
 }
 
 async function loadPastDueReport() {
