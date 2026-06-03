@@ -276,6 +276,25 @@ When adding `/api/vergent-recheck` (Bug 1 fix), it goes here.
 Active feature branch: `claude/continue-previous-session-e2Z43`. Merges
 to main when ready. Render auto-deploys main.
 
+## Workflow rule: ALWAYS merge to main when finished
+
+The user has been explicit (multiple sessions): **never leave a PR
+sitting open**. The cycle is:
+
+1. Commit on a feature branch
+2. Open the PR via `mcp__github__create_pull_request`
+3. **Merge it immediately** via `mcp__github__merge_pull_request`
+   (squash merge), unless the change is risky enough to need explicit
+   user review
+
+Render only auto-deploys `main`. Leaving a PR unmerged means the change
+is invisible to production tests — which has burned debug cycles before
+(diagnostic logging committed but unmerged means the user keeps testing
+the older deployed code).
+
+If the change is risky / user-facing-breaking, still merge — but check
+with the user FIRST before committing it.
+
 ## Plan file
 
 The full multi-phase plan lives at
