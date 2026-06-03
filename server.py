@@ -1857,6 +1857,32 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        # Vergent Credit/Debit Card History report — proxies to
+        # cif-apply's /api/vergent-card-payments. Body:
+        # {start_date, end_date, region_id?, district_id?}.
+        # Used by the dashboard's Payments view.
+        if path == '/api/vergent-card-payments':
+            try:
+                body = json.loads(raw) if raw else {}
+                payload = json.dumps(body).encode()
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/vergent-card-payments',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                # Scraping the ASPX login + report can take 5-10s on a
+                # cold cif-apply; give it room to breathe.
+                with ur.urlopen(req, timeout=60) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[VERGENT-CARD-PAYMENTS UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[VERGENT-CARD-PAYMENTS ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         # Vergent scheduled payments — proxies to cif-apply's
         # /api/vergent-scheduled-payments. Body: {hdr_id}. Used by the
         # Loans Due table to show a card icon when a scheduled card
