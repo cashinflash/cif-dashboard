@@ -2206,7 +2206,7 @@ function setRoute(name, fbId) {
     else loadCustomers();
   }
   document.body.dataset.firebaseId = (name === 'detail' && fbId) ? fbId : '';
-  document.body.dataset.route = name;
+  document.body.dataset.currentRoute = name;
   // Stop the Payments auto-refresh timer when navigating away. It
   // restarts on the next successful loadPayments().
   if (name !== 'payments' && typeof _payAutoStop === 'function') _payAutoStop();
@@ -7490,7 +7490,7 @@ function _payRenderLiveIndicator() {
 }
 // Pause/resume on tab-visibility change so we don't poll while hidden.
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && document.body.dataset.route === 'payments') {
+  if (!document.hidden && document.body.dataset.currentRoute === 'payments') {
     _payAutoTick();   // immediate refresh on tab-focus
   }
 });
