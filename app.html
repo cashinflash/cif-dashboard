@@ -7623,9 +7623,16 @@ function renderPayments() {
   const rowHtml = (r) => {
     const cid = r.customer_id || '';
     const vlink = cid ? `https://shared.lms.vergentlms.com/customer/general?action=view&id=${encodeURIComponent(cid)}` : '';
-    const customerCell = cid
+    const customerLink = cid
       ? `<a href="${vlink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;font-weight:700" onclick="event.stopPropagation()">${escapeHtml(r.customer || '—')}</a>`
       : `<span style="font-weight:700;color:var(--text)">${escapeHtml(r.customer || '—')}</span>`;
+    // Loan-history hover icon — same component used on Loans Due.
+    // _loanHistShow / _loanHistHide / _loanHistToggle live in the
+    // global JS module and fetch via /api/vergent-loans.
+    const histIcon = cid
+      ? `<span class="lns-hist-icn" data-cid="${escapeHtml(cid)}" data-name="${escapeHtml(r.customer || '')}" onmouseenter="_loanHistShow(this)" onmouseleave="_loanHistHide()" onclick="event.stopPropagation();_loanHistToggle(this)" title="Loan history" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;color:var(--muted);cursor:pointer;margin-left:6px;vertical-align:middle"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><polyline points="3 4 3 9 8 9"/><path d="M12 7v5l3 2"/></svg></span>`
+      : '';
+    const customerCell = customerLink + histIcon;
     const declineHtml = r.decline_reason
       ? `<div style="font-size:11px;color:var(--red);font-weight:600;margin-top:3px;line-height:1.3">${escapeHtml(r.decline_reason)}</div>`
       : '';
