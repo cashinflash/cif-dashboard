@@ -7090,7 +7090,7 @@ function togglePastDueAutoRefresh(on) {
     _pastDueAutoTimer = setInterval(() => {
       if (document.visibilityState === 'visible' &&
           document.getElementById('view-reports')?.classList.contains('active')) {
-        loadPastDueReport();
+        loadPastDueReport(/*silent=*/true);
       }
     }, 300000);
   }
@@ -7390,7 +7390,14 @@ let _payCache = null;          // { rows, totals, fetchedAt, start, end }
 let _payStatusFilter = 'all';  // all | approved | declined | funding
 let _payCurrentRange = null;   // { start, end } as YYYY-MM-DD
 let _payAutoTimer = null;      // setInterval handle for auto-refresh
-const _PAY_AUTO_INTERVAL_MS = 60 * 1000;   // 60s
+// 2-minute interval (was 60s). Each poll triggers a 5-10s Vergent
+// ASPX scrape on cif-apply which blocks other requests during that
+// window. A more aggressive interval was contributing to transient
+// 502s when the operator hit the Servicing past-due endpoint at the
+// same time cif-apply was mid-scrape.
+const _PAY_AUTO_INTERVAL_MS = 2 * 60 * 1000;
+// Live indicator label reflects whatever interval is set above.
+const _PAY_AUTO_INTERVAL_LABEL = '2 min';
 
 function _payIsoDate(d) {
   // YYYY-MM-DD in local TZ
@@ -7489,7 +7496,7 @@ function _payRenderLiveIndicator() {
   const today = _payIsoDate(new Date());
   const includesToday = _payCurrentRange && _payCurrentRange.end >= today;
   if (_payAutoTimer && includesToday) {
-    el.innerHTML = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(22,163,74,.5);animation:pay-pulse 2s infinite"></span> Live — refreshing every 60s';
+    el.innerHTML = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(22,163,74,.5);animation:pay-pulse 2s infinite"></span> Live — refreshing every ' + _PAY_AUTO_INTERVAL_LABEL;
     el.style.display = 'inline-flex';
   } else {
     el.style.display = 'none';
@@ -7686,7 +7693,7 @@ function exportPaymentsCSV() {
   URL.revokeObjectURL(url);
 }
 
-async function loadPastDueReport() {
+async function loadPastDueReport(silent) {
   // Unified Loans-Due fetcher — pulls the past-due + upcoming (next 30
   // days) lists in parallel, populates both row arrays, then hands off
   // to renderLoansDueUnified which buckets and draws sticky-section
@@ -7698,8 +7705,8 @@ async function loadPastDueReport() {
   await _hydrateApptState();
   const table = document.getElementById('rpt-table');
   const status = document.getElementById('rpt-status');
-  if (table && !_pastDueLoadedAt) table.innerHTML = '<div class="tbl-loading">Loading loans due…</div>';
-  if (status) status.textContent = '';
+  if (table && !_pastDueLoadedAt && !silent) table.innerHTML = '<div class="tbl-loading">Loading loans due…</div>';
+  if (status && !silent) status.textContent = '';
   try {
     const [pdResp, upResp] = await Promise.all([
       fetch('/api/vergent-report-pastdue', {
@@ -7717,6 +7724,14 @@ async function loadPastDueReport() {
     const ud = await upResp.json().catch(() => ({}));
     if (!pdResp.ok || !d || d.ok === false) {
       const detail = (d && d.detail) || (d && d.error) || ('HTTP ' + pdResp.status);
+      // Silent auto-refresh: cif-apply might be transiently busy (e.g.,
+      // mid-scrape for the Payments page). Don't blow away the table
+      // the operator is actively using — just log and try again next
+      // tick. Only show the full error UI on a manual/initial load.
+      if (silent) {
+        console.warn('[loans-due] auto-refresh failed:', detail);
+        return;
+      }
       table.innerHTML = `<div class="tbl-empty"><div style="margin-bottom:10px;color:var(--red);font-weight:700">Couldn't load report</div><pre style="text-align:left;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;font-size:11px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow:auto;max-height:400px;white-space:pre-wrap;word-break:break-word">${escapeHtml(String(detail))}</pre></div>`;
       return;
     }
@@ -7731,6 +7746,10 @@ async function loadPastDueReport() {
     }
     filterPastDueReport(document.getElementById('rpt-search')?.value || '');
   } catch (e) {
+    if (silent) {
+      console.warn('[loans-due] auto-refresh network error:', e.message || e);
+      return;
+    }
     table.innerHTML = `<div class="tbl-empty">Network error: ${escapeHtml(e.message || String(e))}</div>`;
   }
 }
