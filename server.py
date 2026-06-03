@@ -1624,6 +1624,23 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        if path in ('/api/send-returned-payment', '/api/send-thank-you-payment'):
+            try:
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com' + path,
+                    data=raw, headers={'Content-Type': 'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=30) as r:
+                    result = r.read()
+                self.send_json(200, json.loads(result))
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[EMAIL PROXY ERROR] {path}: {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         if path == '/api/rerun-plaid':
             try:
                 body = json.loads(raw)

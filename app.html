@@ -1155,6 +1155,7 @@ button,input,select{font-family:inherit}
       <a data-route="if" href="#if"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</a>
       <a data-route="payments" href="#payments"><svg class="icn"><use href="#i-card"/></svg>Payments</a>
       <a data-route="reports" href="#reports"><svg class="icn"><use href="#i-chart"/></svg>Servicing</a>
+      <a data-route="communications" href="#communications"><svg class="icn"><use href="#i-message"/></svg>Communications</a>
       <hr>
       <!-- Alert sound toggle. State persists in localStorage as
            cif_alerts_sound_enabled. The label updates to reflect
@@ -1652,6 +1653,100 @@ button,input,select{font-family:inherit}
     <div id="pay-status" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
     <div id="pay-table">
       <div class="tbl-loading">Loading payments…</div>
+    </div>
+  </div>
+</div>
+
+<!-- COMMUNICATIONS — every outgoing email we've sent to a customer.
+     Reads Firebase /emailLog (written by cif-apply's send endpoints
+     on every send — denial, returned-payment, thank-you). Operator
+     can filter by kind, click any row to preview the rendered HTML
+     in an iframe, and use "Send Test Email" to verify a template
+     renders correctly before flipping any auto-send wiring on. -->
+<div class="view" id="view-communications">
+  <div class="main full">
+    <div class="greet">
+      <div>
+        <div class="greet-title">Communications</div>
+        <div class="greet-sub">Outgoing customer emails — denial decisions, returned payments, and payment confirmations. Click any row to preview.</div>
+      </div>
+      <div class="greet-actions">
+        <button class="btn btn-ghost" onclick="loadCommunications()" title="Refresh"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-refresh"/></svg>Refresh</button>
+        <button class="btn btn-primary" onclick="openCommTestModal()"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-message"/></svg>Send Test Email</button>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div id="comm-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px"></div>
+
+    <!-- Filter chips -->
+    <div class="chips" style="margin-bottom:12px">
+      <button class="chip active" data-comm-kind="all"                 onclick="setCommFilter('all')">All</button>
+      <button class="chip"        data-comm-kind="thank_you_payment"   onclick="setCommFilter('thank_you_payment')">Thank You</button>
+      <button class="chip"        data-comm-kind="returned_payment"    onclick="setCommFilter('returned_payment')">Returned Payment</button>
+      <button class="chip"        data-comm-kind="denial"              onclick="setCommFilter('denial')">Denial</button>
+      <input type="text" id="comm-search" placeholder="Search recipient, loan id, subject…" oninput="renderCommunications()" style="margin-left:8px;flex:1;min-width:240px;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;font-family:inherit;outline:none">
+    </div>
+
+    <div id="comm-status" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
+    <div id="comm-list">
+      <div class="tbl-loading">Loading emails…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Preview modal: iframe rendered_html so styles can't leak into
+     the dashboard chrome. Closes on backdrop click or ✕ button. -->
+<div id="comm-preview-modal" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:20px"
+     onclick="if(event.target.id==='comm-preview-modal')closeCommPreview()">
+  <div style="background:white;border-radius:14px;width:100%;max-width:760px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:16px 22px;border-bottom:1px solid var(--border);gap:12px">
+      <div style="min-width:0;flex:1">
+        <div id="comm-preview-subject" style="font-size:15px;font-weight:700;color:var(--text);line-height:1.3;margin-bottom:4px"></div>
+        <div id="comm-preview-meta" style="font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums"></div>
+      </div>
+      <button onclick="closeCommPreview()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1" title="Close">&times;</button>
+    </div>
+    <iframe id="comm-preview-iframe" sandbox="allow-same-origin" style="flex:1;width:100%;min-height:520px;border:0;background:#f5f7f5"></iframe>
+  </div>
+</div>
+
+<!-- Send Test Email modal -->
+<div id="comm-test-modal" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:20px"
+     onclick="if(event.target.id==='comm-test-modal')closeCommTestModal()">
+  <div style="background:white;border-radius:14px;width:100%;max-width:520px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 22px;border-bottom:1px solid var(--border)">
+      <div style="font-size:15px;font-weight:700;color:var(--text)">Send Test Email</div>
+      <button onclick="closeCommTestModal()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1" title="Close">&times;</button>
+    </div>
+    <div style="padding:18px 22px;overflow-y:auto;display:flex;flex-direction:column;gap:12px">
+      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Template
+        <select id="ct-kind" style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;background:white">
+          <option value="thank_you_payment">Thank You for Payment</option>
+          <option value="returned_payment">Returned Payment</option>
+          <option value="denial">Denial</option>
+        </select>
+      </label>
+      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Send to
+        <input type="email" id="ct-to" placeholder="you@cashinflash.com" style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit">
+      </label>
+      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Recipient name
+        <input type="text" id="ct-name" placeholder="Test User" style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit">
+      </label>
+      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Loan ID <span style="font-weight:500;color:var(--muted2);text-transform:none">(optional)</span>
+        <input type="text" id="ct-loan" placeholder="1-3781-4834757" style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit">
+      </label>
+      <label id="ct-balance-label" style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Loan balance <span style="font-weight:500;color:var(--muted2);text-transform:none">(optional, returned-payment only)</span>
+        <input type="text" id="ct-balance" placeholder="$300.00" style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit">
+      </label>
+      <label id="ct-reasons-label" style="display:none;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Reasons <span style="font-weight:500;color:var(--muted2);text-transform:none">(denial only, one per line)</span>
+        <textarea id="ct-reasons" rows="4" placeholder="Insufficient income&#10;Recent NSF activity" style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;resize:vertical"></textarea>
+      </label>
+      <div id="ct-result" style="font-size:12.5px;color:var(--muted)"></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 22px;border-top:1px solid var(--border)">
+      <button class="btn btn-ghost" onclick="closeCommTestModal()">Cancel</button>
+      <button class="btn btn-primary" id="ct-send-btn" onclick="sendCommTest()">Send Test</button>
     </div>
   </div>
 </div>
@@ -2157,7 +2252,7 @@ function toast(msg, kind, opts) {
 function _ensureSidebarInExternalViews() {
   const src = document.querySelector('#view-dashboard > .shell > .subnav');
   if (!src) return;
-  ['view-customers', 'view-if', 'view-payments'].forEach(id => {
+  ['view-customers', 'view-if', 'view-payments', 'view-communications'].forEach(id => {
     const v = document.getElementById(id);
     if (!v || v.querySelector(':scope > .shell')) return;   // already wired
     const main = v.querySelector(':scope > .main');
@@ -2197,6 +2292,7 @@ function setRoute(name, fbId) {
   if (name === 'if') loadIFSubmissions();
   if (name === 'reports') loadPastDueReport();
   if (name === 'payments') loadPayments();
+  if (name === 'communications') loadCommunications();
   if (name === 'customers') {
     // setRoute('customers', 'applinks' | 'portallinks' | 'portal')
     // honors the requested inner tab; otherwise loadCustomers picks
@@ -2233,6 +2329,7 @@ function readRouteFromHash() {
   if (h === '#if' || h === '#instant-funding') return ['if', null];
   if (h === '#reports') return ['reports', null];
   if (h === '#payments') return ['payments', null];
+  if (h === '#communications') return ['communications', null];
   // All Customers-related hashes resolve to the unified view; the
   // 2nd tuple element selects the inner sub-tab. Legacy Connections
   // hashes (#connections, #applinks, #plaid, #portallinks, #portal-plaid)
@@ -7684,6 +7781,234 @@ function exportPaymentsCSV() {
   a.download = `vergent-card-payments-${_payCache.start}-to-${_payCache.end}.csv`;
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COMMUNICATIONS — outgoing-email log
+// ═══════════════════════════════════════════════════════════════
+// Reads Firebase /emailLog (written by cif-apply's send endpoints).
+// Each entry carries kind / to_email / subject / sent_at / status /
+// rendered_html / etc. We list them newest-first, let the operator
+// filter by kind, preview the rendered HTML in an iframe, and send
+// test emails to verify templates before any auto-send wiring.
+let _commCache = null;          // { entries: [...], fetchedAt }
+let _commKindFilter = 'all';    // all | thank_you_payment | returned_payment | denial
+
+const _COMM_KIND_LABELS = {
+  thank_you_payment: 'Thank You',
+  returned_payment:  'Returned Payment',
+  denial:            'Denial',
+};
+const _COMM_KIND_COLORS = {
+  thank_you_payment: { bg: '#dcfce7', fg: '#15803d' },
+  returned_payment:  { bg: '#fee2e2', fg: '#b91c1c' },
+  denial:            { bg: '#fef3c7', fg: '#b45309' },
+};
+
+async function loadCommunications() {
+  const listEl = document.getElementById('comm-list');
+  const statusEl = document.getElementById('comm-status');
+  if (listEl) listEl.innerHTML = '<div class="tbl-loading">Loading emails…</div>';
+  if (statusEl) statusEl.textContent = '';
+  try {
+    // Pull the most recent 200 logs (sorted by sent_at server-side).
+    // Firebase REST orderBy requires an index, but a simple .json
+    // fetch returns the whole node; we sort + slice client-side.
+    const data = await fbGet('emailLog.json');
+    const entries = data && typeof data === 'object'
+      ? Object.entries(data).map(([id, v]) => Object.assign({}, v, { _id: id }))
+      : [];
+    entries.sort((a, b) => (b.sent_at || 0) - (a.sent_at || 0));
+    _commCache = { entries: entries.slice(0, 500), fetchedAt: Date.now() };
+    renderCommunications();
+  } catch (e) {
+    if (listEl) listEl.innerHTML = `<div class="tbl-empty" style="padding:40px 20px;color:var(--red)">Couldn't load emails: ${escapeHtml(e.message || String(e))}</div>`;
+  }
+}
+
+function setCommFilter(kind) {
+  _commKindFilter = kind;
+  document.querySelectorAll('[data-comm-kind]').forEach(b =>
+    b.classList.toggle('active', b.getAttribute('data-comm-kind') === kind));
+  renderCommunications();
+}
+
+function _commFmtTime(ms) {
+  if (!ms) return '—';
+  try {
+    const d = new Date(ms);
+    if (isNaN(d)) return '—';
+    return d.toLocaleString(undefined, {
+      month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit',
+    });
+  } catch (e) { return '—'; }
+}
+
+function renderCommunications() {
+  if (!_commCache) return;
+  const all = _commCache.entries;
+  const statsEl = document.getElementById('comm-stats');
+  if (statsEl) {
+    const card = (label, val, sub) => `<div style="background:white;border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-xs)">
+      <div style="font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">${escapeHtml(label)}</div>
+      <div style="font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--text);font-variant-numeric:tabular-nums">${val}</div>
+      <div style="font-size:11.5px;color:var(--muted);font-weight:500;margin-top:4px">${escapeHtml(sub || '')}</div>
+    </div>`;
+    const cnt = (k) => all.filter(e => e.kind === k).length;
+    const failed = all.filter(e => e.status === 'failed').length;
+    statsEl.innerHTML =
+        card('Thank You',         cnt('thank_you_payment').toLocaleString(), 'sent to customers')
+      + card('Returned Payment',  cnt('returned_payment').toLocaleString(),  'sent to customers')
+      + card('Denial',            cnt('denial').toLocaleString(),            'sent to applicants')
+      + card('Send Failures',     failed.toLocaleString(),                   failed > 0 ? 'check rows tagged Failed' : 'all sends OK');
+  }
+
+  const q = (document.getElementById('comm-search')?.value || '').toLowerCase().trim();
+  const filtered = all.filter(e => {
+    if (_commKindFilter !== 'all' && e.kind !== _commKindFilter) return false;
+    if (q) {
+      const hay = `${e.to_email || ''} ${e.to_name || ''} ${e.subject || ''} ${e.loan_id || ''} ${e.customer_id || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const statusEl = document.getElementById('comm-status');
+  if (statusEl) statusEl.textContent = `${filtered.length} of ${all.length} email${all.length === 1 ? '' : 's'}`;
+
+  const listEl = document.getElementById('comm-list');
+  if (!filtered.length) {
+    listEl.innerHTML = `<div class="tbl-card-scroll" style="padding:48px 20px;text-align:center"><div style="font-size:13px;color:var(--muted)">No emails match this filter.</div></div>`;
+    return;
+  }
+
+  const rowHtml = (e) => {
+    const colors = _COMM_KIND_COLORS[e.kind] || { bg: '#f3f4f6', fg: '#6b7280' };
+    const label  = _COMM_KIND_LABELS[e.kind] || (e.kind || '?').toUpperCase();
+    const testBadge = e.test
+      ? '<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;background:#dbeafe;color:#1d4ed8;font-size:9.5px;font-weight:800;letter-spacing:.04em">TEST</span>'
+      : '';
+    const failBadge = e.status === 'failed'
+      ? '<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;background:#fee2e2;color:#b91c1c;font-size:9.5px;font-weight:800;letter-spacing:.04em">FAILED</span>'
+      : '';
+    return `<tr data-comm-id="${escapeHtml(e._id)}" style="cursor:pointer" onclick="openCommPreview('${escapeHtml(e._id)}')">
+      <td><span style="display:inline-block;padding:2px 9px;border-radius:999px;background:${colors.bg};color:${colors.fg};font-size:11px;font-weight:700;letter-spacing:.04em">${escapeHtml(label.toUpperCase())}</span>${testBadge}${failBadge}</td>
+      <td><div style="font-weight:700;color:var(--text)">${escapeHtml(e.to_name || '—')}</div><div style="font-size:11.5px;color:var(--muted)">${escapeHtml(e.to_email || '')}</div></td>
+      <td><div style="color:var(--text)">${escapeHtml(e.subject || '')}</div>${e.loan_id ? `<div style="font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums">${escapeHtml(e.loan_id)}</div>` : ''}</td>
+      <td><span class="tbl-time" style="font-variant-numeric:tabular-nums">${escapeHtml(_commFmtTime(e.sent_at))}</span></td>
+    </tr>`;
+  };
+  listEl.innerHTML = `<div class="tbl-card-scroll">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:170px">Kind</th>
+          <th style="width:220px">Recipient</th>
+          <th>Subject</th>
+          <th style="width:140px">Sent</th>
+        </tr>
+      </thead>
+      <tbody>${filtered.map(rowHtml).join('')}</tbody>
+    </table>
+  </div>`;
+}
+
+function openCommPreview(id) {
+  if (!_commCache) return;
+  const e = _commCache.entries.find(x => x._id === id);
+  if (!e) return;
+  const subjectEl = document.getElementById('comm-preview-subject');
+  const metaEl    = document.getElementById('comm-preview-meta');
+  const ifr       = document.getElementById('comm-preview-iframe');
+  if (subjectEl) subjectEl.textContent = e.subject || '(no subject)';
+  if (metaEl) {
+    const parts = [
+      `To: ${e.to_name ? e.to_name + ' <' + e.to_email + '>' : e.to_email}`,
+      _commFmtTime(e.sent_at),
+      e.test ? 'TEST SEND' : null,
+      e.status === 'failed' ? `FAILED (${e.error || 'unknown'})` : null,
+    ].filter(Boolean);
+    metaEl.textContent = parts.join(' · ');
+  }
+  if (ifr) {
+    const html = e.rendered_html || '<div style="padding:40px;font-family:sans-serif;color:#888;text-align:center">No rendered HTML stored for this email.</div>';
+    ifr.srcdoc = html;
+  }
+  document.getElementById('comm-preview-modal').style.display = 'flex';
+}
+function closeCommPreview() {
+  document.getElementById('comm-preview-modal').style.display = 'none';
+  const ifr = document.getElementById('comm-preview-iframe');
+  if (ifr) ifr.srcdoc = '';   // free memory
+}
+
+function openCommTestModal() {
+  const m = document.getElementById('comm-test-modal');
+  if (!m) return;
+  // Default the recipient to the logged-in operator's email if we
+  // have it.
+  const me = document.getElementById('user-name')?.textContent || '';
+  const meEmail = (me.includes('@')) ? me.trim() : '';
+  const toEl = document.getElementById('ct-to'); if (toEl && !toEl.value) toEl.value = meEmail;
+  const nameEl = document.getElementById('ct-name'); if (nameEl && !nameEl.value) nameEl.value = 'Test User';
+  const result = document.getElementById('ct-result'); if (result) result.textContent = '';
+  _commUpdateTestModalForKind();
+  m.style.display = 'flex';
+  // Show/hide kind-specific fields when the kind changes.
+  const kindEl = document.getElementById('ct-kind');
+  if (kindEl) kindEl.onchange = _commUpdateTestModalForKind;
+}
+function _commUpdateTestModalForKind() {
+  const k = document.getElementById('ct-kind')?.value || 'thank_you_payment';
+  const balLabel = document.getElementById('ct-balance-label');
+  const reasonsLabel = document.getElementById('ct-reasons-label');
+  if (balLabel)     balLabel.style.display     = (k === 'returned_payment') ? '' : 'none';
+  if (reasonsLabel) reasonsLabel.style.display = (k === 'denial')           ? '' : 'none';
+}
+function closeCommTestModal() {
+  document.getElementById('comm-test-modal').style.display = 'none';
+}
+async function sendCommTest() {
+  const btn = document.getElementById('ct-send-btn');
+  const result = document.getElementById('ct-result');
+  const kind = document.getElementById('ct-kind').value;
+  const toEmail = (document.getElementById('ct-to').value || '').trim();
+  const toName  = (document.getElementById('ct-name').value || 'Test User').trim();
+  const loanId  = (document.getElementById('ct-loan').value || '').trim();
+  const balance = (document.getElementById('ct-balance').value || '').trim();
+  const reasonsRaw = (document.getElementById('ct-reasons').value || '').trim();
+  if (!toEmail) { result.textContent = 'Recipient email is required.'; result.style.color = 'var(--red)'; return; }
+  result.style.color = 'var(--muted)';
+  result.textContent = 'Sending…';
+  btn.disabled = true;
+  const endpoint = kind === 'denial' ? '/api/send-denial'
+                 : kind === 'returned_payment' ? '/api/send-returned-payment'
+                 : '/api/send-thank-you-payment';
+  const body = kind === 'denial'
+    ? { email: toEmail, name: toName, reasons: reasonsRaw.split('\n').map(s => s.trim()).filter(Boolean), test: true }
+    : { to_email: toEmail, to_name: toName, loan_id: loanId, loan_balance: balance, test: true };
+  try {
+    const r = await fetch(endpoint, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.ok) {
+      result.style.color = 'var(--green)';
+      result.textContent = `Sent ✓  Check ${toEmail}. The email also appears in the list below within a few seconds.`;
+      setTimeout(loadCommunications, 1500);
+    } else {
+      result.style.color = 'var(--red)';
+      result.textContent = `Failed: ${d.error || d.detail || ('HTTP ' + r.status)}`;
+    }
+  } catch (e) {
+    result.style.color = 'var(--red)';
+    result.textContent = `Network error: ${e.message || e}`;
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function loadPastDueReport(silent) {
