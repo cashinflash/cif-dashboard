@@ -7465,42 +7465,28 @@ function setPayStatusFilter(status) {
   renderPayments();
 }
 
-// Auto-refresh: poll every 60s while the Payments view is active, the
-// browser tab is visible, AND the chosen date range includes today
-// (no point re-fetching historical data — it doesn't change). Pause
-// when the tab is hidden, resume when it's visible again. Zero impact
-// on Firebase (this endpoint is a Vergent scrape; no Firebase ops).
+// Auto-refresh: DISABLED as of #159's follow-up hotfix. Each poll
+// triggers a 5-10s Vergent ASPX scrape on cif-apply, which runs on
+// Render's single-threaded http.server and blocks every other endpoint
+// during that window. We were observing transient 502s on Loans Due
+// (and even on Payments itself) when the scrape collided with other
+// requests. Auto-poll stays off; the operator can hit Refresh
+// manually. If we revive this later we should add server-side
+// request coalescing on cif-apply first.
 function _payAutoStart() {
   _payAutoStop();
-  _payAutoTimer = setInterval(_payAutoTick, _PAY_AUTO_INTERVAL_MS);
   _payRenderLiveIndicator();
 }
 function _payAutoStop() {
   if (_payAutoTimer) { clearInterval(_payAutoTimer); _payAutoTimer = null; }
   _payRenderLiveIndicator();
 }
-function _payAutoTick() {
-  // Only fire if the operator is still on Payments + the page is
-  // visible + the range includes today. Otherwise the interval is
-  // wasting work.
-  if (document.body.dataset.route !== 'payments') return _payAutoStop();
-  if (document.hidden) return;
-  if (!_payCurrentRange) return;
-  const today = _payIsoDate(new Date());
-  if (_payCurrentRange.end < today) return;   // historical only
-  loadPayments(/*silent=*/true);
-}
+function _payAutoTick() { /* no-op — auto-refresh disabled */ }
 function _payRenderLiveIndicator() {
+  // Auto-refresh is disabled (see _payAutoStart); the indicator stays
+  // hidden until we re-enable polling with server-side coalescing.
   const el = document.getElementById('pay-live-indicator');
-  if (!el) return;
-  const today = _payIsoDate(new Date());
-  const includesToday = _payCurrentRange && _payCurrentRange.end >= today;
-  if (_payAutoTimer && includesToday) {
-    el.innerHTML = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(22,163,74,.5);animation:pay-pulse 2s infinite"></span> Live — refreshing every ' + _PAY_AUTO_INTERVAL_LABEL;
-    el.style.display = 'inline-flex';
-  } else {
-    el.style.display = 'none';
-  }
+  if (el) el.style.display = 'none';
 }
 // Pause/resume on tab-visibility change so we don't poll while hidden.
 document.addEventListener('visibilitychange', () => {
