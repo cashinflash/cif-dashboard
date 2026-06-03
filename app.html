@@ -775,6 +775,7 @@ button,input,select{font-family:inherit}
 .vg-spinner{width:13px;height:13px;border:2px solid var(--blue-100);border-top-color:var(--blue);border-radius:50%;animation:vgspin .7s linear infinite;flex-shrink:0}
 @keyframes vgspin{to{transform:rotate(360deg)}}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes pay-pulse{0%{box-shadow:0 0 0 0 rgba(22,163,74,.5)}70%{box-shadow:0 0 0 8px rgba(22,163,74,0)}100%{box-shadow:0 0 0 0 rgba(22,163,74,0)}}
 .vg-card.busy{position:relative;pointer-events:none;opacity:.92}
 .vg-card.busy::after{content:'';position:absolute;inset:0;border-radius:10px;background:repeating-linear-gradient(45deg,rgba(22,163,74,.04),rgba(22,163,74,.04) 8px,transparent 8px,transparent 16px);pointer-events:none}
 
@@ -1129,9 +1130,9 @@ button,input,select{font-family:inherit}
     <div class="brand-name">Cash in Flash</div>
   </a>
   <nav class="topnav-tabs">
-    <button class="tnt active" data-route="dashboard"><svg class="icn"><use href="#i-dashboard"/></svg>Dashboard</button>
-    <button class="tnt" data-route="queue"><svg class="icn"><use href="#i-list"/></svg>Applications</button>
-    <button class="tnt" data-route="reports"><svg class="icn"><use href="#i-chart"/></svg>Servicing</button>
+    <a class="tnt active" data-route="dashboard" href="#dashboard"><svg class="icn"><use href="#i-dashboard"/></svg>Dashboard</a>
+    <a class="tnt" data-route="queue" href="#queue"><svg class="icn"><use href="#i-list"/></svg>Applications</a>
+    <a class="tnt" data-route="reports" href="#reports"><svg class="icn"><use href="#i-chart"/></svg>Servicing</a>
   </nav>
   <div class="topnav-spacer"></div>
   <div class="search-wrap">
@@ -1150,10 +1151,10 @@ button,input,select{font-family:inherit}
       <div class="topnav-user-role" id="user-role">…</div>
     </div>
     <div class="user-menu" id="user-menu">
-      <button data-route="customers" type="button"><svg class="icn"><use href="#i-list"/></svg>Customers</button>
-      <button data-route="if" type="button"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
-      <button data-route="payments" type="button"><svg class="icn"><use href="#i-card"/></svg>Payments</button>
-      <button data-route="reports" type="button"><svg class="icn"><use href="#i-chart"/></svg>Servicing</button>
+      <a data-route="customers" href="#customers"><svg class="icn"><use href="#i-list"/></svg>Customers</a>
+      <a data-route="if" href="#if"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</a>
+      <a data-route="payments" href="#payments"><svg class="icn"><use href="#i-card"/></svg>Payments</a>
+      <a data-route="reports" href="#reports"><svg class="icn"><use href="#i-chart"/></svg>Servicing</a>
       <hr>
       <!-- Alert sound toggle. State persists in localStorage as
            cif_alerts_sound_enabled. The label updates to reflect
@@ -1170,10 +1171,10 @@ button,input,select{font-family:inherit}
      Overview / Customers / Instant Funding one tap away from
      Applications, Servicing, Detail, and any other view. -->
 <nav class="mobile-subnav">
-  <button class="subnav-link" data-route="dashboard"><svg class="icn"><use href="#i-overview"/></svg>Overview</button>
-  <button class="subnav-link" data-route="if"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</button>
-  <button class="subnav-link" data-route="payments"><svg class="icn"><use href="#i-card"/></svg>Payments</button>
-  <button class="subnav-link" data-route="customers"><svg class="icn"><use href="#i-list"/></svg>Customers</button>
+  <a class="subnav-link" data-route="dashboard" href="#dashboard"><svg class="icn"><use href="#i-overview"/></svg>Overview</a>
+  <a class="subnav-link" data-route="if" href="#if"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</a>
+  <a class="subnav-link" data-route="payments" href="#payments"><svg class="icn"><use href="#i-card"/></svg>Payments</a>
+  <a class="subnav-link" data-route="customers" href="#customers"><svg class="icn"><use href="#i-list"/></svg>Customers</a>
 </nav>
 
 <!-- DASHBOARD -->
@@ -1182,10 +1183,10 @@ button,input,select{font-family:inherit}
     <aside class="subnav">
       <div class="subnav-section">
         <div class="subnav-label">Insights</div>
-        <button class="subnav-link active" data-route="dashboard"><svg class="icn"><use href="#i-overview"/></svg>Overview</button>
-        <button class="subnav-link" data-route="if" style="position:relative"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding<span id="alertcount-if" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></button>
-        <button class="subnav-link" data-route="payments"><svg class="icn"><use href="#i-card"/></svg>Payments</button>
-        <button class="subnav-link" data-route="customers" style="position:relative"><svg class="icn"><use href="#i-list"/></svg>Customers<span id="alertcount-conn" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></button>
+        <a class="subnav-link active" data-route="dashboard" href="#dashboard"><svg class="icn"><use href="#i-overview"/></svg>Overview</a>
+        <a class="subnav-link" data-route="if" href="#if" style="position:relative"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding<span id="alertcount-if" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></a>
+        <a class="subnav-link" data-route="payments" href="#payments"><svg class="icn"><use href="#i-card"/></svg>Payments</a>
+        <a class="subnav-link" data-route="customers" href="#customers" style="position:relative"><svg class="icn"><use href="#i-list"/></svg>Customers<span id="alertcount-conn" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></a>
       </div>
     </aside>
     <div class="main">
@@ -1632,7 +1633,8 @@ button,input,select{font-family:inherit}
         <input type="date" id="pay-end"   style="border:1px solid var(--border);border-radius:8px;padding:5px 8px;font-size:12.5px;font-family:inherit">
         <button class="chip" onclick="setPayPreset('custom')">Apply</button>
       </span>
-      <span id="pay-loaded-at" style="margin-left:auto;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums"></span>
+      <span id="pay-live-indicator" style="margin-left:auto;display:none;align-items:center;gap:6px;font-size:11.5px;color:var(--green-dark);font-weight:600"></span>
+      <span id="pay-loaded-at" style="font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums"></span>
     </div>
 
     <!-- KPI cards -->
@@ -2204,6 +2206,10 @@ function setRoute(name, fbId) {
     else loadCustomers();
   }
   document.body.dataset.firebaseId = (name === 'detail' && fbId) ? fbId : '';
+  document.body.dataset.route = name;
+  // Stop the Payments auto-refresh timer when navigating away. It
+  // restarts on the next successful loadPayments().
+  if (name !== 'payments' && typeof _payAutoStop === 'function') _payAutoStop();
   if (name === 'detail' && fbId) {
     location.hash = '#fb=' + encodeURIComponent(fbId);
   } else if (name === 'customers') {
@@ -5073,6 +5079,10 @@ document.addEventListener('click', (e) => {
   if (tab) { switchDetailTab(tab.getAttribute('data-tab')); return; }
   const t = e.target.closest('[data-route]');
   if (t) {
+    // Let the browser handle modifier-clicks (cmd/ctrl/shift) and
+    // middle-clicks so right-click → Open in new tab + cmd-click work
+    // naturally on the nav <a href="#route"> links.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
     e.preventDefault();
     setRoute(t.getAttribute('data-route'));
     return;
@@ -7379,6 +7389,8 @@ function renderContactQueue(rows) {
 let _payCache = null;          // { rows, totals, fetchedAt, start, end }
 let _payStatusFilter = 'all';  // all | approved | declined | funding
 let _payCurrentRange = null;   // { start, end } as YYYY-MM-DD
+let _payAutoTimer = null;      // setInterval handle for auto-refresh
+const _PAY_AUTO_INTERVAL_MS = 60 * 1000;   // 60s
 
 function _payIsoDate(d) {
   // YYYY-MM-DD in local TZ
@@ -7446,7 +7458,51 @@ function setPayStatusFilter(status) {
   renderPayments();
 }
 
-async function loadPayments() {
+// Auto-refresh: poll every 60s while the Payments view is active, the
+// browser tab is visible, AND the chosen date range includes today
+// (no point re-fetching historical data — it doesn't change). Pause
+// when the tab is hidden, resume when it's visible again. Zero impact
+// on Firebase (this endpoint is a Vergent scrape; no Firebase ops).
+function _payAutoStart() {
+  _payAutoStop();
+  _payAutoTimer = setInterval(_payAutoTick, _PAY_AUTO_INTERVAL_MS);
+  _payRenderLiveIndicator();
+}
+function _payAutoStop() {
+  if (_payAutoTimer) { clearInterval(_payAutoTimer); _payAutoTimer = null; }
+  _payRenderLiveIndicator();
+}
+function _payAutoTick() {
+  // Only fire if the operator is still on Payments + the page is
+  // visible + the range includes today. Otherwise the interval is
+  // wasting work.
+  if (document.body.dataset.route !== 'payments') return _payAutoStop();
+  if (document.hidden) return;
+  if (!_payCurrentRange) return;
+  const today = _payIsoDate(new Date());
+  if (_payCurrentRange.end < today) return;   // historical only
+  loadPayments(/*silent=*/true);
+}
+function _payRenderLiveIndicator() {
+  const el = document.getElementById('pay-live-indicator');
+  if (!el) return;
+  const today = _payIsoDate(new Date());
+  const includesToday = _payCurrentRange && _payCurrentRange.end >= today;
+  if (_payAutoTimer && includesToday) {
+    el.innerHTML = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(22,163,74,.5);animation:pay-pulse 2s infinite"></span> Live — refreshing every 60s';
+    el.style.display = 'inline-flex';
+  } else {
+    el.style.display = 'none';
+  }
+}
+// Pause/resume on tab-visibility change so we don't poll while hidden.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && document.body.dataset.route === 'payments') {
+    _payAutoTick();   // immediate refresh on tab-focus
+  }
+});
+
+async function loadPayments(silent) {
   if (!_payCurrentRange) {
     _payCurrentRange = _payRangeForPreset('today');
     const si = document.getElementById('pay-start'); if (si) si.value = _payCurrentRange.start;
@@ -7459,8 +7515,12 @@ async function loadPayments() {
   const tbl = document.getElementById('pay-table');
   const status = document.getElementById('pay-status');
   const loaded = document.getElementById('pay-loaded-at');
-  if (tbl) tbl.innerHTML = '<div class="tbl-loading">Loading payments from Vergent… (this may take 5-10 seconds)</div>';
-  if (status) status.textContent = '';
+  // Skip the loading UI on auto-refresh (silent=true) so the table
+  // doesn't flash empty every 60 seconds. Errors still surface.
+  if (!silent) {
+    if (tbl) tbl.innerHTML = '<div class="tbl-loading">Loading payments from Vergent… (this may take 5-10 seconds)</div>';
+    if (status) status.textContent = '';
+  }
   try {
     const r = await fetch('/api/vergent-card-payments', {
       method: 'POST', credentials: 'include',
@@ -7470,6 +7530,12 @@ async function loadPayments() {
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.ok) {
       const msg = d.detail || d.error || ('HTTP ' + r.status);
+      // On silent auto-refresh, don't blow away the table on a single
+      // failed poll — just log and keep showing the last good data.
+      if (silent) {
+        console.warn('[payments] auto-refresh failed:', msg);
+        return;
+      }
       if (tbl) tbl.innerHTML = `<div class="tbl-empty" style="padding:40px 20px">
         <div style="font-size:14px;color:var(--red);font-weight:700;margin-bottom:6px">Couldn't load payments.</div>
         <div style="font-size:12px;color:var(--muted)">${escapeHtml(msg)}</div></div>`;
@@ -7478,7 +7544,13 @@ async function loadPayments() {
     _payCache = { rows: d.rows || [], totals: d.totals || {}, fetchedAt: Date.now(), start: range.start, end: range.end };
     if (loaded) loaded.textContent = `Loaded ${new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
     renderPayments();
+    // Kick the auto-refresh after the first successful load. Only the
+    // first call lights this up; subsequent silent refreshes already
+    // have it running.
+    if (!silent && !_payAutoTimer) _payAutoStart();
+    else _payRenderLiveIndicator();
   } catch (e) {
+    if (silent) { console.warn('[payments] auto-refresh network error:', e.message); return; }
     if (tbl) tbl.innerHTML = `<div class="tbl-empty" style="padding:40px 20px;color:var(--red)">Network error: ${escapeHtml(e.message || 'unknown')}</div>`;
   }
 }
