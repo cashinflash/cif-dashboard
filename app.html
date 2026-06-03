@@ -7535,11 +7535,11 @@ function renderPayments() {
     return;
   }
 
-  // Sort: most-recent first
+  // Sort: oldest first (top of table = earliest in the day)
   const sorted = filtered.slice().sort((a, b) => {
     const ta = new Date(a.real_date || 0).getTime();
     const tb = new Date(b.real_date || 0).getTime();
-    return tb - ta;
+    return ta - tb;
   });
 
   const statusPill = (r) => {
