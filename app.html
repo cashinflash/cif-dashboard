@@ -7892,8 +7892,14 @@ function renderCommunications() {
     const failBadge = e.status === 'failed'
       ? '<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;background:#fee2e2;color:#b91c1c;font-size:9.5px;font-weight:800;letter-spacing:.04em">FAILED</span>'
       : '';
+    const autoBadge = e.auto
+      ? '<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;background:#ede9fe;color:#6d28d9;font-size:9.5px;font-weight:800;letter-spacing:.04em" title="Auto-sent on payment scrape">AUTO</span>'
+      : '';
+    const dryBadge = e.status === 'dry_run'
+      ? '<span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-size:9.5px;font-weight:800;letter-spacing:.04em" title="Rendered + logged but NOT sent via SendGrid">DRY-RUN</span>'
+      : '';
     return `<tr data-comm-id="${escapeHtml(e._id)}" style="cursor:pointer" onclick="openCommPreview('${escapeHtml(e._id)}')">
-      <td><span style="display:inline-block;padding:2px 9px;border-radius:999px;background:${colors.bg};color:${colors.fg};font-size:11px;font-weight:700;letter-spacing:.04em">${escapeHtml(label.toUpperCase())}</span>${testBadge}${failBadge}</td>
+      <td><span style="display:inline-block;padding:2px 9px;border-radius:999px;background:${colors.bg};color:${colors.fg};font-size:11px;font-weight:700;letter-spacing:.04em">${escapeHtml(label.toUpperCase())}</span>${testBadge}${autoBadge}${dryBadge}${failBadge}</td>
       <td><div style="font-weight:700;color:var(--text)">${escapeHtml(e.to_name || '—')}</div><div style="font-size:11.5px;color:var(--muted)">${escapeHtml(e.to_email || '')}</div></td>
       <td><div style="color:var(--text)">${escapeHtml(e.subject || '')}</div>${e.loan_id ? `<div style="font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums">${escapeHtml(e.loan_id)}</div>` : ''}</td>
       <td><span class="tbl-time" style="font-variant-numeric:tabular-nums">${escapeHtml(_commFmtTime(e.sent_at))}</span></td>
@@ -7927,6 +7933,8 @@ function openCommPreview(id) {
       `To: ${e.to_name ? e.to_name + ' <' + e.to_email + '>' : e.to_email}`,
       _commFmtTime(e.sent_at),
       e.test ? 'TEST SEND' : null,
+      e.auto ? 'AUTO-SENT' : null,
+      e.status === 'dry_run' ? 'DRY-RUN — NOT SENT to customer (rendered + logged only)' : null,
       e.status === 'failed' ? `FAILED (${e.error || 'unknown'})` : null,
     ].filter(Boolean);
     metaEl.textContent = parts.join(' · ');
