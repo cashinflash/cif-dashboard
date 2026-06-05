@@ -1684,6 +1684,7 @@ button,input,select{font-family:inherit}
       <button class="chip active" data-comm-kind="all"                 onclick="setCommFilter('all')">All</button>
       <button class="chip"        data-comm-kind="thank_you_payment"   onclick="setCommFilter('thank_you_payment')">Thank You</button>
       <button class="chip"        data-comm-kind="returned_payment"    onclick="setCommFilter('returned_payment')">Returned Payment</button>
+      <button class="chip"        data-comm-kind="funds_sent"          onclick="setCommFilter('funds_sent')">Funds Sent</button>
       <button class="chip"        data-comm-kind="denial"              onclick="setCommFilter('denial')">Denial</button>
       <input type="text" id="comm-search" placeholder="Search recipient, loan id, subject…" oninput="renderCommunications()" style="margin-left:8px;flex:1;min-width:240px;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;font-family:inherit;outline:none">
     </div>
@@ -7797,11 +7798,13 @@ let _commKindFilter = 'all';    // all | thank_you_payment | returned_payment | 
 const _COMM_KIND_LABELS = {
   thank_you_payment: 'Thank You',
   returned_payment:  'Returned Payment',
+  funds_sent:        'Funds Sent',
   denial:            'Denial',
 };
 const _COMM_KIND_COLORS = {
   thank_you_payment: { bg: '#dcfce7', fg: '#15803d' },
   returned_payment:  { bg: '#fee2e2', fg: '#b91c1c' },
+  funds_sent:        { bg: '#dbeafe', fg: '#1d4ed8' },
   denial:            { bg: '#fef3c7', fg: '#b45309' },
 };
 
