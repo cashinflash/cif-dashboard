@@ -291,6 +291,13 @@ button,input,select{font-family:inherit}
    inner scroll container. */
 #pay-table .tbl-card-scroll{max-height:none;overflow:visible;border-radius:var(--radius)}
 #pay-table .tbl-card-scroll .tbl thead th{position:sticky;top:var(--topnav-h);z-index:5}
+/* Same fix for Communications page and Loans Due (Servicing) — operators
+   want one page-level scroll instead of a smaller scrollable frame
+   within the window. Loans Due has section dividers (Today / 1-7 / 8-30
+   / 31+) — they keep pinning via their existing position:sticky rule
+   stacked just below the now-viewport-pinned thead. */
+#comm-list .tbl-card-scroll, #rpt-table .tbl-card-scroll{max-height:none;overflow:visible;border-radius:var(--radius)}
+#comm-list .tbl-card-scroll .tbl thead th, #rpt-table .tbl-card-scroll .tbl thead th{position:sticky;top:var(--topnav-h);z-index:5}
 /* Section header rows used in the unified Loans Due table — sticky
    under the thead, span the full row, distinct background so the
    eye reads them as group dividers. */
