@@ -749,6 +749,36 @@ button,input,select{font-family:inherit}
 .qa-btn-amber{color:#c2410c;border-color:#fcd34d;background:#fffbeb}
 .qa-btn-amber:hover{background:#fef3c7;border-color:#f59e0b;color:#9a3412}
 .qa-btn-amber .icn{color:#c2410c}
+/* Emerald variant for the Approve Email button — matches the existing
+   green palette so operators read it as a positive action, distinct
+   from the amber Denial Email sibling. */
+.qa-btn-emerald{color:#166534;border-color:#86efac;background:#f0fdf4}
+.qa-btn-emerald:hover{background:#dcfce7;border-color:#22c55e;color:#14532d}
+.qa-btn-emerald .icn{color:#15803d}
+/* Approve-email modal — same overall shape as the denial modal but
+   green-accented + only a single amount field plus quick-pick chips. */
+.appr-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:center;justify-content:center;padding:1rem;display:none}
+.appr-ov.open{display:flex}
+.appr-card{background:white;border-radius:14px;width:100%;max-width:480px;max-height:96vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.appr-head{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px}
+.appr-title{font-size:15px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px}
+.appr-title .icn{width:16px;height:16px;color:#15803d}
+.appr-meta{font-size:12px;color:var(--muted);margin-top:2px}
+.appr-body{padding:18px 22px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+.appr-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.appr-amount-row{display:flex;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:10px 14px}
+.appr-amount-row .ccy{font-size:18px;font-weight:800;color:#15803d}
+.appr-amount-row input{flex:1;background:transparent;border:none;outline:none;font-size:20px;font-weight:800;color:var(--text);font-family:inherit;font-variant-numeric:tabular-nums;min-width:0}
+.appr-chips{display:flex;gap:6px;flex-wrap:wrap}
+.appr-chip{padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:white;font-size:12.5px;font-weight:700;color:var(--text2);cursor:pointer;font-family:inherit;transition:all .12s}
+.appr-chip:hover{border-color:#86efac;background:#f0fdf4;color:#166534}
+.appr-chip.active{background:#15803d;border-color:#15803d;color:white}
+.appr-actions{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:8px}
+.appr-actions .btn{flex:1;justify-content:center}
+.btn-approve-send{flex:2 !important;background:#15803d;color:white;border:1px solid #15803d;padding:8px 14px;border-radius:8px;font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.btn-approve-send:hover{background:#14532d;border-color:#14532d}
+.btn-approve-send:disabled{opacity:.5;cursor:not-allowed}
+.btn-approve-send .icn{width:14px;height:14px;stroke-width:2.25}
 .qa-btn-amber:hover .icn{color:#9a3412}
 
 /* VERGENT panel — softer card to feel less like a bare rectangle.
@@ -1565,6 +1595,7 @@ button,input,select{font-family:inherit}
               <button class="qa-btn" id="dv-rerun-btn" title="Re-run the engine using stored data — no new Plaid pull"><svg class="icn"><use href="#i-refresh"/></svg>Re-Run Report</button>
               <button class="qa-btn" id="dv-reextract-btn" style="display:none" title="Re-read the uploaded PDF with the latest extraction logic, then re-run. Use when a stored extraction looks wrong (reconciliation failed, miscounts). Takes ~30–60s."><svg class="icn"><use href="#i-refresh"/></svg>Re-extract from PDF</button>
               <button class="qa-btn" id="dv-refresh-plaid-btn" title="Pull a fresh Plaid asset report and re-run"><svg class="icn"><use href="#i-refresh"/></svg>Refresh from Plaid</button>
+              <button class="qa-btn qa-btn-emerald" id="dv-approve-mail-btn" title="Send the approval email to the applicant with their approved loan amount"><svg class="icn"><use href="#i-check"/></svg>Approve Email</button>
               <button class="qa-btn qa-btn-amber" id="dv-denial-btn" title="Send the denial-reasons email to the applicant"><svg class="icn"><use href="#i-message"/></svg>Denial Email</button>
             </div>
           </div>
@@ -1695,6 +1726,7 @@ button,input,select{font-family:inherit}
     <!-- Filter chips -->
     <div class="chips" style="margin-bottom:12px">
       <button class="chip active" data-comm-kind="all"                 onclick="setCommFilter('all')">All</button>
+      <button class="chip"        data-comm-kind="approval"            onclick="setCommFilter('approval')">Approval</button>
       <button class="chip"        data-comm-kind="thank_you_payment"   onclick="setCommFilter('thank_you_payment')">Thank You</button>
       <button class="chip"        data-comm-kind="returned_payment"    onclick="setCommFilter('returned_payment')">Returned Payment</button>
       <button class="chip"        data-comm-kind="funds_sent"          onclick="setCommFilter('funds_sent')">Funds Sent</button>
@@ -1736,6 +1768,7 @@ button,input,select{font-family:inherit}
     <div style="padding:18px 22px;overflow-y:auto;display:flex;flex-direction:column;gap:12px">
       <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Template
         <select id="ct-kind" style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;background:white">
+          <option value="approval">Approval</option>
           <option value="thank_you_payment">Thank You for Payment</option>
           <option value="returned_payment">Returned Payment</option>
           <option value="denial">Denial</option>
@@ -1986,6 +2019,41 @@ button,input,select{font-family:inherit}
 <!-- Denial Email modal — ported from classic. POSTs to /api/send-denial
      which proxies to cif-apply. Only the JS-rendered checkboxes change
      between visits; the chrome stays static. -->
+<!-- Approve-email modal — opens from Quick Actions "Approve Email" button.
+     Operator picks the approval amount via quick-pick chips ($100/$150/
+     $200/$255) or types a custom amount, then sends. POSTs to
+     /api/send-approval which proxies to cif-apply -> approval template
+     -> SendGrid. Logs to /emailLog with kind="approval". -->
+<div class="appr-ov" id="appr-ov">
+  <div class="appr-card">
+    <div class="appr-head">
+      <div>
+        <div class="appr-title"><svg class="icn"><use href="#i-check"/></svg>Send Approval Email</div>
+        <div class="appr-meta" id="appr-to-label">To: —</div>
+      </div>
+      <button onclick="closeApprovalModal()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1" title="Close">&times;</button>
+    </div>
+    <div class="appr-body">
+      <div class="appr-label">Approval Amount</div>
+      <div class="appr-amount-row">
+        <span class="ccy">$</span>
+        <input type="number" id="appr-amount" min="100" max="1000" step="1" value="255" inputmode="decimal">
+      </div>
+      <div class="appr-label">Quick Pick</div>
+      <div class="appr-chips" id="appr-chips">
+        <button type="button" class="appr-chip" data-appr-amt="100">$100</button>
+        <button type="button" class="appr-chip" data-appr-amt="150">$150</button>
+        <button type="button" class="appr-chip" data-appr-amt="200">$200</button>
+        <button type="button" class="appr-chip active" data-appr-amt="255">$255</button>
+      </div>
+    </div>
+    <div class="appr-actions">
+      <button class="btn btn-ghost" type="button" id="appr-cancel">Cancel</button>
+      <button class="btn-approve-send" type="button" id="appr-send"><svg class="icn"><use href="#i-check"/></svg>Send Approval Email</button>
+    </div>
+  </div>
+</div>
+
 <div class="dnl-ov" id="dnl-ov">
   <div class="dnl-card">
     <div class="dnl-head">
@@ -4512,6 +4580,73 @@ function closeDenialModal() {
   _denialFbId = null;
 }
 
+// ───────────── Approval-email modal ─────────────
+// Opened from Quick Actions "Approve Email" button on the application
+// detail. Operator picks the approval amount via chip or custom input,
+// then sends. The send goes through /api/send-approval -> cif-apply ->
+// SendGrid. Logs to /emailLog with kind="approval" so it shows up in
+// Communications.
+let _apprFbId = null;
+let _apprEmail = '';
+let _apprName  = '';
+
+function openApprovalModal(fbId) {
+  const a = apps.find(x => x.firebaseId === fbId);
+  if (!a) return;
+  _apprFbId = fbId;
+  _apprEmail = (a.applicationData && a.applicationData.email) || '';
+  _apprName  = ((a.applicationData && a.applicationData.firstName) || '') + ' ' +
+               ((a.applicationData && a.applicationData.lastName) || '');
+  _apprName = _apprName.trim() || 'Valued Customer';
+  if (!_apprEmail) { toast('No email address on file for this customer', 'err'); return; }
+  // Pre-fill amount from the offer field if the operator has already
+  // typed one in the detail header — otherwise default to $255 (max).
+  const offer = parseFloat((document.getElementById('dv-offer-amount')?.value || '255'));
+  const amt = (isFinite(offer) && offer > 0) ? Math.round(offer) : 255;
+  const amtInput = document.getElementById('appr-amount');
+  if (amtInput) amtInput.value = amt;
+  // Sync chip active state to whatever the input shows.
+  document.querySelectorAll('#appr-chips .appr-chip').forEach(c => {
+    c.classList.toggle('active', parseInt(c.getAttribute('data-appr-amt')) === amt);
+  });
+  const meta = document.getElementById('appr-to-label');
+  if (meta) meta.textContent = `To: ${_apprName} <${_apprEmail}>`;
+  document.getElementById('appr-ov').classList.add('open');
+}
+function closeApprovalModal() {
+  document.getElementById('appr-ov').classList.remove('open');
+  _apprFbId = null; _apprEmail = ''; _apprName = '';
+}
+async function sendApprovalEmail() {
+  if (!_apprEmail) { toast('No email address on file for this customer', 'err'); return; }
+  const amtRaw = (document.getElementById('appr-amount')?.value || '').trim();
+  const amt = parseFloat(amtRaw);
+  if (!isFinite(amt) || amt <= 0) { toast('Enter a valid approval amount', 'err'); return; }
+  const btn = document.getElementById('appr-send');
+  btn.disabled = true;
+  const orig = btn.innerHTML;
+  btn.innerHTML = 'Sending…';
+  try {
+    const r = await fetch('/api/send-approval', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: _apprEmail, name: _apprName, amount: amt })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.ok) {
+      toast(`Approval email sent to ${_apprEmail} ✓`, 'ok');
+      closeApprovalModal();
+    } else {
+      toast('Send failed: ' + (d.error || ('HTTP ' + r.status)), 'err');
+    }
+  } catch (e) {
+    toast('Send failed: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+}
+
 async function sendDenialEmail() {
   if (!_denialEmail) { toast('No email address on file for this customer', 'err'); return; }
   const selectedReasons = DENIAL_REASONS.filter(
@@ -5213,6 +5348,25 @@ function _activeFbId() { return document.body.dataset.firebaseId || ''; }
 // for the same flow — they're synonymous now.
 document.getElementById('dv-decline-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) openDenialModal(id); });
 document.getElementById('dv-denial-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) openDenialModal(id); });
+document.getElementById('dv-approve-mail-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) openApprovalModal(id); });
+document.getElementById('appr-cancel').addEventListener('click', closeApprovalModal);
+document.getElementById('appr-send').addEventListener('click', sendApprovalEmail);
+document.getElementById('appr-ov').addEventListener('click', (e) => { if (e.target.id === 'appr-ov') closeApprovalModal(); });
+// Quick-pick chips set the amount input; typing in the input syncs
+// chip-active state back.
+document.getElementById('appr-chips').addEventListener('click', (e) => {
+  const c = e.target.closest('.appr-chip'); if (!c) return;
+  const amt = parseInt(c.getAttribute('data-appr-amt'));
+  const inp = document.getElementById('appr-amount');
+  if (inp) inp.value = amt;
+  document.querySelectorAll('#appr-chips .appr-chip').forEach(x => x.classList.toggle('active', x === c));
+});
+document.getElementById('appr-amount').addEventListener('input', (e) => {
+  const v = parseFloat(e.target.value);
+  document.querySelectorAll('#appr-chips .appr-chip').forEach(c => {
+    c.classList.toggle('active', parseInt(c.getAttribute('data-appr-amt')) === v);
+  });
+});
 document.getElementById('dnl-cancel').addEventListener('click', closeDenialModal);
 document.getElementById('dnl-close').addEventListener('click', closeDenialModal);
 document.getElementById('dnl-send').addEventListener('click', sendDenialEmail);
@@ -7809,12 +7963,14 @@ let _commCache = null;          // { entries: [...], fetchedAt }
 let _commKindFilter = 'all';    // all | thank_you_payment | returned_payment | denial
 
 const _COMM_KIND_LABELS = {
+  approval:          'Approval',
   thank_you_payment: 'Thank You',
   returned_payment:  'Returned Payment',
   funds_sent:        'Funds Sent',
   denial:            'Denial',
 };
 const _COMM_KIND_COLORS = {
+  approval:          { bg: '#bbf7d0', fg: '#14532d' },
   thank_you_payment: { bg: '#dcfce7', fg: '#15803d' },
   returned_payment:  { bg: '#fee2e2', fg: '#b91c1c' },
   funds_sent:        { bg: '#dbeafe', fg: '#1d4ed8' },
@@ -8008,9 +8164,12 @@ async function sendCommTest() {
   btn.disabled = true;
   const endpoint = kind === 'denial' ? '/api/send-denial'
                  : kind === 'returned_payment' ? '/api/send-returned-payment'
+                 : kind === 'approval' ? '/api/send-approval'
                  : '/api/send-thank-you-payment';
   const body = kind === 'denial'
     ? { email: toEmail, name: toName, reasons: reasonsRaw.split('\n').map(s => s.trim()).filter(Boolean), test: true }
+    : kind === 'approval'
+    ? { email: toEmail, name: toName, amount: 255, test: true }
     : { to_email: toEmail, to_name: toName, loan_id: loanId, loan_balance: balance, test: true };
   try {
     const r = await fetch(endpoint, {
