@@ -5326,17 +5326,27 @@ const DENIAL_REASONS = [
 ];
 
 const DENIAL_KEYWORD_MAP = [
-  { keywords: ['income','pay','gross','salary','employment','wages'], reasons: [0,1] },
-  { keywords: ['nsf','returned','insufficient fund','bounced'], reasons: [3] },
-  { keywords: ['negative','below zero','overdraft'], reasons: [4] },
-  { keywords: ['balance','low','average daily'], reasons: [5] },
-  { keywords: ['closed','account close'], reasons: [6] },
-  { keywords: ['fraud','suspicious','unusual'], reasons: [7] },
-  { keywords: ['identity','mismatch','name','id'], reasons: [8] },
-  { keywords: ['fintech','advance','dave','brigit','earnin','payday','cash advance'], reasons: [2] },
-  { keywords: ['speculative','gambling','crypto','betting'], reasons: [10] },
-  { keywords: ['repayment','hardship','afford','cash flow','fcf'], reasons: [11] },
-  { keywords: ['statement','window','30 day','period','outside'], reasons: [9,12] },
+  // Income-related decline reasons
+  { keywords: ['no verified', 'no payroll', 'income source stale', 'no income deposit'], reasons: [1] },
+  { keywords: ['stated income anomaly', 'stated income materially', 'income unverifiable'], reasons: [0, 1] },
+  { keywords: ['insufficient', 'below the minimum tier', 'free cash flow', 'fcf', 'outflows exceed', 'monthly outflows', 'repayment', 'hardship', 'afford', 'cash flow'], reasons: [11] },
+  // Stability decline reasons
+  { keywords: ['nsf', 'returned', 'insufficient fund', 'bounced'], reasons: [3] },
+  { keywords: ['negative balance', 'negative days', 'overdraft pattern', 'ending negative', 'ended negative'], reasons: [4] },
+  { keywords: ['low ending', 'avg daily balance', 'low average daily', 'low balance'], reasons: [5] },
+  // Stacking / fintech / payday
+  { keywords: ['fintech stacking', 'cash-advance apps', 'severe fintech', 'extreme fintech', 'payday-loan stacking', 'acute payday'], reasons: [2] },
+  { keywords: ['bnpl', 'installment payments', 'buy now pay later'], reasons: [2] },
+  // Fraud / identity
+  { keywords: ['fraud', 'suspicious', 'unusual'], reasons: [7] },
+  { keywords: ['identity', 'mismatch', 'wrong account', 'self-transfer'], reasons: [8] },
+  // Speculative / gambling
+  { keywords: ['speculative', 'gambling', 'crypto', 'skill-gaming', 'lottery'], reasons: [10] },
+  // Statement quality
+  { keywords: ['reconciliation', 'extraction unreliable', 'too few transactions', 'insufficient data', 'incomplete', 'unreadable'], reasons: [12] },
+  { keywords: ['statement', 'window', '30 day', '60 day', 'outside'], reasons: [9] },
+  // Active competing loan
+  { keywords: ['competing loan', 'fresh loan', 'rollover'], reasons: [2] },
 ];
 
 let denialFbId = null;
@@ -5353,7 +5363,9 @@ function openDenialModal(fbId) {
   document.getElementById('denial-to-label').textContent = 'To: ' + (denialEmail || 'No email on file');
   document.getElementById('denial-email-display').textContent = denialEmail || 'No email address found';
 
-  // Auto-select reasons based on Claude decline reason
+  // Pass 1 — text keyword matching against the engine's decline reason
+  // string. Catches named drivers the engine surfaces verbatim ("severe
+  // fintech stacking", "reconciliation failed", "outflows exceed").
   const declineReason = (a.reason || '').toLowerCase();
   const autoSelected = new Set();
   DENIAL_KEYWORD_MAP.forEach(({keywords, reasons}) => {
@@ -5361,8 +5373,27 @@ function openDenialModal(fbId) {
       reasons.forEach(r => autoSelected.add(r));
     }
   });
-  // If nothing matched, default to reason 0 (insufficient income) as fallback
-  if (autoSelected.size === 0) autoSelected.add(0);
+
+  // Pass 2 — data-driven signals. When the engine surfaces fewer
+  // drivers than apply (the reason text only includes the top 1-2),
+  // the numeric fields catch the rest. Mirrors the engine's traffic-
+  // light logic.
+  const fcf = Number(a.fcf || 0);
+  const monthlyIncome = Number(a.monthlyIncome || a.monthly_income || 0);
+  const monthlyExpenses = Number(a.monthlyExpenses || a.monthly_expenses || 0);
+  const nsfCount = Number(a.nsfCount || a.nsf_count || 0);
+  const fintechCount = Number(a.fintechCount || a.fintech_count || 0);
+  if (fcf < 0) autoSelected.add(11);
+  if (monthlyIncome > 0 && monthlyIncome < 500) autoSelected.add(0);
+  if (monthlyIncome <= 0) autoSelected.add(1);
+  if (nsfCount >= 3) autoSelected.add(3);
+  if (fintechCount >= 5) autoSelected.add(2);
+  if (monthlyIncome > 0 && monthlyExpenses > monthlyIncome * 1.5) autoSelected.add(11);
+
+  // Smarter fallback: most engine declines are capacity-driven, so
+  // default to "Inability to demonstrate repayment without hardship"
+  // (reason 11) instead of "Insufficient income" (reason 0).
+  if (autoSelected.size === 0) autoSelected.add(11);
 
   // Render checkboxes
   const container = document.getElementById('denial-reasons');
