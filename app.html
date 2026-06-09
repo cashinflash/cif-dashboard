@@ -3507,16 +3507,63 @@ function copyEngineReport(btn) {
   clone.querySelectorAll('summary').forEach(s => {
     s.innerHTML = s.innerHTML.replace(/\s*[—-]\s*click to expand\s*/i, '');
   });
-  const html = clone.innerHTML;
+  const reportHtmlBody = clone.innerHTML;
   // Render offscreen so innerText gives properly line-broken plain text
   // (rendering-aware, and the forced-open details are now visible).
   const stage = document.createElement('div');
   stage.style.cssText = 'position:fixed;left:-99999px;top:0;width:820px;white-space:normal';
   stage.appendChild(clone);
   document.body.appendChild(stage);
-  const text = (clone.innerText || clone.textContent || '')
+  const reportText = (clone.innerText || clone.textContent || '')
     .replace(/\n{3,}/g, '\n\n').trim();
   document.body.removeChild(stage);
+
+  // Look up the current applicant so we can prepend NAME and the Plaid/
+  // statement document URL — the three pieces the operator needs when
+  // pasting an applicant into a chat for manual review. fbId lives on
+  // document.body.dataset.firebaseId during the detail view (set by
+  // renderDetail / setDetailView).
+  const fbId = document.body.dataset.firebaseId || '';
+  const a = (typeof apps !== 'undefined' && apps.find) ? apps.find(x => x.firebaseId === fbId) : null;
+  const ad = a && a.applicationData || {};
+  const name = (a && (a.formName || a.name)) || (ad && ((ad.firstName||'') + ' ' + (ad.lastName||'')).trim()) || 'Unknown';
+  // Same field-coalesce the existing detail view uses (see renderDetail's
+  // urlSection call) so we pick up Plaid asset reports AND
+  // bank-statement PDF uploads AND legacy ad.assetReportUrl shape.
+  const docUrl = (a && a.bankStatementUrl)
+              || (ad && (ad.bankStatementUrl || ad.assetReportUrl))
+              || '';
+  const dec = (a && a.claudeDecision) || (a && a.status) || '';
+  const amt = (a && a.amount) || '';
+  const verdictLine = name + (dec ? '  ('+dec+(amt?(' '+amt):'')+')' : '');
+  const urlBlock = docUrl
+    ? docUrl
+    : '(no Plaid asset report / bank statement URL on this record)';
+
+  const textHeader = [
+    '=== APPLICANT ===',
+    verdictLine,
+    '',
+    '=== PLAID / STATEMENT DOCUMENT URL ===',
+    urlBlock,
+    '',
+    '=== FULL UNDERWRITING REPORT ===',
+    '',
+  ].join('\n');
+  const text = textHeader + reportText;
+
+  // Same header as a leading paragraph for the HTML flavor so it
+  // pastes cleanly into rich-text destinations too.
+  const safeUrl = urlBlock.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const safeName = verdictLine.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const htmlHeader = '<div style="font-family:inherit;margin-bottom:14px">'
+    + '<div style="font-size:11px;font-weight:700;color:#666;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Applicant</div>'
+    + '<div style="font-size:14px;margin-bottom:10px"><b>' + safeName + '</b></div>'
+    + '<div style="font-size:11px;font-weight:700;color:#666;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Plaid / Statement Document URL</div>'
+    + '<div style="font-size:12px;margin-bottom:14px"><a href="' + safeUrl + '">' + safeUrl + '</a></div>'
+    + '<div style="font-size:11px;font-weight:700;color:#666;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Full Underwriting Report</div>'
+    + '</div>';
+  const html = htmlHeader + reportHtmlBody;
 
   const done = ok => _copyReportFeedback(btn, ok ? 'Copied!' : 'Copy failed', ok);
 
