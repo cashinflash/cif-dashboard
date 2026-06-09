@@ -229,6 +229,21 @@ button,input,select{font-family:inherit}
 .chip.active .chip-ct{background:rgba(255,255,255,.2);color:white}
 .chip.right{margin-left:auto}
 
+/* ════ BULK SELECT (one-time feature — remove this whole block when done) ════
+   Checkboxes live in every queue row but stay hidden until the operator
+   clicks "Select". Then a body-level class reveals them and a bulk action
+   bar appears. Designed to be deleted cleanly: this CSS block, the markup
+   block (queue-bulk-bar + Select chip), and the JS block are each fenced
+   with the same "BULK SELECT" banner. */
+.queue-sel-cb{display:none;width:17px;height:17px;margin-right:2px;cursor:pointer;flex-shrink:0;accent-color:var(--green)}
+body.queue-select-mode .queue-sel-cb{display:inline-block}
+body.queue-select-mode #queue-tbody tr[data-fb]{cursor:pointer}
+body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-50)}
+.queue-bulk-bar{display:none;align-items:center;gap:12px;margin:-4px 0 16px;padding:10px 14px;background:#fef2f2;border:1px solid var(--red-200);border-radius:10px}
+.queue-bulk-bar .qbb-count{font-size:13px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.queue-bulk-bar .qbb-spacer{flex:1}
+/* ════ END BULK SELECT CSS ════ */
+
 .queue-grid{display:grid;grid-template-columns:1fr 320px;gap:16px}
 @media(max-width:1200px){.queue-grid{grid-template-columns:1fr}}
 
@@ -1386,7 +1401,17 @@ button,input,select{font-family:inherit}
       <button class="chip" data-filter="Pending">Pending<span class="chip-ct" id="ct-pending">0</span></button>
       <button class="chip" data-filter="Approved">Approved<span class="chip-ct" id="ct-approved">0</span></button>
       <button class="chip" data-filter="Declined">Declined<span class="chip-ct" id="ct-declined">0</span></button>
-      <button class="chip right"><svg class="icn" style="width:12px;height:12px"><use href="#i-download"/></svg>Export CSV</button>
+      <!-- BULK SELECT (one-time feature — remove this Select chip when done) -->
+      <button class="chip right" id="queue-select-toggle" type="button"><svg class="icn" style="width:12px;height:12px"><use href="#i-check"/></svg>Select</button>
+      <button class="chip"><svg class="icn" style="width:12px;height:12px"><use href="#i-download"/></svg>Export CSV</button>
+    </div>
+
+    <!-- BULK SELECT (one-time feature — remove this bar when done) -->
+    <div class="queue-bulk-bar" id="queue-bulk-bar">
+      <span class="qbb-count" id="queue-sel-count">0 selected</span>
+      <span class="qbb-spacer"></span>
+      <button class="btn btn-ghost" id="queue-bulk-cancel" type="button">Cancel</button>
+      <button class="btn btn-danger" id="queue-bulk-delete" type="button" disabled><svg class="icn"><use href="#i-x"/></svg>Delete Selected</button>
     </div>
 
     <div class="queue-grid">
@@ -2938,7 +2963,7 @@ function renderQueue() {
     const appType = (a.applicationData || a.hasApp) ? 'Application' : (a.filename ? 'Document' : 'Manual');
     const appMeta = a.amount ? a.amount.replace(/^N\/A$/, '—') : '';
     rows.push(`<tr data-fb="${escapeHtml(a.firebaseId)}">
-      <td><div class="applicant"><div class="av">${escapeHtml(initials(a.name))}</div><div class="applicant-text"><div class="applicant-name">${escapeHtml(a.name || 'Unnamed')} ${sourceBadge(a)}</div><div class="applicant-id">#${escapeHtml(idShort)}</div></div></div></td>
+      <td><div class="applicant"><input type="checkbox" class="queue-sel-cb" data-fb="${escapeHtml(a.firebaseId)}" title="Select for bulk action"><div class="av">${escapeHtml(initials(a.name))}</div><div class="applicant-text"><div class="applicant-name">${escapeHtml(a.name || 'Unnamed')} ${sourceBadge(a)}</div><div class="applicant-id">#${escapeHtml(idShort)}</div></div></div></td>
       <td><div class="app-info"><div class="app-type">${escapeHtml(appType)}</div><div class="app-meta">${escapeHtml(appMeta)}</div></div></td>
       <td><span class="score-circle ${sc}">${a.score != null ? a.score : '—'}</span></td>
       <td><span class="status ${sCls}">${escapeHtml(a.status || 'Pending')}</span></td>
@@ -2946,7 +2971,16 @@ function renderQueue() {
       <td><div class="tbl-time">${fmtTimeAgo(a.updatedAt || a.createdAt)}</div></td>
     </tr>`);
   }
+  // BULK SELECT (one-time feature): preserve checked rows across a
+  // re-render (filter change, forced refresh) so the operator's
+  // selection survives. Remove these two fenced lines with the feature.
+  const _selBefore = document.body.classList.contains('queue-select-mode')
+    ? new Set(Array.from(document.querySelectorAll('.queue-sel-cb:checked')).map(cb => cb.getAttribute('data-fb'))) : null;
   tbody.innerHTML = rows.join('');
+  if (_selBefore && _selBefore.size) {
+    _selBefore.forEach(fb => { const cb = tbody.querySelector(`.queue-sel-cb[data-fb="${fb}"]`); if (cb) cb.checked = true; });
+    _updateQueueSelCount();
+  }
 }
 
 // ───────── Detail ─────────
@@ -5122,9 +5156,14 @@ async function init() {
   // tab is actually visible. Returning focus to the tab triggers
   // an immediate refresh so operators never see stale data.
   pollTimer = setInterval(() => {
+    // BULK SELECT (one-time feature): skip the auto-refresh while the
+    // operator is mid bulk-selection so a poll doesn't wipe their
+    // checked rows. Remove this guard clause with the rest of the feature.
+    if (document.body.classList.contains('queue-select-mode')) return;
     if (document.visibilityState === 'visible') loadReports();
   }, 60000);
   document.addEventListener('visibilitychange', () => {
+    if (document.body.classList.contains('queue-select-mode')) return; // BULK SELECT guard
     if (document.visibilityState === 'visible') loadReports();
   });
 
@@ -5381,10 +5420,79 @@ document.addEventListener('click', (e) => {
     return;
   }
   const row = e.target.closest('tr[data-fb]');
-  if (row) { setRoute('detail', row.getAttribute('data-fb')); return; }
+  if (row) {
+    // BULK SELECT (one-time feature): in select mode, a row click toggles
+    // its checkbox instead of opening the detail view. Clicking the
+    // checkbox itself toggles natively — we just refresh the count.
+    if (document.body.classList.contains('queue-select-mode')) {
+      const cb = row.querySelector('.queue-sel-cb');
+      if (cb && e.target !== cb) cb.checked = !cb.checked;
+      _updateQueueSelCount();
+      return;
+    }
+    setRoute('detail', row.getAttribute('data-fb')); return;
+  }
   const act = e.target.closest('.activity-row[data-fb]');
   if (act) { setRoute('detail', act.getAttribute('data-fb')); return; }
 });
+
+// ════ BULK SELECT (one-time feature — remove this whole JS block when done) ════
+function _updateQueueSelCount() {
+  const n = document.querySelectorAll('.queue-sel-cb:checked').length;
+  const el = document.getElementById('queue-sel-count');
+  if (el) el.textContent = `${n} selected`;
+  const del = document.getElementById('queue-bulk-delete');
+  if (del) del.disabled = (n === 0);
+}
+function _enterQueueSelectMode() {
+  document.body.classList.add('queue-select-mode');
+  document.getElementById('queue-bulk-bar').style.display = 'flex';
+  document.getElementById('queue-select-toggle').classList.add('active');
+  _updateQueueSelCount();
+}
+function _exitQueueSelectMode() {
+  document.body.classList.remove('queue-select-mode');
+  document.getElementById('queue-bulk-bar').style.display = 'none';
+  document.getElementById('queue-select-toggle').classList.remove('active');
+  document.querySelectorAll('.queue-sel-cb').forEach(cb => { cb.checked = false; });
+}
+function _toggleQueueSelectMode() {
+  if (document.body.classList.contains('queue-select-mode')) _exitQueueSelectMode();
+  else _enterQueueSelectMode();
+}
+async function _bulkDeleteSelected() {
+  const ids = Array.from(document.querySelectorAll('.queue-sel-cb:checked'))
+    .map(cb => cb.getAttribute('data-fb')).filter(Boolean);
+  if (!ids.length) { toast('No applications selected', 'err'); return; }
+  if (!confirm(`Permanently delete ${ids.length} application${ids.length === 1 ? '' : 's'}? This removes the records from Firebase and can't be undone.`)) return;
+  const btn = document.getElementById('queue-bulk-delete');
+  btn.disabled = true;
+  const orig = btn.innerHTML;
+  btn.innerHTML = 'Deleting…';
+  let ok = 0, fail = 0;
+  for (const fbId of ids) {
+    try {
+      const r = await fetch(`${FB}/reports/${fbId}.json`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-Method': 'DELETE' },
+        body: '{}'
+      });
+      if (r.status === 401) { window.location.replace('/'); return; }
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const idx = apps.findIndex(x => x.firebaseId === fbId);
+      if (idx >= 0) apps.splice(idx, 1);
+      ok++;
+    } catch (e) { fail++; }
+  }
+  btn.innerHTML = orig;
+  toast(`Deleted ${ok}${fail ? `, ${fail} failed` : ''}`, fail ? 'err' : 'ok');
+  _exitQueueSelectMode();
+  loadReports();
+}
+document.getElementById('queue-select-toggle')?.addEventListener('click', _toggleQueueSelectMode);
+document.getElementById('queue-bulk-cancel')?.addEventListener('click', _exitQueueSelectMode);
+document.getElementById('queue-bulk-delete')?.addEventListener('click', _bulkDeleteSelected);
+// ════ END BULK SELECT JS ════
 
 // Detail action handlers — read fbId from body dataset on each click
 function _activeFbId() { return document.body.dataset.firebaseId || ''; }
