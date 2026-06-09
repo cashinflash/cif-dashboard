@@ -2104,6 +2104,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       </div>
       <div class="dnl-actions">
         <button class="btn btn-ghost" id="dnl-cancel" type="button">Cancel</button>
+        <button class="btn" id="dnl-skip-email" type="button" title="Mark this application as Declined without sending the customer an email. Useful for cleaning up old pending applications." style="background:#fef2f2;color:#991b1b;border:1px solid #fecaca">Mark Declined (no email)</button>
         <button class="btn btn-denial-send" id="dnl-send" type="button"><svg class="icn"><use href="#i-message"/></svg>Send Denial Email</button>
       </div>
     </div>
@@ -4774,6 +4775,32 @@ async function sendDenialEmail() {
   }
 }
 
+// Mark the applicant Declined without sending the email. Used by the
+// "Mark Declined (no email)" button in the denial modal — handy for
+// cleaning up old pending applications where the customer doesn't
+// need to be re-notified. Reads the active applicant from the modal's
+// _denialFbId state, closes the modal, then patches the status
+// directly (skipping setStatus's confirm — the modal click was the
+// explicit action).
+async function declineNoEmail() {
+  const fbId = _denialFbId;
+  if (!fbId) return;
+  closeDenialModal();
+  const a = apps.find(x => x.firebaseId === fbId);
+  if (!a) return;
+  toast('Marking Declined…');
+  const _now = Date.now();
+  try {
+    await fbPatchReport(fbId, { status: 'Declined', statusUpdatedAt: _now });
+    Object.assign(a, { status: 'Declined', statusUpdatedAt: _now });
+    if (_fullRecordCache[fbId]) Object.assign(_fullRecordCache[fbId], { status: 'Declined', statusUpdatedAt: _now });
+    toast('Marked Declined (no email sent)', 'ok');
+    rerender();
+  } catch (e) {
+    toast('Update failed: ' + e.message, 'err');
+  }
+}
+
 async function deleteApplication(fbId) {
   const a = apps.find(x => x.firebaseId === fbId);
   if (!a) return;
@@ -5525,6 +5552,7 @@ document.getElementById('appr-amount').addEventListener('input', (e) => {
 document.getElementById('dnl-cancel').addEventListener('click', closeDenialModal);
 document.getElementById('dnl-close').addEventListener('click', closeDenialModal);
 document.getElementById('dnl-send').addEventListener('click', sendDenialEmail);
+document.getElementById('dnl-skip-email')?.addEventListener('click', declineNoEmail);
 document.getElementById('dnl-ov').addEventListener('click', (e) => { if (e.target.id === 'dnl-ov') closeDenialModal(); });
 document.getElementById('dv-approve-btn').addEventListener('click', async () => {
   const id = _activeFbId(); if (!id) return;
