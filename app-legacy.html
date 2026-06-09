@@ -3216,7 +3216,7 @@ ${a.extractedSSN?`<div style="display:flex;align-items:center;justify-content:sp
     ${''}
   </div>
   <div style="display:flex;gap:6px;margin-left:auto">
-    <button class="mact-secondary" onclick="copyModal('${fbId}')">⎘ Copy</button>
+    <button class="mact-secondary" onclick="copyModal('${fbId}')" title="Copies name + Plaid/statement URL + full report text in one block">⎘ Copy Full Report</button>
     <button class="mact-secondary" onclick="delApp('${fbId}')" style="color:var(--red);border-color:var(--red-border)">🗑</button>
   </div>
 </div>
@@ -3802,7 +3802,35 @@ async function updStatusWithAmt(fbId,s){
   logAudit(action, a?.name || fbId, `amount=${final}${overrideKind ? '; engine='+a?.claudeDecision : ''}`);
   await loadReports();openModal(fbId);toast('Updated to '+s,'ok');
 }
-function copyModal(fbId){const a=apps.find(x=>x.firebaseId===fbId);if(a){const t=document.createElement('div');t.innerHTML=a.report;navigator.clipboard.writeText(t.textContent).then(()=>toast('Copied ✓','ok'));}}
+function copyModal(fbId){
+  const a=apps.find(x=>x.firebaseId===fbId);if(!a)return;
+  // Strip HTML from the report so what gets pasted is plain text the
+  // operator (or Claude) can scan without markup noise.
+  const t=document.createElement('div');t.innerHTML=a.report||'';
+  const reportText = (t.textContent || '').trim();
+  const name = (a.formName || a.name || 'Unknown').trim();
+  const bsUrl = a.bankStatementUrl || '(no Plaid/statement document URL on record)';
+  const dec = a.claudeDecision || a.status || '';
+  const amt = a.amount || '';
+  // Bundle: name + statement URL + full report, with section headers
+  // so the receiver (Claude or anyone else) can immediately see the
+  // three pieces. Operator workflow: open the applicant, hit Copy,
+  // paste the whole thing in a chat / note.
+  const bundle = [
+    '=== APPLICANT ===',
+    name + (dec ? '  ('+dec+(amt?(' '+amt):'')+')' : ''),
+    '',
+    '=== PLAID / STATEMENT DOCUMENT URL ===',
+    bsUrl,
+    '',
+    '=== FULL UNDERWRITING REPORT ===',
+    reportText,
+  ].join('\n');
+  navigator.clipboard.writeText(bundle).then(
+    ()=>toast('Copied: name + URL + full report ✓','ok'),
+    ()=>toast('Copy failed — try again','err')
+  );
+}
 
 // ════════════════════════════════════════
 // REPORT PANEL — single tab combining re-run controls + v2 report
