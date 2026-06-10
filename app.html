@@ -3027,6 +3027,17 @@ function renderQueue() {
 }
 
 // ───────── Detail ─────────
+// §10 shadow phase: the v4 one-screen report is generated on every run
+// but lives in `v4Report` until cutover promotes it to the canonical
+// `report` field. This toggle lets operators read v4's reasoning while
+// adjudicating shadow disagreements; it disappears post-cutover
+// (engineVersionPrimary === 'v4' means the canonical report IS v4).
+let _reportShowV4 = false, _reportViewFbId = null;
+function toggleV4Report() {
+  _reportShowV4 = !_reportShowV4;
+  if (_reportViewFbId) renderDetail(_reportViewFbId);
+}
+
 function renderDetail(fbId) {
   const a = apps.find(x => x.firebaseId === fbId);
   if (!a) {
@@ -3230,13 +3241,28 @@ function renderDetail(fbId) {
   // expanded state) untouched. Same lesson the docs grid below
   // already learned with its isNewApplicant guard.
   const reportEl = document.getElementById('dv-report-html');
-  const reportHtml = (a.report && String(a.report).trim()) ? a.report : '';
+  if (_reportViewFbId !== fbId) { _reportShowV4 = false; _reportViewFbId = fbId; }
+  const v4ShadowHtml = (a.v4Report && String(a.v4Report).trim()
+                        && a.engineVersionPrimary !== 'v4') ? a.v4Report : '';
+  const showV4 = _reportShowV4 && !!v4ShadowHtml;
+  let v4ToggleBar = '';
+  if (v4ShadowHtml) {
+    v4ToggleBar = '<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">'
+      + '<button onclick="toggleV4Report()" style="background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">'
+      + (showV4 ? 'Back to primary engine report' : 'Preview v4 report (shadow)')
+      + '</button>'
+      + (showV4 ? '<span style="font-size:11px;color:#a15c00;font-weight:700">V4 SHADOW PREVIEW — not the deciding engine yet</span>' : '')
+      + '</div>';
+  }
+  const reportHtml = showV4
+    ? (v4ToggleBar + a.v4Report)
+    : ((a.report && String(a.report).trim()) ? (v4ToggleBar + a.report) : '');
   if (reportHtml !== _lastReportHtml || fbId !== _lastDetailFbId) {
     if (reportHtml) {
       reportEl.innerHTML = reportHtml;
       reportEl.classList.remove('dv-report-empty');
     } else {
-      reportEl.innerHTML = 'No engine report on file. Run the engine to generate one.';
+      reportEl.innerHTML = v4ToggleBar + 'No engine report on file. Run the engine to generate one.';
       reportEl.className = 'dv-report-html dv-report-empty';
     }
     _lastReportHtml = reportHtml;
