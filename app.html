@@ -5247,6 +5247,7 @@ async function rerunEngine(fbId) {
     if (!r.ok) throw new Error('Re-run failed');
     toast('Re-run complete — refreshing', 'ok');
     await loadReports();
+    _rehydrateForV4Shadow(fbId);
   } catch (e) {
     toast('Re-run failed: ' + e.message, 'err');
     _lastReportHtml = null;
@@ -5254,6 +5255,22 @@ async function rerunEngine(fbId) {
   } finally {
     dvEndRerunLoading();
   }
+}
+
+// The v4 shadow writes v4Report to Firebase a few seconds AFTER the
+// rerun/refresh response returns (daemon thread on cif-apply). The
+// detail view renders from the hydrated-record cache, so without a
+// re-hydrate the "Preview v4 report (shadow)" toggle only appeared
+// after closing and reopening the applicant — which made it look like
+// older records never got a v4 report at all. Re-pull the full record
+// a few times on a short backoff.
+function _rehydrateForV4Shadow(fbId) {
+  [1500, 4000, 9000].forEach(delay => {
+    setTimeout(async () => {
+      await hydrateFullRecord(fbId);
+      rerender();
+    }, delay);
+  });
 }
 
 // Re-extract a PDF-uploaded applicant: re-download the original PDF and
@@ -5314,6 +5331,7 @@ async function refreshFromPlaid(fbId) {
     if (!r.ok) throw new Error('Refresh failed');
     toast('Plaid refreshed — re-running engine', 'ok');
     await loadReports();
+    _rehydrateForV4Shadow(fbId);
   } catch (e) {
     toast('Refresh failed: ' + e.message, 'err');
     _lastReportHtml = null;
