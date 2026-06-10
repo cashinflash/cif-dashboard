@@ -4686,19 +4686,68 @@ const DENIAL_REASONS = [
   "Inability to demonstrate repayment without hardship",
   "Incomplete or unreadable bank statement"
 ];
+// Legacy/canonical fallback only — v4 declines pre-check from the
+// STRUCTURED gate data instead (see _denialPrecheck). Generic tokens
+// removed 2026-06-10: 'id' matched inside "paid" (pre-checking
+// Identity mismatch), 'pay' matched "post-payday survival", 'low'
+// matched "outflows", bare 'balance' couldn't tell "negative balance"
+// from "low average balance".
 const DENIAL_KEYWORD_MAP = [
-  { keywords: ['income','pay','gross','salary','employment','wages'], reasons: [0,1] },
+  { keywords: ['income','salary','employment','wages','payroll'], reasons: [0,1] },
   { keywords: ['nsf','returned','insufficient fund','bounced'], reasons: [3] },
-  { keywords: ['negative','below zero','overdraft'], reasons: [4] },
-  { keywords: ['balance','low','average daily'], reasons: [5] },
-  { keywords: ['closed','account close'], reasons: [6] },
-  { keywords: ['fraud','suspicious','unusual'], reasons: [7] },
-  { keywords: ['identity','mismatch','name','id'], reasons: [8] },
-  { keywords: ['fintech','advance','dave','brigit','earnin','payday','cash advance'], reasons: [2] },
-  { keywords: ['speculative','gambling','crypto','betting'], reasons: [10] },
-  { keywords: ['repayment','hardship','afford','cash flow','fcf'], reasons: [11] },
-  { keywords: ['statement','window','30 day','period','outside'], reasons: [9,12] }
+  { keywords: ['negative','overdraft'], reasons: [4] },
+  { keywords: ['average daily','avg balance','daily balance','low balance'], reasons: [5] },
+  { keywords: ['closed'], reasons: [6] },
+  { keywords: ['fraud','suspicious','reconcile'], reasons: [7] },
+  { keywords: ['identity','mismatch'], reasons: [8] },
+  { keywords: ['fintech','advance','dave','brigit','earnin','payday loan','payday-loan','payday lender','stacking','competing loan','other lenders'], reasons: [2] },
+  { keywords: ['speculative','gambling','crypto','betting','brokerage','swept'], reasons: [10] },
+  { keywords: ['hardship','afford','cash flow','fcf','never rests'], reasons: [11] },
+  { keywords: ['too few transactions','statement window','reconnect','unreadable'], reasons: [9,12] }
 ];
+
+// Pre-check the denial reasons from the engine's ACTUAL decline data.
+// Priority: a v4 DECLINE maps its failed gates (exact, structured) to
+// the customer-facing reasons; anything else falls back to the
+// keyword scan of the canonical reason text. Returns a Set of
+// DENIAL_REASONS indexes — possibly empty, in which case the operator
+// picks by hand (better than the old behavior of defaulting to
+// "Insufficient income" on declines that had verified income).
+function _denialPrecheck(a) {
+  const auto = new Set();
+  let gates = null;
+  try { gates = a.v4GatesJson ? JSON.parse(a.v4GatesJson) : null; } catch (e) {}
+  if ((a.v4Decision || '').toUpperCase() === 'DECLINE' && Array.isArray(gates)) {
+    const failed = gates.filter(g => g && g.passed === false);
+    failed.forEach(g => {
+      const v = g.value || {};
+      switch (g.id) {
+        case 'G1': auto.add(1); break;                       // no/stale verified income
+        case 'G2': auto.add(4); break;                       // negative now / last 7d
+        case 'G3': {                                         // NSF and/or chronic negative
+          const nsf = (v.nsf_count || 0) >= 3;
+          const neg = (v.negative_days_30 || 0) >= 8;
+          if (nsf) auto.add(3);
+          if (neg) auto.add(4);
+          if (!nsf && !neg) auto.add(3);
+          break;
+        }
+        case 'G4': auto.add(2); break;                       // stacking / competing loans
+        case 'G5': auto.add(10); break;                      // brokerage/gambling sweep
+        case 'G6': auto.add((v.statement_days || 99) < 30 ? 9 : 12); break;
+      }
+    });
+    // Gates passed but min-wins tiering bottomed out: the balance
+    // metrics can't support even the smallest tier.
+    if (failed.length === 0) { auto.add(5); auto.add(11); }
+    if (auto.size) return auto;
+  }
+  const reasonText = (a.reason || '').toLowerCase();
+  DENIAL_KEYWORD_MAP.forEach(({ keywords, reasons }) => {
+    if (keywords.some(k => reasonText.includes(k))) reasons.forEach(r => auto.add(r));
+  });
+  return auto;
+}
 
 let _denialFbId = null;
 let _denialEmail = '';
@@ -4713,13 +4762,10 @@ function openDenialModal(fbId) {
   document.getElementById('dnl-to-label').textContent = 'To: ' + (_denialEmail || 'No email on file');
   document.getElementById('dnl-to-display').textContent = _denialEmail || 'No email address found';
 
-  // Auto-select reasons based on the engine's decline-reason text.
-  const reasonText = (a.reason || '').toLowerCase();
-  const auto = new Set();
-  DENIAL_KEYWORD_MAP.forEach(({ keywords, reasons }) => {
-    if (keywords.some(k => reasonText.includes(k))) reasons.forEach(r => auto.add(r));
-  });
-  if (auto.size === 0) auto.add(0);  // fallback to "insufficient income"
+  // Pre-check from the engine's actual decline data (v4 gates when v4
+  // declined; tightened keyword fallback otherwise). May be empty —
+  // the send button already requires picking at least one reason.
+  const auto = _denialPrecheck(a);
 
   const wrap = document.getElementById('dnl-reasons');
   wrap.innerHTML = DENIAL_REASONS.map((text, i) => `
