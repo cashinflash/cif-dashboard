@@ -2100,7 +2100,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
           <input type="number" id="ovr-amount" min="50" max="1000" step="1" inputmode="decimal">
         </div>
       </div>
-      <div class="appr-label">Override reason (required, min 20 characters)</div>
+      <div class="appr-label" id="ovr-reason-label">Override reason (required, min 20 characters)</div>
       <textarea id="ovr-reason" rows="3" maxlength="500" placeholder="Why are you overriding the engine? Be specific — this is logged with your username." oninput="document.getElementById('ovr-count').textContent = this.value.trim().length + ' / 20 minimum'" style="width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:13px;font-family:inherit;outline:none;background:var(--surface2);color:var(--text);resize:vertical"></textarea>
       <div id="ovr-count" style="font-size:11px;color:var(--muted);margin-top:4px">0 / 20 minimum</div>
     </div>
@@ -3140,11 +3140,14 @@ function renderDetail(fbId) {
   // overriding stays possible but must feel deliberate (modal + reason).
   const _apBtn = document.getElementById('dv-approve-btn');
   if (_apBtn) {
-    const _engDecl = engineVerdict.toLowerCase().startsWith('decl');
+    // Not secondary when the v4 shadow approved — following v4 over the
+    // primary's decline is the expected shadow-phase workflow.
+    const _engDecl = engineVerdict.toLowerCase().startsWith('decl')
+      && (a.v4Decision || '').toUpperCase() !== 'APPROVE';
     _apBtn.style.background = _engDecl ? 'var(--surface2)' : '';
     _apBtn.style.color = _engDecl ? 'var(--muted)' : '';
     _apBtn.style.borderColor = _engDecl ? 'var(--border)' : '';
-    _apBtn.title = _engDecl ? 'Engine declined this file — approving requires a logged override reason' : '';
+    _apBtn.title = _engDecl ? 'Engine declined this file — approving opens a logged override' : '';
   }
 
   // Recommended decision card
@@ -3343,9 +3346,12 @@ function renderDetail(fbId) {
   if (isNewApplicant) {
     // §8.2: never pre-fill the offer on an engine DECLINE — the
     // pre-filled amount anchored operators toward funding declines
-    // (the Elvin pattern). Engine APPROVE/REVIEW pre-fill as before.
+    // (the Elvin pattern). Exception: when the v4 shadow APPROVED the
+    // file, pre-fill ITS tier — the operator is following the engine
+    // under validation, not exercising contrary judgement.
     const _engDeclined = ((a.claudeDecision || '').trim().toLowerCase()).startsWith('decl');
-    const amtNum = _engDeclined ? null : parseAmount(a.amount);
+    const _v4Tier = ((a.v4Decision || '').toUpperCase() === 'APPROVE') ? (a.v4Tier || null) : null;
+    const amtNum = _engDeclined ? _v4Tier : parseAmount(a.amount);
     document.getElementById('dv-offer-input').value = amtNum != null ? amtNum.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '';
   }
 
@@ -5002,8 +5008,15 @@ function openOverrideModal(fbId, status) {
     const typed = parseAmount(document.getElementById('dv-offer-input')?.value || '');
     document.getElementById('ovr-amount').value = typed || '';
   }
+  // Reason is OPTIONAL when funding (operator request 2026-06-10) — a
+  // default still lands in the override log so grading data flows.
+  // Declining an engine-APPROVE keeps the required typed reason (that
+  // side leads to an adverse-action notice).
+  document.getElementById('ovr-reason-label').textContent = funding
+    ? 'Override reason (optional — logged with your username)'
+    : 'Override reason (required, min 20 characters)';
   document.getElementById('ovr-reason').value = '';
-  document.getElementById('ovr-count').textContent = '0 / 20 minimum';
+  document.getElementById('ovr-count').textContent = funding ? 'optional' : '0 / 20 minimum';
   document.getElementById('ovr-ov').classList.add('open');
 }
 
@@ -5016,8 +5029,15 @@ async function confirmOverride() {
   if (!_ovrCtx) return;
   const { fbId, status, engineTier } = _ovrCtx;
   const funding = status === 'Approved';
-  const reason = (document.getElementById('ovr-reason').value || '').trim();
-  if (reason.length < 20) { toast('Override reason must be at least 20 characters', 'err'); return; }
+  let reason = (document.getElementById('ovr-reason').value || '').trim();
+  if (funding) {
+    if (!reason) {
+      const _a = apps.find(x => x.firebaseId === fbId);
+      reason = `Operator funded against engine ${(_a && _a.claudeDecision) || 'DECLINE'} (no reason given)`;
+    }
+  } else if (reason.length < 20) {
+    toast('Override reason must be at least 20 characters', 'err'); return;
+  }
   let amount = null;
   if (funding) {
     amount = parseFloat(document.getElementById('ovr-amount').value);
@@ -5069,8 +5089,19 @@ function _recordHumanAction(fbId, status, opts) {
 async function setStatus(fbId, status, opts = {}) {
   const a = apps.find(x => x.firebaseId === fbId);
   if (!a) return;
-  // §8.2: crossing the engine requires the logged-override modal.
-  if (!opts.fromOverride && _needsOverride(a, status)) { openOverrideModal(fbId, status); return; }
+  // §8.2: crossing the engine requires the logged-override modal —
+  // EXCEPT approving a file the v4 shadow approved: that's the
+  // expected shadow-phase workflow, so the override is auto-logged
+  // (grading data still flows) without a typed reason.
+  if (!opts.fromOverride && _needsOverride(a, status)) {
+    if (status === 'Approved' && (a.v4Decision || '').toUpperCase() === 'APPROVE') {
+      // engineTier = the CROSSED (primary) engine's tier: 0, it declined.
+      opts = { ...opts, fromOverride: true, engineTier: 0,
+               overrideReason: `Followed v4 engine: APPROVE $${a.v4Tier || '?'} (primary engine: ${a.claudeDecision || 'DECLINED'})` };
+    } else {
+      openOverrideModal(fbId, status); return;
+    }
+  }
   if (!opts.skipConfirm && !confirm(`${status} ${a.name || 'this applicant'}?`)) return;
   toast('Updating…');
   const _now = Date.now();
@@ -5820,7 +5851,12 @@ document.getElementById('dv-approve-btn').addEventListener('click', async () => 
   // §8.2: funding an engine-DECLINE goes through the override modal,
   // which collects the amount itself — skip saveOffer's empty-input
   // validation (the offer field deliberately isn't pre-filled here).
-  if (a && _needsOverride(a, 'Approved')) { openOverrideModal(id, 'Approved'); return; }
+  // Exception: a v4-shadow APPROVE flows straight through (the offer is
+  // pre-filled with v4's tier; setStatus auto-logs the override).
+  if (a && _needsOverride(a, 'Approved')
+      && (a.v4Decision || '').toUpperCase() !== 'APPROVE') {
+    openOverrideModal(id, 'Approved'); return;
+  }
   await saveOffer(id);
   await setStatus(id, 'Approved');
 });
