@@ -30,9 +30,12 @@ def _fb_url(suffix):
 # and would otherwise leave the index stale ("everything Pending after
 # refresh until you open each one").
 _INDEX_TOP_FIELDS = (
-    'name', 'status', 'score', 'createdAt', 'updatedAt', 'date', 'time',
+    'name', 'status', 'createdAt', 'updatedAt', 'date', 'time',
     'source', 'amount', 'submissionId', 'filename', 'claudeDecision',
     'reason', 'v2Decision', 'vergentGuid', 'processingComplete',
+    # v4 (spec §8): list-row subtitle + tier badge + human action.
+    # 'score' dropped — dead v1 field, no longer written by cif-apply.
+    'v4ReasonLine', 'v4Decision', 'v4Tier', 'humanAction',
 )
 _INDEX_APPDATA_FIELDS = ('email', 'phone', 'firstName', 'lastName')
 
@@ -1589,6 +1592,61 @@ class Handler(BaseHTTPRequestHandler):
                 'expiresAt': expires_at,
                 'target': target,
             })
+            return
+
+        # ── §8.2 override / human-action log ─────────────────────────
+        # Records what a HUMAN did, distinct from the engine verdict.
+        # Body: {firebase_id, humanAction: 'funded'|'declined', amount,
+        #        reason, engineVerdict, engineTier, isOverride}
+        # The operator is stamped SERVER-SIDE from the session — the
+        # override log grades reviewers against the engine later, so it
+        # must not be client-spoofable. isOverride=true additionally
+        # writes /overrides/{firebase_id}; every call patches
+        # humanAction/humanActionAt on the report + mirrors the index.
+        if path == '/api/override':
+            try:
+                body = json.loads(raw or b'{}')
+            except Exception:
+                self.send_json(400, {'error': 'invalid_json'}); return
+            fb_id = (body.get('firebase_id') or '').strip()
+            action = (body.get('humanAction') or '').strip().lower()
+            if not fb_id or action not in ('funded', 'declined'):
+                self.send_json(400, {'error': 'firebase_id and humanAction (funded|declined) required'})
+                return
+            operator = sessions.get(token, {}).get('user', 'unknown')
+            now_ms = int(time.time() * 1000)
+            try:
+                if body.get('isOverride'):
+                    override_rec = json.dumps({
+                        'ts': now_ms,
+                        'operator': operator,
+                        'engineVerdict': body.get('engineVerdict') or '',
+                        'engineTier': body.get('engineTier') or 0,
+                        'humanAction': action,
+                        'amount': body.get('amount') or 0,
+                        'reason': (body.get('reason') or '').strip(),
+                    }).encode()
+                    oreq = urllib.request.Request(
+                        _fb_url(f'overrides/{fb_id}.json'), data=override_rec,
+                        headers={'Content-Type': 'application/json'}, method='PUT')
+                    urllib.request.urlopen(oreq, timeout=10).read()
+                    _audit('engine_override', user=operator, fb_id=fb_id,
+                           action=action, engine=body.get('engineVerdict') or '')
+                ha_patch = json.dumps({
+                    'humanAction': action,
+                    'humanActionAt': now_ms,
+                    'humanActionBy': operator,
+                    'updatedAt': now_ms,
+                }).encode()
+                hreq = urllib.request.Request(
+                    _fb_url(f'reports/{fb_id}.json'), data=ha_patch,
+                    headers={'Content-Type': 'application/json'}, method='PATCH')
+                urllib.request.urlopen(hreq, timeout=10).read()
+                _mirror_report_write_to_index(f'reports/{fb_id}.json', 'PATCH', ha_patch)
+                self.send_json(200, {'ok': True, 'operator': operator,
+                                     'override': bool(body.get('isOverride'))})
+            except Exception as e:
+                self.send_json(500, {'error': str(e)})
             return
 
         if path.startswith('/fb/'):

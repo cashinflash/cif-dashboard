@@ -269,11 +269,9 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 .app-type{font-size:12.5px;color:var(--text2);font-weight:600}
 .app-meta{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
 
-.score-circle{width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;border:2px solid;font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
-.sc-h{border-color:var(--green);color:var(--green);background:white}
-.sc-m{border-color:var(--amber);color:var(--amber-700);background:white}
-.sc-l{border-color:var(--red);color:var(--red);background:white}
-.sc-n{border-color:var(--border2);color:var(--muted);background:white}
+/* .score-circle / .sc-* deleted (v4 spec §8.4): the dead v1 score field
+   rendered a red 0/100 circle on every applicant. Engine tier badge
+   (engineBadge) replaced the column, reusing the .status pill classes. */
 
 .status{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;display:inline-flex;align-items:center;gap:5px}
 .status::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
@@ -1421,7 +1419,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
             <tr>
               <th>Applicant</th>
               <th>Application</th>
-              <th>Score</th>
+              <th>Engine</th>
               <th>Status</th>
               <th>Submitted</th>
               <th>Last Activity</th>
@@ -1487,7 +1485,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
         <div class="dv-hero-stats" id="dv-stats">
           <div class="dv-hero-stat"><div class="dv-hero-stat-lbl">Loans</div><div class="dv-hero-stat-val" id="dv-loans-count">—</div><div class="dv-hero-stat-tag" id="dv-loans-tag">total</div></div>
           <div class="dv-hero-stat"><div class="dv-hero-stat-lbl">Avg Days Late</div><div class="dv-hero-stat-val" id="dv-avg-days-late">—</div><div class="dv-hero-stat-tag" id="dv-avg-days-late-tag">across history</div></div>
-          <div class="dv-hero-stat"><div class="dv-hero-stat-lbl">Status</div><div class="dv-hero-stat-val" id="dv-status">—</div><div class="dv-hero-stat-tag" id="dv-status-tag">—</div></div>
+          <div class="dv-hero-stat"><div class="dv-hero-stat-lbl">Engine / Action</div><div class="dv-hero-stat-val" id="dv-status">—</div><div class="dv-hero-stat-tag" id="dv-status-tag">—</div></div>
         </div>
       </div>
 
@@ -2079,6 +2077,40 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   </div>
 </div>
 
+<!-- §8.2 override modal — logged override when the operator crosses the
+     engine: funding an engine-DECLINE (heavy red) or declining an
+     engine-APPROVE (lighter amber). Requires a typed reason (min 20
+     chars). Writes /overrides/{fbId} + humanAction via /api/override
+     (operator stamped server-side). At 250 apps/day this log is how
+     reviewers get graded against the engine later. -->
+<div class="appr-ov" id="ovr-ov">
+  <div class="appr-card">
+    <div class="appr-head" id="ovr-head">
+      <div>
+        <div class="appr-title" id="ovr-title">Override engine decision</div>
+        <div class="appr-meta" id="ovr-meta">—</div>
+      </div>
+      <button onclick="closeOverrideModal()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1" title="Close">&times;</button>
+    </div>
+    <div class="appr-body">
+      <div id="ovr-amount-row">
+        <div class="appr-label">Amount to fund</div>
+        <div class="appr-amount-row">
+          <span class="ccy">$</span>
+          <input type="number" id="ovr-amount" min="50" max="1000" step="1" inputmode="decimal">
+        </div>
+      </div>
+      <div class="appr-label">Override reason (required, min 20 characters)</div>
+      <textarea id="ovr-reason" rows="3" maxlength="500" placeholder="Why are you overriding the engine? Be specific — this is logged with your username." oninput="document.getElementById('ovr-count').textContent = this.value.trim().length + ' / 20 minimum'" style="width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:13px;font-family:inherit;outline:none;background:var(--surface2);color:var(--text);resize:vertical"></textarea>
+      <div id="ovr-count" style="font-size:11px;color:var(--muted);margin-top:4px">0 / 20 minimum</div>
+    </div>
+    <div class="appr-actions">
+      <button class="btn btn-ghost" type="button" onclick="closeOverrideModal()">Cancel</button>
+      <button class="btn" type="button" id="ovr-confirm" onclick="confirmOverride()" style="background:#991b1b;color:#fff;border:1px solid #7f1d1d">Override &amp; Continue</button>
+    </div>
+  </div>
+</div>
+
 <div class="dnl-ov" id="dnl-ov">
   <div class="dnl-card">
     <div class="dnl-head">
@@ -2305,11 +2337,18 @@ function initials(name) {
   return name.split(/\s+/).filter(Boolean).slice(0,2).map(s=>s[0].toUpperCase()).join('') || '?';
 }
 
-function scoreClass(score) {
-  if (score == null) return 'sc-n';
-  if (score >= 70) return 'sc-h';
-  if (score >= 40) return 'sc-m';
-  return 'sc-l';
+// §8.4: engine tier badge replaces the dead v1 score circle. Verdict
+// comes from claudeDecision (the canonical engine verdict — v2 today,
+// v4 after cutover); tier from the canonical promoted amount. Reuses
+// the existing .status pill classes so the column reads like the rest
+// of the table.
+function engineBadge(a) {
+  const v = (a.claudeDecision || '').trim().toLowerCase();
+  if (!v) return '<span class="status processing">—</span>';
+  const amt = parseAmount(a.amount);
+  if (v.startsWith('appr')) return `<span class="status approved">APPROVE${amt ? ' $' + amt : ''}</span>`;
+  if (v.startsWith('decl')) return '<span class="status declined">DECLINE</span>';
+  return `<span class="status review">REVIEW${amt ? ' $' + amt : ''}</span>`;
 }
 
 function statusClass(status) {
@@ -2790,7 +2829,7 @@ function renderDashboard() {
       const b = bucketStatus(a);
       const cls = b === 'approved' ? 'ok' : b === 'declined' ? 'no' : 'warn';
       const num = b === 'approved' ? '✓' : b === 'declined' ? '✕' : '◷';
-      const sub = a.score != null ? `score ${a.score}` : (a.email || a.phone || '');
+      const sub = a.v4ReasonLine || a.reason || a.email || a.phone || '';
       return `<div class="activity-row" data-fb="${escapeHtml(a.firebaseId)}">
         <div class="act-icon ${cls}">${num}</div>
         <div class="act-text"><div class="act-label">${escapeHtml(a.name || 'Unnamed')} · ${escapeHtml(a.status || 'Pending')}</div><div class="act-sub">${escapeHtml(sub)}</div></div>
@@ -2958,15 +2997,18 @@ function renderQueue() {
       rows.push(`<tr class="queue-group"><td colspan="6">${escapeHtml(group)}</td></tr>`);
       lastGroup = group;
     }
-    const sc = scoreClass(a.score);
     const sCls = statusClass(a.status);
     const idShort = (a.submissionId || a.firebaseId || '').slice(-6).toUpperCase();
     const appType = (a.applicationData || a.hasApp) ? 'Application' : (a.filename ? 'Document' : 'Manual');
     const appMeta = a.amount ? a.amount.replace(/^N\/A$/, '—') : '';
+    // §8.5: one-sentence engine reason as the row subtitle so the queue
+    // is scannable without opening modals. v4ReasonLine when the v4
+    // shadow has run; falls back to the canonical engine reason.
+    const subReason = a.v4ReasonLine || a.reason || '';
     rows.push(`<tr data-fb="${escapeHtml(a.firebaseId)}">
       <td><div class="applicant"><input type="checkbox" class="queue-sel-cb" data-fb="${escapeHtml(a.firebaseId)}" title="Select for bulk action"><div class="av">${escapeHtml(initials(a.name))}</div><div class="applicant-text"><div class="applicant-name">${escapeHtml(a.name || 'Unnamed')} ${sourceBadge(a)}</div><div class="applicant-id">#${escapeHtml(idShort)}</div></div></div></td>
-      <td><div class="app-info"><div class="app-type">${escapeHtml(appType)}</div><div class="app-meta">${escapeHtml(appMeta)}</div></div></td>
-      <td><span class="score-circle ${sc}">${a.score != null ? a.score : '—'}</span></td>
+      <td><div class="app-info"><div class="app-type">${escapeHtml(appType)}</div><div class="app-meta">${escapeHtml(appMeta)}</div>${subReason ? `<div class="app-meta" style="max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(subReason)}">${escapeHtml(subReason)}</div>` : ''}</div></td>
+      <td>${engineBadge(a)}</td>
       <td><span class="status ${sCls}">${escapeHtml(a.status || 'Pending')}</span></td>
       <td><div class="tbl-time">${escapeHtml(a.date || '')}<br>${escapeHtml(a.time || '')}</div></td>
       <td><div class="tbl-time">${fmtTimeAgo(a.updatedAt || a.createdAt)}</div></td>
@@ -3063,10 +3105,36 @@ function renderDetail(fbId) {
     }
   }
 
-  document.getElementById('dv-status').textContent = a.status || 'Pending';
+  // §8.1: engine verdict and human action are DISTINCT fields — the
+  // header mirrors the ENGINE until a human acts, and neither ever
+  // overwrites the other. Big value = engine verdict (claudeDecision);
+  // tag = what a human actually did (humanAction, stamped server-side
+  // via /api/override). The Elvin bug — header said APPROVED on an
+  // engine-REVIEW file — came from conflating these.
+  const engineVerdict = (a.claudeDecision || '').trim();
+  document.getElementById('dv-status').textContent =
+    engineVerdict || (a.processingComplete === false ? 'Processing' : (a.status || 'Pending'));
   const stTag = document.getElementById('dv-status-tag');
-  stTag.textContent = a.claudeDecision || '—';
-  stTag.className = 'dv-hero-stat-tag ' + (b === 'approved' ? 'ok' : b === 'declined' ? 'no' : 'warn');
+  const _ha = (a.humanAction || '').toLowerCase();
+  const _legacyActed = !_ha && (b === 'approved' || b === 'declined');
+  stTag.textContent =
+    _ha === 'funded' ? '✓ funded' + (a.humanActionBy ? ' by ' + a.humanActionBy : '')
+    : _ha === 'declined' ? '✕ declined' + (a.humanActionBy ? ' by ' + a.humanActionBy : '')
+    : _legacyActed ? 'marked ' + a.status + ' (pre-v4)'
+    : 'no action yet';
+  stTag.className = 'dv-hero-stat-tag ' +
+    (_ha === 'funded' ? 'ok' : _ha === 'declined' ? 'no'
+     : _legacyActed ? (b === 'approved' ? 'ok' : 'no') : 'warn');
+  // §8.2: on an engine DECLINE the Approve button renders secondary —
+  // overriding stays possible but must feel deliberate (modal + reason).
+  const _apBtn = document.getElementById('dv-approve-btn');
+  if (_apBtn) {
+    const _engDecl = engineVerdict.toLowerCase().startsWith('decl');
+    _apBtn.style.background = _engDecl ? 'var(--surface2)' : '';
+    _apBtn.style.color = _engDecl ? 'var(--muted)' : '';
+    _apBtn.style.borderColor = _engDecl ? 'var(--border)' : '';
+    _apBtn.title = _engDecl ? 'Engine declined this file — approving requires a logged override reason' : '';
+  }
 
   // Recommended decision card
   const recBlock = document.getElementById('dv-recommended');
@@ -3126,7 +3194,6 @@ function renderDetail(fbId) {
     { lbl: 'DTI', val: dti == null ? '—' : (dti + '<span class="unit">%</span>'), valClass: dtiClass, sub: 'debt-to-income', valHtml: true },
     { lbl: 'Max Offer', val: offer == null ? '—' : '$' + Number(offer).toLocaleString(), valClass: offerClass, sub: offer == null ? 'not yet run' : (offer > 0 ? 'v2 final tier' : 'declined by v2') },
     { lbl: 'Confidence', val: conf == null ? '—' : (Math.round(conf * 100) + '<span class="unit">%</span>'), valClass: confClass, sub: 'v2 engine', verified: conf != null && conf >= 0.80, valHtml: true },
-    { lbl: 'Score', val: a.score != null ? (a.score + '<span class="unit">/100</span>') : '—', valClass: a.score >= 70 ? 'green' : (a.score >= 40 ? 'amber' : (a.score != null ? 'red' : 'muted')), sub: a.score >= 70 ? 'good' : (a.score >= 40 ? 'fair' : (a.score != null ? 'low' : 'pending')), valHtml: true },
     { lbl: 'Bank Account', val: bankDisplay, valClass: '', valSize: 'sm', sub: ad.accountType || 'on file', verified: !!(ad.bankName && last4), verifiedLabel: 'Verified' },
   ];
   snap.innerHTML = cards.map(c => {
@@ -3210,7 +3277,7 @@ function renderDetail(fbId) {
     histHtml += '<div class="docs-grid" style="grid-template-columns:1fr">' + prior.map(p => {
       const pb = bucketStatus(p);
       const pAmt = parseAmount(p.amount);
-      const pSub = `${escapeHtml(p.date || '')} ${escapeHtml(p.time || '')}${p.score != null ? ' · score ' + p.score : ''}${pAmt ? ' · $' + pAmt.toLocaleString() : ''}`;
+      const pSub = `${escapeHtml(p.date || '')} ${escapeHtml(p.time || '')}${pAmt ? ' · $' + pAmt.toLocaleString() : ''}`;
       return `<a class="doc-card" data-fb="${escapeHtml(p.firebaseId)}" style="cursor:pointer">
         <div class="doc-card-icn"><svg class="icn"><use href="#i-history"/></svg></div>
         <div class="doc-card-text"><div class="doc-card-name">${escapeHtml(p.name || 'Unnamed')} · <span class="status ${pb}" style="font-size:10px">${escapeHtml(p.status || 'Pending')}</span></div><div class="doc-card-meta">${pSub}</div></div>
@@ -3248,7 +3315,11 @@ function renderDetail(fbId) {
   // switch only. If we re-set it on every poll, an operator editing
   // the offer would see their input reset every ~8s.
   if (isNewApplicant) {
-    const amtNum = parseAmount(a.amount);
+    // §8.2: never pre-fill the offer on an engine DECLINE — the
+    // pre-filled amount anchored operators toward funding declines
+    // (the Elvin pattern). Engine APPROVE/REVIEW pre-fill as before.
+    const _engDeclined = ((a.claudeDecision || '').trim().toLowerCase()).startsWith('decl');
+    const amtNum = _engDeclined ? null : parseAmount(a.amount);
     document.getElementById('dv-offer-input').value = amtNum != null ? amtNum.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '';
   }
 
@@ -3840,7 +3911,7 @@ function renderProfilePanel(fbId) {
         const pb = bucketStatus(p);
         const pAmt = parseAmount(p.amount);
         const isCurrent = p.firebaseId === fbId;
-        const meta = `${escapeHtml(p.date || '')} ${escapeHtml(p.time || '')}${p.score != null ? ' · score ' + p.score : ''}${pAmt ? ' · $' + pAmt.toLocaleString() : ''}`;
+        const meta = `${escapeHtml(p.date || '')} ${escapeHtml(p.time || '')}${pAmt ? ' · $' + pAmt.toLocaleString() : ''}`;
         return `<a class="doc-card" data-fb="${escapeHtml(p.firebaseId)}" style="cursor:${isCurrent ? 'default' : 'pointer'};${isCurrent ? 'border-color:var(--green-200);background:var(--green-50)' : ''}">
           <div class="doc-card-icn"><svg class="icn"><use href="#i-history"/></svg></div>
           <div class="doc-card-text"><div class="doc-card-name">${escapeHtml(p.name || 'Unnamed')} · <span class="status ${pb}" style="font-size:10px">${escapeHtml(p.status || 'Pending')}</span>${isCurrent ? ' <span style="font-size:10px;color:var(--green-dark);font-weight:700">· VIEWING</span>' : ''}</div><div class="doc-card-meta">${meta}</div></div>
@@ -4681,12 +4752,17 @@ function openApprovalModal(fbId) {
                ((a.applicationData && a.applicationData.lastName) || '');
   _apprName = _apprName.trim() || 'Valued Customer';
   if (!_apprEmail) { toast('No email address on file for this customer', 'err'); return; }
-  // Pre-fill amount from the offer field if the operator has already
-  // typed one in the detail header — otherwise default to $255 (max).
-  const offer = parseFloat((document.getElementById('dv-offer-amount')?.value || '255'));
-  const amt = (isFinite(offer) && offer > 0) ? Math.round(offer) : 255;
+  // §8.3: engine APPROVE pre-fills the engine tier so one-click stays
+  // fast where the engine is confident. Anything else (DECLINE/REVIEW/
+  // no decision) starts from whatever the operator typed in the offer
+  // field — never a default $255, which anchored operators toward max
+  // approvals on files the engine didn't approve. (Also fixes the dead
+  // dv-offer-amount lookup — the real offer field is dv-offer-input.)
+  const _engV = (a.claudeDecision || '').trim().toLowerCase();
+  const typed = parseAmount(document.getElementById('dv-offer-input')?.value || '');
+  const amt = typed || (_engV.startsWith('appr') ? parseAmount(a.amount) : null);
   const amtInput = document.getElementById('appr-amount');
-  if (amtInput) amtInput.value = amt;
+  if (amtInput) amtInput.value = amt || '';
   // Sync chip active state to whatever the input shows.
   document.querySelectorAll('#appr-chips .appr-chip').forEach(c => {
     c.classList.toggle('active', parseInt(c.getAttribute('data-appr-amt')) === amt);
@@ -4786,19 +4862,10 @@ async function declineNoEmail() {
   const fbId = _denialFbId;
   if (!fbId) return;
   closeDenialModal();
-  const a = apps.find(x => x.firebaseId === fbId);
-  if (!a) return;
-  toast('Marking Declined…');
-  const _now = Date.now();
-  try {
-    await fbPatchReport(fbId, { status: 'Declined', statusUpdatedAt: _now });
-    Object.assign(a, { status: 'Declined', statusUpdatedAt: _now });
-    if (_fullRecordCache[fbId]) Object.assign(_fullRecordCache[fbId], { status: 'Declined', statusUpdatedAt: _now });
-    toast('Marked Declined (no email sent)', 'ok');
-    rerender();
-  } catch (e) {
-    toast('Update failed: ' + e.message, 'err');
-  }
+  // Routes through setStatus so the §8.2 override gate applies here
+  // too (declining an engine-APPROVE needs a logged reason). The modal
+  // click was the explicit action, so no extra confirm().
+  await setStatus(fbId, 'Declined', { skipConfirm: true });
 }
 
 async function deleteApplication(fbId) {
@@ -4827,10 +4894,112 @@ async function deleteApplication(fbId) {
   }
 }
 
-async function setStatus(fbId, status) {
+// ───────── §8.2 Override flow ─────────
+// Crossing the engine — funding an engine-DECLINE or declining an
+// engine-APPROVE — opens a logged-override modal requiring a typed
+// reason (min 20 chars). Every status change funnels through
+// setStatus, so the gate lives there. REVIEW verdicts don't gate
+// (the engine didn't take a stand) but still record humanAction.
+let _ovrCtx = null;
+
+function _needsOverride(a, status) {
+  const v = ((a && a.claudeDecision) || '').trim().toLowerCase();
+  if (status === 'Approved') return v.startsWith('decl');
+  if (status === 'Declined') return v.startsWith('appr');
+  return false;
+}
+
+function openOverrideModal(fbId, status) {
   const a = apps.find(x => x.firebaseId === fbId);
   if (!a) return;
-  if (!confirm(`${status} ${a.name || 'this applicant'}?`)) return;
+  const funding = status === 'Approved';
+  _ovrCtx = { fbId, status, engineTier: parseAmount(a.amount) || 0 };
+  document.getElementById('ovr-title').textContent = funding
+    ? 'Override: fund an engine DECLINE' : 'Override: decline an engine APPROVE';
+  document.getElementById('ovr-meta').textContent =
+    `Engine said ${a.claudeDecision || '—'} for ${a.name || 'this applicant'} — you're marking ${status}.`;
+  // Heavy red when funding against a decline; lighter amber when
+  // declining an engine approve (spec §8.2).
+  const head = document.getElementById('ovr-head');
+  const btn = document.getElementById('ovr-confirm');
+  head.style.background = funding ? '#fef2f2' : '#fff5e6';
+  btn.style.background = funding ? '#991b1b' : '#b45309';
+  btn.style.border = funding ? '1px solid #7f1d1d' : '1px solid #92400e';
+  document.getElementById('ovr-amount-row').style.display = funding ? '' : 'none';
+  if (funding) {
+    const typed = parseAmount(document.getElementById('dv-offer-input')?.value || '');
+    document.getElementById('ovr-amount').value = typed || '';
+  }
+  document.getElementById('ovr-reason').value = '';
+  document.getElementById('ovr-count').textContent = '0 / 20 minimum';
+  document.getElementById('ovr-ov').classList.add('open');
+}
+
+function closeOverrideModal() {
+  document.getElementById('ovr-ov').classList.remove('open');
+  _ovrCtx = null;
+}
+
+async function confirmOverride() {
+  if (!_ovrCtx) return;
+  const { fbId, status, engineTier } = _ovrCtx;
+  const funding = status === 'Approved';
+  const reason = (document.getElementById('ovr-reason').value || '').trim();
+  if (reason.length < 20) { toast('Override reason must be at least 20 characters', 'err'); return; }
+  let amount = null;
+  if (funding) {
+    amount = parseFloat(document.getElementById('ovr-amount').value);
+    if (!isFinite(amount) || amount <= 0) { toast('Enter the amount you are funding', 'err'); return; }
+    amount = Math.round(amount);
+    await fbPatchReport(fbId, { amount: '$' + amount });
+    const a = apps.find(x => x.firebaseId === fbId);
+    if (a) a.amount = '$' + amount;
+    if (_fullRecordCache[fbId]) _fullRecordCache[fbId].amount = '$' + amount;
+  }
+  closeOverrideModal();
+  await setStatus(fbId, status, {
+    skipConfirm: true, fromOverride: true,
+    overrideReason: reason, overrideAmount: amount, engineTier,
+  });
+}
+
+// §8: record the human action DISTINCT from the engine verdict. The
+// server stamps the operator from the session and writes
+// /overrides/{fbId} (override crossings only) + humanAction/
+// humanActionAt on the report. Best-effort: a log failure never blocks
+// the status change the operator just made.
+function _recordHumanAction(fbId, status, opts) {
+  const a = apps.find(x => x.firebaseId === fbId);
+  const action = status === 'Approved' ? 'funded' : status === 'Declined' ? 'declined' : null;
+  if (!action) return;
+  const engineTier = (opts && opts.engineTier) != null ? opts.engineTier : (parseAmount(a && a.amount) || 0);
+  fetch('/api/override', {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      firebase_id: fbId,
+      humanAction: action,
+      engineVerdict: (a && a.claudeDecision) || '',
+      engineTier,
+      amount: (opts && opts.overrideAmount) || parseAmount(a && a.amount) || 0,
+      reason: (opts && opts.overrideReason) || '',
+      isOverride: !!(opts && opts.fromOverride),
+    })
+  }).then(r => r.json()).then(d => {
+    const now = Date.now();
+    const patch = { humanAction: action, humanActionAt: now, humanActionBy: (d && d.operator) || '' };
+    if (a) Object.assign(a, patch);
+    if (_fullRecordCache[fbId]) Object.assign(_fullRecordCache[fbId], patch);
+    rerender();
+  }).catch(() => {});
+}
+
+async function setStatus(fbId, status, opts = {}) {
+  const a = apps.find(x => x.firebaseId === fbId);
+  if (!a) return;
+  // §8.2: crossing the engine requires the logged-override modal.
+  if (!opts.fromOverride && _needsOverride(a, status)) { openOverrideModal(fbId, status); return; }
+  if (!opts.skipConfirm && !confirm(`${status} ${a.name || 'this applicant'}?`)) return;
   toast('Updating…');
   const _now = Date.now();
   await fbPatchReport(fbId, { status, statusUpdatedAt: _now });
@@ -4839,6 +5008,7 @@ async function setStatus(fbId, status) {
   // (and the open detail view) reflect the new status, not the stale
   // snapshot captured when the applicant was first opened.
   if (_fullRecordCache[fbId]) Object.assign(_fullRecordCache[fbId], { status, statusUpdatedAt: _now });
+  _recordHumanAction(fbId, status, opts);
   toast(`Marked ${status}`, 'ok');
   rerender();
 }
@@ -5556,6 +5726,11 @@ document.getElementById('dnl-skip-email')?.addEventListener('click', declineNoEm
 document.getElementById('dnl-ov').addEventListener('click', (e) => { if (e.target.id === 'dnl-ov') closeDenialModal(); });
 document.getElementById('dv-approve-btn').addEventListener('click', async () => {
   const id = _activeFbId(); if (!id) return;
+  const a = apps.find(x => x.firebaseId === id);
+  // §8.2: funding an engine-DECLINE goes through the override modal,
+  // which collects the amount itself — skip saveOffer's empty-input
+  // validation (the offer field deliberately isn't pre-filled here).
+  if (a && _needsOverride(a, 'Approved')) { openOverrideModal(id, 'Approved'); return; }
   await saveOffer(id);
   await setStatus(id, 'Approved');
 });

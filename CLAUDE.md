@@ -211,6 +211,42 @@ function (search for `applicationModal` or similar) to find a stable
 anchor. Then update `getOrInsertBadge()` in `_PHASE2_PANEL_HTML` to
 prefer that anchor over the legacy push button.
 
+## v4 dashboard changes (spec §8 — docs/v4_spec.md in cif-apply)
+
+Landed on `claude/epic-davinci-cdufn9` alongside the cif-apply engine_v4
+work. What changed and where:
+
+- **Engine tier badge replaced the Score column** (`engineBadge()` in
+  app.html, near the old scoreClass site): `APPROVE $X` / `DECLINE` /
+  `REVIEW $X` from `claudeDecision` + canonical `amount`, rendered with
+  the existing `.status` pill classes. The dead v1 `score` field is no
+  longer written by cif-apply and was deleted from the snapshot cards,
+  CSS, and reportsIndex projections.
+- **Row subtitle** = `v4ReasonLine` (fallback: canonical `reason`) so
+  the queue scans without opening modals.
+- **Detail hero splits engine verdict from human action** (§8.1): big
+  value mirrors `claudeDecision` until a human acts; tag shows
+  `humanAction` (`funded`/`declined` + operator), legacy fallback shows
+  `marked <status> (pre-v4)`. Never let one overwrite the other.
+- **Override flow** (§8.2): every status change funnels through
+  `setStatus(fbId, status, opts)`. Crossing the engine (funding an
+  engine-DECLINE, declining an engine-APPROVE) opens the `#ovr-ov`
+  modal — typed reason ≥20 chars required; funding overrides also
+  collect the amount (the offer field deliberately does NOT pre-fill on
+  engine declines, and `dv-approve-btn` renders gray). Confirm calls
+  `POST /api/override` (server.py, just before the `/fb/` write proxy):
+  operator stamped SERVER-SIDE from the session, writes
+  `/overrides/{fbId}` on crossings, patches `humanAction`/
+  `humanActionAt`/`humanActionBy` on every funded/declined action,
+  mirrors the index, emits an `engine_override` audit line. At 250
+  apps/day this log is how reviewers get graded against the engine.
+- **Approval-email modal** pre-fills the engine tier only on engine
+  APPROVE (the old code read a nonexistent `dv-offer-amount` element
+  and defaulted every email to $255).
+- `_INDEX_TOP_FIELDS` (server.py) must stay lock-step with cif-apply's
+  run_server.py copy: `score` is out; `v4ReasonLine` / `v4Decision` /
+  `v4Tier` / `humanAction` are in.
+
 ## Style language conventions in this repo
 
 For ANY UI work, match these patterns from app.html:
@@ -273,7 +309,9 @@ When adding `/api/vergent-recheck` (Bug 1 fix), it goes here.
 
 ## Branch convention
 
-Active feature branch: `claude/continue-previous-session-e2Z43`. Merges
+Active feature branch: `claude/epic-davinci-cdufn9` (the v4 engine /
+dashboard work). Older work lived on
+`claude/continue-previous-session-e2Z43`. Merges
 to main when ready. Render auto-deploys main.
 
 ## Workflow rule: ALWAYS merge to main when finished
