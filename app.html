@@ -2798,9 +2798,12 @@ function renderDashboard() {
 
   document.getElementById('greet-sub').innerHTML = `<b>${counts().pending}</b> pending · <b>${counts().approved}</b> approved · <b>${counts().declined}</b> declined`;
 
-  // ── Pipeline donut: deduped (unique customers) ──
-  const dedup = dedupedApps();
-  const dc = _bucketCounts(dedup);
+  // ── Pipeline donut: same range-filtered raw list as the KPI cards,
+  // so the donut total always equals the "Total Applications" card for
+  // the selected time range. (Previously counted deduped unique
+  // customers across all time — operator saw 1068 vs 1215 and read it
+  // as a bug. Raw submissions vs unique customers; now both raw.)
+  const dc = _bucketCounts(inRange);
   const total = dc.total || 1;
   const pPct = (dc.pending / total) * 100;
   const aPct = (dc.approved / total) * 100;
