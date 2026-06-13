@@ -1620,6 +1620,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
               <button class="qa-btn" id="dv-refresh-plaid-btn" title="Pull a fresh Plaid asset report and re-run"><svg class="icn"><use href="#i-refresh"/></svg>Refresh from Plaid</button>
               <button class="qa-btn qa-btn-emerald" id="dv-approve-mail-btn" title="Send the approval email to the applicant with their approved loan amount"><svg class="icn"><use href="#i-check"/></svg>Approve Email</button>
               <button class="qa-btn qa-btn-amber" id="dv-denial-btn" title="Send the denial-reasons email to the applicant"><svg class="icn"><use href="#i-message"/></svg>Denial Email</button>
+              <button class="qa-btn qa-btn-emerald" id="dv-create-loan-btn" onclick="openCreateLoanModal()" title="Create a loan agreement in Vergent for this applicant and trigger the e-sign email"><svg class="icn"><use href="#i-zap"/></svg>Create Loan</button>
             </div>
           </div>
           <!-- Vergent rail — hidden for found customers via renderVergentPanel
@@ -2073,6 +2074,41 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     <div class="appr-actions">
       <button class="btn btn-ghost" type="button" id="appr-cancel">Cancel</button>
       <button class="btn-approve-send" type="button" id="appr-send"><svg class="icn"><use href="#i-check"/></svg>Send Approval Email</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Loan modal — opens from Quick Actions "Create Loan" button.
+     Posts to /api/vergent-create-loan which proxies to cif-apply ->
+     Vergent PostCustomerLoan -> sendEsignDocs (Vergent emails the
+     customer using its own configured template). Operator confirms
+     amount + due date; defaults pre-fill from the engine's approved
+     amount and a today+14d cycle. -->
+<div class="appr-ov" id="cl-ov">
+  <div class="appr-card">
+    <div class="appr-head">
+      <div>
+        <div class="appr-title"><svg class="icn"><use href="#i-zap"/></svg>Create Loan + Send E-Sign</div>
+        <div class="appr-meta" id="cl-meta">Customer: —</div>
+      </div>
+      <button onclick="closeCreateLoanModal()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1" title="Close">&times;</button>
+    </div>
+    <div class="appr-body">
+      <div class="appr-label">Loan Amount</div>
+      <div class="appr-amount-row">
+        <span class="ccy">$</span>
+        <input type="number" id="cl-amount" min="50" max="1000" step="1" value="255" inputmode="decimal">
+      </div>
+      <div class="appr-label" style="margin-top:14px">Due Date</div>
+      <input type="date" id="cl-due-date" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit">
+      <div class="appr-label" style="margin-top:14px">Disbursement Card</div>
+      <div id="cl-card-info" style="background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:10px 12px;border-radius:8px;font-size:12.5px;font-weight:600">—</div>
+      <div id="cl-card-hint" style="font-size:11.5px;color:var(--muted);margin-top:4px">Uses the customer's most recently saved Vergent card. Save the card first if not done.</div>
+      <div id="cl-result" style="font-size:12px;margin-top:14px;min-height:16px"></div>
+    </div>
+    <div class="appr-actions">
+      <button class="btn btn-ghost" type="button" onclick="closeCreateLoanModal()">Cancel</button>
+      <button class="btn-approve-send" type="button" id="cl-send" onclick="submitCreateLoan()"><svg class="icn"><use href="#i-zap"/></svg>Create Loan + Send E-Sign</button>
     </div>
   </div>
 </div>
@@ -3597,6 +3633,127 @@ async function saveDebitCardToVergent(btn) {
       resultEl.style.color = '#5a0d0d';
       resultEl.textContent = 'Network error: ' + (e && e.message || String(e));
     }
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Create Loan flow — chained PostCustomerLoan -> sendEsignDocs against
+// Vergent. Opens from the Quick Actions "Create Loan" button on the
+// applicant detail page. Reads the engine-approved amount + customer
+// info from the loaded record, lets the operator confirm/adjust loan
+// amount + due date, and posts to /api/vergent-create-loan.
+function openCreateLoanModal() {
+  const fbId = document.body.dataset.firebaseId || '';
+  if (!fbId) {
+    toast('No applicant selected.', 'err');
+    return;
+  }
+  // Pull the canonical engine-approved amount + customer name from
+  // whatever the detail view already loaded (window.currentReport is
+  // populated by the detail-render functions).
+  const rec = window.currentReport || window._dvRecord || {};
+  const ad = rec.applicationData || {};
+  const vm = rec.vergentMatch || {};
+  const cid = (vm.customerId || rec.vergentCustomerId || '').toString();
+  const fullName = ((ad.firstName || '') + ' ' + (ad.lastName || '')).trim() || '—';
+  const metaEl = document.getElementById('cl-meta');
+  if (metaEl) {
+    metaEl.textContent = cid
+      ? `Customer: ${fullName} • Vergent #${cid}`
+      : `Customer: ${fullName} • No Vergent customer yet`;
+  }
+  const amt = Number(rec.amount || ad.requestedAmount || 255);
+  const amtEl = document.getElementById('cl-amount');
+  if (amtEl) amtEl.value = String(Math.max(50, Math.min(1000, Math.round(amt))));
+  // Default due date = today + 14 days (CA payday cycle).
+  const due = new Date();
+  due.setDate(due.getDate() + 14);
+  const dueEl = document.getElementById('cl-due-date');
+  if (dueEl) dueEl.value = due.toISOString().slice(0, 10);
+  // Card info from the saved Vergent card record (best-effort -- if we
+  // don't have it cached, show a generic "most recent card" hint).
+  const dc = ad.debitCard || {};
+  const cardInfoEl = document.getElementById('cl-card-info');
+  if (cardInfoEl) {
+    const last4 = ((dc.cardNumber || '') + '').replace(/\D/g, '').slice(-4);
+    const brand = (dc.brand || 'Card').toString();
+    cardInfoEl.textContent = last4
+      ? `${brand} ••••${last4} (most recently saved)`
+      : 'Vergent default card on file (most recently saved)';
+  }
+  const resEl = document.getElementById('cl-result');
+  if (resEl) { resEl.textContent = ''; resEl.style.color = 'var(--muted)'; }
+  const btn = document.getElementById('cl-send');
+  if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  document.getElementById('cl-ov').style.display = 'flex';
+  // Hard gate: no Vergent customer = no loan.
+  if (!cid) {
+    if (resEl) {
+      resEl.style.color = '#5a0d0d';
+      resEl.textContent = 'No Vergent customer ID on file. Use Create + Push first.';
+    }
+    if (btn) { btn.disabled = true; btn.style.opacity = '.55'; }
+  }
+}
+
+function closeCreateLoanModal() {
+  const ov = document.getElementById('cl-ov');
+  if (ov) ov.style.display = 'none';
+}
+
+async function submitCreateLoan() {
+  const fbId = document.body.dataset.firebaseId || '';
+  const amtEl = document.getElementById('cl-amount');
+  const dueEl = document.getElementById('cl-due-date');
+  const resEl = document.getElementById('cl-result');
+  const btn = document.getElementById('cl-send');
+  const setMsg = (color, text) => {
+    if (!resEl) return;
+    resEl.style.color = color;
+    resEl.textContent = text;
+  };
+  if (!fbId) { setMsg('#5a0d0d', 'No applicant selected.'); return; }
+  const amount = Number(amtEl && amtEl.value);
+  if (!amount || amount < 50 || amount > 1000) {
+    setMsg('#5a0d0d', 'Loan amount must be between $50 and $1,000.');
+    return;
+  }
+  const dueRaw = (dueEl && dueEl.value || '').trim();
+  if (!dueRaw) { setMsg('#5a0d0d', 'Due date required.'); return; }
+  if (btn) { btn.disabled = true; btn.style.opacity = '.55'; }
+  setMsg('var(--muted)', 'Creating loan + sending e-sign…');
+  try {
+    const r = await fetch('/api/vergent-create-loan', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        firebase_id: fbId,
+        loan_amount: amount,
+        // Vergent wants ISO datetime; the <input type="date"> gives us
+        // YYYY-MM-DD, so reify to ISO with T00:00:00.000Z so PostCustomerLoan
+        // doesn't reject the format.
+        due_date: dueRaw + 'T00:00:00.000Z',
+        send_esign: true,
+      }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d && d.ok) {
+      const hdr = d.hdrId || '—';
+      const esign = d.esignSent ? ' • E-sign email sent' : ' • E-sign failed (see Render logs)';
+      setMsg('#1a6b3c', `Loan #${hdr} created${esign}`);
+      toast('Loan created in Vergent', 'ok');
+      setTimeout(closeCreateLoanModal, 2000);
+    } else {
+      const upstream = d && d.status ? 'Vergent HTTP ' + d.status : '';
+      const snippet = (d && (d.loanDetail || d.detail || d.error) || '').toString().trim();
+      const parts = [upstream, snippet].filter(Boolean);
+      const text = parts.length ? parts.join(' — ') : 'HTTP ' + r.status + ' (no body)';
+      setMsg('#5a0d0d', text.slice(0, 320));
+    }
+  } catch (e) {
+    setMsg('#5a0d0d', 'Network error: ' + (e && e.message || String(e)));
   } finally {
     if (btn) { btn.disabled = false; btn.style.opacity = ''; }
   }
