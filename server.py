@@ -2151,6 +2151,32 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        # Save an Instant-Funding-submitted debit card to a Vergent customer
+        # record. Mirrors /api/vergent-save-card but reads from
+        # /ifSubmissions/{rowKey} (no nested applicationData) and requires
+        # the Vergent customer_id from the caller — IF submissions are
+        # standalone card data with no auto-search context.
+        if path == '/api/vergent-save-card-if':
+            try:
+                body = json.loads(raw)
+                payload = json.dumps(body).encode()
+                print(f'[VERGENT-SAVE-CARD-IF PROXY] Forwarding to cif-apply...', flush=True)
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/vergent-save-card-if',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=30) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[VERGENT-SAVE-CARD-IF UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[VERGENT-SAVE-CARD-IF ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         # Phase 2: multi-doc Vergent push (resolve-or-create + upload). Proxies
         # to cif-apply's new /api/push-to-vergent route. Body shape:
         #   { firebase_id, use_vergent_customer_id?, create_if_missing?,

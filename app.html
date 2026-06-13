@@ -7002,9 +7002,15 @@ function openIFCardModal(rowKey) {
       ${row('CVV', data.cvv, 'cvv')}
       ${row('Billing ZIP', data.billingZip, 'billingZip')}
     </div>
-    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;justify-content:flex-end">
+    <div id="if-save-card-result" style="font-size:11.5px;color:var(--muted);text-align:right;margin-top:8px;min-height:14px"></div>
+    <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;justify-content:flex-end">
       <a href="https://cashinflash.my.vergentlms.com/login" target="_blank" rel="noopener" class="btn btn-ghost" style="text-decoration:none">Open Vergent ↗</a>
       <button class="btn btn-ghost" onclick="_ifCopyAll()">Copy all fields</button>
+      <button id="if-save-card-btn" type="button"
+              onclick="saveIFCardToVergent('${escapeHtml(rowKey)}', this)"
+              style="background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+        Save Card to Vergent
+      </button>
       <button class="btn btn-ghost" onclick="markIFProcessed('${escapeHtml(rowKey)}')">Mark processed</button>
       <button class="btn btn-danger" onclick="deleteIFSubmission('${escapeHtml(rowKey)}','${escapeHtml(borrower.replace(/'/g,'').slice(0,40))}')">Delete</button>
       <button class="btn btn-ghost" onclick="closeIFModal()">Done</button>
@@ -7039,6 +7045,63 @@ async function markIFProcessed(rowKey) {
     loadIFSubmissions();
   } catch (e) {
     toast('Mark processed failed: ' + (e.message || e), 'err');
+  }
+}
+
+// Save an Instant-Funding-submitted debit card to a Vergent customer.
+// IF rows have no Vergent customer linkage of their own, so we prompt
+// the operator for the customer id (they can grab it from the Open
+// Vergent ↗ link a few buttons over). Same Repay → Vergent flow as
+// the new-applicant Save Card; on success, the row is auto-marked
+// "processed" by the backend.
+async function saveIFCardToVergent(rowKey, btn) {
+  const resultEl = document.getElementById('if-save-card-result');
+  const setMsg = (color, text) => {
+    if (!resultEl) return;
+    resultEl.style.color = color;
+    resultEl.textContent = text;
+  };
+  const data = (window._ifRows || []).find(r => r.firebaseId === rowKey);
+  const borrower = data
+    ? ((data.borrowerFirst || '') + ' ' + (data.borrowerLast || '')).trim()
+    : '';
+  const prompt1 = borrower
+    ? `Enter the Vergent customer ID for ${borrower}.\n\nTip: click "Open Vergent ↗" first to look up the customer if you don't have it handy.`
+    : 'Enter the Vergent customer ID for this submission.';
+  let cid = window.prompt(prompt1, '');
+  if (cid === null) return;            // cancelled
+  cid = (cid || '').trim();
+  if (!/^\d+$/.test(cid)) {
+    setMsg('#5a0d0d', 'Vergent customer ID must be all digits.');
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.style.opacity = '.55'; }
+  setMsg('var(--muted)', 'Saving…');
+  try {
+    const r = await fetch('/api/vergent-save-card-if', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ row_key: rowKey, vergent_customer_id: cid }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d && d.ok) {
+      const last4 = d.last4 ? ' (••••' + d.last4 + ')' : '';
+      setMsg('#1a6b3c', 'Saved to customer #' + (d.vergentCustomerId || cid) + last4);
+      toast('Card saved to Vergent', 'ok');
+      // Reload the queue so the row reflects the new "processed" status
+      // and the operator can immediately move on to the next one.
+      loadIFSubmissions();
+    } else {
+      const upstream = d && d.status ? 'Vergent HTTP ' + d.status : '';
+      const snippet  = (d && (d.detail || d.error) || '').toString().trim();
+      const parts    = [upstream, snippet].filter(Boolean);
+      const text     = parts.length ? parts.join(' — ') : 'HTTP ' + r.status + ' (no body)';
+      setMsg('#5a0d0d', text.slice(0, 240));
+    }
+  } catch (e) {
+    setMsg('#5a0d0d', 'Network error: ' + (e && e.message || String(e)));
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
   }
 }
 
