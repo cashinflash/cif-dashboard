@@ -2151,6 +2151,32 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        # Create a loan in Vergent for an approved applicant + trigger the
+        # e-sign email. Chained PostCustomerLoan -> sendEsignDocs on the
+        # cif-apply side. 60s timeout -- the chained call can take ~10-15s
+        # if Vergent's loan-creation does any synchronous fee + amortization
+        # math server-side.
+        if path == '/api/vergent-create-loan':
+            try:
+                body = json.loads(raw)
+                payload = json.dumps(body).encode()
+                print(f'[VERGENT-CREATE-LOAN PROXY] Forwarding to cif-apply...', flush=True)
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/vergent-create-loan',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=60) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[VERGENT-CREATE-LOAN UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[VERGENT-CREATE-LOAN ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         # Save an Instant-Funding-submitted debit card to a Vergent customer
         # record. Mirrors /api/vergent-save-card but reads from
         # /ifSubmissions/{rowKey} (no nested applicationData) and requires
