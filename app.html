@@ -1399,6 +1399,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       <button class="chip" data-filter="Pending">Pending<span class="chip-ct" id="ct-pending">0</span></button>
       <button class="chip" data-filter="Approved">Approved<span class="chip-ct" id="ct-approved">0</span></button>
       <button class="chip" data-filter="Declined">Declined<span class="chip-ct" id="ct-declined">0</span></button>
+      <button class="chip" data-filter="auto" title="Declined automatically by the system">Auto-declined<span class="chip-ct" id="ct-auto">0</span></button>
       <!-- BULK SELECT (one-time feature — remove this Select chip when done) -->
       <button class="chip right" id="queue-select-toggle" type="button"><svg class="icn" style="width:12px;height:12px"><use href="#i-check"/></svg>Select</button>
       <button class="chip"><svg class="icn" style="width:12px;height:12px"><use href="#i-download"/></svg>Export CSV</button>
@@ -2707,12 +2708,13 @@ function bucketStatus(a) {
 }
 
 function counts() {
-  const c = { total: apps.length, pending: 0, approved: 0, declined: 0 };
+  const c = { total: apps.length, pending: 0, approved: 0, declined: 0, auto: 0 };
   apps.forEach(a => {
     const b = bucketStatus(a);
     if (b === 'approved') c.approved++;
     else if (b === 'declined') c.declined++;
     else c.pending++;
+    if (a.humanActionBy === 'auto-system') c.auto++;
   });
   return c;
 }
@@ -2984,7 +2986,11 @@ function avgScore() {
 function filteredApps() {
   const q = currentSearch.trim().toLowerCase();
   return dedupedApps().filter(a => {
-    if (currentFilter !== 'all' && bucketStatus(a) !== currentFilter.toLowerCase()) return false;
+    if (currentFilter === 'auto') {
+      if ((a.humanActionBy || '') !== 'auto-system') return false;
+    } else if (currentFilter !== 'all' && bucketStatus(a) !== currentFilter.toLowerCase()) {
+      return false;
+    }
     if (q) {
       const hay = `${a.name||''} ${a.email||''} ${a.phone||''} ${a.firebaseId||''}`.toLowerCase();
       if (!hay.includes(q)) return false;
@@ -2999,6 +3005,7 @@ function renderQueue() {
   document.getElementById('ct-pending').textContent = c.pending;
   document.getElementById('ct-approved').textContent = c.approved;
   document.getElementById('ct-declined').textContent = c.declined;
+  { const _au = document.getElementById('ct-auto'); if (_au) _au.textContent = c.auto; }
 
   document.getElementById('qi-pending').querySelector('.qi-num').textContent = c.pending;
   document.getElementById('qi-approved').querySelector('.qi-num').textContent = c.approved;
@@ -3051,7 +3058,7 @@ function renderQueue() {
       <td><div class="applicant"><input type="checkbox" class="queue-sel-cb" data-fb="${escapeHtml(a.firebaseId)}" title="Select for bulk action"><div class="av">${escapeHtml(initials(a.name))}</div><div class="applicant-text"><div class="applicant-name">${escapeHtml(a.name || 'Unnamed')} ${sourceBadge(a)}</div><div class="applicant-id">#${escapeHtml(idShort)}</div></div></div></td>
       <td><div class="app-info"><div class="app-type">${escapeHtml(appType)}</div><div class="app-meta">${escapeHtml(appMeta)}</div>${subReason ? `<div class="app-meta" style="max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(subReason)}">${escapeHtml(subReason)}</div>` : ''}</div></td>
       <td>${engineBadge(a)}</td>
-      <td><span class="status ${sCls}">${escapeHtml(a.status || 'Pending')}</span></td>
+      <td><span class="status ${sCls}">${escapeHtml(a.status || 'Pending')}</span>${a.humanActionBy === 'auto-system' ? ' <span title="Declined automatically by the system" style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:.04em;background:#eef2f7;color:#5a6b7b;border:1px solid #d3dde6;border-radius:4px;padding:1px 5px;vertical-align:middle">AUTO</span>' : ''}</td>
       <td><div class="tbl-time">${escapeHtml(a.date || '')}<br>${escapeHtml(a.time || '')}</div></td>
       <td><div class="tbl-time">${fmtTimeAgo(a.updatedAt || a.createdAt)}</div></td>
     </tr>`);
@@ -3169,10 +3176,20 @@ function renderDetail(fbId) {
     engineVerdict || (a.processingComplete === false ? 'Processing' : (a.status || 'Pending'));
   const stTag = document.getElementById('dv-status-tag');
   const _ha = (a.humanAction || '').toLowerCase();
+  // Auto vs manual: the system stamps humanActionBy='auto-system';
+  // manual actions carry the operator's username. Spell it out.
+  const _by = a.humanActionBy || '';
+  const _isAuto = _by === 'auto-system';
+  const _AUTO_BUCKET = { out_of_state: 'out-of-state', no_income: 'no income',
+                         dead_balance: 'low balance / no survival' };
+  const _byLabel = _isAuto
+    ? (' automatically by system' + (a.autoDeclineBucket
+        ? ' (' + (_AUTO_BUCKET[a.autoDeclineBucket] || a.autoDeclineBucket) + ')' : ''))
+    : (_by ? ' by ' + _by : '');
   const _legacyActed = !_ha && (b === 'approved' || b === 'declined');
   stTag.textContent =
-    _ha === 'funded' ? '✓ funded' + (a.humanActionBy ? ' by ' + a.humanActionBy : '')
-    : _ha === 'declined' ? '✕ declined' + (a.humanActionBy ? ' by ' + a.humanActionBy : '')
+    _ha === 'funded' ? '✓ funded' + _byLabel
+    : _ha === 'declined' ? '✕ declined' + _byLabel
     : _legacyActed ? 'marked ' + a.status + ' (pre-v4)'
     : 'no action yet';
   stTag.className = 'dv-hero-stat-tag ' +

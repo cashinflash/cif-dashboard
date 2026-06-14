@@ -35,7 +35,9 @@ _INDEX_TOP_FIELDS = (
     'reason', 'v2Decision', 'vergentGuid', 'processingComplete',
     # v4 (spec §8): list-row subtitle + tier badge + human action.
     # 'score' dropped — dead v1 field, no longer written by cif-apply.
+    # humanActionBy/autoDeclineBucket: so the queue can badge auto-declines.
     'v4ReasonLine', 'v4Decision', 'v4Tier', 'humanAction',
+    'humanActionBy', 'autoDeclineBucket',
 )
 _INDEX_APPDATA_FIELDS = ('email', 'phone', 'firstName', 'lastName')
 
