@@ -3720,17 +3720,9 @@ async function openCreateLoanModal() {
     if (sel) {
       sel.innerHTML = cards.map(function(c, i) {
         const brand = c.brand || 'Card';
-        const last4 = c.last4 ? '••••' + c.last4 : 'no last4';
-        const created = c.createdDate
-          ? ' • added ' + (c.createdDate || '').slice(0, 10)
-          : '';
-        const ineligible = (c.isEligibleForDisbursement === false)
-          ? ' • not disbursement-eligible'
-          : '';
-        const inactive = (c.isActive === false) ? ' • inactive' : '';
+        const last4 = c.last4 || '----';
         return `<option value="${c.id}"${i === 0 ? ' selected' : ''}>` +
-          `${brand} ${last4}${created}${ineligible}${inactive}` +
-          '</option>';
+          `${brand} ${last4}` + '</option>';
       }).join('');
     }
   } catch (e) {
