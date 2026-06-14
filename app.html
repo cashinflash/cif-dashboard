@@ -3646,102 +3646,100 @@ async function saveDebitCardToVergent(btn) {
 // applicant detail page. Reads the engine-approved amount + customer
 // info from the loaded record, lets the operator confirm/adjust loan
 // amount + due date, and posts to /api/vergent-create-loan.
-function openCreateLoanModal() {
+async function openCreateLoanModal() {
   const fbId = document.body.dataset.firebaseId || '';
   if (!fbId) {
     toast('No applicant selected.', 'err');
     return;
   }
-  // Pull the canonical engine-approved amount + customer name from
-  // whatever the detail view already loaded (window.currentReport is
-  // populated by the detail-render functions).
-  const rec = window.currentReport || window._dvRecord || {};
+  const metaEl = document.getElementById('cl-meta');
+  const amtEl  = document.getElementById('cl-amount');
+  const dueEl  = document.getElementById('cl-due-date');
+  const resEl  = document.getElementById('cl-result');
+  const btn    = document.getElementById('cl-send');
+  const sel    = document.getElementById('cl-card-select');
+  const hint   = document.getElementById('cl-card-hint');
+  if (resEl) { resEl.textContent = ''; resEl.style.color = 'var(--muted)'; }
+  if (btn)   { btn.disabled = false; btn.style.opacity = ''; }
+  if (sel)   sel.innerHTML = '<option value="">Loading cards on file…</option>';
+  if (hint)  { hint.style.color = 'var(--muted)'; hint.textContent = 'Most recently saved card is at the top.'; }
+  if (metaEl) metaEl.textContent = 'Loading…';
+  // Default due date = today + 14 days (CA payday cycle).
+  const due = new Date();
+  due.setDate(due.getDate() + 14);
+  if (dueEl) dueEl.value = due.toISOString().slice(0, 10);
+  document.getElementById('cl-ov').style.display = 'flex';
+  // Fetch the live record from Firebase so we don't depend on whatever
+  // the detail view did or didn't populate on a global. /fb/ is the
+  // same proxy the Phase 2 badge uses, so we know it works.
+  let rec = {};
+  try {
+    const r = await fetch(`/fb/reports/${encodeURIComponent(fbId)}.json`, {
+      credentials: 'include',
+    });
+    if (r.ok) rec = (await r.json().catch(() => ({}))) || {};
+  } catch (e) { /* fall through with empty rec */ }
   const ad = rec.applicationData || {};
   const vm = rec.vergentMatch || {};
   const cid = (vm.customerId || rec.vergentCustomerId || '').toString();
   const fullName = ((ad.firstName || '') + ' ' + (ad.lastName || '')).trim() || '—';
-  const metaEl = document.getElementById('cl-meta');
   if (metaEl) {
     metaEl.textContent = cid
       ? `Customer: ${fullName} • Vergent #${cid}`
       : `Customer: ${fullName} • No Vergent customer yet`;
   }
   const amt = Number(rec.amount || ad.requestedAmount || 255);
-  const amtEl = document.getElementById('cl-amount');
   if (amtEl) amtEl.value = String(Math.max(50, Math.min(1000, Math.round(amt))));
-  // Default due date = today + 14 days (CA payday cycle).
-  const due = new Date();
-  due.setDate(due.getDate() + 14);
-  const dueEl = document.getElementById('cl-due-date');
-  if (dueEl) dueEl.value = due.toISOString().slice(0, 10);
-  const resEl = document.getElementById('cl-result');
-  if (resEl) { resEl.textContent = ''; resEl.style.color = 'var(--muted)'; }
-  const btn = document.getElementById('cl-send');
-  if (btn) { btn.disabled = false; btn.style.opacity = ''; }
-  // Reset card dropdown to loading state every open so a stale list
-  // doesn't show for the wrong customer.
-  const sel = document.getElementById('cl-card-select');
-  if (sel) {
-    sel.innerHTML = '<option value="">Loading cards on file…</option>';
-  }
-  document.getElementById('cl-ov').style.display = 'flex';
-  // Hard gate: no Vergent customer = no loan.
+  // Hard gate when there's REALLY no Vergent customer (rec confirmed).
   if (!cid) {
     if (resEl) {
       resEl.style.color = '#5a0d0d';
-      resEl.textContent = 'No Vergent customer ID on file. Use Create + Push first.';
+      resEl.textContent = 'No Vergent customer ID on this record. Use Create + Push first.';
     }
     if (btn) { btn.disabled = true; btn.style.opacity = '.55'; }
     if (sel) sel.innerHTML = '<option value="">— no customer —</option>';
     return;
   }
-  // Fetch the customer's cards from Vergent and populate the dropdown
-  // (newest-first, backend takes care of sorting). Best-effort: if the
-  // fetch fails we surface a clear error and let the operator decide
-  // whether to fall back to Vergent's default card (prepaid_card_id=0).
-  fetch(`/api/vergent-list-cards?fb=${encodeURIComponent(fbId)}`, {
-    credentials: 'include',
-  })
-    .then(r => r.json().catch(() => ({})))
-    .then(d => {
-      const cards = (d && d.cards) || [];
-      if (!cards.length) {
-        if (sel) {
-          sel.innerHTML = '<option value="0">Vergent default card on file</option>';
-        }
-        const hint = document.getElementById('cl-card-hint');
-        if (hint) {
-          hint.style.color = '#5a3300';
-          hint.textContent = 'No cards listed by Vergent — will use the customer\'s default. ' +
-            (d && d.debug ? ' (' + d.debug.slice(0, 80) + ')' : '');
-        }
-        return;
-      }
-      if (sel) {
-        sel.innerHTML = cards.map(function(c, i) {
-          const brand = c.brand || 'Card';
-          const last4 = c.last4 ? '••••' + c.last4 : 'no last4';
-          const created = c.createdDate
-            ? ' • added ' + (c.createdDate || '').slice(0, 10)
-            : '';
-          const ineligible = (c.isEligibleForDisbursement === false)
-            ? ' • not disbursement-eligible'
-            : '';
-          const inactive = (c.isActive === false) ? ' • inactive' : '';
-          return `<option value="${c.id}"${i === 0 ? ' selected' : ''}>` +
-            `${brand} ${last4}${created}${ineligible}${inactive}` +
-            '</option>';
-        }).join('');
-      }
-    })
-    .catch(function() {
+  // Fetch the customer's cards from Vergent and populate the dropdown.
+  try {
+    const r = await fetch(
+      `/api/vergent-list-cards?fb=${encodeURIComponent(fbId)}`,
+      { credentials: 'include' },
+    );
+    const d = await r.json().catch(() => ({}));
+    const cards = (d && d.cards) || [];
+    if (!cards.length) {
       if (sel) sel.innerHTML = '<option value="0">Vergent default card on file</option>';
-      const hint = document.getElementById('cl-card-hint');
       if (hint) {
-        hint.style.color = '#5a0d0d';
-        hint.textContent = 'Could not fetch saved cards — falling back to default.';
+        hint.style.color = '#5a3300';
+        hint.textContent = 'No cards returned by Vergent — will use the customer\'s default. ' +
+          (d && d.debug ? '(' + d.debug.slice(0, 80) + ')' : '');
       }
-    });
+      return;
+    }
+    if (sel) {
+      sel.innerHTML = cards.map(function(c, i) {
+        const brand = c.brand || 'Card';
+        const last4 = c.last4 ? '••••' + c.last4 : 'no last4';
+        const created = c.createdDate
+          ? ' • added ' + (c.createdDate || '').slice(0, 10)
+          : '';
+        const ineligible = (c.isEligibleForDisbursement === false)
+          ? ' • not disbursement-eligible'
+          : '';
+        const inactive = (c.isActive === false) ? ' • inactive' : '';
+        return `<option value="${c.id}"${i === 0 ? ' selected' : ''}>` +
+          `${brand} ${last4}${created}${ineligible}${inactive}` +
+          '</option>';
+      }).join('');
+    }
+  } catch (e) {
+    if (sel) sel.innerHTML = '<option value="0">Vergent default card on file</option>';
+    if (hint) {
+      hint.style.color = '#5a0d0d';
+      hint.textContent = 'Could not fetch saved cards — falling back to default.';
+    }
+  }
 }
 
 function closeCreateLoanModal() {
