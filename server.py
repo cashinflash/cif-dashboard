@@ -1447,6 +1447,35 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        # List a Vergent customer's cards on file for the Create Loan
+        # disbursement-card dropdown. Forwards GET to cif-apply's
+        # /api/vergent-list-cards (which calls Vergent V1 GetCustomerCards
+        # + falls back to GetCustomerData if dedicated list 404s).
+        if path == '/api/vergent-list-cards':
+            if not valid_session(token):
+                self.send_json(401, {'error': 'Unauthorized'}); return
+            qs = ''
+            if '?' in self.path:
+                qs = self.path.split('?', 1)[1]
+            try:
+                import urllib.request as ur
+                req = ur.Request(
+                    f'https://cif-apply.onrender.com/api/vergent-list-cards?{qs}',
+                    method='GET',
+                )
+                with ur.urlopen(req, timeout=30) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[VERGENT-LIST-CARDS UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[VERGENT-LIST-CARDS ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         # Phase U.3: poll a Plaid asset report. Path:
         # /api/portal-plaid/asset-report/{token}        → JSON (poll)
         # /api/portal-plaid/asset-report/{token}/pdf    → binary PDF
