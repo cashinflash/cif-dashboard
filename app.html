@@ -2102,8 +2102,10 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       <div class="appr-label" style="margin-top:14px">Due Date</div>
       <input type="date" id="cl-due-date" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit">
       <div class="appr-label" style="margin-top:14px">Disbursement Card</div>
-      <div id="cl-card-info" style="background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:10px 12px;border-radius:8px;font-size:12.5px;font-weight:600">—</div>
-      <div id="cl-card-hint" style="font-size:11.5px;color:var(--muted);margin-top:4px">Uses the customer's most recently saved Vergent card. Save the card first if not done.</div>
+      <select id="cl-card-select" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;background:#fff">
+        <option value="">Loading cards on file…</option>
+      </select>
+      <div id="cl-card-hint" style="font-size:11.5px;color:var(--muted);margin-top:4px">Most recently saved card is at the top.</div>
       <div id="cl-result" style="font-size:12px;margin-top:14px;min-height:16px"></div>
     </div>
     <div class="appr-actions">
@@ -3672,21 +3674,16 @@ function openCreateLoanModal() {
   due.setDate(due.getDate() + 14);
   const dueEl = document.getElementById('cl-due-date');
   if (dueEl) dueEl.value = due.toISOString().slice(0, 10);
-  // Card info from the saved Vergent card record (best-effort -- if we
-  // don't have it cached, show a generic "most recent card" hint).
-  const dc = ad.debitCard || {};
-  const cardInfoEl = document.getElementById('cl-card-info');
-  if (cardInfoEl) {
-    const last4 = ((dc.cardNumber || '') + '').replace(/\D/g, '').slice(-4);
-    const brand = (dc.brand || 'Card').toString();
-    cardInfoEl.textContent = last4
-      ? `${brand} ••••${last4} (most recently saved)`
-      : 'Vergent default card on file (most recently saved)';
-  }
   const resEl = document.getElementById('cl-result');
   if (resEl) { resEl.textContent = ''; resEl.style.color = 'var(--muted)'; }
   const btn = document.getElementById('cl-send');
   if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  // Reset card dropdown to loading state every open so a stale list
+  // doesn't show for the wrong customer.
+  const sel = document.getElementById('cl-card-select');
+  if (sel) {
+    sel.innerHTML = '<option value="">Loading cards on file…</option>';
+  }
   document.getElementById('cl-ov').style.display = 'flex';
   // Hard gate: no Vergent customer = no loan.
   if (!cid) {
@@ -3695,7 +3692,56 @@ function openCreateLoanModal() {
       resEl.textContent = 'No Vergent customer ID on file. Use Create + Push first.';
     }
     if (btn) { btn.disabled = true; btn.style.opacity = '.55'; }
+    if (sel) sel.innerHTML = '<option value="">— no customer —</option>';
+    return;
   }
+  // Fetch the customer's cards from Vergent and populate the dropdown
+  // (newest-first, backend takes care of sorting). Best-effort: if the
+  // fetch fails we surface a clear error and let the operator decide
+  // whether to fall back to Vergent's default card (prepaid_card_id=0).
+  fetch(`/api/vergent-list-cards?fb=${encodeURIComponent(fbId)}`, {
+    credentials: 'include',
+  })
+    .then(r => r.json().catch(() => ({})))
+    .then(d => {
+      const cards = (d && d.cards) || [];
+      if (!cards.length) {
+        if (sel) {
+          sel.innerHTML = '<option value="0">Vergent default card on file</option>';
+        }
+        const hint = document.getElementById('cl-card-hint');
+        if (hint) {
+          hint.style.color = '#5a3300';
+          hint.textContent = 'No cards listed by Vergent — will use the customer\'s default. ' +
+            (d && d.debug ? ' (' + d.debug.slice(0, 80) + ')' : '');
+        }
+        return;
+      }
+      if (sel) {
+        sel.innerHTML = cards.map(function(c, i) {
+          const brand = c.brand || 'Card';
+          const last4 = c.last4 ? '••••' + c.last4 : 'no last4';
+          const created = c.createdDate
+            ? ' • added ' + (c.createdDate || '').slice(0, 10)
+            : '';
+          const ineligible = (c.isEligibleForDisbursement === false)
+            ? ' • not disbursement-eligible'
+            : '';
+          const inactive = (c.isActive === false) ? ' • inactive' : '';
+          return `<option value="${c.id}"${i === 0 ? ' selected' : ''}>` +
+            `${brand} ${last4}${created}${ineligible}${inactive}` +
+            '</option>';
+        }).join('');
+      }
+    })
+    .catch(function() {
+      if (sel) sel.innerHTML = '<option value="0">Vergent default card on file</option>';
+      const hint = document.getElementById('cl-card-hint');
+      if (hint) {
+        hint.style.color = '#5a0d0d';
+        hint.textContent = 'Could not fetch saved cards — falling back to default.';
+      }
+    });
 }
 
 function closeCreateLoanModal() {
@@ -3735,6 +3781,11 @@ async function submitCreateLoan() {
         // YYYY-MM-DD, so reify to ISO with T00:00:00.000Z so PostCustomerLoan
         // doesn't reject the format.
         due_date: dueRaw + 'T00:00:00.000Z',
+        // Selected card id from the dropdown. 0 means "use Vergent's
+        // default" (the cif-apply backend treats 0 as the fall-through).
+        prepaid_card_id: Number(
+          (document.getElementById('cl-card-select') || {}).value || 0
+        ),
         send_esign: true,
       }),
     });
