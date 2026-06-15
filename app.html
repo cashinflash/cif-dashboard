@@ -3306,18 +3306,14 @@ function renderDetail(fbId) {
   stTag.className = 'dv-hero-stat-tag ' +
     (_ha === 'funded' ? 'ok' : _ha === 'declined' ? 'no'
      : _legacyActed ? (b === 'approved' ? 'ok' : 'no') : 'warn');
-  // §8.2: on an engine DECLINE the Approve button renders secondary —
-  // overriding stays possible but must feel deliberate (modal + reason).
+  // Override nudges removed (operator request 2026-06-15): the Approve
+  // button always renders primary, regardless of the engine verdict.
   const _apBtn = document.getElementById('dv-approve-btn');
   if (_apBtn) {
-    // Not secondary when the v4 shadow approved — following v4 over the
-    // primary's decline is the expected shadow-phase workflow.
-    const _engDecl = engineVerdict.toLowerCase().startsWith('decl')
-      && (a.v4Decision || '').toUpperCase() !== 'APPROVE';
-    _apBtn.style.background = _engDecl ? 'var(--surface2)' : '';
-    _apBtn.style.color = _engDecl ? 'var(--muted)' : '';
-    _apBtn.style.borderColor = _engDecl ? 'var(--border)' : '';
-    _apBtn.title = _engDecl ? 'Engine declined this file — approving opens a logged override' : '';
+    _apBtn.style.background = '';
+    _apBtn.style.color = '';
+    _apBtn.style.borderColor = '';
+    _apBtn.title = '';
   }
 
   // Recommended decision card
@@ -3514,14 +3510,11 @@ function renderDetail(fbId) {
   // switch only. If we re-set it on every poll, an operator editing
   // the offer would see their input reset every ~8s.
   if (isNewApplicant) {
-    // §8.2: never pre-fill the offer on an engine DECLINE — the
-    // pre-filled amount anchored operators toward funding declines
-    // (the Elvin pattern). Exception: when the v4 shadow APPROVED the
-    // file, pre-fill ITS tier — the operator is following the engine
-    // under validation, not exercising contrary judgement.
-    const _engDeclined = ((a.claudeDecision || '').trim().toLowerCase()).startsWith('decl');
+    // Pre-fill the offer with the best available amount: v4's tier when
+    // v4 approved, else the canonical engine amount. (Override no-prefill
+    // nudge removed 2026-06-15.)
     const _v4Tier = ((a.v4Decision || '').toUpperCase() === 'APPROVE') ? (a.v4Tier || null) : null;
-    const amtNum = _engDeclined ? _v4Tier : parseAmount(a.amount);
+    const amtNum = _v4Tier || parseAmount(a.amount);
     document.getElementById('dv-offer-input').value = amtNum != null ? amtNum.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '';
   }
 
@@ -5463,19 +5456,10 @@ function _recordHumanAction(fbId, status, opts) {
 async function setStatus(fbId, status, opts = {}) {
   const a = apps.find(x => x.firebaseId === fbId);
   if (!a) return;
-  // §8.2: crossing the engine requires the logged-override modal —
-  // EXCEPT approving a file the v4 shadow approved: that's the
-  // expected shadow-phase workflow, so the override is auto-logged
-  // (grading data still flows) without a typed reason.
-  if (!opts.fromOverride && _needsOverride(a, status)) {
-    if (status === 'Approved' && (a.v4Decision || '').toUpperCase() === 'APPROVE') {
-      // engineTier = the CROSSED (primary) engine's tier: 0, it declined.
-      opts = { ...opts, fromOverride: true, engineTier: 0,
-               overrideReason: `Followed v4 engine: APPROVE $${a.v4Tier || '?'} (primary engine: ${a.claudeDecision || 'DECLINED'})` };
-    } else {
-      openOverrideModal(fbId, status); return;
-    }
-  }
+  // Override gating removed (operator request 2026-06-15): approve or
+  // decline ANY file in one click — no reason, no modal, ever. The
+  // silent humanAction stamp (who acted) is kept so auto-vs-manual
+  // labels keep working; it's a background write that never blocks you.
   if (!opts.skipConfirm && !confirm(`${status} ${a.name || 'this applicant'}?`)) return;
   toast('Updating…');
   const _now = Date.now();
@@ -6221,16 +6205,8 @@ document.getElementById('dnl-skip-email')?.addEventListener('click', declineNoEm
 document.getElementById('dnl-ov').addEventListener('click', (e) => { if (e.target.id === 'dnl-ov') closeDenialModal(); });
 document.getElementById('dv-approve-btn').addEventListener('click', async () => {
   const id = _activeFbId(); if (!id) return;
-  const a = apps.find(x => x.firebaseId === id);
-  // §8.2: funding an engine-DECLINE goes through the override modal,
-  // which collects the amount itself — skip saveOffer's empty-input
-  // validation (the offer field deliberately isn't pre-filled here).
-  // Exception: a v4-shadow APPROVE flows straight through (the offer is
-  // pre-filled with v4's tier; setStatus auto-logs the override).
-  if (a && _needsOverride(a, 'Approved')
-      && (a.v4Decision || '').toUpperCase() !== 'APPROVE') {
-    openOverrideModal(id, 'Approved'); return;
-  }
+  // Override gating removed (operator request 2026-06-15): one-click
+  // approve regardless of the engine verdict.
   await saveOffer(id);
   await setStatus(id, 'Approved');
 });
