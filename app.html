@@ -2098,7 +2098,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       <div class="appr-label">Loan Amount</div>
       <div class="appr-amount-row">
         <span class="ccy">$</span>
-        <input type="number" id="cl-amount" min="50" max="1000" step="1" value="255" inputmode="decimal">
+        <input type="number" id="cl-amount" min="100" max="255" step="1" value="255" inputmode="decimal">
       </div>
       <div class="appr-label" style="margin-top:14px">Due Date</div>
       <input type="date" id="cl-due-date" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit">
@@ -3792,10 +3792,17 @@ async function openCreateLoanModal() {
   if (sel)   sel.innerHTML = '<option value="">Loading cards on file…</option>';
   if (hint)  { hint.style.color = 'var(--muted)'; hint.textContent = 'Most recently saved card is at the top.'; }
   if (metaEl) metaEl.textContent = 'Loading…';
-  // Default due date = today + 14 days (CA payday cycle).
-  const due = new Date();
-  due.setDate(due.getDate() + 14);
-  if (dueEl) dueEl.value = due.toISOString().slice(0, 10);
+  // Default due date = today + 14 days (CA payday cycle minimum).
+  // Vergent enforces a 14-day minimum term -- block earlier dates
+  // via the input's min attribute so the operator can't accidentally
+  // pick one that gets rejected. No max -- they can extend if needed.
+  const minDue = new Date();
+  minDue.setDate(minDue.getDate() + 14);
+  const minStr = minDue.toISOString().slice(0, 10);
+  if (dueEl) {
+    dueEl.min = minStr;
+    dueEl.value = minStr;
+  }
   document.getElementById('cl-ov').style.display = 'flex';
   // Fetch the live record from Firebase so we don't depend on whatever
   // the detail view did or didn't populate on a global. /fb/ is the
@@ -3818,8 +3825,10 @@ async function openCreateLoanModal() {
       ? `Customer: ${fullName} • Vergent #${cid}`
       : `Customer: ${fullName} • No Vergent customer yet`;
   }
+  // Pre-fill from the engine-approved amount (or the operator's
+  // overridden amount on the record). Cap to the CA $255 max we lend.
   const amt = Number(rec.amount || ad.requestedAmount || 255);
-  if (amtEl) amtEl.value = String(Math.max(50, Math.min(1000, Math.round(amt))));
+  if (amtEl) amtEl.value = String(Math.max(100, Math.min(255, Math.round(amt))));
   // Hard gate when there's REALLY no Vergent customer (rec confirmed).
   if (!cid) {
     if (resEl) {
@@ -3886,12 +3895,21 @@ async function submitCreateLoan() {
   };
   if (!fbId) { setMsg('#5a0d0d', 'No applicant selected.'); return; }
   const amount = Number(amtEl && amtEl.value);
-  if (!amount || amount < 50 || amount > 1000) {
-    setMsg('#5a0d0d', 'Loan amount must be between $50 and $1,000.');
+  if (!amount || amount < 100 || amount > 255) {
+    setMsg('#5a0d0d', 'Loan amount must be between $100 and $255.');
     return;
   }
   const dueRaw = (dueEl && dueEl.value || '').trim();
   if (!dueRaw) { setMsg('#5a0d0d', 'Due date required.'); return; }
+  // Enforce Vergent's 14-day minimum even if the operator typed past
+  // the input min.
+  const minDueChk = new Date(); minDueChk.setHours(0,0,0,0);
+  minDueChk.setDate(minDueChk.getDate() + 14);
+  const picked = new Date(dueRaw + 'T00:00:00');
+  if (picked < minDueChk) {
+    setMsg('#5a0d0d', 'Due date must be at least 14 days from today (Vergent minimum).');
+    return;
+  }
   if (btn) { btn.disabled = true; btn.style.opacity = '.55'; }
   setMsg('var(--muted)', 'Creating loan + sending e-sign…');
   try {
