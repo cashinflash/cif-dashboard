@@ -3947,7 +3947,14 @@ async function submitCreateLoan() {
     const d = await r.json().catch(() => ({}));
     if (r.ok && d && d.ok) {
       const hdr = d.hdrId || '—';
-      const esign = d.esignSent ? ' • E-sign email sent' : ' • E-sign pending (see Render logs)';
+      // cif-apply now dispatches the e-sign send on a background thread
+      // (waits up to 3 min for Vergent to finish building the doc
+      // package, then fires the saved template). esignDispatched=true
+      // means the worker started; final esignSent lands on Firebase.
+      const esign = d.esignDispatched
+        ? ' • E-sign email will fire when Vergent finishes building docs'
+        : (d.esignSent ? ' • E-sign email sent'
+                       : ' • E-sign pending (see Render logs)');
       setMsg('#1a6b3c', 'Loan #' + hdr + ' created' + esign);
       toast('Loan created in Vergent', 'ok');
       setTimeout(closeCreateLoanModal, 2500);
