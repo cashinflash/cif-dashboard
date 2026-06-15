@@ -2096,10 +2096,11 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     </div>
     <div class="appr-body">
       <div class="appr-label">Loan Amount</div>
-      <div class="appr-amount-row">
+      <div class="appr-amount-row" id="cl-amount-row">
         <span class="ccy">$</span>
-        <input type="number" id="cl-amount" min="100" max="255" step="1" value="255" inputmode="decimal">
+        <input type="number" id="cl-amount" min="100" max="255" step="1" value="255" inputmode="decimal" oninput="_clAmtCheck(this)" onblur="_clAmtCheck(this)">
       </div>
+      <div id="cl-amount-err" style="font-size:11.5px;color:#5a0d0d;margin-top:4px;min-height:14px"></div>
       <div class="appr-label" style="margin-top:14px">Due Date</div>
       <input type="date" id="cl-due-date" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit">
       <div class="appr-label" style="margin-top:14px">Disbursement Card</div>
@@ -3882,6 +3883,30 @@ function closeCreateLoanModal() {
 // The loan-route-sweep proved Originate (flat LoanInfo body) is a
 // separate Vergent controller with its own working mapper. cif-apply's
 // /api/vergent-create-loan chains: Originate -> sendEsignDocs.
+// Live validation for the Create Loan amount input. Outlines the field
+// red and shows an inline hint when out-of-range; greens up + clears
+// hint when valid. Also disables the submit button so the operator
+// can't fire an invalid request.
+function _clAmtCheck(el) {
+  if (!el) return;
+  const row = document.getElementById('cl-amount-row');
+  const err = document.getElementById('cl-amount-err');
+  const btn = document.getElementById('cl-send');
+  const v = Number(el.value);
+  let msg = '';
+  if (el.value === '' || isNaN(v))    msg = 'Enter an amount.';
+  else if (v < 100)                   msg = 'Minimum loan amount is $100.';
+  else if (v > 255)                   msg = 'Maximum loan amount is $255.';
+  const bad = !!msg;
+  if (row) {
+    row.style.borderColor = bad ? '#e84545' : '';
+    row.style.boxShadow   = bad ? '0 0 0 3px rgba(232,69,69,.12)' : '';
+    row.style.background  = bad ? '#fde7e7' : '';
+  }
+  if (err) err.textContent = msg;
+  if (btn) { btn.disabled = bad; btn.style.opacity = bad ? '.55' : ''; }
+}
+
 async function submitCreateLoan() {
   const fbId = document.body.dataset.firebaseId || '';
   const amtEl = document.getElementById('cl-amount');
