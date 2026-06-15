@@ -1305,7 +1305,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 
         <div class="card">
           <div class="card-head">
-            <div class="card-title"><svg class="icn"><use href="#i-clock"/></svg>Today's Activity</div>
+            <div class="card-title"><svg class="icn"><use href="#i-clock"/></svg>Action Center</div>
             <button class="card-link" data-route="queue">View all<svg class="icn"><use href="#i-arrow-right"/></svg></button>
           </div>
           <div class="activity" id="activity-feed">
@@ -1396,7 +1396,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 
     <div class="chips" id="queue-chips">
       <button class="chip active" data-filter="all">All<span class="chip-ct" id="ct-all">0</span></button>
-      <button class="chip" data-filter="Pending">Pending<span class="chip-ct" id="ct-pending">0</span></button>
+      <button class="chip" data-filter="Pending" title="Applications awaiting your decision (auto-declines are already removed)">Needs Review<span class="chip-ct" id="ct-pending">0</span></button>
       <button class="chip" data-filter="Approved">Approved<span class="chip-ct" id="ct-approved">0</span></button>
       <button class="chip" data-filter="Declined">Declined<span class="chip-ct" id="ct-declined">0</span></button>
       <button class="chip" data-filter="auto" title="Declined automatically by the system">Auto-declined<span class="chip-ct" id="ct-auto">0</span></button>
@@ -2700,19 +2700,60 @@ function previousRangeLabel(range) {
 
 // ───────── Counts ─────────
 function bucketStatus(a) {
-  const s = (a.status || '').toLowerCase();
+  const s = (a.status || '').trim().toLowerCase();
   if (s === 'approved') return 'approved';
   if (s === 'declined') return 'declined';
-  if (s === 'pending' || s === '' || s === 'review' || s === 'processing') return 'pending';
-  return 'pending';
+  if (s === 'pending' || s === 'review' || s === 'pending review') return 'pending';
+  // Non-review states must NOT inflate "Pending Review" (the old catch-all
+  // counted these as pending, so the KPI/chip said N but clicking Pending
+  // showed nothing — errored/stuck/retry records that aren't actionable):
+  if (s === 'error') return 'error';
+  if (s.includes('processing') || s.includes('retry') || s.includes('plaid'))
+    return 'processing';
+  if (s === '') return a.processingComplete === false ? 'processing' : 'pending';
+  // Unknown terminal-ish status: show for review (don't silently hide), but
+  // if still mid-pipeline treat as processing.
+  return a.processingComplete === false ? 'processing' : 'pending';
+}
+
+// "Decided" = the engine reached a terminal verdict a human/system acted
+// on. Explicit (not "!== pending") so processing/error never count as
+// decided after the bucketStatus tightening.
+function isDecided(a) {
+  const b = bucketStatus(a);
+  return b === 'approved' || b === 'declined';
+}
+
+// The operator's canonical work set: one row per customer (latest), only
+// the genuinely review-needing ones. Every "needs review" count and view
+// derives from THIS, so the number always equals what you see on click.
+function reviewQueue() {
+  return dedupedApps().filter(a => bucketStatus(a) === 'pending');
+}
+function reviewGroups() {
+  const q = reviewQueue();
+  const dec = a => (a.claudeDecision || '').trim().toLowerCase();
+  return {
+    all: q,
+    fund: q.filter(a => dec(a).startsWith('appr')),                 // engine APPROVE → fund
+    review: q.filter(a => { const d = dec(a); return !d || d.startsWith('review'); }),
+    confirm: q.filter(a => dec(a).startsWith('decl')),              // engine DECLINE held for you
+  };
 }
 
 function counts() {
-  const c = { total: apps.length, pending: 0, approved: 0, declined: 0, auto: 0 };
-  apps.forEach(a => {
+  // Count over the SAME deduped set the queue renders, so each chip's
+  // number always equals the rows you get when you click it.
+  const c = { total: 0, pending: 0, approved: 0, declined: 0, auto: 0,
+              processing: 0, error: 0 };
+  const list = dedupedApps();
+  c.total = list.length;
+  list.forEach(a => {
     const b = bucketStatus(a);
     if (b === 'approved') c.approved++;
     else if (b === 'declined') c.declined++;
+    else if (b === 'processing') c.processing++;
+    else if (b === 'error') c.error++;
     else c.pending++;
     if (a.humanActionBy === 'auto-system') c.auto++;
   });
@@ -2721,11 +2762,14 @@ function counts() {
 
 // ───────── Dashboard ─────────
 function _bucketCounts(list) {
-  const c = { total: list.length, pending: 0, approved: 0, declined: 0 };
+  const c = { total: list.length, pending: 0, approved: 0, declined: 0,
+              processing: 0, error: 0 };
   list.forEach(a => {
     const b = bucketStatus(a);
     if (b === 'approved') c.approved++;
     else if (b === 'declined') c.declined++;
+    else if (b === 'processing') c.processing++;
+    else if (b === 'error') c.error++;
     else c.pending++;
   });
   return c;
@@ -2814,7 +2858,12 @@ function renderDashboard() {
   const cPrev = _bucketCounts(prev);
 
   document.getElementById('kpi-total').textContent = c.total;
-  document.getElementById('kpi-pending').textContent = c.pending;
+  // Total / Approved / Declined are FLOW metrics (what happened in the
+  // selected range). "Pending Review" is a STATE metric — how many need
+  // you right NOW — so it's the current deduped review queue, not
+  // time-filtered. This is the number that must match Applications →
+  // Needs Review (it was diverging before).
+  document.getElementById('kpi-pending').textContent = reviewQueue().length;
   document.getElementById('kpi-approved').textContent = c.approved;
   document.getElementById('kpi-declined').textContent = c.declined;
 
@@ -2833,7 +2882,10 @@ function renderDashboard() {
   const prevLbl = previousRangeLabel(_kpiRange);
   const vsPrev = prevLbl ? `vs ${prevLbl}` : rangeLabel(_kpiRange);
   document.getElementById('kpi-total-trend').innerHTML = trendLine(c.total, cPrev.total, vsPrev);
-  document.getElementById('kpi-pending-trend').innerHTML = trendLine(c.pending, cPrev.pending, vsPrev);
+  // Pending is current-state (not a flow vs previous period), so show a
+  // plain "awaiting you now" label instead of a misleading trend arrow.
+  document.getElementById('kpi-pending-trend').innerHTML =
+    '<span class="stat-trend-sub">awaiting you now</span>';
   document.getElementById('kpi-approved-trend').innerHTML = decided ? `<svg class="icn"><use href="#i-up"/></svg>${apprRate}%<span class="stat-trend-sub">approval rate</span>` : `<span class="stat-trend-sub">${rangeLabel(_kpiRange)}</span>`;
   document.getElementById('kpi-declined-trend').innerHTML = decided ? `<svg class="icn"><use href="#i-down"/></svg>${declRate}%<span class="stat-trend-sub">decline rate</span>` : `<span class="stat-trend-sub">${rangeLabel(_kpiRange)}</span>`;
 
@@ -2863,33 +2915,80 @@ function renderDashboard() {
   document.getElementById('leg-approved').innerHTML = `${dc.approved}<span class="donut-leg-pct">${Math.round(aPct)}%</span>`;
   document.getElementById('leg-declined').innerHTML = `${dc.declined}<span class="donut-leg-pct">${Math.round(dPct)}%</span>`;
 
-  // ── Activity (last 8 events from raw apps) ──
-  const feed = document.getElementById('activity-feed');
-  if (apps.length === 0) {
-    feed.innerHTML = '<div class="tbl-empty">No activity yet.</div>';
-  } else {
-    const recent = apps.slice(0, 8);
-    feed.innerHTML = recent.map(a => {
-      const b = bucketStatus(a);
-      const cls = b === 'approved' ? 'ok' : b === 'declined' ? 'no' : 'warn';
-      const num = b === 'approved' ? '✓' : b === 'declined' ? '✕' : '◷';
-      const sub = a.v4ReasonLine || a.reason || a.email || a.phone || '';
-      return `<div class="activity-row" data-fb="${escapeHtml(a.firebaseId)}">
-        <div class="act-icon ${cls}">${num}</div>
-        <div class="act-text"><div class="act-label">${escapeHtml(a.name || 'Unnamed')} · ${escapeHtml(a.status || 'Pending')}</div><div class="act-sub">${escapeHtml(sub)}</div></div>
-        <div class="act-time">${fmtTimeAgo(a.createdAt)}</div>
-      </div>`;
-    }).join('');
-  }
+  // ── Action Center: what needs you (grouped) | what the system handled ──
+  renderActionCenter();
 
   // ── Performance MTD: averages across decided apps this month ──
   renderPerformance();
 }
 
+// Two-column cockpit: LEFT = what needs your decision (fund-first,
+// grouped by what the engine wants from you); RIGHT = what the system
+// auto-declined today (for a quick QA scan). All derived from existing
+// fields — pure display, no engine exposure.
+function renderActionCenter() {
+  const feed = document.getElementById('activity-feed');
+  if (!feed) return;
+  const g = reviewGroups();
+  const _today = (() => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
+  const autoToday = dedupedApps().filter(a =>
+    a.humanActionBy === 'auto-system' && (a.humanActionAt || a.createdAt || 0) >= _today);
+
+  const row = (a, icon, cls, sub) =>
+    `<div class="activity-row" data-fb="${escapeHtml(a.firebaseId)}">
+       <div class="act-icon ${cls}">${icon}</div>
+       <div class="act-text"><div class="act-label">${escapeHtml(a.name || 'Unnamed')}</div>
+       <div class="act-sub">${escapeHtml(sub || '')}</div></div>
+       <div class="act-time">${fmtTimeAgo(a.createdAt)}</div></div>`;
+
+  const section = (title, color, items, icon, cls, subOf) => {
+    if (!items.length) return '';
+    const rows = items.slice(0, 6).map(a => row(a, icon, cls, subOf(a))).join('');
+    const more = items.length > 6
+      ? `<div style="padding:6px 22px;font-size:11px;color:var(--muted)">+${items.length - 6} more…</div>` : '';
+    return `<div style="font-size:11px;font-weight:800;letter-spacing:.04em;color:${color};
+              text-transform:uppercase;padding:8px 22px 4px">${title} · ${items.length}</div>${rows}${more}`;
+  };
+
+  const _AUTO_BUCKET = { out_of_state: 'out-of-state', no_income: 'no income',
+                         dead_balance: 'low balance / no survival' };
+
+  const left =
+    `<div style="font-size:12px;font-weight:700;color:var(--text);padding:10px 22px 2px">
+       Needs your review · ${g.all.length}</div>` +
+    (g.all.length === 0
+      ? '<div class="tbl-empty" style="padding:18px 22px">All caught up — nothing awaiting you 🎉</div>'
+      : (section('Ready to fund', 'var(--green)', g.fund, '💰', 'ok',
+           a => 'Engine: APPROVE' + (parseAmount(a.amount) ? ' $' + parseAmount(a.amount) : '')) +
+         section('Needs a decision', 'var(--amber-700)', g.review, '🔎', 'warn',
+           a => a.v4ReasonLine || a.reason || 'Review') +
+         section('Engine declined — confirm/override', 'var(--red)', g.confirm, '⚖️', 'no',
+           a => a.v4ReasonLine || a.reason || 'Declined by engine')));
+
+  const right =
+    `<div style="font-size:12px;font-weight:700;color:var(--text);padding:10px 22px 2px">
+       Auto-declined today · ${autoToday.length}</div>` +
+    (autoToday.length === 0
+      ? '<div class="tbl-empty" style="padding:18px 22px">None yet today.</div>'
+      : autoToday.slice(0, 10).map(a =>
+          row(a, 'A', 'no', (_AUTO_BUCKET[a.autoDeclineBucket] || a.autoDeclineBucket || 'auto-declined')))
+          .join('') +
+        (autoToday.length > 10
+          ? `<div style="padding:6px 22px;font-size:11px;color:var(--muted)">
+               +${autoToday.length - 10} more — <a href="#" onclick="setRoute('queue');document.querySelector('#queue-chips .chip[data-filter=auto]')?.click();return false;" style="color:var(--blue)">view all</a></div>`
+          : ''));
+
+  feed.innerHTML =
+    `<div style="display:flex;flex-wrap:wrap;gap:0">
+       <div style="flex:1 1 320px;min-width:280px;border-right:1px solid var(--border-soft)">${left}</div>
+       <div style="flex:1 1 280px;min-width:240px">${right}</div>
+     </div>`;
+}
+
 function renderPerformance() {
   const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
   const inMonth = apps.filter(a => a.createdAt >= monthStart.getTime());
-  const decidedMonth = inMonth.filter(a => bucketStatus(a) !== 'pending');
+  const decidedMonth = inMonth.filter(a => isDecided(a));
   const apprMonth = decidedMonth.filter(a => bucketStatus(a) === 'approved').length;
   const decRate = decidedMonth.length ? Math.round((apprMonth / decidedMonth.length) * 100) : 0;
 
@@ -2921,17 +3020,17 @@ function renderPerformance() {
 
   // Sparklines — 4-week trend (rolling decided rate / fcf / score)
   drawSpark('spark-rate', _weeklyTrend(apps, w => {
-    const dec = w.filter(a => bucketStatus(a) !== 'pending');
+    const dec = w.filter(a => isDecided(a));
     if (!dec.length) return null;
     return dec.filter(a => bucketStatus(a) === 'approved').length / dec.length;
   }), 'var(--green)');
   drawSpark('spark-fcf', _weeklyTrend(apps, w => {
-    const dec = w.filter(a => bucketStatus(a) !== 'pending');
+    const dec = w.filter(a => isDecided(a));
     const v = dec.map(a => Number(a.fcf || 0)).filter(n => !isNaN(n));
     return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
   }), 'var(--green)');
   drawSpark('spark-score', _weeklyTrend(apps, w => {
-    const dec = w.filter(a => bucketStatus(a) !== 'pending');
+    const dec = w.filter(a => isDecided(a));
     const v = dec.map(a => Number(a.score)).filter(n => !isNaN(n) && n > 0);
     return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
   }), 'var(--green)');
@@ -2985,7 +3084,7 @@ function avgScore() {
 // ───────── Queue ─────────
 function filteredApps() {
   const q = currentSearch.trim().toLowerCase();
-  return dedupedApps().filter(a => {
+  const out = dedupedApps().filter(a => {
     if (currentFilter === 'auto') {
       if ((a.humanActionBy || '') !== 'auto-system') return false;
     } else if (currentFilter !== 'all' && bucketStatus(a) !== currentFilter.toLowerCase()) {
@@ -2997,6 +3096,17 @@ function filteredApps() {
     }
     return true;
   });
+  // Fund-first ordering on the Needs Review view: engine APPROVE (your
+  // money, time-sensitive) at the top, then REVIEW, then held DECLINES
+  // to confirm — newest-first within each group.
+  if (currentFilter === 'Pending') {
+    const rank = a => {
+      const d = (a.claudeDecision || '').trim().toLowerCase();
+      return d.startsWith('appr') ? 0 : (!d || d.startsWith('review')) ? 1 : 2;
+    };
+    out.sort((a, b) => rank(a) - rank(b) || (b.createdAt || 0) - (a.createdAt || 0));
+  }
+  return out;
 }
 
 function renderQueue() {
@@ -3014,14 +3124,15 @@ function renderQueue() {
   // Aging
   const now = Date.now();
   const day = 24 * 3600 * 1000;
-  const old = apps.filter(a => bucketStatus(a) === 'pending' && a.createdAt && (now - a.createdAt) > day).length;
-  const mid = apps.filter(a => bucketStatus(a) === 'pending' && a.createdAt && (now - a.createdAt) > 12 * 3600 * 1000 && (now - a.createdAt) <= day).length;
-  const fresh = apps.filter(a => bucketStatus(a) === 'pending' && a.createdAt && (now - a.createdAt) <= 12 * 3600 * 1000).length;
+  const _rq = reviewQueue();
+  const old = _rq.filter(a => a.createdAt && (now - a.createdAt) > day).length;
+  const mid = _rq.filter(a => a.createdAt && (now - a.createdAt) > 12 * 3600 * 1000 && (now - a.createdAt) <= day).length;
+  const fresh = _rq.filter(a => a.createdAt && (now - a.createdAt) <= 12 * 3600 * 1000).length;
   document.getElementById('age-old').querySelector('.qi-num').textContent = old;
   document.getElementById('age-mid').querySelector('.qi-num').textContent = mid;
   document.getElementById('age-new').querySelector('.qi-num').textContent = fresh;
   document.getElementById('age-today').textContent = apps.filter(a => isToday(a.createdAt)).length;
-  document.getElementById('age-decisions').textContent = apps.filter(a => isToday(a.createdAt) && bucketStatus(a) !== 'pending').length;
+  document.getElementById('age-decisions').textContent = apps.filter(a => isToday(a.createdAt) && isDecided(a)).length;
 
   document.getElementById('queue-sub').innerHTML = `<b>${c.total}</b> applications · <b>${c.pending}</b> pending · live-synced`;
 
