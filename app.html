@@ -2117,6 +2117,47 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   </div>
 </div>
 
+<!-- Edit Applicant Info modal — lets the operator correct application
+     fields (e.g. a malformed DOB that Vergent's create rejects) BEFORE
+     Create Customer / Create Loan. Writes applicationData via the same
+     _fbPatchRaw -> /fb/ PATCH proxy status changes use; PATCH merges, so
+     untouched fields (debitCard, plaid token, etc.) are preserved.
+     Purely additive; default-hidden like the other .appr-ov modals. -->
+<div class="appr-ov" id="edit-ov">
+  <style>#edit-ov .ea-in{width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit;box-sizing:border-box}</style>
+  <div class="appr-card">
+    <div class="appr-head">
+      <div>
+        <div class="appr-title">Edit Applicant Info</div>
+        <div class="appr-meta" id="edit-meta">—</div>
+      </div>
+      <button onclick="closeEditAppModal()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1" title="Close">&times;</button>
+    </div>
+    <div class="appr-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 12px">
+        <div><div class="appr-label">First Name</div><input id="ea-firstName" class="ea-in"></div>
+        <div><div class="appr-label">Middle Name</div><input id="ea-middleName" class="ea-in"></div>
+        <div><div class="appr-label">Last Name</div><input id="ea-lastName" class="ea-in"></div>
+        <div><div class="appr-label">Date of Birth</div><input id="ea-dob" class="ea-in" placeholder="MM/DD/YYYY"></div>
+        <div><div class="appr-label">SSN</div><input id="ea-ssn" class="ea-in" placeholder="123-45-6789"></div>
+        <div><div class="appr-label">Phone</div><input id="ea-phone" class="ea-in"></div>
+        <div style="grid-column:1 / -1"><div class="appr-label">Email</div><input id="ea-email" class="ea-in"></div>
+        <div style="grid-column:1 / -1"><div class="appr-label">Address</div><input id="ea-address" class="ea-in"></div>
+        <div style="grid-column:1 / -1"><div class="appr-label">Address Line 2</div><input id="ea-address2" class="ea-in"></div>
+        <div><div class="appr-label">City</div><input id="ea-city" class="ea-in"></div>
+        <div><div class="appr-label">State</div><input id="ea-state" class="ea-in"></div>
+        <div><div class="appr-label">ZIP</div><input id="ea-zip" class="ea-in"></div>
+      </div>
+      <div id="ea-err" style="font-size:11.5px;color:#5a0d0d;margin-top:8px;min-height:14px"></div>
+      <div id="ea-result" style="font-size:12px;margin-top:4px;min-height:16px"></div>
+    </div>
+    <div class="appr-actions">
+      <button class="btn btn-ghost" type="button" onclick="closeEditAppModal()">Cancel</button>
+      <button class="btn-approve-send" type="button" id="ea-save" onclick="saveEditApp()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- §8.2 override modal — logged override when the operator crosses the
      engine: funding an engine-DECLINE (heavy red) or declining an
      engine-APPROVE (lighter amber). Requires a typed reason (min 20
@@ -3552,6 +3593,7 @@ function buildAppDetails(d) {
   }
   function sec(title) { return `<div class="app-data-section">${escapeHtml(title)}</div>`; }
   return `<div class="app-data">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:4px"><button onclick="openEditAppModal()" style="background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit" title="Correct application fields (e.g. a wrong DOB) before pushing to Vergent">✏️ Edit Info</button></div>
     ${sec('Personal Information')}
     ${row('First Name', d.firstName, 'fname')}
     ${row('Middle Name', d.middleName, 'mname')}
@@ -3870,6 +3912,109 @@ async function openCreateLoanModal() {
 function closeCreateLoanModal() {
   const ov = document.getElementById('cl-ov');
   if (ov) ov.style.display = 'none';
+}
+
+// ── Edit Applicant Info ──────────────────────────────────────────────
+// Correct application fields (e.g. a malformed DOB Vergent rejects)
+// before Create Customer / Create Loan. Writes applicationData via
+// _fbPatchRaw -> /fb/ PATCH (the same proxy status changes use). PATCH
+// merges, so untouched fields (debitCard, plaid token, etc.) are safe.
+const _EDIT_APP_FIELDS = ['firstName','middleName','lastName','dob','ssn',
+  'phone','email','address','address2','city','state','zip'];
+
+function _eaValidDob(dob) {
+  if (!dob) return true;            // empty is allowed; create handles it
+  let mm, dd, yy;
+  if (dob.indexOf('/') >= 0) {
+    const p = dob.split('/'); if (p.length !== 3) return false;
+    mm = +p[0]; dd = +p[1]; yy = +p[2];
+  } else if (dob.indexOf('-') >= 0) {
+    const p = dob.split('-'); if (p.length !== 3) return false;
+    if (p[0].length === 4) { yy = +p[0]; mm = +p[1]; dd = +p[2]; }
+    else { mm = +p[0]; dd = +p[1]; yy = +p[2]; }
+  } else { return false; }
+  return mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31 && yy >= 1900 && yy <= 2100;
+}
+
+async function openEditAppModal() {
+  const fbId = document.body.dataset.firebaseId || '';
+  if (!fbId) { toast('No applicant selected.', 'err'); return; }
+  window._editAppFbId = fbId;
+  const err = document.getElementById('ea-err');
+  const res = document.getElementById('ea-result');
+  if (err) err.textContent = '';
+  if (res) { res.textContent = ''; res.style.color = 'var(--muted)'; }
+  // Prefill from the live record (same /fb/ source the create-loan modal uses).
+  let rec = {};
+  try {
+    const r = await fetch('/fb/reports/' + encodeURIComponent(fbId) + '.json',
+                          { credentials: 'include' });
+    if (r.ok) rec = (await r.json().catch(function () { return {}; })) || {};
+  } catch (e) { /* fall through with empty rec */ }
+  const ad = rec.applicationData || {};
+  _EDIT_APP_FIELDS.forEach(function (k) {
+    const el = document.getElementById('ea-' + k);
+    if (el) el.value = (ad[k] == null ? '' : String(ad[k]));
+  });
+  const meta = document.getElementById('edit-meta');
+  if (meta) meta.textContent =
+    ((ad.firstName || '') + ' ' + (ad.lastName || '')).trim() || fbId;
+  const ov = document.getElementById('edit-ov');
+  if (ov) ov.style.display = 'flex';
+}
+
+function closeEditAppModal() {
+  const ov = document.getElementById('edit-ov');
+  if (ov) ov.style.display = 'none';
+}
+
+async function saveEditApp() {
+  const fbId = window._editAppFbId || document.body.dataset.firebaseId || '';
+  if (!fbId) { toast('No applicant selected.', 'err'); return; }
+  const err = document.getElementById('ea-err');
+  const res = document.getElementById('ea-result');
+  const btn = document.getElementById('ea-save');
+  if (err) err.textContent = '';
+  const vals = {};
+  _EDIT_APP_FIELDS.forEach(function (k) {
+    const el = document.getElementById('ea-' + k);
+    if (el) vals[k] = (el.value || '').trim();
+  });
+  if (!_eaValidDob(vals.dob)) {
+    if (err) err.textContent =
+      'Date of Birth must be a real date — MM/DD/YYYY, e.g. 08/27/1988.';
+    return;
+  }
+  if (vals.email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(vals.email)) {
+    if (err) err.textContent =
+      'Email needs an @ and a domain, e.g. name@domain.com.';
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+  if (res) { res.style.color = 'var(--muted)'; res.textContent = 'Saving…'; }
+  try {
+    await _fbPatchRaw(
+      'reports/' + encodeURIComponent(fbId) + '/applicationData.json', vals);
+    // Reflect the edit in the in-memory record so the detail re-renders
+    // with the new values (Create Customer reads fresh from /fb/ anyway).
+    try {
+      const a = (typeof apps !== 'undefined' && apps)
+        ? apps.find(function (x) { return x.firebaseId === fbId; }) : null;
+      if (a) { a.applicationData = Object.assign({}, a.applicationData || {}, vals); }
+    } catch (e) { /* non-fatal */ }
+    if (res) { res.style.color = '#1a6b3c';
+               res.textContent = 'Saved. You can now Create Customer / Loan.'; }
+    setTimeout(function () {
+      closeEditAppModal();
+      try { if (document.body.dataset.firebaseId === fbId) renderDetail(fbId); }
+      catch (e) { /* non-fatal */ }
+    }, 800);
+  } catch (e) {
+    if (res) { res.style.color = '#5a0d0d';
+               res.textContent = 'Save failed: ' + ((e && e.message) || e); }
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  }
 }
 
 // Create Loan -- now fully headless via the /loan/Originate endpoint.
