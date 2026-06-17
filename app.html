@@ -808,6 +808,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 .vg-headline a{color:var(--green-dark);text-decoration:none;font-weight:800}
 .vg-meta{font-size:11.5px;color:var(--muted);font-weight:500;line-height:1.45}
 .vg-checks{display:flex;flex-wrap:wrap;gap:6px}
+.vg-checks-note{font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-50);border:1px solid var(--green-200);border-radius:7px;padding:5px 9px}
 .vg-check{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--text2);padding:5px 9px;border:1px solid var(--border);border-radius:7px;cursor:pointer;background:white;user-select:none}
 .vg-check input{margin:0;width:12px;height:12px;accent-color:var(--green);cursor:pointer}
 .vg-check.has{border-color:var(--green-200);background:var(--green-50);color:var(--green-dark)}
@@ -4833,11 +4834,12 @@ function renderVergentPanel(fbId) {
   }
   const status = (m.status || 'unknown').toLowerCase();
 
+  // Statement + DL checkboxes removed (operator request): both docs are
+  // ALWAYS required on create/push, so the checkboxes were noise + a
+  // footgun. _vgGetSelected() now always returns both kinds. A small
+  // static line reassures the operator both docs go. Note input kept.
   const checkboxes = `
-    <div class="vg-checks">
-      <label class="vg-check has"><input type="checkbox" id="vg-push-statement" checked> Statement</label>
-      <label class="vg-check has"><input type="checkbox" id="vg-push-dl" checked> DL</label>
-    </div>
+    <div class="vg-checks-note">Driver's License + Bank Statement are always included.</div>
     <input class="vg-note-input" id="vg-note" placeholder="Note for Vergent (optional, e.g. Approved $100)">
   `;
 
@@ -4916,18 +4918,13 @@ function renderVergentPanel(fbId) {
 }
 
 function _vgGetSelected() {
-  const stmt = document.getElementById('vg-push-statement');
-  const dl = document.getElementById('vg-push-dl');
   const note = document.getElementById('vg-note');
-  const doc_kinds = [];
-  // Server (cif-apply vergent_phase2.handle_push_to_vergent) reads
-  // doc_kinds from the body and defaults to ['bank_statement'] when
-  // missing — sending push_statement/push_dl booleans was being silently
-  // ignored, which is why DL pushes were quietly pushing the statement.
-  if (!stmt || stmt.checked) doc_kinds.push('bank_statement');
-  if (!dl || dl.checked) doc_kinds.push('drivers_license');
+  // Checkboxes removed (operator request): Statement + DL are ALWAYS
+  // sent on every create/push. Returning both unconditionally guarantees
+  // the DL can never silently drop. (Kept reading no DOM state so this
+  // can't be affected by markup changes.)
   return {
-    doc_kinds,
+    doc_kinds: ['bank_statement', 'drivers_license'],
     note: note ? note.value : ''
   };
 }
@@ -5058,18 +5055,13 @@ async function _vgRunNoteOnly(fbId, text) {
 function _vgUpdateButtonLabel() {
   const card = document.getElementById('vg-card');
   if (!card) return;
-  const stmt = document.getElementById('vg-push-statement');
-  const dl = document.getElementById('vg-push-dl');
-  const note = document.getElementById('vg-note');
-  const anyChecked = (stmt && stmt.checked) || (dl && dl.checked);
-  const hasNote = note && (note.value || '').trim().length > 0;
-  // Update the primary push button (found state) — uses
-  // [data-vg-primary] so we don't conflict with create / use-id /
-  // re-check.
+  // Doc checkboxes were removed (operator request) — Statement + DL are
+  // ALWAYS sent now, so the found-state primary push button reads
+  // "Push docs" unconditionally. The note is optional metadata and
+  // doesn't change what's pushed. Uses [data-vg-primary] so we don't
+  // touch the create / use-id / re-check buttons.
   card.querySelectorAll('[data-vg-primary]').forEach(btn => {
-    if (anyChecked) btn.innerHTML = '↗ Push selected';
-    else if (hasNote) btn.innerHTML = '✎ Push note';
-    else btn.innerHTML = '↗ Push';
+    btn.innerHTML = '↗ Push docs';
   });
 }
 
