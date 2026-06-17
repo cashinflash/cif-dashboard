@@ -769,11 +769,14 @@ _PHASE2_PANEL_HTML = ("""
       var pushed = match.vergentPushedDocs || {};
       var bsTag = pushed.bank_statement  ? ' ✓' : '';
       var dlTag = pushed.drivers_license ? ' ✓' : '';
+      // Statement + DL are ALWAYS pushed on every Push action (operator
+      // request: they're required, the checkboxes were noise). The
+      // pushed-tags inline ("DL ✓ · Statement ✓") still show what's
+      // already on file in Vergent.
       html = '<span class="v2pill v2pill-found">✓ Vergent: #' + cid + '</span>'
         + docsHint
-        + '<label class="v2kind"><input type="checkbox" name="kind" value="bank_statement" checked> Statement' + bsTag + '</label>'
-        + '<label class="v2kind"><input type="checkbox" name="kind" value="drivers_license"> DL' + dlTag + '</label>'
-        + '<button type="button" class="v2btn" data-action="push">↗ Push selected</button>'
+        + '<span class="v2b-meta">Will push: DL' + dlTag + ' · Statement' + bsTag + '</span>'
+        + '<button type="button" class="v2btn" data-action="push">↗ Push docs</button>'
         + '<span class="v2b-result"></span>';
 
     } else if (status === 'not_found') {
@@ -793,12 +796,12 @@ _PHASE2_PANEL_HTML = ("""
           + '<button type="button" class="v2btn sec" data-action="recheck">↻ Re-check</button>'
           + '<span class="v2b-result"></span>';
       } else {
+        // Statement + DL are always sent on Create + Push (operator
+        // request: they're required, the checkboxes were noise).
         html = '<span class="v2pill v2pill-notfound">+ Vergent: New</span>'
           + docsHint
-          + '<label class="v2kind"><input type="checkbox" name="kind" value="bank_statement" checked> Statement</label>'
-          + '<label class="v2kind"><input type="checkbox" name="kind" value="drivers_license" checked> DL</label>'
           + '<input type="text" class="v2note" data-action="note-input" placeholder="Note for Vergent (optional, e.g. Approved $100)" maxlength="200">'
-          + '<button type="button" class="v2btn" data-action="create-and-push">↗ Create + Push selected</button>'
+          + '<button type="button" class="v2btn" data-action="create-and-push">↗ Create Customer + Push docs</button>'
           + '<button type="button" class="v2btn sec" data-action="recheck">↻ Re-check</button>'
           + '<span class="v2b-result"></span>';
       }
@@ -811,12 +814,12 @@ _PHASE2_PANEL_HTML = ("""
         return '<label class="v2cand"><input type="radio" name="vcand" value="' + escAttr(cid2) + '"'
           + (i === 0 ? ' checked' : '') + '> #' + escAttr(cid2) + (nm ? ' ' + escAttr(nm) : '') + '</label>';
       }).join('');
+      // Statement + DL are always pushed on Use + Push (operator
+      // request: they're required, the checkboxes were noise).
       html = '<span class="v2pill v2pill-ambig">⚠ Vergent: ' + (match.totalCount || cands.length) + ' matches</span>'
         + docsHint
         + rows
-        + '<label class="v2kind"><input type="checkbox" name="kind" value="bank_statement" checked> Statement</label>'
-        + '<label class="v2kind"><input type="checkbox" name="kind" value="drivers_license"> DL</label>'
-        + '<button type="button" class="v2btn" data-action="push-pick">↗ Use + Push selected</button>'
+        + '<button type="button" class="v2btn" data-action="push-pick">↗ Use + Push docs</button>'
         + '<button type="button" class="v2btn sec" data-action="recheck">↻ Re-check</button>'
         + '<span class="v2b-result"></span>';
 
@@ -931,12 +934,16 @@ _PHASE2_PANEL_HTML = ("""
     if (resultEl) resultEl.textContent = 'Pushing...';
     badge.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
 
-    // All push actions read the kind checkboxes if present, defaulting
-    // to bank_statement only when none are. This keeps the UX uniform
-    // across Existing / New / Ambiguous: same checkboxes everywhere.
+    // Checkboxes were removed (operator request) -- both Statement and
+    // DL are required on every push. We still read any surviving
+    // input[name="kind"] for forward compatibility (in case the
+    // checkboxes ever come back), but default to BOTH docs so nothing
+    // ever silently ships without the DL.
     var checkedKinds = Array.from(badge.querySelectorAll('input[name="kind"]:checked'))
       .map(function(c) { return c.value; });
-    var docKinds = checkedKinds.length ? checkedKinds : ['bank_statement'];
+    var docKinds = checkedKinds.length
+      ? checkedKinds
+      : ['bank_statement', 'drivers_license'];
 
     var reqBody = { firebase_id: fbId, doc_kinds: docKinds };
     if (action === 'create-and-push') {
@@ -991,6 +998,15 @@ _PHASE2_PANEL_HTML = ("""
             sum.className = 'v2populated';
             sum.textContent = bits.join(' · ');
             resultEl.parentNode.insertBefore(sum, resultEl.nextSibling);
+          }
+          // Auto-recheck after a successful Create + Push so the badge
+          // flips from "+ Vergent: New" to "✓ Vergent: #N" without the
+          // operator having to click Re-check. Small delay gives the
+          // success message a beat to read; callRecheck swaps the badge
+          // to the `found` render. Only fires on `create-and-push` so
+          // we don't double-call for the simple Push docs path.
+          if (action === 'create-and-push') {
+            setTimeout(function() { callRecheck(fbId, badge); }, 1200);
           }
         } else {
           // Surface the actual Vergent response body first — that's what
