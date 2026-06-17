@@ -823,18 +823,6 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
    AND from the parent flex container's gap calculation, so the next
    visible field (Due Date / footer) sits flush. */
 #cl-ov #cl-amount-err:empty,#cl-ov #cl-result:empty{display:none}
-/* Create Customer modal — same tight visual language as Create Loan,
-   scoped so #appr-ov (approval email) keeps its generous spacing. */
-#cc-ov .appr-card{max-width:420px}
-#cc-ov .appr-head{padding:14px 18px 12px}
-#cc-ov .appr-title{font-size:14.5px}
-#cc-ov .appr-meta{font-size:11.5px}
-#cc-ov .appr-body{padding:14px 18px;gap:8px}
-#cc-ov .appr-label{font-size:10.5px;margin-top:0}
-#cc-ov .appr-actions{padding:11px 18px;gap:8px}
-#cc-ov .appr-actions .btn-ghost{flex:1}
-#cc-ov .btn-approve-send{flex:1.4 !important;padding:8px 12px;font-size:12.5px}
-#cc-ov #cc-result:empty{display:none}
 .btn-approve-send:hover{background:#14532d;border-color:#14532d}
 .btn-approve-send:disabled{opacity:.5;cursor:not-allowed}
 .btn-approve-send .icn{width:14px;height:14px;stroke-width:2.25}
@@ -1562,7 +1550,6 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
                 <div class="profile-status-label" id="profile-status-label">Checking Vergent…</div>
                 <div class="profile-status-sub" id="profile-status-sub">Loading customer profile</div>
               </div>
-              <span id="profile-bank-badge" style="display:none;align-items:center;gap:5px;background:var(--green-50);color:var(--green-dark);border:1px solid var(--green-200);padding:6px 11px;border-radius:999px;font-size:11.5px;font-weight:700;letter-spacing:.02em;margin-right:6px"><svg class="icn" style="width:13px;height:13px"><use href="#i-bank"/></svg>Bank Connected</span>
               <button class="btn btn-ghost" id="profile-vergent-recheck" type="button" title="Re-check Vergent for an existing customer record" style="display:none"><svg class="icn"><use href="#i-refresh"/></svg>Re-check</button>
               <a class="btn btn-ghost" id="profile-vergent-link" href="#" target="_blank" rel="noopener" style="display:none"><svg class="icn"><use href="#i-external"/></svg>Open in Vergent</a>
             </div>
@@ -1671,11 +1658,28 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
           <div class="dv-rail-section">
             <div class="dv-rail-title">Quick Actions</div>
             <div class="qa-grid">
+              <!-- Create Customer (operator request: top of Quick
+                   Actions, identical visual to Create Loan). Hidden by
+                   default; renderProfilePanel toggles visibility based
+                   on the applicant's Vergent status (not_found / new /
+                   unknown -> shown; found / ambiguous / error ->
+                   hidden). Clicking expands the inline note panel
+                   below. -->
+              <button class="qa-btn qa-btn-emerald" id="dv-create-customer-btn" style="display:none" title="Create the customer in Vergent and push their DL + Bank Statement"><svg class="icn"><use href="#i-user"/></svg>Create Customer</button>
+              <div id="dv-create-customer-expand" style="display:none;border:1px solid #b2d9c0;background:#f0faf4;border-radius:8px;padding:10px">
+                <div style="font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Note for Vergent (optional)</div>
+                <textarea id="dv-cc-note" rows="3" maxlength="200" placeholder="e.g. Approved for $100" style="width:100%;border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:12.5px;font-family:inherit;resize:vertical;min-height:56px;box-sizing:border-box"></textarea>
+                <div id="dv-cc-status" style="font-size:11.5px;color:var(--muted);margin-top:6px;min-height:14px"></div>
+                <div style="display:flex;gap:6px;margin-top:8px">
+                  <button class="btn btn-ghost" id="dv-cc-cancel" type="button" style="flex:1">Cancel</button>
+                  <button class="qa-btn qa-btn-emerald" id="dv-cc-confirm" type="button" style="flex:1.4"><svg class="icn"><use href="#i-user"/></svg>Create Customer</button>
+                </div>
+              </div>
+              <button class="qa-btn qa-btn-emerald" id="dv-create-loan-btn" onclick="openCreateLoanModal()" title="Create a loan agreement in Vergent for this applicant and trigger the e-sign email"><svg class="icn"><use href="#i-zap"/></svg>Create Loan</button>
               <!-- Re-Run Report split-action: one button label, two
                    modes via the adjacent <select>. Default = stored
                    data (the cheap, common case); operator can flip to
-                   "with fresh Plaid pull" when needed. Replaces the
-                   two separate Re-Run / Refresh buttons. -->
+                   "with fresh Plaid pull" when needed. -->
               <div class="qa-btn-group" style="display:flex;gap:6px;align-items:stretch">
                 <button class="qa-btn" id="dv-rerun-btn" style="flex:1" title="Re-run the report. Use the dropdown to pick: stored data (fast) or with a fresh Plaid pull."><svg class="icn"><use href="#i-refresh"/></svg>Re-Run Report</button>
                 <select id="dv-rerun-mode" title="Pick the source data for the re-run" style="border:1px solid var(--border);border-radius:8px;padding:0 8px;font-size:12px;font-family:inherit;background:#fff;cursor:pointer">
@@ -1689,7 +1693,6 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
                    resolving instead of throwing. The dropdown above is
                    the new UI surface. -->
               <button class="qa-btn" id="dv-refresh-plaid-btn" style="display:none" aria-hidden="true" tabindex="-1"></button>
-              <button class="qa-btn qa-btn-emerald" id="dv-create-loan-btn" onclick="openCreateLoanModal()" title="Create a loan agreement in Vergent for this applicant and trigger the e-sign email"><svg class="icn"><use href="#i-zap"/></svg>Create Loan</button>
             </div>
           </div>
           <!-- Vergent rail — hidden for found customers via renderVergentPanel
@@ -2181,30 +2184,6 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     <div class="appr-actions">
       <button class="btn btn-ghost" type="button" onclick="closeCreateLoanModal()">Cancel</button>
       <button class="btn-approve-send" type="button" id="cl-send" onclick="submitCreateLoan()"><svg class="icn"><use href="#i-zap"/></svg>Create Loan</button>
-    </div>
-  </div>
-</div>
-
-<!-- Create Customer modal — opens from the Vergent "Create Customer"
-     button. Mirrors the Create Loan modal's structure so the design
-     family stays consistent. Note pre-fills with the approved amount. -->
-<div class="appr-ov" id="cc-ov">
-  <div class="appr-card">
-    <div class="appr-head">
-      <div>
-        <div class="appr-title"><svg class="icn"><use href="#i-user"/></svg>Create Customer</div>
-        <div class="appr-meta" id="cc-meta">Customer: —</div>
-      </div>
-      <button onclick="closeCreateCustomerModal()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1" title="Close">&times;</button>
-    </div>
-    <div class="appr-body">
-      <div class="appr-label">Note for Vergent (optional)</div>
-      <textarea id="cc-note" rows="3" maxlength="200" placeholder="e.g. Approved for \$100" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:13.5px;font-family:inherit;resize:vertical;min-height:64px"></textarea>
-      <div id="cc-result" style="font-size:12px"></div>
-    </div>
-    <div class="appr-actions">
-      <button class="btn btn-ghost" type="button" onclick="closeCreateCustomerModal()">Cancel</button>
-      <button class="btn-approve-send" type="button" id="cc-send" onclick="submitCreateCustomer()"><svg class="icn"><use href="#i-user"/></svg>Create Customer</button>
     </div>
   </div>
 </div>
@@ -4070,69 +4049,6 @@ function closeCreateLoanModal() {
   if (ov) ov.style.display = 'none';
 }
 
-// ── Create Customer modal (Vergent push) ────────────────────────────
-// Opened from the redesigned Vergent rail (single "Create Customer"
-// button). Pre-fills the note with "Approved for \$X" using the same
-// rec.amount source the Create Loan modal reads (saveOffer writes
-// '\$N' strings; parseAmount handles both that and raw numbers).
-let _ccActiveFbId = '';
-function openCreateCustomerModal(fbId) {
-  if (!fbId) return;
-  _ccActiveFbId = fbId;
-  const a = (typeof apps !== 'undefined' && apps)
-    ? apps.find(x => x.firebaseId === fbId) : null;
-  const ad = (a && a.applicationData) || {};
-  const fullName = ((ad.firstName || '') + ' ' + (ad.lastName || '')).trim()
-    || (a && a.name) || '—';
-  const metaEl = document.getElementById('cc-meta');
-  if (metaEl) metaEl.textContent = 'Customer: ' + fullName;
-  // Note pre-fill: "Approved for \$X" (or just the placeholder if no
-  // approval is on record yet -- e.g. operator is creating ad-hoc).
-  const noteEl = document.getElementById('cc-note');
-  if (noteEl) {
-    const amt = a ? parseAmount(a.amount) : null;
-    noteEl.value = amt != null ? ('Approved for $' + Math.round(amt)) : '';
-  }
-  const res = document.getElementById('cc-result');
-  if (res) { res.textContent = ''; res.style.color = 'var(--muted)'; }
-  const send = document.getElementById('cc-send');
-  if (send) { send.disabled = false; send.style.opacity = ''; }
-  const ov = document.getElementById('cc-ov');
-  if (ov) ov.style.display = 'flex';
-  // Autofocus the textarea so the operator can tweak the note instantly.
-  setTimeout(() => { if (noteEl) noteEl.focus(); }, 30);
-}
-
-function closeCreateCustomerModal() {
-  const ov = document.getElementById('cc-ov');
-  if (ov) ov.style.display = 'none';
-}
-
-async function submitCreateCustomer() {
-  const fbId = _ccActiveFbId || _activeFbId();
-  if (!fbId) { toast('No applicant selected.', 'err'); return; }
-  const send = document.getElementById('cc-send');
-  const res  = document.getElementById('cc-result');
-  const note = ((document.getElementById('cc-note') || {}).value || '').trim();
-  if (send) { send.disabled = true; send.style.opacity = '.6'; }
-  if (res)  { res.style.color = 'var(--muted)'; res.textContent = 'Creating customer in Vergent…'; }
-  try {
-    // Delegate to the existing vergentPush() pipeline so the entire
-    // create-and-push path (Firebase enrichment write, populated.card
-    // alert, auto-recheck, error surfacing) stays in ONE function.
-    // _vgGetSelected returns both docs unconditionally now; we just
-    // pre-set the note input before calling.
-    const noteInput = document.getElementById('vg-note');
-    if (noteInput) noteInput.value = note;
-    closeCreateCustomerModal();
-    await vergentPush(fbId, true);
-  } catch (e) {
-    if (res) { res.style.color = '#5a0d0d';
-               res.textContent = 'Create failed: ' + ((e && e.message) || e); }
-  } finally {
-    if (send) { send.disabled = false; send.style.opacity = ''; }
-  }
-}
 
 // ── Edit Applicant Info ──────────────────────────────────────────────
 // Correct application fields (e.g. a malformed DOB Vergent rejects)
@@ -4580,24 +4496,29 @@ function renderProfilePanel(fbId) {
   const subEl = document.getElementById('profile-status-sub');
   const linkEl = document.getElementById('profile-vergent-link');
 
-  // Bank Connected badge — shown when the customer has an active Plaid
-  // access_token (meaning the App Links / Portal Links flow can re-pull
-  // a fresh asset report at any time without prompting the customer to
-  // reconnect). Asset-token-only records aren't "live" (token refers to
-  // a single static snapshot), so they don't qualify.
-  const bankBadgeEl = document.getElementById('profile-bank-badge');
-  if (bankBadgeEl) {
-    const hasActivePlaid = !!(a.plaidAccessToken || ad.plaidAccessToken);
-    bankBadgeEl.style.display = hasActivePlaid ? 'inline-flex' : 'none';
-  }
+  // (Bank Connected badge removed -- the right-rail Documents section
+  // already shows Plaid vs Bank Statement accurately.)
   if (linkEl) linkEl.style.display = 'none';
   // Re-check button: visible only when there's NOT a matched Vergent
   // customer yet (status: not_found / new / ambiguous / error / pending).
   // Hidden on 'found' since the operator has nothing left to re-check.
   const recheckBtn = document.getElementById('profile-vergent-recheck');
-  if (recheckBtn) {
-    const matchedHere = m && (m.status || '').toLowerCase() === 'found';
-    recheckBtn.style.display = matchedHere ? 'none' : 'inline-flex';
+  const matchedHere = m && (m.status || '').toLowerCase() === 'found';
+  if (recheckBtn) recheckBtn.style.display = matchedHere ? 'none' : 'inline-flex';
+  // Create Customer button (rail Quick Actions): shown ONLY for the
+  // not_found / new state, where the operator's next action is to
+  // create the Vergent record. Hidden on found (already exists),
+  // ambiguous (operator picks from a match list in the Vergent rail),
+  // error (operator re-checks first), and the loading state.
+  const createCustBtn = document.getElementById('dv-create-customer-btn');
+  const createCustExpand = document.getElementById('dv-create-customer-expand');
+  if (createCustBtn) {
+    const ms = m ? (m.status || '').toLowerCase() : '';
+    const showCreate = !!m && (ms === 'not_found' || ms === 'new');
+    createCustBtn.style.display = showCreate ? 'inline-flex' : 'none';
+    // Auto-collapse the expand panel when the button hides (e.g. status
+    // flipped to found after auto-recheck).
+    if (!showCreate && createCustExpand) createCustExpand.style.display = 'none';
   }
 
   if (!m) {
@@ -5106,19 +5027,13 @@ function renderVergentPanel(fbId) {
         <div class="vg-actions"><button class="vg-btn vg-btn-ghost" onclick="vergentRecheck('${fbId}')">↻ Re-check</button></div>
         <div class="vg-result" id="vg-result"></div>`;
     } else {
-      statusPill.textContent = 'New';
-      statusPill.className = 'vg-status new';
-      // Clean redesign (operator request): a single Create Customer
-      // button styled like the Create Loan button. Clicking opens a
-      // modal with a note input pre-filled with 'Approved for \$X'.
-      // The Re-check button moved to the profile-status banner above.
-      card.innerHTML = `
-        <button class="vg-btn vg-btn-primary vg-btn-large" data-vg-create-customer="${fbId}"><svg class="icn"><use href="#i-user"/></svg>Create Customer</button>
-        <div class="vg-result" id="vg-result"></div>`;
-      // Wire the click → opens the new modal (defined below). Using a
-      // delegated approach so we don't depend on inline onclick.
-      const btn = card.querySelector('[data-vg-create-customer]');
-      if (btn) btn.addEventListener('click', () => openCreateCustomerModal(fbId));
+      // not_found: the Create Customer button now lives in Quick
+      // Actions (rail), with an inline expand for the note. Hide the
+      // entire Vergent rail section so there's no duplicate UI.
+      if (rail) rail.style.display = 'none';
+      _restoreNote();
+      _vgWireDynamicLabel();
+      return;
     }
   } else if (status === 'ambiguous' && Array.isArray(m.matches)) {
     statusPill.textContent = m.matches.length + ' matches';
@@ -6634,6 +6549,64 @@ document.getElementById('dv-delete-btn').addEventListener('click', () => { const
 document.getElementById('profile-vergent-recheck')?.addEventListener('click', () => {
   const id = _activeFbId(); if (id) vergentRecheck(id);
 });
+// Quick Actions: Create Customer inline-expand flow. Click the button
+// to reveal the note panel pre-filled with the approved amount; cancel
+// to collapse; confirm to fire the existing vergentPush(fbId, true)
+// path (auto-recheck + persistent enrichment alert all remain wired).
+function _ccOpenExpand() {
+  const id = _activeFbId(); if (!id) return;
+  const a = (typeof apps !== 'undefined' && apps)
+    ? apps.find(x => x.firebaseId === id) : null;
+  const btn = document.getElementById('dv-create-customer-btn');
+  const exp = document.getElementById('dv-create-customer-expand');
+  const note = document.getElementById('dv-cc-note');
+  const status = document.getElementById('dv-cc-status');
+  const confirm = document.getElementById('dv-cc-confirm');
+  if (btn) btn.style.display = 'none';
+  if (exp) exp.style.display = '';
+  if (status) status.textContent = '';
+  if (confirm) { confirm.disabled = false; confirm.style.opacity = ''; }
+  if (note) {
+    const amt = a ? parseAmount(a.amount) : null;
+    note.value = amt != null ? ('Approved for $' + Math.round(amt)) : '';
+    setTimeout(() => { note.focus(); note.select && note.select(); }, 30);
+  }
+}
+function _ccCancelExpand() {
+  const btn = document.getElementById('dv-create-customer-btn');
+  const exp = document.getElementById('dv-create-customer-expand');
+  if (exp) exp.style.display = 'none';
+  if (btn) btn.style.display = 'inline-flex';
+}
+async function _ccConfirmExpand() {
+  const id = _activeFbId(); if (!id) return;
+  const note = document.getElementById('dv-cc-note');
+  const status = document.getElementById('dv-cc-status');
+  const confirm = document.getElementById('dv-cc-confirm');
+  const noteText = ((note && note.value) || '').trim();
+  if (confirm) { confirm.disabled = true; confirm.style.opacity = '.6'; }
+  if (status) { status.style.color = 'var(--muted)';
+                status.textContent = 'Creating customer in Vergent…'; }
+  // Hand the note off to the existing #vg-note input (which vergentPush
+  // reads via _vgGetSelected) so the entire backend pipeline stays
+  // identical. Re-render is handled by vergentPush -> loadVergentMatch
+  // -> renderProfilePanel which also collapses this panel on success.
+  const vgNote = document.getElementById('vg-note');
+  if (vgNote) vgNote.value = noteText;
+  try {
+    await vergentPush(id, true);
+    // Auto-collapse after a successful push so the panel doesn't sit
+    // open over "Existing Customer" once auto-recheck flips the status.
+    _ccCancelExpand();
+  } catch (e) {
+    if (status) { status.style.color = '#5a0d0d';
+                  status.textContent = 'Create failed: ' + ((e && e.message) || e); }
+    if (confirm) { confirm.disabled = false; confirm.style.opacity = ''; }
+  }
+}
+document.getElementById('dv-create-customer-btn')?.addEventListener('click', _ccOpenExpand);
+document.getElementById('dv-cc-cancel')?.addEventListener('click', _ccCancelExpand);
+document.getElementById('dv-cc-confirm')?.addEventListener('click', _ccConfirmExpand);
 // "Mark resolved" on the persistent card-save-failed alert. Operator-
 // only action: doesn't change anything in Vergent; just records that
 // the human has acknowledged + handled the failure. Patches the
