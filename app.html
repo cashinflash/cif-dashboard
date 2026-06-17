@@ -164,6 +164,9 @@ button,input,select{font-family:inherit}
 /* ANALYTICS OVERVIEW — small cards beneath the donut showing
    Servicing snapshot (Due Today / Tomorrow / This Week / Past Due) */
 .analytics-overview{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 22px 22px;border-top:1px solid var(--border-soft);padding-top:18px;margin-top:4px}
+.analytics-section-title{padding:14px 22px 6px;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;border-top:1px solid var(--border-soft)}
+.analytics-section-title + .analytics-overview{border-top:none !important;padding-top:0 !important;margin-top:0 !important}
+.analytics-overview-2col{grid-template-columns:repeat(2,1fr) !important}
 .analytics-ov-cell{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 12px 12px;text-align:center;cursor:pointer;transition:all .12s}
 .analytics-ov-cell:hover{background:#ecfdf5;border-color:#a7e8c2;transform:translateY(-1px);box-shadow:0 2px 8px rgba(15,40,30,.06)}
 .analytics-ov-label{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
@@ -1212,6 +1215,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     <symbol id="i-external" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></symbol>
     <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></symbol>
     <symbol id="i-key" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
   </defs>
 </svg>
 
@@ -1331,13 +1335,22 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
               <div class="donut-leg-item"><span class="donut-leg-dot" style="background:#dc2626"></span><span class="donut-leg-name">Declined</span><span class="donut-leg-value" id="leg-declined">0<span class="donut-leg-pct" id="leg-declined-pct">0%</span></span></div>
             </div>
           </div>
-          <!-- Payments overview under the donut. Populated by
-               renderAnalyticsOverview() from the Servicing data. -->
+          <!-- Payments Due (Servicing). Populated by
+               renderAnalyticsOverview(). -->
+          <div class="analytics-section-title">Payments Due</div>
           <div class="analytics-overview">
             <div class="analytics-ov-cell" onclick="_openServicingBucket('up-today')"><div class="analytics-ov-label">Due Today</div><div class="analytics-ov-value" id="ov-due-today">—</div><div class="analytics-ov-amt" id="ov-due-today-amt">$0</div></div>
             <div class="analytics-ov-cell" onclick="_openServicingBucket('up-tomorrow')"><div class="analytics-ov-label">Due Tomorrow</div><div class="analytics-ov-value" id="ov-due-tomorrow">—</div><div class="analytics-ov-amt" id="ov-due-tomorrow-amt">$0</div></div>
             <div class="analytics-ov-cell" onclick="_openServicingBucket('up-week')"><div class="analytics-ov-label">Due This Week</div><div class="analytics-ov-value" id="ov-due-week">—</div><div class="analytics-ov-amt" id="ov-due-week-amt">$0</div></div>
             <div class="analytics-ov-cell" onclick="_openServicingBucket(null)"><div class="analytics-ov-label">Past Due</div><div class="analytics-ov-value pastdue" id="ov-past-due">—</div><div class="analytics-ov-amt pastdue" id="ov-past-due-amt">$0</div></div>
+          </div>
+          <!-- Payments (today). Two wide cells matching the row above
+               so the strip stays balanced. Populated by
+               renderAnalyticsPaymentsToday() from /api/payments-today. -->
+          <div class="analytics-section-title">Payments</div>
+          <div class="analytics-overview analytics-overview-2col">
+            <div class="analytics-ov-cell" onclick="navigate('payments')"><div class="analytics-ov-label">Today's Approved</div><div class="analytics-ov-value" id="ov-pay-approved-amt">$0</div><div class="analytics-ov-amt" id="ov-pay-approved-ct">—</div></div>
+            <div class="analytics-ov-cell" onclick="navigate('payments')"><div class="analytics-ov-label">Today's Funded</div><div class="analytics-ov-value" id="ov-pay-funded-amt">$0</div><div class="analytics-ov-amt" id="ov-pay-funded-ct">—</div></div>
           </div>
         </div>
 
@@ -1522,8 +1535,8 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
           </div>
         </div>
         <div class="dv-hero-stats" id="dv-stats">
-          <div class="dv-hero-stat"><div class="dv-hero-stat-lbl">Loans</div><div class="dv-hero-stat-val" id="dv-loans-count">—</div><div class="dv-hero-stat-tag" id="dv-loans-tag">total</div></div>
-          <div class="dv-hero-stat"><div class="dv-hero-stat-lbl">Avg Days Late</div><div class="dv-hero-stat-val" id="dv-avg-days-late">—</div><div class="dv-hero-stat-tag" id="dv-avg-days-late-tag">across history</div></div>
+          <div class="dv-hero-stat" id="dv-hero-loans"><div class="dv-hero-stat-lbl">Loans</div><div class="dv-hero-stat-val" id="dv-loans-count">—</div><div class="dv-hero-stat-tag" id="dv-loans-tag">total</div></div>
+          <div class="dv-hero-stat" id="dv-hero-avg-late"><div class="dv-hero-stat-lbl">Avg Days Late</div><div class="dv-hero-stat-val" id="dv-avg-days-late">—</div><div class="dv-hero-stat-tag" id="dv-avg-days-late-tag">across history</div></div>
           <div class="dv-hero-stat"><div class="dv-hero-stat-lbl">Engine / Action</div><div class="dv-hero-stat-val" id="dv-status">—</div><div class="dv-hero-stat-tag" id="dv-status-tag">—</div></div>
         </div>
       </div>
@@ -1681,7 +1694,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
                    data (the cheap, common case); operator can flip to
                    "with fresh Plaid pull" when needed. -->
               <div class="qa-btn-group" style="display:flex;gap:6px;align-items:stretch">
-                <button class="qa-btn" id="dv-rerun-btn" style="flex:1" title="Re-run the report. Use the dropdown to pick: stored data (fast) or with a fresh Plaid pull."><svg class="icn"><use href="#i-refresh"/></svg>Re-Run Report</button>
+                <button class="qa-btn" id="dv-rerun-btn" style="flex:1" title="Re-run the report. Use the dropdown to pick: stored data (fast) or with a fresh Plaid pull."><svg class="icn"><use href="#i-refresh"/></svg>Re-Run</button>
                 <select id="dv-rerun-mode" title="Pick the source data for the re-run" style="border:1px solid var(--border);border-radius:8px;padding:0 8px;font-size:12px;font-family:inherit;background:#fff;cursor:pointer">
                   <option value="stored" selected>Stored data</option>
                   <option value="plaid">Fresh Plaid pull</option>
@@ -2904,7 +2917,56 @@ function _openServicingBucket(bucketKey) {
   setRoute('reports');
 }
 
+// Cache for the dashboard "Payments" (today) cards. 5-minute TTL.
+let _paymentsTodayCache = null;
+let _paymentsTodayPending = false;
+function _paintPaymentsToday(totals) {
+  const approvedAmtEl = document.getElementById('ov-pay-approved-amt');
+  const approvedCtEl  = document.getElementById('ov-pay-approved-ct');
+  const fundedAmtEl   = document.getElementById('ov-pay-funded-amt');
+  const fundedCtEl    = document.getElementById('ov-pay-funded-ct');
+  if (!approvedAmtEl) return;
+  const ax = totals.total_approved_amount || 0;
+  const ac = totals.total_approved_count  || 0;
+  const fx = totals.total_funding_amount  || 0;
+  const fc = totals.total_funding_count   || 0;
+  approvedAmtEl.textContent = typeof _payFmtMoneyShort === 'function'
+    ? _payFmtMoneyShort(ax) : ('$' + Math.round(ax));
+  approvedCtEl.textContent  = `${ac} payment${ac === 1 ? '' : 's'}`;
+  fundedAmtEl.textContent   = typeof _payFmtMoneyShort === 'function'
+    ? _payFmtMoneyShort(fx) : ('$' + Math.round(fx));
+  fundedCtEl.textContent    = `${fc} disbursement${fc === 1 ? '' : 's'}`;
+}
+async function renderAnalyticsPaymentsToday() {
+  // Paint cached immediately so dashboard re-renders don't clear the
+  // cards while a refetch is in flight.
+  if (_paymentsTodayCache) {
+    _paintPaymentsToday(_paymentsTodayCache.totals);
+    if (Date.now() - _paymentsTodayCache.fetchedAt < 5 * 60 * 1000) return;
+  }
+  if (_paymentsTodayPending) return;
+  _paymentsTodayPending = true;
+  try {
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const r = await fetch('/api/vergent-card-payments', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ start_date: today, end_date: today }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.ok) {
+      _paymentsTodayCache = { totals: d.totals || {}, fetchedAt: Date.now() };
+      _paintPaymentsToday(_paymentsTodayCache.totals);
+    }
+  } catch (e) { /* non-fatal */ }
+  finally { _paymentsTodayPending = false; }
+}
+
 async function renderAnalyticsOverview() {
+  // Kick the Payments-today fetch in parallel; it has its own cache and
+  // never blocks the Servicing donut + Due cards.
+  renderAnalyticsPaymentsToday();
   if (_analyticsOverviewInFlight) return _analyticsOverviewInFlight;
   if (Date.now() - _analyticsOverviewLoadedAt < 60000 && _pastDueRows && _upcomingRows) {
     _paintAnalyticsOverview();
@@ -3353,6 +3415,21 @@ function renderDetail(fbId) {
   const loansTag = document.getElementById('dv-loans-tag');
   const avgEl = document.getElementById('dv-avg-days-late');
   const avgTag = document.getElementById('dv-avg-days-late-tag');
+  // Smart-hide: hide both LOANS + AVG DAYS LATE entirely when there's
+  // no Vergent record. The Engine / Action card flex-expands to fill
+  // the freed space so the hero strip never looks broken (operator
+  // requested: empty placeholder cards were noise on new applicants).
+  // When loans data is present but cache is still loading, keep them
+  // visible with the '…' state so the strip layout is stable.
+  const heroLoans = document.getElementById('dv-hero-loans');
+  const heroAvg   = document.getElementById('dv-hero-avg-late');
+  if (vmStatus !== 'found') {
+    if (heroLoans) heroLoans.style.display = 'none';
+    if (heroAvg)   heroAvg.style.display = 'none';
+  } else {
+    if (heroLoans) heroLoans.style.display = '';
+    if (heroAvg)   heroAvg.style.display = '';
+  }
   if (vmStatus !== 'found') {
     loansEl.textContent = '—';
     loansTag.textContent = 'no Vergent record';
@@ -4891,10 +4968,43 @@ async function loadVergentLoans(fbId) {
 // load. Operators can still click "Re-check" manually after that.
 const _autoRecheckedFbIds = new Set();
 
+// Persistent localStorage cache of CONFIRMED 'found' Vergent matches.
+// Operator point: a Vergent customer record can't be deleted -- once
+// we've seen status='found' for an fbId, it stays found forever. So we
+// remember it across page loads / tabs / sessions and prime
+// _vergentMatchCache immediately on boot. This makes opening a
+// previously-confirmed applicant feel instant instead of waiting on the
+// /fb/reports/.../vergentMatch.json round-trip.
+//
+// Only 'found' matches are cached -- not_found / ambiguous / error /
+// pending are intentionally allowed to round-trip every open because
+// they're the states where Vergent data might still be changing.
+const _VG_FOUND_LS_KEY = 'cif.vergentFoundCache.v1';
+try {
+  const stored = JSON.parse(localStorage.getItem(_VG_FOUND_LS_KEY) || '{}');
+  Object.keys(stored).forEach(fbId => {
+    const m = stored[fbId];
+    if (m && (m.status || '').toLowerCase() === 'found' && m.customerId) {
+      _vergentMatchCache[fbId] = m;
+    }
+  });
+} catch (e) { /* corrupt entry / quota / private mode -- non-fatal */ }
+function _vgRememberFound(fbId, m) {
+  if (!m || (m.status || '').toLowerCase() !== 'found' || !m.customerId) return;
+  try {
+    const stored = JSON.parse(localStorage.getItem(_VG_FOUND_LS_KEY) || '{}');
+    stored[fbId] = m;
+    localStorage.setItem(_VG_FOUND_LS_KEY, JSON.stringify(stored));
+  } catch (e) { /* quota -- non-fatal */ }
+}
+
 async function loadVergentMatch(fbId) {
   try {
     const m = await fbGet(`reports/${fbId}/vergentMatch.json`);
     _vergentMatchCache[fbId] = m && typeof m === 'object' && !m.error ? m : null;
+    // Persist any newly confirmed 'found' match so the next page open
+    // primes from localStorage and skips the Firebase round-trip.
+    _vgRememberFound(fbId, _vergentMatchCache[fbId]);
   } catch (e) {
     _vergentMatchCache[fbId] = null;
   }
