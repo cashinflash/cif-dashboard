@@ -808,7 +808,6 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 .vg-headline a{color:var(--green-dark);text-decoration:none;font-weight:800}
 .vg-meta{font-size:11.5px;color:var(--muted);font-weight:500;line-height:1.45}
 .vg-checks{display:flex;flex-wrap:wrap;gap:6px}
-.vg-checks-note{font-size:11px;font-weight:600;color:var(--green-dark);background:var(--green-50);border:1px solid var(--green-200);border-radius:7px;padding:5px 9px}
 .vg-check{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--text2);padding:5px 9px;border:1px solid var(--border);border-radius:7px;cursor:pointer;background:white;user-select:none}
 .vg-check input{margin:0;width:12px;height:12px;accent-color:var(--green);cursor:pointer}
 .vg-check.has{border-color:var(--green-200);background:var(--green-50);color:var(--green-dark)}
@@ -3396,11 +3395,16 @@ function renderDetail(fbId) {
   // Show "Re-extract from PDF" only for PDF-upload applicants — Plaid
   // applicants re-pull via "Refresh from Plaid" (there's no PDF of ours
   // to re-read). Source-aware: one Quick Actions area, the right mode shown.
+  // Bank-method flags — hoisted to function scope so the right-rail
+  // Documents section below uses the SAME source of truth as the
+  // Re-extract button visibility check. Stays accurate regardless of
+  // whether the applicant connected via Plaid (apply.cashinflash.com or
+  // portal) or uploaded a bank statement PDF.
+  const _bm = (ad.bankMethod || a.bankMethod || a.filename || '').toLowerCase();
+  const _isPlaid = _bm.includes('plaid') || !!(a.plaidAssetToken || a.plaidAccessToken || ad.plaidAccessToken);
+  const _hasStmt = !!(a.bankStatementUrl || ad.bankStatementUrl);
   const _reBtn = document.getElementById('dv-reextract-btn');
   if (_reBtn) {
-    const _bm = (ad.bankMethod || a.bankMethod || a.filename || '').toLowerCase();
-    const _isPlaid = _bm.includes('plaid') || !!(a.plaidAssetToken || a.plaidAccessToken || ad.plaidAccessToken);
-    const _hasStmt = !!(a.bankStatementUrl || ad.bankStatementUrl);
     _reBtn.style.display = (_hasStmt && !_isPlaid) ? '' : 'none';
   }
   const monthlyIncome = Number(a.monthlyIncome || 0);
@@ -3446,11 +3450,23 @@ function renderDetail(fbId) {
   // duplicated rail readout. (Element guard kept so any old reference
   // doesn't throw if a stale poll fires during an upgrade window.)
 
-  // Documents (right rail — short list)
+  // Documents (right rail — short list). Accurately distinguishes how
+  // the applicant supplied their bank info: Plaid-connected (bankMethod
+  // mentions plaid, OR we have an asset/access token) vs. uploaded
+  // statement (we have a bankStatementUrl but no Plaid token). _isPlaid
+  // / _hasStmt above already do exactly this; reuse them as the source
+  // of truth so the rail and the rest of the page never disagree.
   const docs = document.getElementById('dv-docs');
   const railDocs = [];
-  if (a.filename) railDocs.push({ name: a.filename, meta: 'Bank Statement' });
-  if (ad.bankStatementUrl) railDocs.push({ name: 'Bank Statement', meta: 'Linked' });
+  if (_isPlaid) {
+    railDocs.push({ name: 'Bank — Plaid connected', meta: 'Linked' });
+  } else if (_hasStmt) {
+    railDocs.push({ name: 'Bank Statement (uploaded)', meta: 'Linked' });
+  } else if (a.filename) {
+    // Last-resort fallback: a raw filename without a typed bankMethod.
+    // Show what we have so the operator can spot it.
+    railDocs.push({ name: a.filename, meta: 'Bank Statement' });
+  }
   if (ad.driverLicenseUrl || ad.dlUrl) railDocs.push({ name: 'Driver License', meta: 'Linked' });
   if (a.applicationData) railDocs.push({ name: 'Application', meta: 'On file' });
   if (railDocs.length === 0) docs.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0">No documents on file.</div>';
@@ -4816,6 +4832,23 @@ function renderVergentPanel(fbId) {
   const rail = document.getElementById('dv-rail-vergent');
   if (!card || !statusPill) return;
   const m = _vergentMatchCache[fbId];
+  // PRESERVE OPERATOR-TYPED INPUTS ACROSS RE-RENDERS. Background polls
+  // (loadReports / loadVergentMatch firing after the docs-applicant
+  // auto-recheck completes ~10-15s later) re-call this function and
+  // rewrite card.innerHTML, which would otherwise wipe the half-typed
+  // note. Snapshot here, restore at the end below.
+  const _prevNoteInput = card.querySelector('#vg-note');
+  const _prevNoteValue = _prevNoteInput ? _prevNoteInput.value : null;
+  const _prevNoteFocused = (_prevNoteInput &&
+    document.activeElement === _prevNoteInput);
+  const _restoreNote = () => {
+    if (_prevNoteValue == null) return;
+    const el = card.querySelector('#vg-note');
+    if (el && !el.value) {
+      el.value = _prevNoteValue;
+      if (_prevNoteFocused) el.focus();
+    }
+  };
   // Existing customers don't need the right-rail Vergent shortcut —
   // operators push docs / notes via the dedicated Documents and Notes
   // tabs instead. Hide the entire rail section in that case so the
@@ -4823,23 +4856,22 @@ function renderVergentPanel(fbId) {
   // (new / ambiguous / error / pending).
   const matched = m && (m.status || '').toLowerCase() === 'found';
   if (rail) rail.style.display = matched ? 'none' : '';
-  if (matched) return;  // nothing to render — section is hidden
+  if (matched) { _restoreNote(); return; }  // nothing to render — section is hidden
   if (!m) {
     statusPill.textContent = 'Pending';
     statusPill.className = 'vg-status';
     card.innerHTML = `<div class="vg-pending">No Vergent match data yet.</div>
       <div class="vg-actions"><button class="vg-btn vg-btn-ghost" onclick="vergentRecheck('${fbId}')">↻ Re-check now</button></div>
       <div class="vg-result" id="vg-result"></div>`;
+    _restoreNote();
     return;
   }
   const status = (m.status || 'unknown').toLowerCase();
 
-  // Statement + DL checkboxes removed (operator request): both docs are
-  // ALWAYS required on create/push, so the checkboxes were noise + a
-  // footgun. _vgGetSelected() now always returns both kinds. A small
-  // static line reassures the operator both docs go. Note input kept.
+  // Operator-clean layout: no checkboxes, no help text. Both docs
+  // always send (handled in _vgGetSelected); only the optional note
+  // input is shown.
   const checkboxes = `
-    <div class="vg-checks-note">Driver's License + Bank Statement are always included.</div>
     <input class="vg-note-input" id="vg-note" placeholder="Note for Vergent (optional, e.g. Approved $100)">
   `;
 
@@ -4877,10 +4909,9 @@ function renderVergentPanel(fbId) {
       statusPill.className = 'vg-status new';
       card.innerHTML = `
         <div class="vg-headline">No matching customer</div>
-        <div class="vg-meta">Will create a new Vergent record and push the selected documents.</div>
         ${checkboxes}
         <div class="vg-actions">
-          <button class="vg-btn vg-btn-primary" onclick="vergentPush('${fbId}', true)">+ Create Customer</button>
+          <button class="vg-btn vg-btn-primary" onclick="vergentPush('${fbId}', true)">Create Customer</button>
           <button class="vg-btn vg-btn-ghost" onclick="vergentRecheck('${fbId}')">↻ Re-check</button>
         </div>
         <div class="vg-result" id="vg-result"></div>`;
@@ -4914,6 +4945,7 @@ function renderVergentPanel(fbId) {
       <div class="vg-actions"><button class="vg-btn vg-btn-ghost" onclick="vergentRecheck('${fbId}')">↻ Re-check now</button></div>
       <div class="vg-result" id="vg-result"></div>`;
   }
+  _restoreNote();
   _vgWireDynamicLabel();
 }
 
