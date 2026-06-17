@@ -739,6 +739,19 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 
 /* Danger Zone in the detail right rail */
 .dv-rail-danger{padding-top:16px;border-top:1px solid var(--red-100);margin-top:auto}
+/* Persistent debit-card-save-failed alert. Mirrors the existing red
+   alert design tokens. Renders inside the right rail above Quick
+   Actions; only shown when rec.vergentEnrichment.results.card.ok ===
+   false. Dismiss writes vergentEnrichment.dismissed = true. */
+.dv-card-alert{background:#fde7e7;border:1px solid #f5c2c2;border-left:3px solid #b91c1c;border-radius:8px;padding:10px 12px;display:flex;align-items:flex-start;gap:9px}
+.dv-card-alert-icon{font-size:16px;line-height:1;margin-top:1px}
+.dv-card-alert-body{flex:1;min-width:0}
+.dv-card-alert-title{font-size:12.5px;font-weight:800;color:#5a0d0d;letter-spacing:.01em}
+.dv-card-alert-detail{font-size:11px;color:#7a2222;margin-top:3px;line-height:1.4;word-break:break-word}
+.dv-card-alert-detail:empty{display:none}
+.dv-card-alert-hint{font-size:10.5px;color:#7a2222;margin-top:6px;line-height:1.4;opacity:.85}
+.dv-card-alert-dismiss{margin-top:8px;background:white;color:#5a0d0d;border:1px solid #f5c2c2;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer}
+.dv-card-alert-dismiss:hover{background:#fef2f2;border-color:#b91c1c}
 .dv-rail-danger-btn{width:100%;padding:9px 14px;border-radius:8px;background:var(--red-50);color:var(--red);border:1px solid var(--red-200);font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:all .12s}
 .dv-rail-danger-btn:hover{background:var(--red);color:white;border-color:var(--red)}
 .dv-rail-danger-btn .icn{width:13px;height:13px;stroke-width:2.5}
@@ -1627,6 +1640,17 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
                next to the operator's other tools (delete + push).
                Decline + Approve stay at the top because they're the
                primary outcome decisions. -->
+          <div class="dv-rail-section" id="dv-rail-card-alert" style="display:none">
+            <div class="dv-card-alert">
+              <div class="dv-card-alert-icon">⚠️</div>
+              <div class="dv-card-alert-body">
+                <div class="dv-card-alert-title">Debit card not saved to Vergent</div>
+                <div class="dv-card-alert-detail" id="dv-card-alert-detail"></div>
+                <div class="dv-card-alert-hint">Confirm the card in Vergent or contact the customer if their card was rejected.</div>
+                <button class="dv-card-alert-dismiss" id="dv-card-alert-dismiss" type="button">✓ Mark resolved</button>
+              </div>
+            </div>
+          </div>
           <div class="dv-rail-section">
             <div class="dv-rail-title">Quick Actions</div>
             <div class="qa-grid">
@@ -3463,6 +3487,34 @@ function renderDetail(fbId) {
   // duplicated rail readout. (Element guard kept so any old reference
   // doesn't throw if a stale poll fires during an upgrade window.)
 
+  // Right-rail "debit card not saved" alert. Persistent (Firebase-backed,
+  // not a toast) so the operator can confirm the card in Vergent on
+  // their own time without losing visibility of the failure. Only shown
+  // when:
+  //   - vergentEnrichment.results.card exists and ok === false, AND
+  //   - the detail isn't a 'no debitCard on record' skip, AND
+  //   - the operator hasn't dismissed it with "Mark resolved".
+  // Cleared automatically when a subsequent push lands with card.ok=true
+  // (vergentPush overwrites vergentEnrichment).
+  try {
+    const cardAlert = document.getElementById('dv-rail-card-alert');
+    if (cardAlert) {
+      const en = a.vergentEnrichment || {};
+      const cardR = (en.results && en.results.card) || null;
+      const detail = (cardR && cardR.detail) || '';
+      const isSkipNoCard = /^no |^skipped:/i.test(detail) || /no debitCard/i.test(detail);
+      const failed = cardR && cardR.ok === false && !isSkipNoCard;
+      const dismissed = !!en.dismissed;
+      if (failed && !dismissed) {
+        cardAlert.style.display = '';
+        const det = document.getElementById('dv-card-alert-detail');
+        if (det) det.textContent = detail.slice(0, 220);
+      } else {
+        cardAlert.style.display = 'none';
+      }
+    }
+  } catch (e) { /* non-fatal */ }
+
   // Documents (right rail — short list). Accurately distinguishes how
   // the applicant supplied their bank info: Plaid-connected (bankMethod
   // mentions plaid, OR we have an asset/access token) vs. uploaded
@@ -5064,6 +5116,17 @@ async function _vgRunPush(fbId, body, opts) {
       if (failed.length) msg += ` — but ${failed.join(', ')} failed`;
       else if (skipped.length) msg += ` · skipped (no data): ${skipped.join(', ')}`;
       _vgShow(failed.length ? 'warn' : 'ok', msg);
+      // Persist enrichment outcomes so the right-rail "card not saved"
+      // alert can survive across renders / navigations. Fire-and-forget;
+      // never block the success path on a Firebase hiccup.
+      try {
+        const enrich = { results: pop, at: Date.now() };
+        await _fbPatchRaw('reports/' + encodeURIComponent(fbId) + '.json',
+                          { vergentEnrichment: enrich });
+        const aMem = (typeof apps !== 'undefined' && apps)
+          ? apps.find(x => x.firebaseId === fbId) : null;
+        if (aMem) aMem.vergentEnrichment = enrich;
+      } catch (e) { /* non-fatal */ }
     } else {
       const msg = d.body || d.detail || d.error || ('HTTP ' + r.status);
       _vgShow('err', String(msg).slice(0, 200));
@@ -6446,6 +6509,28 @@ document.getElementById('dv-rerun-btn').addEventListener('click', () => {
 });
 document.getElementById('dv-reextract-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) reExtractPdf(id); });
 document.getElementById('dv-delete-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) deleteApplication(id); });
+// "Mark resolved" on the persistent card-save-failed alert. Operator-
+// only action: doesn't change anything in Vergent; just records that
+// the human has acknowledged + handled the failure. Patches the
+// dismissed flag inside the existing vergentEnrichment object so the
+// underlying card-result + timestamp are preserved for audit.
+document.getElementById('dv-card-alert-dismiss')?.addEventListener('click', async () => {
+  const id = _activeFbId(); if (!id) return;
+  const btn = document.getElementById('dv-card-alert-dismiss');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    await _fbPatchRaw('reports/' + encodeURIComponent(id) + '/vergentEnrichment.json',
+                      { dismissed: true, dismissedAt: Date.now() });
+    const a = (typeof apps !== 'undefined' && apps)
+      ? apps.find(x => x.firebaseId === id) : null;
+    if (a) { a.vergentEnrichment = Object.assign({}, a.vergentEnrichment || {}, { dismissed: true }); }
+    const alertEl = document.getElementById('dv-rail-card-alert');
+    if (alertEl) alertEl.style.display = 'none';
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = '✓ Mark resolved'; }
+    toast('Couldn\'t save: ' + ((e && e.message) || e), 'err');
+  }
+});
 document.getElementById('dv-refresh-plaid-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) refreshFromPlaid(id); });
 document.getElementById('dv-notes-save').addEventListener('click', () => { const id = _activeFbId(); if (id) saveNotes(id); });
 document.getElementById('note-templates-edit').addEventListener('click', _editNoteTemplates);
