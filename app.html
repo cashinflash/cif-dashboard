@@ -805,6 +805,11 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 #cl-ov .appr-actions{padding:11px 18px;gap:8px}
 #cl-ov .appr-actions .btn-ghost{flex:1}
 #cl-ov .btn-approve-send{flex:1.4 !important;padding:8px 12px;font-size:12.5px}
+/* Collapse empty message rows so a valid amount doesn't reserve a
+   blank gap below the field. display:none removes them from flow
+   AND from the parent flex container's gap calculation, so the next
+   visible field (Due Date / footer) sits flush. */
+#cl-ov #cl-amount-err:empty,#cl-ov #cl-result:empty{display:none}
 .btn-approve-send:hover{background:#14532d;border-color:#14532d}
 .btn-approve-send:disabled{opacity:.5;cursor:not-allowed}
 .btn-approve-send .icn{width:14px;height:14px;stroke-width:2.25}
@@ -2122,7 +2127,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
         <span class="ccy">$</span>
         <input type="number" id="cl-amount" min="100" max="255" step="1" value="255" inputmode="decimal" oninput="_clAmtCheck(this)" onblur="_clAmtCheck(this)">
       </div>
-      <div id="cl-amount-err" style="font-size:11.5px;color:#5a0d0d;min-height:14px"></div>
+      <div id="cl-amount-err" style="font-size:11.5px;color:#5a0d0d"></div>
       <div class="appr-label">Due Date</div>
       <input type="date" id="cl-due-date" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:7px 11px;font-size:13.5px;font-family:inherit">
       <div class="appr-label">Disbursement Card</div>
@@ -2130,7 +2135,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
         <option value="">Loading cards on file…</option>
       </select>
       <div id="cl-card-hint" style="font-size:11px;color:var(--muted);margin-top:-4px">Most recently saved card is at the top.</div>
-      <div id="cl-result" style="font-size:12px;min-height:16px"></div>
+      <div id="cl-result" style="font-size:12px"></div>
     </div>
     <div class="appr-actions">
       <button class="btn btn-ghost" type="button" onclick="closeCreateLoanModal()">Cancel</button>
@@ -3899,10 +3904,30 @@ async function openCreateLoanModal() {
       ? `Customer: ${fullName} • Vergent #${cid}`
       : `Customer: ${fullName} • No Vergent customer yet`;
   }
-  // Pre-fill from the engine-approved amount (or the operator's
-  // overridden amount on the record). Cap to the CA $255 max we lend.
-  const amt = Number(rec.amount || ad.requestedAmount || 255);
-  if (amtEl) amtEl.value = String(Math.max(100, Math.min(255, Math.round(amt))));
+  // Pre-fill the loan amount from whatever the operator approved this
+  // applicant for. Resolution order:
+  //   1. rec.amount  — the canonical approved amount (saveOffer writes
+  //      this as a string like '$100', so Number() returns NaN and the
+  //      previous code silently fell through to the $255 default;
+  //      parseAmount strips the $ + commas so we read the real value).
+  //   2. claudeDecision-tier-derived amount (engine's APPROVE pill).
+  //   3. ad.requestedAmount — applicant's request from the form.
+  //   4. 255 — CA payday max.
+  // Cap to 100-255 since Vergent's CA payday model rejects outside that.
+  const approvedAmt = parseAmount(rec.amount);
+  const engineAmt   = parseAmount(rec.claudeAmount);
+  const reqAmt      = parseAmount(ad.requestedAmount);
+  const amt = approvedAmt != null ? approvedAmt
+            : engineAmt   != null ? engineAmt
+            : reqAmt      != null ? reqAmt
+            : 255;
+  if (amtEl) {
+    amtEl.value = String(Math.max(100, Math.min(255, Math.round(amt))));
+    // Recompute the validity styling immediately so the modal opens in
+    // the green/valid state (not flagged with the red error band) when
+    // the pre-fill is in range.
+    if (typeof _clAmtCheck === 'function') _clAmtCheck(amtEl);
+  }
   // Hard gate when there's REALLY no Vergent customer (rec confirmed).
   if (!cid) {
     if (resEl) {
