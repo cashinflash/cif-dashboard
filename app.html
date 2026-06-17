@@ -1616,11 +1616,24 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
           <div class="dv-rail-section">
             <div class="dv-rail-title">Quick Actions</div>
             <div class="qa-grid">
-              <button class="qa-btn" id="dv-rerun-btn" title="Re-run the engine using stored data — no new Plaid pull"><svg class="icn"><use href="#i-refresh"/></svg>Re-Run Report</button>
+              <!-- Re-Run Report split-action: one button label, two
+                   modes via the adjacent <select>. Default = stored
+                   data (the cheap, common case); operator can flip to
+                   "with fresh Plaid pull" when needed. Replaces the
+                   two separate Re-Run / Refresh buttons. -->
+              <div class="qa-btn-group" style="display:flex;gap:6px;align-items:stretch">
+                <button class="qa-btn" id="dv-rerun-btn" style="flex:1" title="Re-run the report. Use the dropdown to pick: stored data (fast) or with a fresh Plaid pull."><svg class="icn"><use href="#i-refresh"/></svg>Re-Run Report</button>
+                <select id="dv-rerun-mode" title="Pick the source data for the re-run" style="border:1px solid var(--border);border-radius:8px;padding:0 8px;font-size:12px;font-family:inherit;background:#fff;cursor:pointer">
+                  <option value="stored" selected>Stored data</option>
+                  <option value="plaid">Fresh Plaid pull</option>
+                </select>
+              </div>
               <button class="qa-btn" id="dv-reextract-btn" style="display:none" title="Re-read the uploaded PDF with the latest extraction logic, then re-run. Use when a stored extraction looks wrong (reconciliation failed, miscounts). Takes ~30–60s."><svg class="icn"><use href="#i-refresh"/></svg>Re-extract from PDF</button>
-              <button class="qa-btn" id="dv-refresh-plaid-btn" title="Pull a fresh Plaid asset report and re-run"><svg class="icn"><use href="#i-refresh"/></svg>Refresh from Plaid</button>
-              <button class="qa-btn qa-btn-emerald" id="dv-approve-mail-btn" title="Send the approval email to the applicant with their approved loan amount"><svg class="icn"><use href="#i-check"/></svg>Approve Email</button>
-              <button class="qa-btn qa-btn-amber" id="dv-denial-btn" title="Send the denial-reasons email to the applicant"><svg class="icn"><use href="#i-message"/></svg>Denial Email</button>
+              <!-- Hidden shim so any code that still looks up
+                   dv-refresh-plaid-btn (event listeners, helpers) keeps
+                   resolving instead of throwing. The dropdown above is
+                   the new UI surface. -->
+              <button class="qa-btn" id="dv-refresh-plaid-btn" style="display:none" aria-hidden="true" tabindex="-1"></button>
               <button class="qa-btn qa-btn-emerald" id="dv-create-loan-btn" onclick="openCreateLoanModal()" title="Create a loan agreement in Vergent for this applicant and trigger the e-sign email"><svg class="icn"><use href="#i-zap"/></svg>Create Loan</button>
             </div>
           </div>
@@ -6330,8 +6343,12 @@ function _activeFbId() { return document.body.dataset.firebaseId || ''; }
 // and dispatches the email. Use the Quick Actions Denial Email button
 // for the same flow — they're synonymous now.
 document.getElementById('dv-decline-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) openDenialModal(id); });
-document.getElementById('dv-denial-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) openDenialModal(id); });
-document.getElementById('dv-approve-mail-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) openApprovalModal(id); });
+// dv-denial-btn / dv-approve-mail-btn were removed from Quick Actions
+// — denials now flow through the Decline button (which opens the same
+// modal) and approvals fire automatically on Create Loan. Keep these as
+// no-ops in case any older code path references them.
+document.getElementById('dv-denial-btn')?.addEventListener('click', () => { const id = _activeFbId(); if (id) openDenialModal(id); });
+document.getElementById('dv-approve-mail-btn')?.addEventListener('click', () => { const id = _activeFbId(); if (id) openApprovalModal(id); });
 document.getElementById('appr-cancel').addEventListener('click', closeApprovalModal);
 document.getElementById('appr-send').addEventListener('click', sendApprovalEmail);
 document.getElementById('appr-ov').addEventListener('click', (e) => { if (e.target.id === 'appr-ov') closeApprovalModal(); });
@@ -6362,7 +6379,14 @@ document.getElementById('dv-approve-btn').addEventListener('click', async () => 
   await saveOffer(id);
   await setStatus(id, 'Approved');
 });
-document.getElementById('dv-rerun-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) rerunEngine(id); });
+// Re-Run Report split-action: dropdown selects "stored" (cheap re-run)
+// or "plaid" (re-pull asset report and re-run). Replaces the separate
+// Refresh from Plaid button. Both code paths are unchanged underneath.
+document.getElementById('dv-rerun-btn').addEventListener('click', () => {
+  const id = _activeFbId(); if (!id) return;
+  const mode = (document.getElementById('dv-rerun-mode') || {}).value || 'stored';
+  if (mode === 'plaid') { refreshFromPlaid(id); } else { rerunEngine(id); }
+});
 document.getElementById('dv-reextract-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) reExtractPdf(id); });
 document.getElementById('dv-delete-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) deleteApplication(id); });
 document.getElementById('dv-refresh-plaid-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) refreshFromPlaid(id); });
