@@ -1540,16 +1540,9 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 
           <!-- REPORT PANEL — engine recommendation, snapshot, full analysis -->
           <div class="dv-panel" id="dv-panel-report">
-            <div class="dv-recommended" id="dv-recommended">
-              <div>
-                <div class="dv-rec-label">Recommended Decision</div>
-                <div class="dv-rec-value" id="dv-rec-value">—</div>
-              </div>
-              <div class="dv-rec-right">
-                <div class="dv-rec-right-lbl">Engine Reason</div>
-                <div class="dv-rec-right-val" id="dv-rec-reason" style="font-size:13px;font-weight:600;text-align:right;max-width:340px">—</div>
-              </div>
-            </div>
+            <!-- "Recommended Decision" block removed 2026-06-17: the verdict
+                 + reason already show in the hero (Engine/Action) and on the
+                 v4 report's own banner below — this was a third copy. -->
 
             <div class="dv-alert" id="dv-alert" style="display:none">
               <div class="dv-alert-icn"><svg class="icn"><use href="#i-warning"/></svg></div>
@@ -1559,13 +1552,13 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
               </div>
             </div>
 
-            <div class="sec-h">Application Snapshot</div>
-            <div class="snap-grid" id="dv-snap"></div>
-
             <div class="sec-h">Engine Analysis
               <button type="button" id="dv-copy-report-btn" onclick="copyEngineReport(this)"
                       style="margin-left:auto;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;text-transform:none;letter-spacing:0">Copy full report</button>
             </div>
+            <!-- Slim facts strip (verified income + bank) — replaced the old
+                 7-card snapshot whose other 5 cards were dead v2 fields. -->
+            <div id="dv-snap" style="margin-bottom:14px"></div>
             <div class="dv-report-html" id="dv-report-html"></div>
           </div>
 
@@ -3370,13 +3363,8 @@ function renderDetail(fbId) {
     _apBtn.title = '';
   }
 
-  // Recommended decision card
-  const recBlock = document.getElementById('dv-recommended');
-  const recValue = document.getElementById('dv-rec-value');
-  const recReason = document.getElementById('dv-rec-reason');
-  recBlock.className = 'dv-recommended ' + (b === 'approved' ? '' : b === 'declined' ? 'no' : 'pen');
-  recValue.textContent = (a.claudeDecision || a.status || 'Pending').toUpperCase();
-  recReason.textContent = a.reason || '—';
+  // Recommended-decision card removed 2026-06-17 (was a third copy of the
+  // verdict; hero + v4 report banner cover it).
 
   // Engine-disagreement alert removed (operator request 2026-05-17):
   // v3 is the primary engine post-cutover and the v2 reverse-shadow is
@@ -3426,23 +3414,27 @@ function renderDetail(fbId) {
   const offer = (typeof a.v2TierAmount === 'number') ? a.v2TierAmount : null;
   const offerClass = (offer != null && offer > 0) ? 'green' : (offer === 0 ? 'red' : 'muted');
 
-  const cards = [
-    { lbl: 'Verified Income', val: '$' + Math.round(monthlyIncome).toLocaleString(), valClass: monthlyIncome > 0 ? 'green' : 'muted', sub: 'monthly', note: grossIn > 0 ? ('All deposits $' + Math.round(grossIn).toLocaleString() + '/mo') : '' },
-    { lbl: 'Obligations', val: '$' + Math.round(monthlyExpenses).toLocaleString(), valClass: '', sub: 'committed monthly', note: grossOut > 0 ? ('All withdrawals $' + Math.round(grossOut).toLocaleString() + '/mo') : '' },
-    { lbl: 'FCF / Mo', val: (fcf < 0 ? '-$' : '$') + Math.abs(Math.round(fcf)).toLocaleString(), valClass: fcfClass, sub: 'free cash flow' },
-    { lbl: 'DTI', val: dti == null ? '—' : (dti + '<span class="unit">%</span>'), valClass: dtiClass, sub: 'debt-to-income', valHtml: true },
-    { lbl: 'Max Offer', val: offer == null ? '—' : '$' + Number(offer).toLocaleString(), valClass: offerClass, sub: offer == null ? 'not yet run' : (offer > 0 ? 'v2 final tier' : 'declined by v2') },
-    { lbl: 'Confidence', val: conf == null ? '—' : (Math.round(conf * 100) + '<span class="unit">%</span>'), valClass: confClass, sub: 'v2 engine', verified: conf != null && conf >= 0.80, valHtml: true },
-    { lbl: 'Bank Account', val: bankDisplay, valClass: '', valSize: 'sm', sub: ad.accountType || 'on file', verified: !!(ad.bankName && last4), verifiedLabel: 'Verified' },
-  ];
-  snap.innerHTML = cards.map(c => {
-    const vs = c.valSize ? ' ' + c.valSize : '';
-    const vc = c.valClass ? ' ' + c.valClass : '';
-    const valEl = c.valHtml ? c.val : escapeHtml(c.val);
-    const verifiedEl = c.verified ? `<div class="snap-verified"><svg class="icn"><use href="#i-check"/></svg>${escapeHtml(c.verifiedLabel || 'Verified')}</div>` : '';
-    const noteEl = c.note ? `<div class="snap-note" title="Gross money ${c.lbl === 'Obligations' ? 'out' : 'in'} excluding internal self-transfers — sanity figure, not used in the decision">${escapeHtml(c.note)}</div>` : '';
-    return `<div class="snap-cell"><div class="snap-lbl">${escapeHtml(c.lbl)}</div><div class="snap-val${vc}${vs}">${valEl}</div><div class="snap-sub">${escapeHtml(c.sub || '')}</div>${noteEl}${verifiedEl}</div>`;
-  }).join('');
+  // Slim facts strip — only the two snapshot cards that carry live data
+  // (the other five were dead v2 fields: Obligations/FCF/DTI/Max Offer/
+  // Confidence, all deleted by v4). Flex-wraps so it stacks cleanly on a
+  // phone. (Operator request 2026-06-17.)
+  if (snap) {
+    const incomeStr = monthlyIncome > 0 ? '$' + Math.round(monthlyIncome).toLocaleString() + '/mo' : '—';
+    const acctType = ad.accountType ? ' · ' + ad.accountType : '';
+    const bankVerified = !!(ad.bankName && last4);
+    const fact = (lbl, valHtml) =>
+      `<div style="display:flex;align-items:baseline;gap:7px;min-width:0">
+         <span style="font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);white-space:nowrap">${lbl}</span>
+         ${valHtml}</div>`;
+    snap.innerHTML =
+      `<div style="display:flex;flex-wrap:wrap;gap:8px 22px;align-items:baseline;
+                   padding:11px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px">
+         ${fact('Verified income',
+            `<span style="font-size:16px;font-weight:800;color:${monthlyIncome > 0 ? 'var(--green-dark)' : 'var(--muted)'}">${escapeHtml(incomeStr)}</span>`)}
+         ${fact('Bank',
+            `<span style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(bankDisplay + acctType)}${bankVerified ? ' <span style="color:var(--green-dark);font-weight:800">✓</span>' : ''}</span>`)}
+       </div>`;
+  }
 
   // Decision-checks list removed — its right-rail slot now hosts
   // Quick Actions. Engine / Vergent / notes status are visible on the
