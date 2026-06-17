@@ -823,6 +823,18 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
    AND from the parent flex container's gap calculation, so the next
    visible field (Due Date / footer) sits flush. */
 #cl-ov #cl-amount-err:empty,#cl-ov #cl-result:empty{display:none}
+/* Create Customer modal — same tight visual language as Create Loan,
+   scoped so #appr-ov (approval email) keeps its generous spacing. */
+#cc-ov .appr-card{max-width:420px}
+#cc-ov .appr-head{padding:14px 18px 12px}
+#cc-ov .appr-title{font-size:14.5px}
+#cc-ov .appr-meta{font-size:11.5px}
+#cc-ov .appr-body{padding:14px 18px;gap:8px}
+#cc-ov .appr-label{font-size:10.5px;margin-top:0}
+#cc-ov .appr-actions{padding:11px 18px;gap:8px}
+#cc-ov .appr-actions .btn-ghost{flex:1}
+#cc-ov .btn-approve-send{flex:1.4 !important;padding:8px 12px;font-size:12.5px}
+#cc-ov #cc-result:empty{display:none}
 .btn-approve-send:hover{background:#14532d;border-color:#14532d}
 .btn-approve-send:disabled{opacity:.5;cursor:not-allowed}
 .btn-approve-send .icn{width:14px;height:14px;stroke-width:2.25}
@@ -853,6 +865,10 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 .vg-btn-primary:hover{background:var(--green-dark);border-color:var(--green-dark)}
 .vg-btn-ghost{background:white;color:var(--text2);border-color:var(--border)}
 .vg-btn-ghost:hover{background:var(--surface2)}
+/* Large pill — mirrors the Create Loan Quick Action button so the
+   create-customer redesign feels at home in the same family. */
+.vg-btn-large{padding:11px 16px;font-size:13px;border-radius:9px;width:100%;justify-content:center;gap:7px;box-shadow:0 1px 0 rgba(21,128,61,.18)}
+.vg-btn-large .icn{width:14px;height:14px;stroke-width:2.25}
 .vg-btn:disabled{opacity:.5;cursor:not-allowed}
 .vg-id-row{display:flex;gap:5px}
 .vg-id-input{flex:1;border:1px solid var(--border);border-radius:7px;padding:6px 9px;font-size:11.5px;font-family:inherit;outline:none}
@@ -1547,6 +1563,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
                 <div class="profile-status-sub" id="profile-status-sub">Loading customer profile</div>
               </div>
               <span id="profile-bank-badge" style="display:none;align-items:center;gap:5px;background:var(--green-50);color:var(--green-dark);border:1px solid var(--green-200);padding:6px 11px;border-radius:999px;font-size:11.5px;font-weight:700;letter-spacing:.02em;margin-right:6px"><svg class="icn" style="width:13px;height:13px"><use href="#i-bank"/></svg>Bank Connected</span>
+              <button class="btn btn-ghost" id="profile-vergent-recheck" type="button" title="Re-check Vergent for an existing customer record" style="display:none"><svg class="icn"><use href="#i-refresh"/></svg>Re-check</button>
               <a class="btn btn-ghost" id="profile-vergent-link" href="#" target="_blank" rel="noopener" style="display:none"><svg class="icn"><use href="#i-external"/></svg>Open in Vergent</a>
             </div>
 
@@ -2164,6 +2181,30 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     <div class="appr-actions">
       <button class="btn btn-ghost" type="button" onclick="closeCreateLoanModal()">Cancel</button>
       <button class="btn-approve-send" type="button" id="cl-send" onclick="submitCreateLoan()"><svg class="icn"><use href="#i-zap"/></svg>Create Loan</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Customer modal — opens from the Vergent "Create Customer"
+     button. Mirrors the Create Loan modal's structure so the design
+     family stays consistent. Note pre-fills with the approved amount. -->
+<div class="appr-ov" id="cc-ov">
+  <div class="appr-card">
+    <div class="appr-head">
+      <div>
+        <div class="appr-title"><svg class="icn"><use href="#i-user"/></svg>Create Customer</div>
+        <div class="appr-meta" id="cc-meta">Customer: —</div>
+      </div>
+      <button onclick="closeCreateCustomerModal()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1" title="Close">&times;</button>
+    </div>
+    <div class="appr-body">
+      <div class="appr-label">Note for Vergent (optional)</div>
+      <textarea id="cc-note" rows="3" maxlength="200" placeholder="e.g. Approved for \$100" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:13.5px;font-family:inherit;resize:vertical;min-height:64px"></textarea>
+      <div id="cc-result" style="font-size:12px"></div>
+    </div>
+    <div class="appr-actions">
+      <button class="btn btn-ghost" type="button" onclick="closeCreateCustomerModal()">Cancel</button>
+      <button class="btn-approve-send" type="button" id="cc-send" onclick="submitCreateCustomer()"><svg class="icn"><use href="#i-user"/></svg>Create Customer</button>
     </div>
   </div>
 </div>
@@ -4029,6 +4070,70 @@ function closeCreateLoanModal() {
   if (ov) ov.style.display = 'none';
 }
 
+// ── Create Customer modal (Vergent push) ────────────────────────────
+// Opened from the redesigned Vergent rail (single "Create Customer"
+// button). Pre-fills the note with "Approved for \$X" using the same
+// rec.amount source the Create Loan modal reads (saveOffer writes
+// '\$N' strings; parseAmount handles both that and raw numbers).
+let _ccActiveFbId = '';
+function openCreateCustomerModal(fbId) {
+  if (!fbId) return;
+  _ccActiveFbId = fbId;
+  const a = (typeof apps !== 'undefined' && apps)
+    ? apps.find(x => x.firebaseId === fbId) : null;
+  const ad = (a && a.applicationData) || {};
+  const fullName = ((ad.firstName || '') + ' ' + (ad.lastName || '')).trim()
+    || (a && a.name) || '—';
+  const metaEl = document.getElementById('cc-meta');
+  if (metaEl) metaEl.textContent = 'Customer: ' + fullName;
+  // Note pre-fill: "Approved for \$X" (or just the placeholder if no
+  // approval is on record yet -- e.g. operator is creating ad-hoc).
+  const noteEl = document.getElementById('cc-note');
+  if (noteEl) {
+    const amt = a ? parseAmount(a.amount) : null;
+    noteEl.value = amt != null ? ('Approved for $' + Math.round(amt)) : '';
+  }
+  const res = document.getElementById('cc-result');
+  if (res) { res.textContent = ''; res.style.color = 'var(--muted)'; }
+  const send = document.getElementById('cc-send');
+  if (send) { send.disabled = false; send.style.opacity = ''; }
+  const ov = document.getElementById('cc-ov');
+  if (ov) ov.style.display = 'flex';
+  // Autofocus the textarea so the operator can tweak the note instantly.
+  setTimeout(() => { if (noteEl) noteEl.focus(); }, 30);
+}
+
+function closeCreateCustomerModal() {
+  const ov = document.getElementById('cc-ov');
+  if (ov) ov.style.display = 'none';
+}
+
+async function submitCreateCustomer() {
+  const fbId = _ccActiveFbId || _activeFbId();
+  if (!fbId) { toast('No applicant selected.', 'err'); return; }
+  const send = document.getElementById('cc-send');
+  const res  = document.getElementById('cc-result');
+  const note = ((document.getElementById('cc-note') || {}).value || '').trim();
+  if (send) { send.disabled = true; send.style.opacity = '.6'; }
+  if (res)  { res.style.color = 'var(--muted)'; res.textContent = 'Creating customer in Vergent…'; }
+  try {
+    // Delegate to the existing vergentPush() pipeline so the entire
+    // create-and-push path (Firebase enrichment write, populated.card
+    // alert, auto-recheck, error surfacing) stays in ONE function.
+    // _vgGetSelected returns both docs unconditionally now; we just
+    // pre-set the note input before calling.
+    const noteInput = document.getElementById('vg-note');
+    if (noteInput) noteInput.value = note;
+    closeCreateCustomerModal();
+    await vergentPush(fbId, true);
+  } catch (e) {
+    if (res) { res.style.color = '#5a0d0d';
+               res.textContent = 'Create failed: ' + ((e && e.message) || e); }
+  } finally {
+    if (send) { send.disabled = false; send.style.opacity = ''; }
+  }
+}
+
 // ── Edit Applicant Info ──────────────────────────────────────────────
 // Correct application fields (e.g. a malformed DOB Vergent rejects)
 // before Create Customer / Create Loan. Writes applicationData via
@@ -4486,6 +4591,14 @@ function renderProfilePanel(fbId) {
     bankBadgeEl.style.display = hasActivePlaid ? 'inline-flex' : 'none';
   }
   if (linkEl) linkEl.style.display = 'none';
+  // Re-check button: visible only when there's NOT a matched Vergent
+  // customer yet (status: not_found / new / ambiguous / error / pending).
+  // Hidden on 'found' since the operator has nothing left to re-check.
+  const recheckBtn = document.getElementById('profile-vergent-recheck');
+  if (recheckBtn) {
+    const matchedHere = m && (m.status || '').toLowerCase() === 'found';
+    recheckBtn.style.display = matchedHere ? 'none' : 'inline-flex';
+  }
 
   if (!m) {
     statusEl.className = 'profile-status pending';
@@ -4518,7 +4631,10 @@ function renderProfilePanel(fbId) {
       } else {
         statusEl.className = 'profile-status new';
         labelEl.textContent = 'New Customer';
-        subEl.textContent = 'No prior Vergent record — Create + Push when ready';
+        // Subtext intentionally blank for the 'new' state (operator
+        // request) -- the Create Customer button in the rail tells the
+        // operator what to do; the long sentence here was noise.
+        subEl.textContent = '';
       }
     } else if (s === 'ambiguous') {
       statusEl.className = 'profile-status amb';
@@ -4992,14 +5108,17 @@ function renderVergentPanel(fbId) {
     } else {
       statusPill.textContent = 'New';
       statusPill.className = 'vg-status new';
+      // Clean redesign (operator request): a single Create Customer
+      // button styled like the Create Loan button. Clicking opens a
+      // modal with a note input pre-filled with 'Approved for \$X'.
+      // The Re-check button moved to the profile-status banner above.
       card.innerHTML = `
-        <div class="vg-headline">No matching customer</div>
-        ${checkboxes}
-        <div class="vg-actions">
-          <button class="vg-btn vg-btn-primary" onclick="vergentPush('${fbId}', true)">Create Customer</button>
-          <button class="vg-btn vg-btn-ghost" onclick="vergentRecheck('${fbId}')">↻ Re-check</button>
-        </div>
+        <button class="vg-btn vg-btn-primary vg-btn-large" data-vg-create-customer="${fbId}"><svg class="icn"><use href="#i-user"/></svg>Create Customer</button>
         <div class="vg-result" id="vg-result"></div>`;
+      // Wire the click → opens the new modal (defined below). Using a
+      // delegated approach so we don't depend on inline onclick.
+      const btn = card.querySelector('[data-vg-create-customer]');
+      if (btn) btn.addEventListener('click', () => openCreateCustomerModal(fbId));
     }
   } else if (status === 'ambiguous' && Array.isArray(m.matches)) {
     statusPill.textContent = m.matches.length + ' matches';
@@ -6509,6 +6628,12 @@ document.getElementById('dv-rerun-btn').addEventListener('click', () => {
 });
 document.getElementById('dv-reextract-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) reExtractPdf(id); });
 document.getElementById('dv-delete-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) deleteApplication(id); });
+// Re-check button on the profile status banner -- relocated from the
+// Vergent rail card (operator request: cleaner banner, auto-recheck
+// after Create already handles the common case).
+document.getElementById('profile-vergent-recheck')?.addEventListener('click', () => {
+  const id = _activeFbId(); if (id) vergentRecheck(id);
+});
 // "Mark resolved" on the persistent card-save-failed alert. Operator-
 // only action: doesn't change anything in Vergent; just records that
 // the human has acknowledged + handled the failure. Patches the
