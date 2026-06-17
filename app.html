@@ -789,6 +789,22 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 .appr-actions{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:8px}
 .appr-actions .btn{flex:1;justify-content:center}
 .btn-approve-send{flex:2 !important;background:#15803d;color:white;border:1px solid #15803d;padding:8px 14px;border-radius:8px;font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px}
+/* Create Loan modal — tighter spacing without affecting the shared
+   approval-email modal. Every rule is scoped under #cl-ov so the
+   #appr-ov modal keeps its original generous spacing. */
+#cl-ov .appr-card{max-width:420px}
+#cl-ov .appr-head{padding:14px 18px 12px}
+#cl-ov .appr-title{font-size:14.5px}
+#cl-ov .appr-meta{font-size:11.5px}
+#cl-ov .appr-body{padding:14px 18px;gap:8px}
+#cl-ov .appr-label{font-size:10.5px;margin-top:4px}
+#cl-ov .appr-label:first-child{margin-top:0}
+#cl-ov .appr-amount-row{padding:7px 12px;border-radius:8px;gap:6px}
+#cl-ov .appr-amount-row .ccy{font-size:15px}
+#cl-ov .appr-amount-row input{font-size:18px;font-weight:700;color:#15803d;border:none;background:transparent;outline:none;width:100%;font-family:inherit;padding:0}
+#cl-ov .appr-actions{padding:11px 18px;gap:8px}
+#cl-ov .appr-actions .btn-ghost{flex:1}
+#cl-ov .btn-approve-send{flex:1.4 !important;padding:8px 12px;font-size:12.5px}
 .btn-approve-send:hover{background:#14532d;border-color:#14532d}
 .btn-approve-send:disabled{opacity:.5;cursor:not-allowed}
 .btn-approve-send .icn{width:14px;height:14px;stroke-width:2.25}
@@ -2095,7 +2111,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   <div class="appr-card">
     <div class="appr-head">
       <div>
-        <div class="appr-title"><svg class="icn"><use href="#i-zap"/></svg>Create Loan + Send E-Sign</div>
+        <div class="appr-title"><svg class="icn"><use href="#i-zap"/></svg>Create Loan</div>
         <div class="appr-meta" id="cl-meta">Customer: —</div>
       </div>
       <button onclick="closeCreateLoanModal()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1" title="Close">&times;</button>
@@ -2106,19 +2122,19 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
         <span class="ccy">$</span>
         <input type="number" id="cl-amount" min="100" max="255" step="1" value="255" inputmode="decimal" oninput="_clAmtCheck(this)" onblur="_clAmtCheck(this)">
       </div>
-      <div id="cl-amount-err" style="font-size:11.5px;color:#5a0d0d;margin-top:4px;min-height:14px"></div>
-      <div class="appr-label" style="margin-top:14px">Due Date</div>
-      <input type="date" id="cl-due-date" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit">
-      <div class="appr-label" style="margin-top:14px">Disbursement Card</div>
-      <select id="cl-card-select" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;background:#fff">
+      <div id="cl-amount-err" style="font-size:11.5px;color:#5a0d0d;min-height:14px"></div>
+      <div class="appr-label">Due Date</div>
+      <input type="date" id="cl-due-date" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:7px 11px;font-size:13.5px;font-family:inherit">
+      <div class="appr-label">Disbursement Card</div>
+      <select id="cl-card-select" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:7px 11px;font-size:13px;font-family:inherit;background:#fff">
         <option value="">Loading cards on file…</option>
       </select>
-      <div id="cl-card-hint" style="font-size:11.5px;color:var(--muted);margin-top:4px">Most recently saved card is at the top.</div>
-      <div id="cl-result" style="font-size:12px;margin-top:14px;min-height:16px"></div>
+      <div id="cl-card-hint" style="font-size:11px;color:var(--muted);margin-top:-4px">Most recently saved card is at the top.</div>
+      <div id="cl-result" style="font-size:12px;min-height:16px"></div>
     </div>
     <div class="appr-actions">
       <button class="btn btn-ghost" type="button" onclick="closeCreateLoanModal()">Cancel</button>
-      <button class="btn-approve-send" type="button" id="cl-send" onclick="submitCreateLoan()"><svg class="icn"><use href="#i-zap"/></svg>Create Loan + Send E-Sign</button>
+      <button class="btn-approve-send" type="button" id="cl-send" onclick="submitCreateLoan()"><svg class="icn"><use href="#i-zap"/></svg>Create Loan</button>
     </div>
   </div>
 </div>
