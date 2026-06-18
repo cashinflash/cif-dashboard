@@ -2000,6 +2000,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
         <button id="fund-refresh" class="btn btn-ghost" onclick="loadFundingQueue()" title="Refresh live status from Vergent"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-refresh"/></svg>Refresh</button>
         <button id="fund-probe-btn" class="btn btn-ghost" onclick="runFundingProbe()" title="One-shot: try ~50 Vergent endpoints to see if any exposes the Loan Funding Queue natively. Results are shown in a modal and logged to Render."><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-zap"/></svg>Discover Vergent API</button>
         <button id="fund-swagger-btn" class="btn btn-ghost" onclick="runSwaggerList()" title="Fetches Vergent's Swagger JSON with our V1 Token and lists every funding/queue/list endpoint. Results are shown in a modal and logged to Render."><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-zap"/></svg>List Swagger Endpoints</button>
+        <button id="fund-leads-btn" class="btn btn-ghost" onclick="runFundingLeadsProbe()" title="Calls 6 candidate Vergent list endpoints (GetNotFundedOnlineLeadStatusList etc.) to find which one returns the actual funding queue. Results show response shape per endpoint."><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-zap"/></svg>Test Lead Endpoints</button>
       </div>
     </div>
     <div class="chips" style="margin-bottom:14px;align-items:center;gap:8px">
@@ -10706,6 +10707,69 @@ async function runSwaggerList() {
     if (out) out.innerHTML = html;
   } catch (e) {
     if (out) out.innerHTML = '<div class="tbl-empty" style="padding:20px;color:#5a0d0d">Swagger fetch failed: ' + escapeHtml((e && e.message) || String(e)) + '</div>';
+    if (meta) meta.textContent = 'Failed';
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  }
+}
+
+// Calls 6 candidate V1 list endpoints (GetNotFundedOnlineLeadStatusList
+// etc.) and shows the response shape per endpoint so we can identify
+// which one returns the actual queue.
+async function runFundingLeadsProbe() {
+  const ov   = document.getElementById('fund-probe-ov');
+  const meta = document.getElementById('fund-probe-meta');
+  const out  = document.getElementById('fund-probe-results');
+  const btn  = document.getElementById('fund-leads-btn');
+  if (ov) ov.style.display = 'flex';
+  if (meta) meta.textContent = 'Testing 6 candidate list endpoints…';
+  if (out) out.innerHTML = '<div class="tbl-loading">Calling Vergent V1 list endpoints…</div>';
+  if (btn) { btn.disabled = true; btn.style.opacity = '.55'; }
+  try {
+    const r = await fetch('/api/funding-leads-probe', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error((d && (d.error || d.detail)) || ('HTTP ' + r.status));
+    const results = (d && d.results) || [];
+    const winners = results.filter(x => x.is_list && x.list_len > 0);
+    if (meta) meta.textContent = results.length + ' endpoints tested · ' + winners.length + ' returned a non-empty list';
+    const row = (x) => {
+      const code = x.status || 0;
+      const ok2xx = code >= 200 && code < 300;
+      const auth401 = code === 401 || code === 403;
+      const bg = ok2xx ? '#dcfce7' : (auth401 ? '#fef3c7' : (code >= 400 ? '#fef2f2' : '#f9fafb'));
+      const fg = ok2xx ? '#166534' : (auth401 ? '#92400e' : (code >= 400 ? '#991b1b' : '#6b7280'));
+      const win = x.is_list && x.list_len > 0;
+      const winBadge = win ? '<span style="font-size:9.5px;background:#15803d;color:white;padding:2px 7px;border-radius:5px;font-weight:800;margin-left:6px">LIST ' + x.list_len + '</span>' : '';
+      const keysStr = (x.first_row_keys || []).join(', ');
+      const sampleEntries = Object.entries(x.first_row_sample || {}).slice(0, 8);
+      const sampleStr = sampleEntries.map(([k,v]) => '<b>' + escapeHtml(k) + '</b>: ' + escapeHtml(String(v))).join(' · ');
+      const snip = escapeHtml((x.snippet || x.error || '').slice(0, 400));
+      return '<tr style="background:' + bg + '">'
+        + '<td style="padding:8px 10px;font-weight:700;color:' + fg + ';font-variant-numeric:tabular-nums;vertical-align:top">' + code + '</td>'
+        + '<td style="padding:8px 10px;vertical-align:top">'
+          + '<div style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;font-weight:700;color:#111827">' + escapeHtml(x.method) + ' ' + escapeHtml(x.path) + winBadge + '</div>'
+          + (keysStr ? '<div style="font-size:11px;color:#374151;margin-top:5px"><span style="color:#6b7280">keys:</span> <code style="font-family:ui-monospace,Menlo,Consolas,monospace">' + escapeHtml(keysStr) + '</code></div>' : '')
+          + (sampleStr ? '<div style="font-size:11px;color:#374151;margin-top:5px"><span style="color:#6b7280">sample:</span> ' + sampleStr + '</div>' : '')
+          + (snip ? '<div style="font-size:10.5px;color:#6b7280;margin-top:5px;font-family:ui-monospace,Menlo,Consolas,monospace;max-width:680px;word-break:break-word">' + snip + '</div>' : '')
+        + '</td>'
+        + '</tr>';
+    };
+    // Winners first, then the rest.
+    const losers = results.filter(x => !(x.is_list && x.list_len > 0));
+    const html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">'
+      + (winners.length ? '<thead><tr><td colspan="2" style="padding:9px 10px;font-size:11px;font-weight:800;color:#15803d;background:#f0fdf4;text-transform:uppercase;letter-spacing:.05em">Returned a list — these are the candidates</td></tr></thead><tbody>'
+        + winners.map(row).join('')
+        + '</tbody>' : '')
+      + '<thead><tr><td colspan="2" style="padding:9px 10px;font-size:11px;font-weight:800;color:#6b7280;background:#f9fafb;text-transform:uppercase;letter-spacing:.05em">Other</td></tr></thead><tbody>'
+      + losers.map(row).join('')
+      + '</tbody></table></div>';
+    if (out) out.innerHTML = html;
+  } catch (e) {
+    if (out) out.innerHTML = '<div class="tbl-empty" style="padding:20px;color:#5a0d0d">Probe failed: ' + escapeHtml((e && e.message) || String(e)) + '</div>';
     if (meta) meta.textContent = 'Failed';
   } finally {
     if (btn) { btn.disabled = false; btn.style.opacity = ''; }
