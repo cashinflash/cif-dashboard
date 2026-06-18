@@ -2136,6 +2136,30 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        # Funding Status page: list/refresh the loan funding queue and
+        # remove rows. Forwards to cif-apply. 60s timeout because a
+        # refresh fans out one get_customer_loans call per non-terminal
+        # entry; cif-apply caps it to actually-pending loans.
+        if path in ('/api/funding-queue', '/api/funding-queue-remove'):
+            try:
+                body = json.loads(raw) if raw else {}
+                payload = json.dumps(body).encode()
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com' + path,
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=60) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[FUNDING-QUEUE UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[FUNDING-QUEUE ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         if path == '/api/vergent-report-pastdue':
             try:
                 body = json.loads(raw) if raw else {}

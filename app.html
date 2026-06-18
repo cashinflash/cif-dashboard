@@ -1399,6 +1399,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       <a data-route="customers" href="#customers"><svg class="icn"><use href="#i-list"/></svg>Customers</a>
       <a data-route="if" href="#if"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</a>
       <a data-route="payments" href="#payments"><svg class="icn"><use href="#i-card"/></svg>Payments</a>
+      <a data-route="funding" href="#funding"><svg class="icn"><use href="#i-clock"/></svg>Funding Status</a>
       <a data-route="reports" href="#reports"><svg class="icn"><use href="#i-chart"/></svg>Servicing</a>
       <a data-route="communications" href="#communications"><svg class="icn"><use href="#i-message"/></svg>Communications</a>
       <hr>
@@ -1420,6 +1421,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   <a class="subnav-link" data-route="dashboard" href="#dashboard"><svg class="icn"><use href="#i-overview"/></svg>Overview</a>
   <a class="subnav-link" data-route="if" href="#if"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</a>
   <a class="subnav-link" data-route="payments" href="#payments"><svg class="icn"><use href="#i-card"/></svg>Payments</a>
+  <a class="subnav-link" data-route="funding" href="#funding"><svg class="icn"><use href="#i-clock"/></svg>Funding Status</a>
   <a class="subnav-link" data-route="customers" href="#customers"><svg class="icn"><use href="#i-list"/></svg>Customers</a>
 </nav>
 
@@ -1432,6 +1434,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
         <a class="subnav-link active" data-route="dashboard" href="#dashboard"><svg class="icn"><use href="#i-overview"/></svg>Overview</a>
         <a class="subnav-link" data-route="if" href="#if" style="position:relative"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding<span id="alertcount-if" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></a>
         <a class="subnav-link" data-route="payments" href="#payments"><svg class="icn"><use href="#i-card"/></svg>Payments</a>
+        <a class="subnav-link" data-route="funding" href="#funding"><svg class="icn"><use href="#i-clock"/></svg>Funding Status</a>
         <a class="subnav-link" data-route="customers" href="#customers" style="position:relative"><svg class="icn"><use href="#i-list"/></svg>Customers<span id="alertcount-conn" style="display:none;background:#e84545;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;vertical-align:1px"></span></a>
       </div>
     </aside>
@@ -1977,6 +1980,32 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     <div id="pay-status" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
     <div id="pay-table">
       <div class="tbl-loading">Loading payments…</div>
+    </div>
+  </div>
+</div>
+
+<!-- FUNDING STATUS — mirrors Vergent's Loan Funding Queue (loans
+     created but not yet funded) without opening Vergent. Built from
+     /fundingQueue (every loan we originate, written by cif-apply's
+     create-loan handler) with live status refreshed per-customer via
+     /api/funding-queue. -->
+<div class="view" id="view-funding">
+  <div class="main full">
+    <div class="greet">
+      <div>
+        <div class="greet-title">Funding Status</div>
+        <div class="greet-sub">Loans you've created in Vergent and where each one is in the funding pipeline — live status, no need to open Vergent's queue.</div>
+      </div>
+      <div class="greet-actions">
+        <button id="fund-refresh" class="btn btn-ghost" onclick="loadFundingQueue()" title="Refresh live status from Vergent"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-refresh"/></svg>Refresh</button>
+      </div>
+    </div>
+    <div class="chips" style="margin-bottom:14px;align-items:center;gap:8px">
+      <span id="fund-summary" style="font-size:12.5px;color:var(--muted)"></span>
+      <span id="fund-loaded-at" style="margin-left:auto;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums"></span>
+    </div>
+    <div class="tbl-card" id="fund-table">
+      <div class="tbl-loading">Loading funding queue…</div>
     </div>
   </div>
 </div>
@@ -2815,7 +2844,7 @@ function toast(msg, kind, opts) {
 function _ensureSidebarInExternalViews() {
   const src = document.querySelector('#view-dashboard > .shell > .subnav');
   if (!src) return;
-  ['view-customers', 'view-if', 'view-payments', 'view-communications'].forEach(id => {
+  ['view-customers', 'view-if', 'view-payments', 'view-funding', 'view-communications'].forEach(id => {
     const v = document.getElementById(id);
     if (!v || v.querySelector(':scope > .shell')) return;   // already wired
     const main = v.querySelector(':scope > .main');
@@ -2855,6 +2884,7 @@ function setRoute(name, fbId) {
   if (name === 'if') loadIFSubmissions();
   if (name === 'reports') loadPastDueReport();
   if (name === 'payments') loadPayments();
+  if (name === 'funding') loadFundingQueue();
   if (name === 'communications') loadCommunications();
   if (name === 'customers') {
     // setRoute('customers', 'applinks' | 'portallinks' | 'portal')
@@ -2869,6 +2899,7 @@ function setRoute(name, fbId) {
   // Stop the Payments auto-refresh timer when navigating away. It
   // restarts on the next successful loadPayments().
   if (name !== 'payments' && typeof _payAutoStop === 'function') _payAutoStop();
+  if (name !== 'funding' && typeof _fundAutoStop === 'function') _fundAutoStop();
   if (name === 'detail' && fbId) {
     location.hash = '#fb=' + encodeURIComponent(fbId);
   } else if (name === 'customers') {
@@ -2892,6 +2923,7 @@ function readRouteFromHash() {
   if (h === '#if' || h === '#instant-funding') return ['if', null];
   if (h === '#reports') return ['reports', null];
   if (h === '#payments') return ['payments', null];
+  if (h === '#funding' || h === '#funding-status') return ['funding', null];
   if (h === '#communications') return ['communications', null];
   // All Customers-related hashes resolve to the unified view; the
   // 2nd tuple element selects the inner sub-tab. Legacy Connections
@@ -10358,6 +10390,123 @@ const _COMM_KIND_COLORS = {
   // bounced" (card_failed) at a glance.
   card_failed:       { bg: '#fed7aa', fg: '#9a3412' },
 };
+
+// ───────── Funding Status page ─────────
+// Mirrors Vergent's Loan Funding Queue from /fundingQueue (every loan
+// we originate) with status refreshed live via /api/funding-queue.
+let _fundingRows = [];
+let _fundAutoTimer = null;
+
+async function loadFundingQueue(silent) {
+  const tbl = document.getElementById('fund-table');
+  if (!tbl) return;
+  if (!silent) tbl.innerHTML = '<div class="tbl-loading">Loading funding queue…</div>';
+  const btn = document.getElementById('fund-refresh');
+  if (btn && !silent) { btn.disabled = true; btn.style.opacity = '.6'; }
+  try {
+    const r = await fetch('/api/funding-queue', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh: true }),
+    });
+    const d = await r.json().catch(() => ({}));
+    _fundingRows = (d && d.items) || [];
+    renderFundingQueue();
+    const at = document.getElementById('fund-loaded-at');
+    if (at) at.textContent = 'Updated ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    if (!silent) tbl.innerHTML = '<div class="tbl-empty">Couldn\'t load the funding queue. ' + escapeHtml((e && e.message) || '') + '</div>';
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  }
+  _fundAutoStart();
+}
+
+function _fundAutoStart() {
+  _fundAutoStop();
+  // Refresh live status every 45s while the operator is on the page.
+  _fundAutoTimer = setInterval(() => {
+    if ((document.body.dataset.currentRoute || '') === 'funding'
+        && document.visibilityState === 'visible') {
+      loadFundingQueue(true);
+    }
+  }, 45000);
+}
+function _fundAutoStop() {
+  if (_fundAutoTimer) { clearInterval(_fundAutoTimer); _fundAutoTimer = null; }
+}
+
+// Status → existing .loan-status pill class (green funded / blue
+// pending-signing / red cancelled / gray other).
+function _fundStatusClass(status) {
+  const s = (status || '').toLowerCase();
+  if (s.includes('fund') || s.includes('disburs') || s.includes('paid') || s.includes('complete')) return 'paid';
+  if (s.includes('cancel') || s.includes('void') || s.includes('declin') || s.includes('denied')) return 'late';
+  if (s.includes('sign') || s.includes('pending') || s.includes('active') || s.includes('open')) return 'active';
+  return 'other';
+}
+
+function _fundIsTerminal(status) {
+  return /(fund|disburs|paid|complete|cancel|void|declin|denied)/i.test(status || '');
+}
+
+function renderFundingQueue() {
+  const tbl = document.getElementById('fund-table');
+  const summary = document.getElementById('fund-summary');
+  if (!tbl) return;
+  const rows = _fundingRows || [];
+  if (!rows.length) {
+    tbl.innerHTML = '<div class="tbl-empty" style="padding:28px;text-align:center;color:var(--muted)">No loans in the funding queue yet.<br><span style="font-size:12px">Loans you create appear here automatically with live status.</span></div>';
+    if (summary) summary.textContent = '';
+    return;
+  }
+  const pending = rows.filter(r => !_fundIsTerminal(r.status)).length;
+  if (summary) summary.textContent = rows.length + ' loan' + (rows.length === 1 ? '' : 's') + ' · ' + pending + ' awaiting funding';
+  tbl.innerHTML = '<div class="tbl-card-scroll"><table class="tbl"><thead><tr>'
+    + '<th>Loan ID</th><th>Customer</th><th>Created</th><th>Status</th><th>Funding</th><th style="text-align:right">Amount</th><th></th>'
+    + '</tr></thead><tbody>'
+    + rows.map(r => {
+        const loanId = escapeHtml(String(r.loanNumber || r.hdrId || '—'));
+        const name = escapeHtml(r.customerName || '—');
+        const created = r.createdAt ? new Date(r.createdAt).toLocaleString(undefined, {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '—';
+        const st = escapeHtml(r.status || '—');
+        const stCls = _fundStatusClass(r.status);
+        const fm = escapeHtml(r.fundingMethod || 'Card');
+        const amt = r.amount != null ? '$' + Number(r.amount).toLocaleString(undefined,{maximumFractionDigits:0}) : '—';
+        const cid = String(r.vergentCustomerId || '');
+        const vlink = cid ? 'https://shared.lms.vergentlms.com/customer/general?action=view&id=' + encodeURIComponent(cid) : '';
+        return '<tr>'
+          + '<td class="num">' + loanId + '</td>'
+          + '<td>' + name + '</td>'
+          + '<td><span class="tbl-time">' + escapeHtml(created) + '</span></td>'
+          + '<td><span class="loan-status ' + stCls + '">' + st + '</span></td>'
+          + '<td>' + fm + '</td>'
+          + '<td class="num" style="text-align:right">' + escapeHtml(amt) + '</td>'
+          + '<td style="text-align:right;white-space:nowrap">'
+            + (vlink ? '<a href="' + vlink + '" target="_blank" rel="noopener" class="btn btn-ghost" style="padding:4px 9px;font-size:11px;text-decoration:none">Open ↗</a> ' : '')
+            + '<button class="btn btn-ghost" style="padding:4px 9px;font-size:11px" onclick="removeFundingRow(\'' + escapeHtml(String(r.hdrId)) + '\', this)" title="Remove from this list (does not affect Vergent)">Clear</button>'
+          + '</td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div>';
+}
+
+async function removeFundingRow(hdrId, btn) {
+  if (!hdrId) return;
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    await fetch('/api/funding-queue-remove', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hdr_id: hdrId }),
+    });
+    _fundingRows = (_fundingRows || []).filter(r => String(r.hdrId) !== String(hdrId));
+    renderFundingQueue();
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Clear'; }
+    toast('Couldn\'t remove: ' + ((e && e.message) || e), 'err');
+  }
+}
 
 async function loadCommunications() {
   const listEl = document.getElementById('comm-list');
