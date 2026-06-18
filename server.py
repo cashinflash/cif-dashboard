@@ -2140,7 +2140,7 @@ class Handler(BaseHTTPRequestHandler):
         # remove rows. Forwards to cif-apply. 60s timeout because a
         # refresh fans out one get_customer_loans call per non-terminal
         # entry; cif-apply caps it to actually-pending loans.
-        if path in ('/api/funding-queue', '/api/funding-queue-remove', '/api/funding-queue-backfill', '/api/funding-queue-probe'):
+        if path in ('/api/funding-queue', '/api/funding-queue-remove', '/api/funding-queue-backfill', '/api/funding-queue-probe', '/api/swagger-list'):
             try:
                 body = json.loads(raw) if raw else {}
                 payload = json.dumps(body).encode()
