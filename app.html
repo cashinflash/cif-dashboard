@@ -1133,7 +1133,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   .quick-grid{grid-template-columns:repeat(2,1fr)}
   .perf{grid-template-columns:repeat(2,1fr)}
   .dash-row-2{grid-template-columns:1fr}
-  .tbl-card .tbl th:nth-child(4),.tbl-card .tbl td:nth-child(4),.tbl-card .tbl th:nth-child(8),.tbl-card .tbl td:nth-child(8){display:none}
+  .tbl-card .tbl th:nth-child(5),.tbl-card .tbl td:nth-child(5),.tbl-card .tbl th:nth-child(8),.tbl-card .tbl td:nth-child(8){display:none}
   .brand-img{height:20px;max-width:120px}
   .brand-icon{width:30px;height:30px;border-radius:7px}
 }
@@ -1220,6 +1220,78 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   .time-range{width:100%;-webkit-overflow-scrolling:touch}
   /* Search dropdown anchored to the search box width on phones */
   .search-dd{left:0;right:auto;width:calc(100vw - 24px)}
+}
+
+/* ─── MOBILE IMPROVEMENTS (operator-driven, 2026-06-18) ───
+   The previous responsive rules hid critical info on phones (Status pill,
+   Engine badge). This block restores them via a card-stack layout for the
+   queue table, plus a pile of small fixes the operator asked for after
+   testing the dashboard on iPhone. Scoped tight so it doesn't bleed into
+   the Reports / Communications / Customer-portal tables. */
+@media(max-width:640px){
+  /* Queue table → card-stack. ALL 6 columns stay visible. The
+     `.queue-grid` parent scopes this so other .tbl-card tables (the
+     repeats portal at line 7449, etc.) keep their tabular layout. */
+  .queue-grid .tbl-card{overflow:visible}
+  .queue-grid .tbl-card .tbl,
+  .queue-grid .tbl-card .tbl tbody,
+  .queue-grid .tbl-card .tbl tr,
+  .queue-grid .tbl-card .tbl td{display:block;width:100%}
+  .queue-grid .tbl-card .tbl thead{display:none}
+  .queue-grid .tbl-card .tbl tr[data-fb]{padding:12px 14px 14px;border-bottom:1px solid var(--border);position:relative;cursor:pointer}
+  .queue-grid .tbl-card .tbl tr[data-fb]:hover{background:var(--green-50,#f0fdf4)}
+  .queue-grid .tbl-card .tbl tr[data-fb] td{padding:4px 0;border:none}
+  /* Reset the column-hide rules from earlier @media blocks — in card
+     mode every field stays visible */
+  .queue-grid .tbl-card .tbl tr[data-fb] td:nth-child(3),
+  .queue-grid .tbl-card .tbl tr[data-fb] td:nth-child(4),
+  .queue-grid .tbl-card .tbl tr[data-fb] td:nth-child(5),
+  .queue-grid .tbl-card .tbl tr[data-fb] td:nth-child(7){display:block}
+  /* Engine badge + Status pill ride inline on the same line so the
+     card stays compact instead of becoming six stacked blocks */
+  .queue-grid .tbl-card .tbl tr[data-fb] td:nth-child(3),
+  .queue-grid .tbl-card .tbl tr[data-fb] td:nth-child(4){display:inline-block;margin-right:6px;vertical-align:middle}
+  /* Submitted + Last Activity also inline, slightly smaller */
+  .queue-grid .tbl-card .tbl tr[data-fb] td:nth-child(5),
+  .queue-grid .tbl-card .tbl tr[data-fb] td:nth-child(6){display:inline-block;margin-right:12px;padding-top:6px;font-size:11px}
+  /* Day-group separator rows ("Today", "Yesterday") full-width banners */
+  .queue-grid .tbl-card .tbl tr.queue-group td{display:block !important;padding:10px 14px !important;background:var(--surface2,#f7faf8);font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border)}
+  /* App-meta truncation goes full-width in card mode (was 300px desktop) */
+  .queue-grid .tbl-card .app-info .app-meta[title]{max-width:none !important;white-space:normal !important}
+
+  /* Search inputs — strip rigid 240px min-widths that force horizontal
+     scroll on a 375px viewport */
+  #pay-search,#comm-search,#rpt-search{min-width:0 !important}
+
+  /* Modals — adapt to viewport on small screens. 480/520px max-widths
+     with the ov padding leave too little room for inputs to breathe. */
+  .appr-card,.dnl-card{max-width:calc(100vw - 16px) !important;border-radius:12px}
+  .appr-body,.dnl-body{padding:14px 16px}
+  .appr-head,.dnl-head{padding:14px 16px}
+  .appr-actions,.dnl-actions{padding:12px 16px}
+  /* Action footer buttons stay side-by-side but get equal flex so each
+     one is a comfortable tap target */
+  .appr-actions{flex-wrap:wrap}
+  .appr-actions .btn,.appr-actions .btn-approve-send{flex:1 1 auto;min-width:0}
+
+  /* Quick Actions buttons — bump min-height for fat-finger tap accuracy */
+  .qa-btn{min-height:44px;padding:11px 12px}
+
+  /* Info tab split panes stack — the inline `flex:1 1 320px; min-width:280px`
+     can't shrink below 280px without help. Attribute-selector override. */
+  div[style*="flex:1 1 320px"][style*="min-width:280px"]{flex-basis:100% !important;min-width:0 !important;border-right:none !important;border-bottom:1px solid var(--border-soft);padding-bottom:12px;margin-bottom:12px}
+  div[style*="flex:1 1 280px"][style*="min-width:240px"]{flex-basis:100% !important;min-width:0 !important}
+}
+
+/* Extra-narrow phones (≤ iPhone SE width). Analytics cards stack
+   to one column; the 2x2 grid at 600px gets cramped under 400px. */
+@media(max-width:420px){
+  .analytics-overview{grid-template-columns:1fr !important}
+  .stat{padding:12px}
+  .stat-value{font-size:22px}
+  /* Combo Create Customer & Loan modal max-height bumps so the 5-step
+     process log doesn't overflow the bottom action bar on small phones */
+  #ccl-ov .appr-body{max-height:calc(100vh - 180px)}
 }
 </style>
 </head>
