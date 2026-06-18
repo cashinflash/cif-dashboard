@@ -2401,23 +2401,18 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
           <span class="ccl-step-label">Create customer in Vergent</span>
           <span class="ccl-step-detail"></span>
         </div>
-        <div class="ccl-step" id="ccl-step-docs" data-state="pending">
-          <span class="ccl-step-icon">2</span>
-          <span class="ccl-step-label">Push Driver's License + Bank Statement</span>
-          <span class="ccl-step-detail"></span>
-        </div>
         <div class="ccl-step" id="ccl-step-card" data-state="pending">
-          <span class="ccl-step-icon">3</span>
+          <span class="ccl-step-icon">2</span>
           <span class="ccl-step-label">Save debit card on file</span>
           <span class="ccl-step-detail"></span>
         </div>
         <div class="ccl-step" id="ccl-step-loan" data-state="pending">
-          <span class="ccl-step-icon">4</span>
+          <span class="ccl-step-icon">3</span>
           <span class="ccl-step-label">Create loan</span>
           <span class="ccl-step-detail"></span>
         </div>
         <div class="ccl-step" id="ccl-step-esign" data-state="pending">
-          <span class="ccl-step-icon">5</span>
+          <span class="ccl-step-icon">4</span>
           <span class="ccl-step-label">Send e-sign email</span>
           <span class="ccl-step-detail"></span>
         </div>
@@ -4394,7 +4389,7 @@ function _cclSetStep(key, state, detail) {
   // success/fail at a glance.
   const icon = el.querySelector('.ccl-step-icon');
   if (icon) {
-    const n = ({customer:'1',docs:'2',card:'3',loan:'4',esign:'5'})[key] || '?';
+    const n = ({customer:'1',card:'2',loan:'3',esign:'4'})[key] || '?';
     if (state === 'success') icon.textContent = '✓';
     else if (state === 'fail') icon.textContent = '✕';
     else if (state === 'skipped') icon.textContent = '⊘';
@@ -4404,7 +4399,7 @@ function _cclSetStep(key, state, detail) {
 }
 
 function _cclResetSteps() {
-  ['customer','docs','card','loan','esign'].forEach(k => _cclSetStep(k, 'pending', ''));
+  ['customer','card','loan','esign'].forEach(k => _cclSetStep(k, 'pending', ''));
   const final = document.getElementById('ccl-final');
   if (final) { final.className = ''; final.textContent = ''; }
 }
@@ -4497,12 +4492,15 @@ async function startCreateCustomerLoan() {
   if (startBtn)  { startBtn.disabled = true; startBtn.style.opacity = '.55'; startBtn.textContent = 'Running…'; }
   if (cancelBtn) cancelBtn.textContent = 'Close';
   _cclResetSteps();
-  // Steps 1+2+3 share one /api/push-to-vergent call (it creates the
-  // customer when missing AND attaches docs + card in one shot — see
-  // run_server.py do_POST patch). Mark all three as 'running' so the
-  // operator sees parallel activity rather than sequential ticks.
-  _cclSetStep('customer', 'running', 'Creating in Vergent…');
-  _cclSetStep('docs',     'running', 'Uploading…');
+  // Steps 1+2 share one /api/push-to-vergent call — that endpoint
+  // creates the customer, uploads DL + Bank Statement, AND saves the
+  // debit card in one round-trip (see run_server.py do_POST patch).
+  // We don't track docs as a separate row in the UI because they're
+  // implicit in the Create Customer step (and surfacing a per-doc
+  // status here just confused the operator — the right-rail Vergent
+  // panel already reports doc upload outcomes). Mark customer + card
+  // as running so the operator sees parallel activity.
+  _cclSetStep('customer', 'running', 'Creating + uploading docs…');
   _cclSetStep('card',     'running', 'Saving card…');
   // Hand the note off to #vg-note for parity with the existing Create
   // Customer flow (the right-rail panel reads it from there).
@@ -4527,7 +4525,6 @@ async function startCreateCustomerLoan() {
     if (!ok) {
       const msg = (d.body || d.detail || d.error || ('HTTP ' + r.status)).toString();
       _cclSetStep('customer', 'fail', msg.slice(0, 80));
-      _cclSetStep('docs',     'skipped', 'Customer create failed');
       _cclSetStep('card',     'skipped', 'Customer create failed');
       _cclSetStep('loan',     'skipped', 'Cannot continue');
       _cclSetStep('esign',    'skipped', 'Cannot continue');
@@ -4547,31 +4544,6 @@ async function startCreateCustomerLoan() {
         ? apps.find(x => x.firebaseId === fbId) : null;
       if (aMem) aMem.vergentEnrichment = enrich;
     } catch (e) { /* non-fatal */ }
-    // Docs: success when both uploads landed; warn when one missed;
-    // fail when both missed (and there was data to push).
-    const dlR = pop.drivers_license || {};
-    const bsR = pop.bank_statement || {};
-    const dlOk = dlR.ok === true;
-    const bsOk = bsR.ok === true;
-    const dlSkipped = dlR.ok === false && (dlR.detail || '').toLowerCase().startsWith('no ');
-    const bsSkipped = bsR.ok === false && (bsR.detail || '').toLowerCase().startsWith('no ');
-    if (dlOk && bsOk) {
-      _cclSetStep('docs', 'success', 'DL + Statement uploaded');
-    } else if ((dlOk || dlSkipped) && (bsOk || bsSkipped)) {
-      const parts = [];
-      if (dlOk) parts.push('DL');
-      if (bsOk) parts.push('Statement');
-      _cclSetStep('docs', parts.length ? 'success' : 'skipped',
-                  parts.length ? parts.join(' + ') + ' uploaded' : 'No documents on file');
-    } else {
-      // At least one failure that isn't "no data". Non-fatal — loan
-      // can still proceed (operator can re-push docs later from the
-      // Vergent rail).
-      const fails = [];
-      if (dlR.ok === false && !dlSkipped) fails.push('DL');
-      if (bsR.ok === false && !bsSkipped) fails.push('Statement');
-      _cclSetStep('docs', 'fail', fails.join(' + ') + ' failed (continuing)');
-    }
     // Card: this is the critical gate. populated.card.ok === false AND
     // detail isn't "no card on file" means Vergent rejected the card —
     // we MUST NOT proceed to loan create.
@@ -4604,7 +4576,6 @@ async function startCreateCustomerLoan() {
     }
   } catch (e) {
     _cclSetStep('customer', 'fail', 'Network error');
-    _cclSetStep('docs',     'skipped', 'Customer create failed');
     _cclSetStep('card',     'skipped', 'Customer create failed');
     _cclSetStep('loan',     'skipped', 'Cannot continue');
     _cclSetStep('esign',    'skipped', 'Cannot continue');
@@ -4612,7 +4583,7 @@ async function startCreateCustomerLoan() {
     _cclEnableRetry();
     return;
   }
-  // Step 4 + 5: create the loan + dispatch e-sign.
+  // Step 3 + 4: create the loan + dispatch e-sign.
   _cclSetStep('loan',  'running', 'Creating loan…');
   _cclSetStep('esign', 'running', 'Queued…');
   try {
