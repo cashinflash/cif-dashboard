@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Cash in Flash — Underwriting Dashboard Web Server"""
-import collections, hashlib, hmac, http.client, json, os, secrets, ssl, time, urllib.error, urllib.request
+import collections, hashlib, hmac, http.client, json, os, re, secrets, ssl, time, urllib.error, urllib.request
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 PORT = int(os.environ.get('PORT', 8080))
@@ -431,24 +431,18 @@ def valid_session(token: str) -> bool:
 
 
 def get_token_from_request(handler) -> str:
-    """Extract session token from the HttpOnly cookie first (canonical).
+    """Extract session token from the HttpOnly cookie.
 
-    Falls back to the X-Session header and ?token= query param for
-    backward compat with older clients. CSRF is blocked by the cookie's
+    Previously fell back to an X-Session header and ?token= query param
+    for legacy compat. Both fallbacks were removed — tokens in URLs leak
+    via referer / proxy logs / browser history, and the current app.html
+    + login.html never use either path. CSRF is blocked by the cookie's
     SameSite=Strict flag — cross-origin requests never send the cookie.
     """
     for c in handler.headers.get('Cookie', '').split(';'):
         c = c.strip()
         if c.startswith('cif_token='):
             return c[len('cif_token='):]
-    t = handler.headers.get('X-Session', '').strip()
-    if t:
-        return t
-    if '?' in handler.path:
-        qs = handler.path.split('?', 1)[1]
-        for part in qs.split('&'):
-            if part.startswith('token='):
-                return part[6:]
     return ''
 
 
@@ -1088,7 +1082,88 @@ SECURITY_HEADERS = {
     'X-Frame-Options': 'DENY',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+    # Content-Security-Policy — limits where the page can pull resources
+    # from. The dashboard's 315 KB app.html is full of inline scripts /
+    # event handlers / styles (157 onclick=... attrs, inline <style>
+    # blocks, inline style="" everywhere) so 'unsafe-inline' is required
+    # for script-src and style-src. CSP still buys us:
+    #   - external script blocking (only same-origin + inline)
+    #   - external CSS blocking (only same-origin + inline + Google Fonts)
+    #   - frame-ancestors 'none' protects against clickjacking even if a
+    #     downstream proxy strips X-Frame-Options
+    #   - connect-src limits where XHR/fetch can send data (same-origin
+    #     only — all backend calls go through /fb/ and /api/* proxies)
+    #   - object-src 'none' blocks legacy plugin attacks
+    # img-src and frame-src stay broad (https:) because the dashboard
+    # embeds applicant documents (DL / bank statements) served from
+    # Firebase Storage with signed URLs that vary per applicant.
+    'Content-Security-Policy': (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data: https: blob:; "
+        "connect-src 'self'; "
+        "frame-src 'self' https:; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "object-src 'none'"
+    ),
 }
+
+
+# Max JSON body size accepted on any POST. Anything above this is a
+# misconfiguration or a DoS attempt — reject before reading rfile so an
+# attacker can't OOM the process by claiming Content-Length: 10GB.
+MAX_BODY_BYTES = 5 * 1024 * 1024   # 5 MB
+
+# Whitelist of allowed Firebase root path prefixes for the /fb/ proxy.
+# Operators only need these — write any other path and the proxy 403s.
+# Closes path-traversal / arbitrary-read attack surface: an authenticated
+# operator should NEVER be able to query e.g. /fb/users.json (the user
+# table sits in Firebase too).
+_FB_ALLOWED_PREFIXES = (
+    'reports/',
+    'reports.json',
+    'reportsIndex/',
+    'reportsIndex.json',
+    'overrides/',
+    'overrides.json',
+    'emailLog/',
+    'emailLog.json',
+    'ifSubmissions/',
+    'ifSubmissions.json',
+    'dashboardState/',
+    'dashboardState.json',
+)
+
+
+def _fb_path_is_safe(suffix: str) -> bool:
+    """Return True iff `suffix` is a Firebase REST path the dashboard is
+    allowed to proxy. Blocks path traversal (`..`) and anything outside
+    the whitelist of operator-relevant prefixes.
+
+    Note: Firebase REST treats `..` as a literal child name (not a
+    directory traversal) but blocking it anyway is belt + suspenders
+    against any future intermediary that DOES normalize URLs.
+    """
+    if not suffix:
+        return False
+    if '..' in suffix:
+        return False
+    if suffix.startswith('/') or '\\' in suffix:
+        return False
+    # Reject control chars / non-printable so headers can't be injected.
+    if any(ord(c) < 0x20 or ord(c) == 0x7F for c in suffix):
+        return False
+    return suffix.startswith(_FB_ALLOWED_PREFIXES)
+
+
+# Valid Firebase push-ID / submission-ID format. cif-apply mints these
+# as `[A-Za-z0-9_-]{10,32}`-shaped tokens. Anything else is an attacker
+# trying to slip a `/` or `..` into a path-interpolation.
+_FB_ID_RE = re.compile(r'^[A-Za-z0-9_-]{6,64}$')
 
 
 def _set_session_cookie(handler, token: str, max_age: int) -> None:
@@ -1273,6 +1348,12 @@ class Handler(BaseHTTPRequestHandler):
             if not valid_session(token):
                 self.send_json(401, {'error': 'Unauthorized'}); return
             fb_path = path[4:]
+            # Path-traversal guard — operators can only read the
+            # dashboard-relevant prefixes. Without this, an authenticated
+            # operator could read e.g. /fb/users.json (the user table
+            # also lives in Firebase under USERS_FB_PATH).
+            if not _fb_path_is_safe(fb_path):
+                self.send_json(403, {'error': 'forbidden_fb_path'}); return
             try:
                 with urllib.request.urlopen(_fb_url(fb_path), timeout=10) as r:
                     body = r.read()
@@ -1283,8 +1364,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header('Content-Length', str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
-            except Exception as e:
-                self.send_json(500, {'error': str(e)})
+            except Exception:
+                # Never leak `str(e)` here — urllib HTTPError can carry
+                # the upstream URL (with the ?auth=<secret> querystring).
+                self.send_json(500, {'error': 'firebase_proxy_failed'})
             return
 
         # ─── Instant-Funding vault — staff views ─────────────────
@@ -1540,7 +1623,15 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(404, {'error': 'not found'})
 
     def do_POST(self):
-        length = int(self.headers.get('Content-Length', 0))
+        # Bound the body size BEFORE reading rfile — an attacker who
+        # claims Content-Length: 10GB would otherwise have us happily
+        # block on rfile.read() and OOM the process.
+        try:
+            length = int(self.headers.get('Content-Length', 0))
+        except (TypeError, ValueError):
+            length = 0
+        if length < 0 or length > MAX_BODY_BYTES:
+            self.send_json(413, {'error': 'payload_too_large'}); return
         raw = self.rfile.read(length) if length else b'{}'
         path = self.path.split('?')[0]
 
@@ -1660,6 +1751,13 @@ class Handler(BaseHTTPRequestHandler):
             if not fb_id or action not in ('funded', 'declined'):
                 self.send_json(400, {'error': 'firebase_id and humanAction (funded|declined) required'})
                 return
+            # Format-validate fb_id before interpolating into Firebase
+            # paths below (`overrides/{fb_id}.json`, `reports/{fb_id}.json`).
+            # Without this guard, fb_id="a/b" would write to a nested
+            # node instead of the intended top-level record.
+            if not _FB_ID_RE.match(fb_id):
+                self.send_json(400, {'error': 'invalid_firebase_id'})
+                return
             operator = sessions.get(token, {}).get('user', 'unknown')
             now_ms = int(time.time() * 1000)
             try:
@@ -1698,7 +1796,15 @@ class Handler(BaseHTTPRequestHandler):
 
         if path.startswith('/fb/'):
             fb_path = path[4:]
-            method = self.headers.get('X-Method', 'POST')
+            # Same whitelist as the GET-side guard above.
+            if not _fb_path_is_safe(fb_path):
+                self.send_json(403, {'error': 'forbidden_fb_path'}); return
+            # Only the methods we actually use. PUT/PATCH overwrite/merge,
+            # POST appends a child, DELETE removes. Reject anything else
+            # so a creative attacker can't smuggle a GET or HEAD through.
+            method = self.headers.get('X-Method', 'POST').upper()
+            if method not in ('POST', 'PUT', 'PATCH', 'DELETE'):
+                self.send_json(405, {'error': 'method_not_allowed'}); return
             try:
                 req = urllib.request.Request(_fb_url(fb_path), data=raw,
                     headers={'Content-Type': 'application/json'}, method=method)
@@ -1712,8 +1818,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header('Content-Length', str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
-            except Exception as e:
-                self.send_json(500, {'error': str(e)})
+            except Exception:
+                # See GET-side note — don't leak the upstream URL.
+                self.send_json(500, {'error': 'firebase_proxy_failed'})
             return
 
         if path == '/api/send-denial':
