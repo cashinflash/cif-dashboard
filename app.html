@@ -10795,9 +10795,13 @@ async function runSwaggerList() {
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error((d && (d.error || d.detail)) || ('HTTP ' + r.status));
     const entries = (d && d.entries) || [];
-    if (meta) meta.textContent = 'Swagger ' + escapeHtml(d.doc_path || '') + ' · ' + entries.length + ' matched / ' + (d.total_paths || 0) + ' total endpoints';
+    const docs = (d && d.docs) || [];
+    const docsLabel = docs.length
+      ? docs.map(dc => dc.host + ' (' + dc.total_paths + ' paths via ' + dc.auth + ')').join(' · ')
+      : 'no swagger docs reachable';
+    if (meta) meta.textContent = entries.length + ' matched · sources: ' + docsLabel;
     if (!entries.length) {
-      if (out) out.innerHTML = '<div class="tbl-empty" style="padding:20px;color:#6b7280">No funding/queue/list endpoints matched. Doc fetched from <code>' + escapeHtml(d.doc_path || '') + '</code> (' + (d.total_paths || 0) + ' paths total).</div>';
+      if (out) out.innerHTML = '<div class="tbl-empty" style="padding:20px;color:#6b7280">No matched endpoints. Sources tried: <code>' + escapeHtml(docsLabel) + '</code></div>';
       return;
     }
     const row = (e) => {
@@ -10805,17 +10809,21 @@ async function runSwaggerList() {
         '<span style="display:inline-block;font-size:10.5px;background:' + (p.required ? '#fef2f2' : '#f3f4f6') + ';color:' + (p.required ? '#991b1b' : '#374151') + ';padding:1px 6px;border-radius:4px;margin:1px 2px 1px 0;font-family:ui-monospace,Menlo,Consolas,monospace">'
         + escapeHtml(p.name) + (p.required ? '*' : '') + '<span style="opacity:.6">:' + escapeHtml(p.in || '') + '</span></span>').join('');
       const pathLow = (e.path || '').toLowerCase();
-      const looksLikeList = ['fund','queue','pending','list','search'].some(k => pathLow.includes(k));
-      const hl = looksLikeList ? 'background:#f0fdf4' : '';
+      const isExternal = (e.host || '').includes('external');
+      const looksLikeList = ['fund','queue','pending','list','search','esign','sign'].some(k => pathLow.includes(k));
+      const hl = isExternal ? 'background:#fef9c3' : (looksLikeList ? 'background:#f0fdf4' : '');
+      const hostBadge = '<span style="display:inline-block;font-size:9.5px;padding:1px 5px;border-radius:4px;font-weight:700;' + (isExternal ? 'background:#fbbf24;color:#78350f' : 'background:#e5e7eb;color:#374151') + '">' + escapeHtml(e.host || '') + '</span>';
       return '<tr style="' + hl + '">'
-        + '<td style="padding:7px 8px;font-weight:700;color:#1e40af;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px">' + escapeHtml(e.method || '') + '</td>'
-        + '<td style="padding:7px 8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:#111827;word-break:break-all">' + escapeHtml(e.path || '') + '</td>'
-        + '<td style="padding:7px 8px;font-size:11px;color:#374151">' + params + '</td>'
-        + '<td style="padding:7px 8px;font-size:11px;color:#6b7280">' + escapeHtml((e.summary || '').slice(0, 200)) + '</td>'
+        + '<td style="padding:7px 8px;vertical-align:top">' + hostBadge + '</td>'
+        + '<td style="padding:7px 8px;font-weight:700;color:#1e40af;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;vertical-align:top">' + escapeHtml(e.method || '') + '</td>'
+        + '<td style="padding:7px 8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:#111827;word-break:break-all;vertical-align:top">' + escapeHtml(e.path || '') + '</td>'
+        + '<td style="padding:7px 8px;font-size:11px;color:#374151;vertical-align:top">' + params + '</td>'
+        + '<td style="padding:7px 8px;font-size:11px;color:#6b7280;vertical-align:top">' + escapeHtml((e.summary || '').slice(0, 200)) + '</td>'
         + '</tr>';
     };
     const html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">'
       + '<thead><tr style="background:#f3f4f6;text-align:left">'
+        + '<th style="padding:7px 8px;font-size:10.5px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Host</th>'
         + '<th style="padding:7px 8px;font-size:10.5px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Method</th>'
         + '<th style="padding:7px 8px;font-size:10.5px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Path</th>'
         + '<th style="padding:7px 8px;font-size:10.5px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Parameters (<span style="color:#991b1b">red = required</span>)</th>'
@@ -10824,6 +10832,10 @@ async function runSwaggerList() {
       + entries.map(row).join('')
       + '</tbody></table></div>';
     if (out) out.innerHTML = html;
+    // Surface the attempts log too — if external host returned 0 paths
+    // we want to see why.
+    window.__lastSwaggerAttempts = d.attempts;
+    console.log('[SWAGGER-LIST] attempts:', d.attempts);
   } catch (e) {
     if (out) out.innerHTML = '<div class="tbl-empty" style="padding:20px;color:#5a0d0d">Swagger fetch failed: ' + escapeHtml((e && e.message) || String(e)) + '</div>';
     if (meta) meta.textContent = 'Failed';
