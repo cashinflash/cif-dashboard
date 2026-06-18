@@ -8573,7 +8573,13 @@ async function markIFProcessed(rowKey) {
 // Same Repay → Vergent flow either way; on success, the row is
 // auto-marked "processed" by the backend.
 function _ifResolveVergentCid(ifRow) {
-  if (!ifRow || typeof apps === 'undefined' || !Array.isArray(apps)) return '';
+  if (!ifRow) return '';
+  // Path 0 — IF row carries vergent_customer_id directly (set by the
+  // cif-apply /card form and by cashinflash.com/if when ?cid=<id> is
+  // on the URL). Fastest, no app-table search needed.
+  const direct_cid = String(ifRow.vergentCustomerId || ifRow.vergent_customer_id || '').trim();
+  if (direct_cid && /^\d+$/.test(direct_cid)) return direct_cid;
+  if (typeof apps === 'undefined' || !Array.isArray(apps)) return '';
   const submissionId = (ifRow.submissionId || '').trim();
   // Path 1 — direct firebase_id link on the IF row.
   const direct = (ifRow.firebase_id || ifRow.firebaseId_app || '').trim();
