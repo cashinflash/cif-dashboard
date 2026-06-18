@@ -1998,6 +1998,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       </div>
       <div class="greet-actions">
         <button id="fund-refresh" class="btn btn-ghost" onclick="loadFundingQueue()" title="Refresh live status from Vergent"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-refresh"/></svg>Refresh</button>
+        <button id="fund-probe-btn" class="btn btn-ghost" onclick="runFundingProbe()" title="One-shot: try ~50 Vergent endpoints to see if any exposes the Loan Funding Queue natively. Results are shown in a modal and logged to Render."><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-zap"/></svg>Discover Vergent API</button>
       </div>
     </div>
     <div class="chips" style="margin-bottom:14px;align-items:center;gap:8px">
@@ -2006,6 +2007,28 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     </div>
     <div class="tbl-card" id="fund-table">
       <div class="tbl-loading">Loading funding queue…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Funding-queue endpoint discovery modal — opened by the
+     "Discover Vergent API" button. Shows the probe's results in a
+     compact table so the operator can scan for any 200-status loan-
+     shaped response. The full table also lands in Render logs. -->
+<div class="appr-ov" id="fund-probe-ov">
+  <div class="appr-card" style="max-width:920px;width:96vw">
+    <div class="appr-head">
+      <div>
+        <div class="appr-title"><svg class="icn"><use href="#i-zap"/></svg>Vergent API Discovery</div>
+        <div class="appr-meta" id="fund-probe-meta">Probing…</div>
+      </div>
+      <button onclick="document.getElementById('fund-probe-ov').style.display='none'" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1" title="Close">&times;</button>
+    </div>
+    <div class="appr-body" style="max-height:calc(100vh - 220px);overflow-y:auto;padding:14px 18px">
+      <p style="font-size:12.5px;color:var(--muted);line-height:1.5;margin:0 0 12px">
+        Tried ~50 candidate Vergent endpoints across three hosts (Classic V1, V2 APIM, Omnia). Each row shows what came back. <b>Green</b> = looks promising (loan-shaped JSON or 2xx with a real response). <b>Yellow</b> = 401/403 (path may be real but our auth doesn't reach it). Send the screenshot to your dev for wiring.
+      </p>
+      <div id="fund-probe-results"></div>
     </div>
   </div>
 </div>
@@ -10535,6 +10558,77 @@ async function removeFundingRow(hdrId, btn) {
   } catch (e) {
     if (btn) { btn.disabled = false; btn.textContent = 'Clear'; }
     toast('Couldn\'t remove: ' + ((e && e.message) || e), 'err');
+  }
+}
+
+// One-shot endpoint-discovery probe for the Loan Funding Queue. Hits
+// ~50 candidate Vergent paths server-side (so it uses our real V1
+// Token + APIM x-api-key); renders results in a compact modal table
+// + dumps the full set to Render logs for me to read.
+async function runFundingProbe() {
+  const ov   = document.getElementById('fund-probe-ov');
+  const meta = document.getElementById('fund-probe-meta');
+  const out  = document.getElementById('fund-probe-results');
+  const btn  = document.getElementById('fund-probe-btn');
+  if (ov) ov.style.display = 'flex';
+  if (meta) meta.textContent = 'Probing… this takes 30–60 seconds.';
+  if (out) out.innerHTML = '<div class="tbl-loading">Trying ~50 endpoints across V1, APIM, and Omnia…</div>';
+  if (btn) { btn.disabled = true; btn.style.opacity = '.55'; }
+  try {
+    const r = await fetch('/api/funding-queue-probe', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error((d && (d.error || d.detail)) || ('HTTP ' + r.status));
+    const all = (d && d.all) || [];
+    const promising = (d && d.promising) || [];
+    if (meta) meta.textContent = all.length + ' endpoints probed · ' + promising.length + ' worth a closer look';
+    const row = (r, idx) => {
+      const code = r.status || 0;
+      const ok2xx = code >= 200 && code < 300;
+      const auth401 = code === 401 || code === 403;
+      const bg = ok2xx ? '#dcfce7' : (auth401 ? '#fef3c7' : (code >= 400 ? '#fef2f2' : '#f9fafb'));
+      const fg = ok2xx ? '#166534' : (auth401 ? '#92400e' : (code >= 400 ? '#991b1b' : '#6b7280'));
+      const flags = [];
+      if (r.looks_json) flags.push('<span style="font-size:9.5px;background:#dbeafe;color:#1e40af;padding:1px 6px;border-radius:4px;font-weight:700">JSON</span>');
+      if (r.mentions_loan) flags.push('<span style="font-size:9.5px;background:#dcfce7;color:#15803d;padding:1px 6px;border-radius:4px;font-weight:700">LOAN-SHAPED</span>');
+      const snip = escapeHtml((r.snippet || r.error || '').slice(0, 200));
+      return '<tr style="background:' + bg + '">'
+        + '<td style="padding:6px 8px;font-weight:700;color:' + fg + ';font-variant-numeric:tabular-nums">' + code + '</td>'
+        + '<td style="padding:6px 8px;font-size:11px;color:#374151">' + escapeHtml(r.host || '') + '</td>'
+        + '<td style="padding:6px 8px;font-size:11px;color:#6b7280">' + escapeHtml(r.auth || '') + '</td>'
+        + '<td style="padding:6px 8px;font-size:11px;color:#374151;font-weight:600">' + escapeHtml(r.method || '') + ' ' + escapeHtml(r.path || '') + '</td>'
+        + '<td style="padding:6px 8px">' + flags.join(' ') + '</td>'
+        + '<td style="padding:6px 8px;font-size:10.5px;color:#6b7280;max-width:340px;word-break:break-word;font-family:ui-monospace,Menlo,Consolas,monospace">' + snip + '</td>'
+        + '</tr>';
+    };
+    // Promising first, then the rest sorted by status.
+    const sortedRest = all.filter(r => !promising.includes(r))
+      .sort((a,b) => (a.status||0) - (b.status||0));
+    const html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px">'
+      + '<thead><tr style="background:#f3f4f6;text-align:left">'
+        + '<th style="padding:7px 8px;font-size:10.5px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Status</th>'
+        + '<th style="padding:7px 8px;font-size:10.5px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Host</th>'
+        + '<th style="padding:7px 8px;font-size:10.5px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Auth</th>'
+        + '<th style="padding:7px 8px;font-size:10.5px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Endpoint</th>'
+        + '<th style="padding:7px 8px;font-size:10.5px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Tags</th>'
+        + '<th style="padding:7px 8px;font-size:10.5px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Response snippet</th>'
+      + '</tr></thead><tbody>'
+      + (promising.length
+          ? '<tr><td colspan="6" style="padding:8px 6px;font-size:10.5px;font-weight:700;color:#15803d;background:#f0fdf4;text-transform:uppercase;letter-spacing:.05em">Promising</td></tr>'
+          + promising.map(row).join('')
+          + '<tr><td colspan="6" style="padding:8px 6px;font-size:10.5px;font-weight:700;color:#6b7280;background:#f9fafb;text-transform:uppercase;letter-spacing:.05em">Other</td></tr>'
+          : '')
+      + sortedRest.map(row).join('')
+      + '</tbody></table></div>';
+    if (out) out.innerHTML = html;
+  } catch (e) {
+    if (out) out.innerHTML = '<div class="tbl-empty" style="padding:20px;color:#5a0d0d">Probe failed: ' + escapeHtml((e && e.message) || String(e)) + '</div>';
+    if (meta) meta.textContent = 'Failed';
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
   }
 }
 
