@@ -10411,6 +10411,36 @@ async function loadFundingQueue(silent) {
     });
     const d = await r.json().catch(() => ({}));
     _fundingRows = (d && d.items) || [];
+    // First-load backfill — if the queue is empty and we haven't tried
+    // a backfill yet on this device, ask cif-apply to import existing
+    // pending loans from our /reports data (one-time recovery for
+    // loans created before the create-loan handler started writing
+    // /fundingQueue). Subsequent visits skip this so a deliberately-
+    // cleared queue isn't re-populated.
+    if (!_fundingRows.length && !silent
+        && !localStorage.getItem('cif.fundingQueueBackfilledAt')) {
+      tbl.innerHTML = '<div class="tbl-loading">Importing existing loans from Vergent…</div>';
+      try {
+        const br = await fetch('/api/funding-queue-backfill', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
+        });
+        const bd = await br.json().catch(() => ({}));
+        localStorage.setItem('cif.fundingQueueBackfilledAt', String(Date.now()));
+        if (bd && bd.added > 0) {
+          // Re-fetch with a live refresh so each imported row pulls
+          // its real status from Vergent.
+          const r2 = await fetch('/api/funding-queue', {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh: true }),
+          });
+          const d2 = await r2.json().catch(() => ({}));
+          _fundingRows = (d2 && d2.items) || [];
+        }
+      } catch (e) { /* non-fatal — falls through to empty state */ }
+    }
     renderFundingQueue();
     const at = document.getElementById('fund-loaded-at');
     if (at) at.textContent = 'Updated ' + new Date().toLocaleTimeString();
