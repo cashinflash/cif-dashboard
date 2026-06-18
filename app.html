@@ -1811,7 +1811,11 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
                 <div class="dv-card-alert-title">Debit card not saved to Vergent</div>
                 <div class="dv-card-alert-detail" id="dv-card-alert-detail"></div>
                 <div class="dv-card-alert-hint">Confirm the card in Vergent or contact the customer if their card was rejected.</div>
-                <button class="dv-card-alert-dismiss" id="dv-card-alert-dismiss" type="button">✓ Mark resolved</button>
+                <div id="dv-card-alert-actions" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+                  <button class="dv-card-alert-dismiss" id="dv-card-alert-send-email" type="button" style="background:#1aab6d;color:white;border:1px solid #1aab6d" title="Email the customer asking them to submit a valid debit card at cashinflash.com/if">📧 Email customer for new card</button>
+                  <button class="dv-card-alert-dismiss" id="dv-card-alert-dismiss" type="button">✓ Mark resolved</button>
+                </div>
+                <div id="dv-card-alert-send-result" style="font-size:11px;color:var(--muted);margin-top:6px;min-height:14px"></div>
               </div>
             </div>
           </div>
@@ -7322,6 +7326,54 @@ document.getElementById('dv-card-alert-dismiss')?.addEventListener('click', asyn
   } catch (e) {
     if (btn) { btn.disabled = false; btn.textContent = '✓ Mark resolved'; }
     toast('Couldn\'t save: ' + ((e && e.message) || e), 'err');
+  }
+});
+// Send Card-Failed email — operator request. Card failed to save in
+// Vergent ⇒ customer's card info is bad ⇒ we send them an email
+// pointing to cashinflash.com/if so they can resubmit. The firebase_id
+// is included on the URL (?fb=...) so the IF row that comes back
+// auto-links to this application and Save Card skips the manual
+// customer-id prompt.
+document.getElementById('dv-card-alert-send-email')?.addEventListener('click', async () => {
+  const id = _activeFbId(); if (!id) return;
+  const a = (typeof apps !== 'undefined' && apps)
+    ? apps.find(x => x.firebaseId === id) : null;
+  const ad = (a && a.applicationData) || {};
+  const toEmail = (ad.email || (a && a.email) || '').trim();
+  const toName  = (((ad.firstName || '') + ' ' + (ad.lastName || '')).trim()
+                   || (a && a.name) || 'Valued Customer').trim();
+  if (!toEmail) {
+    toast('No email on record for this customer.', 'err');
+    return;
+  }
+  if (!confirm(`Send a "submit valid debit card" email to ${toName}\n<${toEmail}>?`)) return;
+  const btn = document.getElementById('dv-card-alert-send-email');
+  const res = document.getElementById('dv-card-alert-send-result');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  if (res) { res.style.color = 'var(--muted)'; res.textContent = ''; }
+  try {
+    const r = await fetch('/api/send-card-failed', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to_email: toEmail,
+        to_name:  toName,
+        firebase_id: id,
+      }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d && d.ok) {
+      if (res) { res.style.color = '#1a6b3c'; res.textContent = '✓ Email sent to ' + toEmail; }
+      toast('Email sent', 'ok');
+      if (btn) btn.textContent = '✓ Email sent';
+    } else {
+      const msg = d.error || d.detail || ('HTTP ' + r.status);
+      if (res) { res.style.color = '#5a0d0d'; res.textContent = 'Send failed: ' + msg; }
+      if (btn) { btn.disabled = false; btn.textContent = '📧 Email customer for new card'; }
+    }
+  } catch (e) {
+    if (res) { res.style.color = '#5a0d0d'; res.textContent = 'Network error: ' + ((e && e.message) || e); }
+    if (btn) { btn.disabled = false; btn.textContent = '📧 Email customer for new card'; }
   }
 });
 document.getElementById('dv-refresh-plaid-btn').addEventListener('click', () => { const id = _activeFbId(); if (id) refreshFromPlaid(id); });
