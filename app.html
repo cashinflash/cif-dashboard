@@ -10516,16 +10516,34 @@ function renderFundingQueue() {
   const pending = rows.filter(r => !_fundIsTerminal(r.status)).length;
   if (summary) summary.textContent = rows.length + ' loan' + (rows.length === 1 ? '' : 's') + ' · ' + pending + ' awaiting funding';
   tbl.innerHTML = '<div class="tbl-card-scroll"><table class="tbl"><thead><tr>'
-    + '<th>Loan ID</th><th>Customer</th><th>Created</th><th>Status</th><th>Funding</th><th style="text-align:right">Amount</th><th></th>'
+    + '<th>Loan ID</th><th>Customer</th><th>Created</th><th>Status</th><th>Funding</th><th>Partner</th><th>Last Updated</th><th style="text-align:right">Amount</th><th></th>'
     + '</tr></thead><tbody>'
     + rows.map(r => {
         const loanId = escapeHtml(String(r.loanNumber || r.hdrId || '—'));
         const name = escapeHtml(r.customerName || '—');
         const created = r.createdAt ? new Date(r.createdAt).toLocaleString(undefined, {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '—';
-        const st = escapeHtml(r.status || '—');
-        const stCls = _fundStatusClass(r.status);
+        // Prefer the authoritative funding-queue status from Vergent's
+        // own /V1/loan/fundingqueue endpoint when present.
+        const statusRaw = r.fundingStatus || r.status || '—';
+        const st = escapeHtml(statusRaw);
+        const stCls = _fundStatusClass(statusRaw);
         const fm = escapeHtml(r.fundingMethod || 'Card');
-        const amt = r.amount != null ? '$' + Number(r.amount).toLocaleString(undefined,{maximumFractionDigits:0}) : '—';
+        const partner = escapeHtml(r.fundingPartner || '—');
+        // Vergent's date strings come back as either ISO (with T) or .NET
+        // /Date(ms)/ format. Render to a readable form when parseable,
+        // else show the raw string.
+        let lastUpd = r.fundingLastUpdated || '';
+        if (lastUpd) {
+          let d = null;
+          const m = /\/Date\((\d+)/.exec(lastUpd);
+          if (m) d = new Date(Number(m[1]));
+          else { const t = Date.parse(lastUpd); if (!isNaN(t)) d = new Date(t); }
+          if (d) lastUpd = d.toLocaleString(undefined, {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+        } else {
+          lastUpd = '—';
+        }
+        const amtVal = r.fundingAmount != null ? r.fundingAmount : r.amount;
+        const amt = amtVal != null ? '$' + Number(amtVal).toLocaleString(undefined,{maximumFractionDigits:0}) : '—';
         const cid = String(r.vergentCustomerId || '');
         const vlink = cid ? 'https://shared.lms.vergentlms.com/customer/general?action=view&id=' + encodeURIComponent(cid) : '';
         return '<tr>'
@@ -10534,6 +10552,8 @@ function renderFundingQueue() {
           + '<td><span class="tbl-time">' + escapeHtml(created) + '</span></td>'
           + '<td><span class="loan-status ' + stCls + '">' + st + '</span></td>'
           + '<td>' + fm + '</td>'
+          + '<td>' + partner + '</td>'
+          + '<td><span class="tbl-time">' + escapeHtml(lastUpd) + '</span></td>'
           + '<td class="num" style="text-align:right">' + escapeHtml(amt) + '</td>'
           + '<td style="text-align:right;white-space:nowrap">'
             + (vlink ? '<a href="' + vlink + '" target="_blank" rel="noopener" class="btn btn-ghost" style="padding:4px 9px;font-size:11px;text-decoration:none">Open ↗</a> ' : '')
