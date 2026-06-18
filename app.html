@@ -1302,14 +1302,26 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
    off-screen. Operator had to zoom out / scroll to find it. Sticky
    positioning pins the action row to the bottom of the body's scroll
    area — buttons always visible regardless of how long the reasons
-   list is. Padding on the bottom adds breathing room above. */
+   list is.
+
+   Operator-followup (2026-06-18): the previous version put Send on its
+   own row below Cancel + Mark Declined, which left it hovering over
+   the iPhone home-indicator and forced a tiny scroll to reach. Now
+   all THREE buttons share the same row, with hideable label spans
+   (".dnl-long-label") trimming "Mark Declined (no email)" → "Mark
+   Declined" and "Send Denial Email" → "Send Email" so they fit. Send
+   gets flex:1.5 so it stays the visual primary. Safe-area padding
+   keeps the buttons clear of the home-indicator. */
 @media(max-width:640px){
   .dnl-body{padding-bottom:0}
-  .dnl-actions{position:sticky;bottom:0;background:white;padding:12px 0 4px;margin-top:8px;border-top:1px solid var(--border);z-index:1;flex-wrap:wrap;gap:6px}
-  .dnl-actions .btn,.dnl-actions .btn-denial-send{flex:1 1 auto;min-width:0;font-size:12px;padding:9px 8px}
-  /* Send button stays the primary visual emphasis but doesn't need 2x
-     width — at narrow widths give it 100% so it sits on its own row */
-  .dnl-actions .btn-denial-send{flex-basis:100% !important;order:99}
+  .dnl-actions{position:sticky;bottom:0;background:white;padding:10px 0 calc(8px + env(safe-area-inset-bottom,0px));margin-top:8px;border-top:1px solid var(--border);z-index:1;display:flex;flex-wrap:nowrap;gap:6px}
+  .dnl-actions .btn,.dnl-actions .btn-denial-send{flex:1 1 0;min-width:0;font-size:12px;padding:11px 6px;white-space:nowrap}
+  /* Send is the primary action — give it ~50% more width than the
+     siblings, keep the envelope icon for instant recognition */
+  .dnl-actions .btn-denial-send{flex:1.5 1 0 !important}
+  .dnl-actions .btn-denial-send .icn{width:12px;height:12px;margin-right:2px}
+  /* Hide the verbose tail of the labels — see HTML markup */
+  .dnl-long-label{display:none}
 }
 </style>
 </head>
@@ -2519,8 +2531,8 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       </div>
       <div class="dnl-actions">
         <button class="btn btn-ghost" id="dnl-cancel" type="button">Cancel</button>
-        <button class="btn" id="dnl-skip-email" type="button" title="Mark this application as Declined without sending the customer an email. Useful for cleaning up old pending applications." style="background:#fef2f2;color:#991b1b;border:1px solid #fecaca">Mark Declined (no email)</button>
-        <button class="btn btn-denial-send" id="dnl-send" type="button"><svg class="icn"><use href="#i-message"/></svg>Send Denial Email</button>
+        <button class="btn" id="dnl-skip-email" type="button" title="Mark this application as Declined without sending the customer an email. Useful for cleaning up old pending applications." style="background:#fef2f2;color:#991b1b;border:1px solid #fecaca">Mark Declined<span class="dnl-long-label"> (no email)</span></button>
+        <button class="btn btn-denial-send" id="dnl-send" type="button"><svg class="icn"><use href="#i-message"/></svg>Send<span class="dnl-long-label"> Denial</span> Email</button>
       </div>
     </div>
   </div>
