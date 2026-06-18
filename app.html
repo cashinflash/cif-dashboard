@@ -2535,6 +2535,19 @@ async function fbGet(path) {
   return r.json();
 }
 
+// YYYY-MM-DD in the BROWSER's LOCAL timezone. Plain
+// d.toISOString().slice(0,10) returns the UTC date, which rolls
+// forward a day for evening Pacific users (e.g. 6/17 17:36 PT =
+// 6/18 00:36 UTC) — making the Create Loan due-date min appear
+// 24h later than it should. Subtracting the local offset before
+// formatting fixes that. The dashboard's operators are always in
+// Pacific, but this helper is timezone-agnostic — it pulls the
+// user's actual offset from the Date object.
+function _localDateStr(d) {
+  const tz = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tz).toISOString().slice(0, 10);
+}
+
 async function getMe() {
   try {
     const r = await fetch('/api/me', { credentials: 'include' });
@@ -4148,9 +4161,11 @@ async function openCreateLoanModal() {
   // Vergent enforces a 14-day minimum term -- block earlier dates
   // via the input's min attribute so the operator can't accidentally
   // pick one that gets rejected. No max -- they can extend if needed.
+  // Use LOCAL date (not UTC) so evening Pacific users don't see the
+  // min roll forward a day -- see _localDateStr.
   const minDue = new Date();
   minDue.setDate(minDue.getDate() + 14);
-  const minStr = minDue.toISOString().slice(0, 10);
+  const minStr = _localDateStr(minDue);
   if (dueEl) {
     dueEl.min = minStr;
     dueEl.value = minStr;
@@ -4310,8 +4325,9 @@ async function openCreateCustomerLoanModal() {
   if (cancelBtn) { cancelBtn.disabled = false; cancelBtn.textContent = 'Cancel'; }
   [noteEl, amtEl, dueEl].forEach(el => { if (el) el.disabled = false; });
   // Default due date = today + 14 (Vergent's CA payday minimum).
+  // LOCAL date, not UTC — see _localDateStr.
   const minDue = new Date(); minDue.setDate(minDue.getDate() + 14);
-  const minStr = minDue.toISOString().slice(0, 10);
+  const minStr = _localDateStr(minDue);
   if (dueEl) { dueEl.min = minStr; dueEl.value = minStr; }
   document.getElementById('ccl-ov').style.display = 'flex';
   // Pre-fill from the live Firebase record (same pattern Create Loan uses).
@@ -4519,9 +4535,21 @@ async function startCreateCustomerLoan() {
       _cclShowFinal('success',
         '✓ Customer created + loan #' + hdr + ' originated + e-sign dispatched.');
       // Refresh detail in the background so the dashboard reflects the
-      // new state when the operator closes the modal.
-      try { renderDetail(fbId); } catch (e) { /* non-fatal */ }
+      // new state when the operator closes the modal — including the
+      // Profile tab's Vergent Loan History (invalidate the 60s
+      // freshness cache so loadVergentLoans does a real fetch) and
+      // the customer docs section.
+      _vergentLoansCache[fbId] = null;
       try { loadVergentMatch(fbId); } catch (e) { /* non-fatal */ }
+      try { loadVergentLoans(fbId); } catch (e) { /* non-fatal */ }
+      try {
+        const mm = _vergentMatchCache[fbId];
+        if (mm && mm.customerId) {
+          _vergentCustDocsCache[mm.customerId] = null;
+          loadVergentCustomerDocs(mm.customerId, fbId);
+        }
+      } catch (e) { /* non-fatal */ }
+      try { renderDetail(fbId); } catch (e) { /* non-fatal */ }
       setTimeout(() => {
         closeCreateCustomerLoanModal();
         try { renderDetail(fbId); } catch (e) {}
@@ -4752,6 +4780,21 @@ async function submitCreateLoan() {
       setMsg('#1a6b3c', 'Loan #' + hdr + ' created' + esign);
       toast('Loan created in Vergent', 'ok');
       setTimeout(closeCreateLoanModal, 2500);
+      // Operator request: refresh the Profile tab's Vergent Loan
+      // History without making them refresh the page. Invalidate the
+      // 60s freshness cache so loadVergentLoans does a real fetch,
+      // and refresh customer docs too (the new loan may have triggered
+      // doc generation on the Vergent side).
+      _vergentLoansCache[fbId] = null;
+      try { await loadVergentLoans(fbId); } catch (e) { /* non-fatal */ }
+      try {
+        const mm = _vergentMatchCache[fbId];
+        if (mm && mm.customerId) {
+          _vergentCustDocsCache[mm.customerId] = null;
+          loadVergentCustomerDocs(mm.customerId, fbId);
+        }
+      } catch (e) { /* non-fatal */ }
+      try { renderDetail(fbId); } catch (e) { /* non-fatal */ }
     } else {
       const upstream = d && d.status ? 'Vergent HTTP ' + d.status : '';
       const snippet = (d && (d.loanDetail || d.detail || d.error) || '').toString().trim();
@@ -5712,6 +5755,30 @@ async function _vgRunPush(fbId, body, opts) {
           ? apps.find(x => x.firebaseId === fbId) : null;
         if (aMem) aMem.vergentEnrichment = enrich;
       } catch (e) { /* non-fatal */ }
+      // Operator request: after a successful create-or-push, the
+      // dashboard MUST reflect the new "found" Vergent state without
+      // the operator clicking Re-check. Synthesize a found match from
+      // the push response and prime both the in-memory cache AND
+      // Firebase (so a refresh keeps it). cif-apply also writes
+      // vergentMatch when it creates a customer, but the response
+      // sometimes lands before that write is visible to a follow-up
+      // read — priming locally makes the UI instant either way.
+      if (cid && cid !== '?') {
+        const synthMatch = {
+          status:     'found',
+          customerId: String(cid),
+          candidate:  { id: String(cid) },
+          checkedAt:  Date.now(),
+          source:     body.create_if_missing ? 'created' : 'pushed',
+        };
+        _vergentMatchCache[fbId] = synthMatch;
+        _vgRememberFound(fbId, synthMatch);
+        // Best-effort persist so a refresh sees the new state.
+        try {
+          await _fbPatchRaw('reports/' + encodeURIComponent(fbId) + '.json',
+                            { vergentMatch: synthMatch });
+        } catch (e) { /* non-fatal */ }
+      }
     } else {
       const msg = d.body || d.detail || d.error || ('HTTP ' + r.status);
       _vgShow('err', String(msg).slice(0, 200));
