@@ -4181,10 +4181,61 @@ function buildDebitCardPanel(dc) {
               style="background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:7px">
         <svg class="icn" style="width:13px;height:13px"><use href="#i-zap"/></svg>Save Card to Vergent
       </button>
+      <button id="dcard-invalid-email" type="button"
+              onclick="sendCardFailedFromDetail(this)"
+              title="Email this customer asking them to submit a valid debit card at cashinflash.com/if"
+              style="background:#fff5e6;color:#9a3412;border:1px solid #f3b770;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:7px">
+        <svg class="icn" style="width:13px;height:13px"><use href="#i-message"/></svg>Invalid Card Email
+      </button>
       <span id="dcard-save-result" style="font-size:11.5px;color:var(--muted)"></span>
     </div>
     <div style="font-size:11.5px;color:var(--muted);padding:0 4px">Click any value to select it — makes it easy to copy into Vergent.</div>
   </div>`;
+}
+
+// Manually send the "submit a valid debit card" email to the current
+// applicant (operator request: a Send-Email button on the Debit Card
+// tab, alongside Save Card, for cases where Vergent rejected the card
+// or the operator just wants to re-request card info). Reuses the same
+// /api/send-card-failed endpoint the right-rail card-failed alert uses;
+// writes status into the shared #dcard-save-result label.
+async function sendCardFailedFromDetail(btn) {
+  const fbId = document.body.dataset.firebaseId || '';
+  const resultEl = document.getElementById('dcard-save-result');
+  const setMsg = (color, text) => {
+    if (resultEl) { resultEl.style.color = color; resultEl.textContent = text; }
+  };
+  if (!fbId) { setMsg('#5a0d0d', 'No applicant selected.'); return; }
+  const a = (typeof apps !== 'undefined' && apps)
+    ? apps.find(x => x.firebaseId === fbId) : null;
+  const ad = (a && a.applicationData) || {};
+  const toEmail = (ad.email || (a && a.email) || '').trim();
+  const toName  = (((ad.firstName || '') + ' ' + (ad.lastName || '')).trim()
+                   || (a && a.name) || 'Valued Customer').trim();
+  if (!toEmail) { setMsg('#5a0d0d', 'No email on record for this customer.'); return; }
+  if (!confirm('Send a "submit valid debit card" email to ' + toName + '\n<' + toEmail + '>?')) return;
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.style.opacity = '.55'; btn.textContent = 'Sending…'; }
+  setMsg('var(--muted)', 'Sending email…');
+  try {
+    const r = await fetch('/api/send-card-failed', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to_email: toEmail, to_name: toName, firebase_id: fbId }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d && d.ok) {
+      setMsg('#1a6b3c', '✓ Invalid-card email sent to ' + toEmail);
+      toast('Email sent', 'ok');
+    } else {
+      const msg = d.error || d.detail || ('HTTP ' + r.status);
+      setMsg('#5a0d0d', 'Send failed: ' + String(msg).slice(0, 200));
+    }
+  } catch (e) {
+    setMsg('#5a0d0d', 'Network error: ' + ((e && e.message) || String(e)));
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = orig; }
+  }
 }
 
 // Push the applicant's debit card into their Vergent customer record.
@@ -8515,6 +8566,23 @@ function openIFCardModal(rowKey) {
       ${row('Billing ZIP', data.billingZip, 'billingZip')}
     </div>
     <div id="if-save-card-result" style="font-size:11.5px;color:var(--muted);text-align:right;margin-top:8px;min-height:14px"></div>
+    <!-- Vergent customer picker — hidden until Save Card can't auto-
+         resolve the customer. Lets the operator match the submission to
+         an applicant we know (by name/email/phone) instead of hunting
+         the raw Vergent customer id. Populated + wired by
+         _ifShowCidPicker(). -->
+    <div id="if-cid-picker" style="display:none;border:1px solid #f3b770;background:#fffdf8;border-radius:10px;padding:12px 14px;margin-top:10px">
+      <div style="font-size:12px;font-weight:700;color:#9a3412;margin-bottom:8px">Which customer is this card for?</div>
+      <input id="if-cid-search" type="text" placeholder="Search by name, email, or phone…" autocomplete="off"
+             style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:13px;font-family:inherit;box-sizing:border-box;outline:none">
+      <div id="if-cid-results" style="margin-top:8px;max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:6px"></div>
+      <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:11.5px;color:var(--muted)">Or enter a Vergent ID directly:</span>
+        <input id="if-cid-manual" type="text" inputmode="numeric" placeholder="e.g. 610262"
+               style="width:110px;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit;outline:none">
+        <button class="btn btn-ghost" type="button" onclick="_ifUseManualCid('${escapeHtml(rowKey)}')">Use ID</button>
+      </div>
+    </div>
     <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;justify-content:flex-end">
       <a href="https://cashinflash.my.vergentlms.com/login" target="_blank" rel="noopener" class="btn btn-ghost" style="text-decoration:none">Open Vergent ↗</a>
       <button class="btn btn-ghost" onclick="_ifCopyAll()">Copy all fields</button>
@@ -8572,14 +8640,34 @@ async function markIFProcessed(rowKey) {
 //      vergentMatch.customerId.
 // Same Repay → Vergent flow either way; on success, the row is
 // auto-marked "processed" by the backend.
+// Normalize a name to a comparison key ("First", "Last" -> "first last").
+function _ifNameKey(first, last) {
+  return ((first || '') + ' ' + (last || '')).trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+// Resolve the Vergent customer id an IF card-submission should be saved
+// to, WITHOUT the operator hunting for it. Tries, in order:
+//   Path 0 — vergent_customer_id baked onto the row (new /card + /if
+//            forms forward ?cid=).
+//   Path 1 — firebase_id on the row -> the linked application's match.
+//   Path 2 — submissionId -> applicationData.ifSubmissionId match.
+//   Path 3 — fuzzy name match: the borrower/cardholder name maps to a
+//            known applicant. Only auto-resolves when UNAMBIGUOUS — all
+//            name-matched applicants must point at the SAME single
+//            Vergent customer id. Name collisions (two different Vergent
+//            customers) return '' so the caller shows the picker.
 function _ifResolveVergentCid(ifRow) {
   if (!ifRow) return '';
-  // Path 0 — IF row carries vergent_customer_id directly (set by the
-  // cif-apply /card form and by cashinflash.com/if when ?cid=<id> is
-  // on the URL). Fastest, no app-table search needed.
+  // Path 0 — IF row carries vergent_customer_id directly.
   const direct_cid = String(ifRow.vergentCustomerId || ifRow.vergent_customer_id || '').trim();
   if (direct_cid && /^\d+$/.test(direct_cid)) return direct_cid;
   if (typeof apps === 'undefined' || !Array.isArray(apps)) return '';
+  const _cidOf = (a) => {
+    const vm = a.vergentMatch || {};
+    if ((vm.status || '').toLowerCase() === 'found' && vm.customerId) return String(vm.customerId);
+    if (a.vergentCustomerId) return String(a.vergentCustomerId);
+    return '';
+  };
   const submissionId = (ifRow.submissionId || '').trim();
   // Path 1 — direct firebase_id link on the IF row.
   const direct = (ifRow.firebase_id || ifRow.firebaseId_app || '').trim();
@@ -8592,46 +8680,63 @@ function _ifResolveVergentCid(ifRow) {
       return ad.ifSubmissionId === submissionId;
     });
   }
-  if (!linked) return '';
-  const vm = linked.vergentMatch || {};
-  if ((vm.status || '').toLowerCase() === 'found' && vm.customerId) {
-    return String(vm.customerId);
+  if (linked) {
+    const id = _cidOf(linked);
+    if (id && /^\d+$/.test(id)) return id;
   }
-  if (linked.vergentCustomerId) return String(linked.vergentCustomerId);
+  // Path 3 — fuzzy name match (unambiguous only).
+  const nameKey = _ifNameKey(ifRow.borrowerFirst, ifRow.borrowerLast)
+               || _ifNameKey(ifRow.cardholderFirst, ifRow.cardholderLast);
+  if (nameKey) {
+    const ids = new Set();
+    apps.forEach(a => {
+      const ad = a.applicationData || {};
+      const k = _ifNameKey(ad.firstName, ad.lastName)
+             || (a.name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      if (k && k === nameKey) {
+        const id = _cidOf(a);
+        if (id && /^\d+$/.test(id)) ids.add(id);
+      }
+    });
+    if (ids.size === 1) return Array.from(ids)[0];
+  }
   return '';
 }
 
 async function saveIFCardToVergent(rowKey, btn) {
+  const data = (window._ifRows || []).find(r => r.firebaseId === rowKey);
+  const borrower = data
+    ? ((data.borrowerFirst || '') + ' ' + (data.borrowerLast || '')).trim()
+    : '';
+  // Auto-resolve first — operator-requested: "i dont have to find the
+  // customers customer id". Paths 0-3 cover direct links + an
+  // unambiguous name match. If we get one, save straight away.
+  const cid = _ifResolveVergentCid(data);
+  if (cid) {
+    _ifDoSaveCard(rowKey, cid, true, btn);
+    return;
+  }
+  // No confident match — show the inline picker so the operator can
+  // pick the customer by name (instead of hunting a Vergent id).
+  _ifShowCidPicker(rowKey, borrower);
+}
+
+// The actual Vergent save. Shared by the auto-resolve path, the picker
+// selection, and the manual-id escape hatch.
+async function _ifDoSaveCard(rowKey, cid, autoResolved, btn) {
   const resultEl = document.getElementById('if-save-card-result');
   const setMsg = (color, text) => {
     if (!resultEl) return;
     resultEl.style.color = color;
     resultEl.textContent = text;
   };
-  const data = (window._ifRows || []).find(r => r.firebaseId === rowKey);
-  const borrower = data
-    ? ((data.borrowerFirst || '') + ' ' + (data.borrowerLast || '')).trim()
-    : '';
-  // Auto-resolve first — operator-requested: "i dont have to find the
-  // customers customer id" when the IF submission is linked to an
-  // application we already know about.
-  let cid = _ifResolveVergentCid(data);
-  let autoResolved = !!cid;
-  if (!cid) {
-    const prompt1 = borrower
-      ? `Couldn't auto-detect a Vergent customer for ${borrower}.\n\nEnter the Vergent customer ID.\nTip: click "Open Vergent ↗" first to look up the customer if you don't have it handy.`
-      : 'Enter the Vergent customer ID for this submission.';
-    cid = window.prompt(prompt1, '');
-    if (cid === null) return;            // cancelled
-    cid = (cid || '').trim();
-    if (!/^\d+$/.test(cid)) {
-      setMsg('#5a0d0d', 'Vergent customer ID must be all digits.');
-      return;
-    }
-  }
+  cid = String(cid || '').trim();
+  if (!/^\d+$/.test(cid)) { setMsg('#5a0d0d', 'Vergent customer ID must be all digits.'); return; }
+  const picker = document.getElementById('if-cid-picker');
+  if (picker) picker.style.display = 'none';
   if (btn) { btn.disabled = true; btn.style.opacity = '.55'; }
   setMsg('var(--muted)', autoResolved
-    ? `Saving to auto-detected customer #${cid}…`
+    ? 'Saving to customer #' + cid + '…'
     : 'Saving…');
   try {
     const r = await fetch('/api/vergent-save-card-if', {
@@ -8644,8 +8749,6 @@ async function saveIFCardToVergent(rowKey, btn) {
       const last4 = d.last4 ? ' (••••' + d.last4 + ')' : '';
       setMsg('#1a6b3c', 'Saved to customer #' + (d.vergentCustomerId || cid) + last4);
       toast('Card saved to Vergent', 'ok');
-      // Reload the queue so the row reflects the new "processed" status
-      // and the operator can immediately move on to the next one.
       loadIFSubmissions();
     } else {
       const upstream = d && d.status ? 'Vergent HTTP ' + d.status : '';
@@ -8659,6 +8762,93 @@ async function saveIFCardToVergent(rowKey, btn) {
   } finally {
     if (btn) { btn.disabled = false; btn.style.opacity = ''; }
   }
+}
+
+// Reveal + populate the inline customer picker. The operator types a
+// name (pre-filled with the borrower) and picks the matching applicant;
+// we resolve THAT applicant's Vergent customer id automatically. A
+// manual-id field stays as a last-resort escape hatch.
+function _ifShowCidPicker(rowKey, borrowerName) {
+  const picker = document.getElementById('if-cid-picker');
+  const search = document.getElementById('if-cid-search');
+  const resultEl = document.getElementById('if-save-card-result');
+  if (!picker || !search) {
+    // Picker markup missing (shouldn't happen) — fall back to a prompt.
+    const cid = window.prompt('Enter the Vergent customer ID for ' + (borrowerName || 'this submission') + ':', '');
+    if (cid !== null && /^\d+$/.test((cid || '').trim())) _ifDoSaveCard(rowKey, cid.trim(), false, null);
+    return;
+  }
+  if (resultEl) {
+    resultEl.style.color = '#9a3412';
+    resultEl.textContent = 'Pick the customer this card belongs to ↓';
+  }
+  picker.style.display = '';
+  search.value = borrowerName || '';
+  search.oninput = function () { _ifRenderCidResults(rowKey, search.value); };
+  _ifRenderCidResults(rowKey, search.value);
+  setTimeout(function () { search.focus(); search.select && search.select(); }, 30);
+}
+
+// Filter `apps` by the query and render clickable customer rows. Each
+// row shows name + email/phone + the Vergent status; rows with a
+// resolvable Vergent id are clickable to save, rows without are shown
+// disabled (so the operator sees there's no Vergent customer to save to
+// and can use the manual id instead).
+function _ifRenderCidResults(rowKey, query) {
+  const box = document.getElementById('if-cid-results');
+  if (!box) return;
+  const q = (query || '').trim().toLowerCase();
+  const list = (typeof apps !== 'undefined' && Array.isArray(apps) ? apps : [])
+    .filter(a => {
+      const ad = a.applicationData || {};
+      const hay = ((ad.firstName || '') + ' ' + (ad.lastName || '') + ' ' +
+                   (a.name || '') + ' ' + (ad.email || a.email || '') + ' ' +
+                   (ad.phone || a.phone || '')).toLowerCase();
+      return !q || hay.includes(q);
+    })
+    .slice(0, 12);
+  if (!list.length) {
+    box.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:6px 2px">No matching applicants. Use the Vergent ID field below.</div>';
+    return;
+  }
+  const _cidOf = (a) => {
+    const vm = a.vergentMatch || {};
+    if ((vm.status || '').toLowerCase() === 'found' && vm.customerId) return String(vm.customerId);
+    if (a.vergentCustomerId) return String(a.vergentCustomerId);
+    return '';
+  };
+  box.innerHTML = list.map(a => {
+    const ad = a.applicationData || {};
+    const nm = (((ad.firstName || '') + ' ' + (ad.lastName || '')).trim() || a.name || 'Unnamed');
+    const meta = (ad.email || a.email || ad.phone || a.phone || a.firebaseId || '').toString();
+    const id = _cidOf(a);
+    if (id && /^\d+$/.test(id)) {
+      return '<div onclick="_ifDoSaveCard(\'' + escapeHtml(rowKey) + '\',\'' + escapeHtml(id) + '\',true,null)" ' +
+        'style="display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;border:1px solid var(--border);border-radius:8px;padding:8px 11px;background:white" ' +
+        'onmouseover="this.style.background=\'#f0fdf4\';this.style.borderColor=\'#86efac\'" onmouseout="this.style.background=\'white\';this.style.borderColor=\'var(--border)\'">' +
+        '<div style="min-width:0"><div style="font-size:13px;font-weight:700;color:var(--text)">' + escapeHtml(nm) + '</div>' +
+        '<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escapeHtml(meta) + '</div></div>' +
+        '<span style="flex:0 0 auto;font-size:11px;font-weight:700;color:#15803d;background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:3px 8px">Vergent #' + escapeHtml(id) + '</span>' +
+        '</div>';
+    }
+    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--border);border-radius:8px;padding:8px 11px;background:#fafbfc;opacity:.7">' +
+      '<div style="min-width:0"><div style="font-size:13px;font-weight:600;color:var(--text2)">' + escapeHtml(nm) + '</div>' +
+      '<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escapeHtml(meta) + '</div></div>' +
+      '<span style="flex:0 0 auto;font-size:11px;font-weight:700;color:#9a3412;background:#fff5e6;border:1px solid #f3b770;border-radius:6px;padding:3px 8px">No Vergent ID</span>' +
+      '</div>';
+  }).join('');
+}
+
+// Manual-id escape hatch from the picker.
+function _ifUseManualCid(rowKey) {
+  const inp = document.getElementById('if-cid-manual');
+  const cid = inp ? (inp.value || '').trim() : '';
+  if (!/^\d+$/.test(cid)) {
+    const resultEl = document.getElementById('if-save-card-result');
+    if (resultEl) { resultEl.style.color = '#5a0d0d'; resultEl.textContent = 'Vergent customer ID must be all digits.'; }
+    return;
+  }
+  _ifDoSaveCard(rowKey, cid, false, null);
 }
 
 // ─────────────────────────────────────────────────────────────────────
