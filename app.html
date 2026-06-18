@@ -8524,11 +8524,40 @@ async function markIFProcessed(rowKey) {
 }
 
 // Save an Instant-Funding-submitted debit card to a Vergent customer.
-// IF rows have no Vergent customer linkage of their own, so we prompt
-// the operator for the customer id (they can grab it from the Open
-// Vergent ↗ link a few buttons over). Same Repay → Vergent flow as
-// the new-applicant Save Card; on success, the row is auto-marked
-// "processed" by the backend.
+// Tries to auto-resolve the Vergent customer ID from the linked
+// application's vergentMatch — falls back to prompting the operator
+// only when that fails. Two auto-resolve paths:
+//   1. IF row carries `firebase_id` (when cashinflash.com/if passed
+//      `?fb=...` on submit) → look up the linked report's
+//      vergentMatch.customerId directly.
+//   2. IF row's `submissionId` matches an application's
+//      applicationData.ifSubmissionId → use that application's
+//      vergentMatch.customerId.
+// Same Repay → Vergent flow either way; on success, the row is
+// auto-marked "processed" by the backend.
+function _ifResolveVergentCid(ifRow) {
+  if (!ifRow || typeof apps === 'undefined' || !Array.isArray(apps)) return '';
+  const submissionId = (ifRow.submissionId || '').trim();
+  // Path 1 — direct firebase_id link on the IF row.
+  const direct = (ifRow.firebase_id || ifRow.firebaseId_app || '').trim();
+  let linked = null;
+  if (direct) linked = apps.find(a => a.firebaseId === direct);
+  // Path 2 — submissionId → application search.
+  if (!linked && submissionId) {
+    linked = apps.find(a => {
+      const ad = a.applicationData || {};
+      return ad.ifSubmissionId === submissionId;
+    });
+  }
+  if (!linked) return '';
+  const vm = linked.vergentMatch || {};
+  if ((vm.status || '').toLowerCase() === 'found' && vm.customerId) {
+    return String(vm.customerId);
+  }
+  if (linked.vergentCustomerId) return String(linked.vergentCustomerId);
+  return '';
+}
+
 async function saveIFCardToVergent(rowKey, btn) {
   const resultEl = document.getElementById('if-save-card-result');
   const setMsg = (color, text) => {
@@ -8540,18 +8569,27 @@ async function saveIFCardToVergent(rowKey, btn) {
   const borrower = data
     ? ((data.borrowerFirst || '') + ' ' + (data.borrowerLast || '')).trim()
     : '';
-  const prompt1 = borrower
-    ? `Enter the Vergent customer ID for ${borrower}.\n\nTip: click "Open Vergent ↗" first to look up the customer if you don't have it handy.`
-    : 'Enter the Vergent customer ID for this submission.';
-  let cid = window.prompt(prompt1, '');
-  if (cid === null) return;            // cancelled
-  cid = (cid || '').trim();
-  if (!/^\d+$/.test(cid)) {
-    setMsg('#5a0d0d', 'Vergent customer ID must be all digits.');
-    return;
+  // Auto-resolve first — operator-requested: "i dont have to find the
+  // customers customer id" when the IF submission is linked to an
+  // application we already know about.
+  let cid = _ifResolveVergentCid(data);
+  let autoResolved = !!cid;
+  if (!cid) {
+    const prompt1 = borrower
+      ? `Couldn't auto-detect a Vergent customer for ${borrower}.\n\nEnter the Vergent customer ID.\nTip: click "Open Vergent ↗" first to look up the customer if you don't have it handy.`
+      : 'Enter the Vergent customer ID for this submission.';
+    cid = window.prompt(prompt1, '');
+    if (cid === null) return;            // cancelled
+    cid = (cid || '').trim();
+    if (!/^\d+$/.test(cid)) {
+      setMsg('#5a0d0d', 'Vergent customer ID must be all digits.');
+      return;
+    }
   }
   if (btn) { btn.disabled = true; btn.style.opacity = '.55'; }
-  setMsg('var(--muted)', 'Saving…');
+  setMsg('var(--muted)', autoResolved
+    ? `Saving to auto-detected customer #${cid}…`
+    : 'Saving…');
   try {
     const r = await fetch('/api/vergent-save-card-if', {
       method: 'POST', credentials: 'include',
