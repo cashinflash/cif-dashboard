@@ -10517,6 +10517,7 @@ async function syncFundingFromVergent(silent) {
     // applicant has a /reports record on our side).
     let added = 0, scraped = 0, source = 'classic';
     let classicError = '';
+    let classicDebug = '';
     try {
       const r = await fetch('/api/funding-queue-classic', {
         method: 'POST', credentials: 'include',
@@ -10524,6 +10525,7 @@ async function syncFundingFromVergent(silent) {
         body: '{}',
       });
       const d = await r.json().catch(() => ({}));
+      classicDebug = (d && d.debug) || '';
       if (r.ok) {
         added = d.added || 0;
         scraped = d.scraped || 0;
@@ -10532,6 +10534,12 @@ async function syncFundingFromVergent(silent) {
       }
     } catch (e) {
       classicError = (e && e.message) || String(e);
+    }
+    // Surface the classic-scrape debug to the operator so we can see
+    // which step failed (login? wrong host? multi-store selector?).
+    if (!silent && (classicError || scraped === 0) && classicDebug) {
+      console.log('[CLASSIC-SCRAPE DEBUG]\n' + classicDebug);
+      window.__lastClassicDebug = classicDebug;
     }
     // Fallback: if classic-scrape didn't bring anything in (most often
     // because the service account doesn't have UI login privileges),
@@ -10553,16 +10561,39 @@ async function syncFundingFromVergent(silent) {
       const detail = source === 'classic'
         ? (scraped + ' row' + (scraped === 1 ? '' : 's') + ' scraped from Vergent')
         : (scraped + ' customer' + (scraped === 1 ? '' : 's') + ' scanned');
-      toast('Synced — ' + added + ' loan' + (added === 1 ? '' : 's') + ' added · ' + detail, 'ok');
+      toast('Synced — ' + added + ' loan' + (added === 1 ? '' : 's') + ' added · ' + detail + (source === 'rebuild' && classicDebug ? ' · classic-scrape failed — see debug button' : ''), 'ok');
       loadFundingQueue();
     }
-    return { added, scraped, source, classicError };
+    // If classic scrape didn't work, expose a button to show its log.
+    if (classicDebug && source !== 'classic') {
+      _renderClassicDebugButton(classicDebug, classicError);
+    }
+    return { added, scraped, source, classicError, classicDebug };
   } catch (e) {
     if (!silent) toast('Sync failed: ' + ((e && e.message) || e), 'err');
     return { error: (e && e.message) || String(e) };
   } finally {
     if (btn) { btn.disabled = false; btn.style.opacity = ''; }
   }
+}
+
+// Adds a tiny "Show classic-scrape debug" button under the funding
+// summary so the operator can paste the diagnostic back to me.
+function _renderClassicDebugButton(debug, err) {
+  const summary = document.getElementById('fund-summary');
+  if (!summary) return;
+  if (summary.querySelector('.classic-dbg-btn')) return;
+  const btn = document.createElement('button');
+  btn.className = 'classic-dbg-btn';
+  btn.textContent = 'Why didn\'t classic-scrape work?';
+  btn.style.cssText = 'margin-left:10px;padding:3px 9px;font-size:11px;font-weight:700;background:#fff5e6;color:#5a3300;border:1px solid #f0b27a;border-radius:6px;cursor:pointer;font-family:inherit';
+  btn.onclick = () => {
+    const w = window.open('', 'classic-dbg', 'width=720,height=520');
+    if (!w) { alert(debug); return; }
+    w.document.write('<html><head><title>Classic-scrape debug</title></head><body style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;padding:18px;background:#0d1117;color:#e6edf3;line-height:1.6"><h3 style="font-family:system-ui;margin:0 0 14px">Classic-scrape debug log</h3><pre style="white-space:pre-wrap;word-break:break-word">' + (err ? 'ERROR: ' + err + '\n\n' : '') + debug.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])) + '</pre></body></html>');
+    w.document.close();
+  };
+  summary.appendChild(btn);
 }
 
 function _fundAutoStart() {
