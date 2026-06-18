@@ -1840,6 +1840,13 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
                 </div>
               </div>
               <button class="qa-btn qa-btn-emerald" id="dv-create-loan-btn" onclick="openCreateLoanModal()" title="Create a loan agreement in Vergent for this applicant and trigger the e-sign email"><svg class="icn"><use href="#i-zap"/></svg>Create Loan</button>
+              <!-- Shown by renderProfilePanel when the customer already
+                   has a Held / Pending / Active / Outstanding loan in
+                   Vergent. Hides the Create Loan + combo buttons so the
+                   operator can't create a second loan; auto-clears when
+                   the existing loan is voided/funded in Vergent (cache
+                   refetches on tab visibilitychange). -->
+              <div id="dv-active-loan-notice" style="display:none;font-size:11.5px;color:#5a3300;background:#fff5e6;border:1px solid #f3b770;border-radius:8px;padding:8px 10px;line-height:1.4">⚠️ <strong>Active loan exists</strong><span id="dv-active-loan-detail" style="display:block;margin-top:2px;font-weight:400">Void or finish the existing loan in Vergent before creating a new one.</span></div>
               <!-- Combo flow (operator request): Create Customer ->
                    Push DL+Statement -> Verify card -> Create Loan ->
                    Send E-Sign. Distinct dark-green gradient + left
@@ -4643,6 +4650,22 @@ async function startCreateCustomerLoan() {
   // Step 3 + 4: create the loan + dispatch e-sign.
   _cclSetStep('loan',  'running', 'Creating loan…');
   _cclSetStep('esign', 'running', 'Queued…');
+  // The standalone Create Loan modal fetches the customer's cards list
+  // FIRST and passes the real card id when creating the loan -- the
+  // combo used to just pass 0 and hope Vergent picked the right card,
+  // which produced the HTTP 502 (no body) error the operator hit. Mirror
+  // the standalone behavior: fetch list, pick the just-saved card.
+  let resolvedCardId = 0;
+  try {
+    const cr = await fetch('/api/vergent-list-cards?fb=' + encodeURIComponent(fbId),
+                            { credentials: 'include' });
+    const cd = await cr.json().catch(() => ({}));
+    const cards = (cd && cd.cards) || [];
+    if (cards.length) {
+      const first = Number(cards[0].id);
+      if (Number.isFinite(first) && first > 0) resolvedCardId = first;
+    }
+  } catch (e) { /* fall back to 0 — Vergent picks default */ }
   try {
     const r = await fetch('/api/vergent-create-loan', {
       method: 'POST', credentials: 'include',
@@ -4651,7 +4674,7 @@ async function startCreateCustomerLoan() {
         firebase_id: fbId,
         loan_amount: amount,
         due_date: dueRaw + 'T00:00:00.000Z',
-        prepaid_card_id: 0,   // auto-resolve to the just-saved card
+        prepaid_card_id: resolvedCardId,
         send_esign: true,
       }),
     });
@@ -5215,6 +5238,41 @@ function renderProfilePanel(fbId) {
     // flipped to found after auto-recheck).
     if (!showCreate && createCustExpand) createCustExpand.style.display = 'none';
   }
+  // Active-loan gate (operator request: one active loan per customer).
+  // Hide Create Loan + the combo button when any loan in Vergent is in
+  // a non-terminal status. Voiding/funding/closing the loan in Vergent
+  // clears this on the next loans-cache refresh (tab visibilitychange
+  // triggers a forced refetch — see the listener near loadVergentLoans).
+  const createLoanBtn = document.getElementById('dv-create-loan-btn');
+  const activeLoanNotice = document.getElementById('dv-active-loan-notice');
+  const activeLoanDetail = document.getElementById('dv-active-loan-detail');
+  const loansCache = _vergentLoansCache[fbId];
+  const loans = (loansCache && loansCache.loans) || [];
+  const activeLoan = loans.find(l => {
+    const s = (l.status || '').toLowerCase();
+    if (l.is_outstanding === false) return false;   // explicitly closed
+    return s.includes('pending') || s.includes('held')
+        || s.includes('active') || s.includes('current')
+        || s.includes('outstanding') || s.includes('open');
+  });
+  if (activeLoan) {
+    if (createLoanBtn) createLoanBtn.style.display = 'none';
+    if (createCustLoanBtn) createCustLoanBtn.style.display = 'none';
+    if (activeLoanNotice) {
+      activeLoanNotice.style.display = '';
+      if (activeLoanDetail) {
+        const num = activeLoan.loan_number || (activeLoan.loan_id ? '#' + activeLoan.loan_id : '');
+        const st  = (activeLoan.status || '').toUpperCase() || 'OPEN';
+        const ref = num ? num + ' · ' + st : st;
+        activeLoanDetail.textContent = 'Loan ' + ref + ' · void or finish it in Vergent before creating a new one.';
+      }
+    }
+  } else {
+    if (createLoanBtn) createLoanBtn.style.display = '';   // restore CSS default
+    if (activeLoanNotice) activeLoanNotice.style.display = 'none';
+    // Don't restore createCustLoanBtn here — the earlier block already
+    // controls it based on Vergent match status.
+  }
 
   if (!m) {
     statusEl.className = 'profile-status pending';
@@ -5580,6 +5638,26 @@ async function loadVergentLoans(fbId) {
     renderProfilePanel(fbId);  // re-render the status sub-line ("3 prior loans")
   }
 }
+
+// Real-time refresh: when the dashboard tab regains focus (operator
+// just switched back from Vergent after voiding / funding a loan),
+// invalidate the current applicant's loans cache + refetch so the
+// active-loan gate in renderProfilePanel sees fresh data. Without
+// this, the Create Loan button stays hidden until the 60s freshness
+// window expires. Re-arms automatically -- listener stays registered
+// for the lifetime of the page.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  const fbId = (document.body && document.body.dataset && document.body.dataset.firebaseId) || '';
+  if (!fbId) return;
+  // Force-invalidate the freshness cache so loadVergentLoans actually
+  // hits the API. The fetch's completion handler calls renderProfilePanel,
+  // which re-evaluates the active-loan gate against the new data.
+  try { if (typeof _vergentLoansCache !== 'undefined') _vergentLoansCache[fbId] = null; }
+  catch (e) { /* non-fatal */ }
+  try { if (typeof loadVergentLoans === 'function') loadVergentLoans(fbId); }
+  catch (e) { /* non-fatal */ }
+});
 
 // ───────── Vergent panel ─────────
 // One-shot guard: each fbId only gets auto-rechecked once per page
