@@ -1283,15 +1283,33 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   div[style*="flex:1 1 280px"][style*="min-width:240px"]{flex-basis:100% !important;min-width:0 !important}
 }
 
-/* Extra-narrow phones (≤ iPhone SE width). Analytics cards stack
-   to one column; the 2x2 grid at 600px gets cramped under 400px. */
+/* Extra-narrow phones (≤ iPhone SE width). Operator request: keep
+   the dashboard Payments Due cards as the compact 2x2 grid all the
+   way down — the previous 1-col fallback made the dashboard taller
+   than the operator wanted on a phone. Only the secondary `.stat`
+   padding gets tightened. */
 @media(max-width:420px){
-  .analytics-overview{grid-template-columns:1fr !important}
   .stat{padding:12px}
   .stat-value{font-size:22px}
   /* Combo Create Customer & Loan modal max-height bumps so the 5-step
      process log doesn't overflow the bottom action bar on small phones */
   #ccl-ov .appr-body{max-height:calc(100vh - 180px)}
+}
+
+/* === Denial Email modal — sticky footer on mobile ===
+   Structure has .dnl-actions INSIDE .dnl-body (line 2498), so on a
+   short phone viewport the body scrolls and the Send button falls
+   off-screen. Operator had to zoom out / scroll to find it. Sticky
+   positioning pins the action row to the bottom of the body's scroll
+   area — buttons always visible regardless of how long the reasons
+   list is. Padding on the bottom adds breathing room above. */
+@media(max-width:640px){
+  .dnl-body{padding-bottom:0}
+  .dnl-actions{position:sticky;bottom:0;background:white;padding:12px 0 4px;margin-top:8px;border-top:1px solid var(--border);z-index:1;flex-wrap:wrap;gap:6px}
+  .dnl-actions .btn,.dnl-actions .btn-denial-send{flex:1 1 auto;min-width:0;font-size:12px;padding:9px 8px}
+  /* Send button stays the primary visual emphasis but doesn't need 2x
+     width — at narrow widths give it 100% so it sits on its own row */
+  .dnl-actions .btn-denial-send{flex-basis:100% !important;order:99}
 }
 </style>
 </head>
@@ -1918,7 +1936,11 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     </div>
 
     <!-- KPI cards -->
-    <div class="stats" id="pay-stats" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px"></div>
+    <!-- Payments page top stats. Was repeat(5,1fr) which clipped the
+         Instant Funded card on iPhone (5 × 75px doesn't fit a 375px
+         viewport with padding). auto-fit + minmax lets the grid wrap
+         to 3-cols / 2-cols / 1-col automatically based on width. -->
+    <div class="stats" id="pay-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px"></div>
 
     <!-- Filter chips -->
     <div class="chips" style="margin-bottom:12px">
