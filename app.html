@@ -1998,6 +1998,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       </div>
       <div class="greet-actions">
         <button id="fund-refresh" class="btn btn-ghost" onclick="loadFundingQueue()" title="Refresh live status from Vergent"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-refresh"/></svg>Refresh</button>
+        <button id="fund-sync-btn" class="btn btn-primary" onclick="syncFundingFromVergent()" title="Walks our applicant records and pulls every loan in 'Held' / 'Pending Funding' / 'Pending Signing' status from Vergent. Use this if the page is empty."><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-zap"/></svg>Sync from Vergent</button>
         <button id="fund-probe-btn" class="btn btn-ghost" onclick="runFundingProbe()" title="One-shot: try ~50 Vergent endpoints to see if any exposes the Loan Funding Queue natively. Results are shown in a modal and logged to Render."><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-zap"/></svg>Discover Vergent API</button>
         <button id="fund-swagger-btn" class="btn btn-ghost" onclick="runSwaggerList()" title="Fetches Vergent's Swagger JSON with our V1 Token and lists every funding/queue/list endpoint. Results are shown in a modal and logged to Render."><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-zap"/></svg>List Swagger Endpoints</button>
         <button id="fund-leads-btn" class="btn btn-ghost" onclick="runFundingLeadsProbe()" title="Calls 6 candidate Vergent list endpoints (GetNotFundedOnlineLeadStatusList etc.) to find which one returns the actual funding queue. Results show response shape per endpoint."><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-zap"/></svg>Test Lead Endpoints</button>
@@ -10466,6 +10467,26 @@ async function loadFundingQueue(silent) {
         }
       } catch (e) { /* non-fatal — falls through to empty state */ }
     }
+    // Second pass — if still empty (the legacy backfill only catches
+    // loans WE originated; mixed-source customers + non-/reports
+    // applicants are invisible to it), do the aggressive rebuild:
+    // walk /reports, query Vergent per-customer for any loan in a
+    // funding-queue status. Gated to one shot per device per day so
+    // a deliberately-cleared queue isn't re-populated immediately.
+    if (!_fundingRows.length && !silent) {
+      const lastSync = Number(localStorage.getItem('cif.fundingQueueSyncedAt') || 0);
+      const sinceMs = Date.now() - lastSync;
+      if (sinceMs > 24 * 60 * 60 * 1000) {  // 24h
+        await syncFundingFromVergent(/*silent=*/true);
+        const r3 = await fetch('/api/funding-queue', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh: false }),
+        });
+        const d3 = await r3.json().catch(() => ({}));
+        _fundingRows = (d3 && d3.items) || [];
+      }
+    }
     renderFundingQueue();
     const at = document.getElementById('fund-loaded-at');
     if (at) at.textContent = 'Updated ' + new Date().toLocaleTimeString();
@@ -10475,6 +10496,41 @@ async function loadFundingQueue(silent) {
     if (btn) { btn.disabled = false; btn.style.opacity = ''; }
   }
   _fundAutoStart();
+}
+
+// Walks our /reports, queries Vergent's V1/{customerId}/loans for every
+// unique customer in parallel, filters to loans in funding-queue status
+// (Held / Pending Funding / Pending Signing / Approved For Funding /
+// etc.), and writes each match to /fundingQueue. Use this when the
+// page is empty — auto-runs once per day on visit, manually via the
+// "Sync from Vergent" button.
+async function syncFundingFromVergent(silent) {
+  const btn = document.getElementById('fund-sync-btn');
+  const tbl = document.getElementById('fund-table');
+  const summary = document.getElementById('fund-summary');
+  if (btn) { btn.disabled = true; btn.style.opacity = '.55'; }
+  if (!silent && tbl) tbl.innerHTML = '<div class="tbl-loading">Syncing from Vergent… walking your applicants and pulling each one\'s pending loans (this takes 30–90 seconds).</div>';
+  if (!silent && summary) summary.textContent = 'Syncing…';
+  try {
+    const r = await fetch('/api/funding-queue-rebuild', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error((d && (d.error || d.detail)) || ('HTTP ' + r.status));
+    localStorage.setItem('cif.fundingQueueSyncedAt', String(Date.now()));
+    if (!silent) {
+      toast('Synced — ' + (d.added || 0) + ' loan' + ((d.added === 1) ? '' : 's') + ' added · ' + (d.customersScanned || 0) + ' customers scanned', 'ok');
+      loadFundingQueue();
+    }
+    return d;
+  } catch (e) {
+    if (!silent) toast('Sync failed: ' + ((e && e.message) || e), 'err');
+    return { error: (e && e.message) || String(e) };
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  }
 }
 
 function _fundAutoStart() {
