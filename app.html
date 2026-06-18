@@ -2004,6 +2004,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       <button class="chip"        data-comm-kind="returned_payment"    onclick="setCommFilter('returned_payment')">Returned Payment</button>
       <button class="chip"        data-comm-kind="funds_sent"          onclick="setCommFilter('funds_sent')">Funds Sent</button>
       <button class="chip"        data-comm-kind="denial"              onclick="setCommFilter('denial')">Denial</button>
+      <button class="chip"        data-comm-kind="card_failed"         onclick="setCommFilter('card_failed')">Invalid Card</button>
       <input type="text" id="comm-search" placeholder="Search recipient, loan id, subject…" oninput="renderCommunications()" style="margin-left:8px;flex:1;min-width:240px;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;font-family:inherit;outline:none">
     </div>
 
@@ -2045,6 +2046,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
           <option value="thank_you_payment">Thank You for Payment</option>
           <option value="returned_payment">Returned Payment</option>
           <option value="denial">Denial</option>
+          <option value="card_failed">Invalid Card</option>
         </select>
       </label>
       <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Send to
@@ -10058,7 +10060,7 @@ function exportPaymentsCSV() {
 // filter by kind, preview the rendered HTML in an iframe, and send
 // test emails to verify templates before any auto-send wiring.
 let _commCache = null;          // { entries: [...], fetchedAt }
-let _commKindFilter = 'all';    // all | thank_you_payment | returned_payment | denial
+let _commKindFilter = 'all';    // all | approval | thank_you_payment | returned_payment | funds_sent | denial | card_failed
 
 const _COMM_KIND_LABELS = {
   approval:          'Approval',
@@ -10066,6 +10068,7 @@ const _COMM_KIND_LABELS = {
   returned_payment:  'Returned Payment',
   funds_sent:        'Funds Sent',
   denial:            'Denial',
+  card_failed:       'Invalid Card',
 };
 const _COMM_KIND_COLORS = {
   approval:          { bg: '#bbf7d0', fg: '#14532d' },
@@ -10073,6 +10076,10 @@ const _COMM_KIND_COLORS = {
   returned_payment:  { bg: '#fee2e2', fg: '#b91c1c' },
   funds_sent:        { bg: '#dbeafe', fg: '#1d4ed8' },
   denial:            { bg: '#fef3c7', fg: '#b45309' },
+  // Orange — distinct from denial's amber so the operator's eye can
+  // separate "applicant declined" (denial) from "approved but card
+  // bounced" (card_failed) at a glance.
+  card_failed:       { bg: '#fed7aa', fg: '#9a3412' },
 };
 
 async function loadCommunications() {
@@ -10263,11 +10270,17 @@ async function sendCommTest() {
   const endpoint = kind === 'denial' ? '/api/send-denial'
                  : kind === 'returned_payment' ? '/api/send-returned-payment'
                  : kind === 'approval' ? '/api/send-approval'
+                 : kind === 'card_failed' ? '/api/send-card-failed'
                  : '/api/send-thank-you-payment';
   const body = kind === 'denial'
     ? { email: toEmail, name: toName, reasons: reasonsRaw.split('\n').map(s => s.trim()).filter(Boolean), test: true }
     : kind === 'approval'
     ? { email: toEmail, name: toName, amount: 255, test: true }
+    : kind === 'card_failed'
+    // Test sends don't carry a firebase_id, so the IF link falls back
+    // to the generic cashinflash.com/if/ (no ?fb= auto-link param) —
+    // that's expected for a test.
+    ? { to_email: toEmail, to_name: toName, test: true }
     : { to_email: toEmail, to_name: toName, loan_id: loanId, loan_balance: balance, test: true };
   try {
     const r = await fetch(endpoint, {
