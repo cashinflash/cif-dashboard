@@ -2140,17 +2140,16 @@ class Handler(BaseHTTPRequestHandler):
         # remove rows. Forwards to cif-apply. 60s timeout because a
         # refresh fans out one get_customer_loans call per non-terminal
         # entry; cif-apply caps it to actually-pending loans.
-        if path in ('/api/funding-queue', '/api/funding-queue-remove', '/api/funding-queue-backfill', '/api/funding-queue-probe', '/api/swagger-list', '/api/funding-leads-probe', '/api/funding-queue-rebuild'):
+        if path in ('/api/funding-queue', '/api/funding-queue-remove', '/api/funding-queue-backfill', '/api/funding-queue-probe', '/api/swagger-list', '/api/funding-leads-probe', '/api/funding-queue-rebuild', '/api/funding-queue-classic'):
             try:
                 body = json.loads(raw) if raw else {}
                 payload = json.dumps(body).encode()
                 import urllib.request as ur
                 req = ur.Request('https://cif-apply.onrender.com' + path,
                     data=payload, headers={'Content-Type': 'application/json'}, method='POST')
-                # Rebuild walks /reports + calls Vergent per-customer in
-                # parallel — can take 30-90s on a fresh database. Other
-                # endpoints are quick.
-                _timeout = 120 if path == '/api/funding-queue-rebuild' else 60
+                # Rebuild + classic-scrape can take 30-90s; bump timeout
+                # for those. Other endpoints are quick.
+                _timeout = 120 if path in ('/api/funding-queue-rebuild', '/api/funding-queue-classic') else 60
                 with ur.urlopen(req, timeout=_timeout) as r:
                     result = json.loads(r.read().decode())
                 self.send_json(200, result)
