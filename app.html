@@ -782,6 +782,13 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
    green palette so operators read it as a positive action, distinct
    from the amber Denial Email sibling. */
 .qa-btn-emerald{color:#166534;border-color:#86efac;background:#f0fdf4}
+/* Big combo button — Create Customer + Loan. Dark gradient + thin
+   light-green left accent stripe so it visually outranks the two
+   individual buttons above. */
+.qa-btn-emerald-dark{color:white;border-color:#0c4a2a;background:linear-gradient(135deg,#15803d,#0c4a2a);font-weight:800;letter-spacing:.01em;box-shadow:0 2px 8px rgba(12,74,42,.22);position:relative;overflow:hidden;padding-left:14px}
+.qa-btn-emerald-dark::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:#86efac}
+.qa-btn-emerald-dark:hover{background:linear-gradient(135deg,#0e6b34,#082c19);border-color:#082c19;box-shadow:0 4px 12px rgba(12,74,42,.32)}
+.qa-btn-emerald-dark .icn{color:white}
 .qa-btn-emerald:hover{background:#dcfce7;border-color:#22c55e;color:#14532d}
 .qa-btn-emerald .icn{color:#15803d}
 /* Approve-email modal — same overall shape as the denial modal but
@@ -830,6 +837,44 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 .btn-approve-send:disabled{opacity:.5;cursor:not-allowed}
 .btn-approve-send .icn{width:14px;height:14px;stroke-width:2.25}
 .qa-btn-amber:hover .icn{color:#9a3412}
+/* Create Customer & Loan combo modal — tighter spacing scoped under
+   #ccl-ov so it doesn't bleed into the shared approval-email modal.
+   Wider than the Create Loan modal because it has the live process
+   log below the inputs. */
+#ccl-ov .appr-card{max-width:520px}
+#ccl-ov .appr-head{padding:14px 18px 12px}
+#ccl-ov .appr-title{font-size:14.5px}
+#ccl-ov .appr-meta{font-size:11.5px}
+#ccl-ov .appr-body{padding:14px 18px;gap:8px;max-height:calc(100vh - 220px);overflow-y:auto}
+#ccl-ov .appr-label{font-size:10.5px;margin-top:4px}
+#ccl-ov .appr-label:first-child{margin-top:0}
+#ccl-ov .appr-amount-row{padding:7px 12px;border-radius:8px;gap:6px}
+#ccl-ov .appr-amount-row .ccy{font-size:15px}
+#ccl-ov .appr-amount-row input{font-size:18px;font-weight:700;color:#15803d;border:none;background:transparent;outline:none;width:100%;font-family:inherit;padding:0}
+#ccl-ov .appr-actions{padding:11px 18px;gap:8px}
+#ccl-ov .appr-actions .btn-ghost{flex:1}
+#ccl-ov .btn-approve-send{flex:1.4 !important;padding:8px 12px;font-size:12.5px}
+#ccl-ov #ccl-amount-err:empty,#ccl-ov #ccl-final:empty{display:none}
+/* Process log — 5 steps with status icons. Each row shows the step
+   label on the left and a small status pill on the right. */
+.ccl-process{display:flex;flex-direction:column;gap:6px;margin-top:8px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:#fafbfc}
+.ccl-process-title{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+.ccl-step{display:flex;align-items:center;gap:8px;font-size:12.5px;line-height:1.3}
+.ccl-step-icon{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;font-size:11px;font-weight:700;flex-shrink:0;background:#e5e7eb;color:#6b7280;border:1px solid #d1d5db}
+.ccl-step-label{flex:1;color:#374151}
+.ccl-step-detail{font-size:11px;color:var(--muted)}
+.ccl-step.running .ccl-step-icon{background:#dbeafe;color:#1e40af;border-color:#93c5fd;animation:cclSpin 1s linear infinite}
+.ccl-step.success .ccl-step-icon{background:#dcfce7;color:#15803d;border-color:#86efac}
+.ccl-step.success .ccl-step-label{color:#15803d;font-weight:600}
+.ccl-step.fail .ccl-step-icon{background:#fee2e2;color:#b91c1c;border-color:#fca5a5}
+.ccl-step.fail .ccl-step-label{color:#b91c1c;font-weight:600}
+.ccl-step.skipped .ccl-step-icon{background:#f3f4f6;color:#9ca3af;border-color:#e5e7eb}
+.ccl-step.skipped .ccl-step-label{color:#9ca3af;text-decoration:line-through}
+@keyframes cclSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+#ccl-final{padding:8px 10px;border-radius:6px;font-size:12px;font-weight:600;margin-top:6px}
+#ccl-final.success{background:#dcfce7;color:#15803d;border:1px solid #86efac}
+#ccl-final.warn{background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
+#ccl-final.error{background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5}
 
 /* VERGENT panel — softer card to feel less like a bare rectangle.
    Subtle shadow + a thin top accent stripe colored by status helps
@@ -1349,8 +1394,8 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
                renderAnalyticsPaymentsToday() from /api/payments-today. -->
           <div class="analytics-section-title">Payments</div>
           <div class="analytics-overview analytics-overview-2col">
-            <div class="analytics-ov-cell" onclick="navigate('payments')"><div class="analytics-ov-label">Today's Approved</div><div class="analytics-ov-value" id="ov-pay-approved-amt">$0</div><div class="analytics-ov-amt" id="ov-pay-approved-ct">—</div></div>
-            <div class="analytics-ov-cell" onclick="navigate('payments')"><div class="analytics-ov-label">Today's Funded</div><div class="analytics-ov-value" id="ov-pay-funded-amt">$0</div><div class="analytics-ov-amt" id="ov-pay-funded-ct">—</div></div>
+            <div class="analytics-ov-cell" onclick="setRoute('payments')"><div class="analytics-ov-label">Today's Approved</div><div class="analytics-ov-value" id="ov-pay-approved-amt">$0</div><div class="analytics-ov-amt" id="ov-pay-approved-ct">—</div></div>
+            <div class="analytics-ov-cell" onclick="setRoute('payments')"><div class="analytics-ov-label">Today's Funded</div><div class="analytics-ov-value" id="ov-pay-funded-amt">$0</div><div class="analytics-ov-amt" id="ov-pay-funded-ct">—</div></div>
           </div>
         </div>
 
@@ -1689,6 +1734,15 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
                 </div>
               </div>
               <button class="qa-btn qa-btn-emerald" id="dv-create-loan-btn" onclick="openCreateLoanModal()" title="Create a loan agreement in Vergent for this applicant and trigger the e-sign email"><svg class="icn"><use href="#i-zap"/></svg>Create Loan</button>
+              <!-- Combo flow (operator request): Create Customer ->
+                   Push DL+Statement -> Verify card -> Create Loan ->
+                   Send E-Sign. Distinct dark-green gradient + left
+                   accent stripe so it stands out from the two
+                   individual buttons above. Hidden until status is
+                   not_found / new so it doesn't compete with Create
+                   Loan on an existing customer (renderProfilePanel
+                   toggles it alongside dv-create-customer-btn). -->
+              <button class="qa-btn qa-btn-emerald-dark" id="dv-create-cust-loan-btn" style="display:none" title="Create the customer in Vergent + push documents + create the loan + send e-sign — all in one shot."><svg class="icn"><use href="#i-zap"/></svg>Create Customer &amp; Loan</button>
               <!-- Re-Run Report split-action: one button label, two
                    modes via the adjacent <select>. Default = stored
                    data (the cheap, common case); operator can flip to
@@ -2197,6 +2251,76 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     <div class="appr-actions">
       <button class="btn btn-ghost" type="button" onclick="closeCreateLoanModal()">Cancel</button>
       <button class="btn-approve-send" type="button" id="cl-send" onclick="submitCreateLoan()"><svg class="icn"><use href="#i-zap"/></svg>Create Loan</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Customer + Loan combo modal — opens from the dark-green
+     Quick Actions button. Orchestrates 5 steps in series:
+       1. Create the customer in Vergent (via /api/push-to-vergent with
+          create_if_missing:true).
+       2. Push DL + Bank Statement docs (same request — populated.
+          drivers_license / bank_statement carry per-doc results).
+       3. Verify the debit card saved (populated.card.ok must be true;
+          if false AND not "no card on file", we STOP — no card means
+          we can't fund the loan).
+       4. Create the loan (via /api/vergent-create-loan).
+       5. E-sign is dispatched by cif-apply on a background thread
+          when send_esign:true (we just report it fired).
+     The same call covers Steps 1+2+3; Step 4 is a separate call. -->
+<div class="appr-ov" id="ccl-ov">
+  <div class="appr-card">
+    <div class="appr-head">
+      <div>
+        <div class="appr-title"><svg class="icn"><use href="#i-zap"/></svg>Create Customer &amp; Loan</div>
+        <div class="appr-meta" id="ccl-meta">Customer: —</div>
+      </div>
+      <button onclick="closeCreateCustomerLoanModal()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1" title="Close">&times;</button>
+    </div>
+    <div class="appr-body">
+      <div class="appr-label">Note (posted to Vergent on the customer record)</div>
+      <input type="text" id="ccl-note" placeholder="Approved for $—" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:7px 11px;font-size:13px;font-family:inherit;box-sizing:border-box">
+      <div class="appr-label">Loan Amount</div>
+      <div class="appr-amount-row" id="ccl-amount-row">
+        <span class="ccy">$</span>
+        <input type="number" id="ccl-amount" min="100" max="255" step="1" value="255" inputmode="decimal">
+      </div>
+      <div id="ccl-amount-err" style="font-size:11.5px;color:#5a0d0d"></div>
+      <div class="appr-label">Due Date</div>
+      <input type="date" id="ccl-due-date" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:7px 11px;font-size:13.5px;font-family:inherit">
+      <div class="ccl-process">
+        <div class="ccl-process-title">Process</div>
+        <div class="ccl-step" id="ccl-step-customer" data-state="pending">
+          <span class="ccl-step-icon">1</span>
+          <span class="ccl-step-label">Create customer in Vergent</span>
+          <span class="ccl-step-detail"></span>
+        </div>
+        <div class="ccl-step" id="ccl-step-docs" data-state="pending">
+          <span class="ccl-step-icon">2</span>
+          <span class="ccl-step-label">Push Driver's License + Bank Statement</span>
+          <span class="ccl-step-detail"></span>
+        </div>
+        <div class="ccl-step" id="ccl-step-card" data-state="pending">
+          <span class="ccl-step-icon">3</span>
+          <span class="ccl-step-label">Save debit card on file</span>
+          <span class="ccl-step-detail"></span>
+        </div>
+        <div class="ccl-step" id="ccl-step-loan" data-state="pending">
+          <span class="ccl-step-icon">4</span>
+          <span class="ccl-step-label">Create loan</span>
+          <span class="ccl-step-detail"></span>
+        </div>
+        <div class="ccl-step" id="ccl-step-esign" data-state="pending">
+          <span class="ccl-step-icon">5</span>
+          <span class="ccl-step-label">Send e-sign email</span>
+          <span class="ccl-step-detail"></span>
+        </div>
+      </div>
+      <div id="ccl-final"></div>
+    </div>
+    <div class="appr-actions">
+      <button class="btn btn-ghost" type="button" onclick="closeCreateCustomerLoanModal()" id="ccl-cancel">Cancel</button>
+      <button class="btn-approve-send" type="button" id="ccl-start" onclick="startCreateCustomerLoan()"><svg class="icn"><use href="#i-zap"/></svg>Start Process</button>
     </div>
   </div>
 </div>
@@ -4127,6 +4251,318 @@ function closeCreateLoanModal() {
 }
 
 
+// ── Create Customer + Loan combo ─────────────────────────────────────
+// One-click orchestration: create the Vergent customer (pushing DL +
+// Bank Statement + debit card in the same call) → check the card saved
+// → create the loan → fire e-sign. The card-save check is the critical
+// gate: if Vergent didn't persist the debit card during customer create
+// (and there IS a card on file from the application), we STOP. Without
+// a card on Vergent's side we can't disburse, so creating the loan
+// would just leave us with a half-baked record. The operator can fix
+// the card issue and click Retry, which re-runs from Step 1 (Vergent
+// will recognize the existing customer and skip the create).
+function _cclSetStep(key, state, detail) {
+  const el = document.getElementById('ccl-step-' + key);
+  if (!el) return;
+  ['pending','running','success','fail','skipped'].forEach(s => el.classList.remove(s));
+  el.classList.add(state);
+  el.dataset.state = state;
+  const det = el.querySelector('.ccl-step-detail');
+  if (det) det.textContent = detail || '';
+  // Swap the numeric badge for a status glyph so the eye can scan
+  // success/fail at a glance.
+  const icon = el.querySelector('.ccl-step-icon');
+  if (icon) {
+    const n = ({customer:'1',docs:'2',card:'3',loan:'4',esign:'5'})[key] || '?';
+    if (state === 'success') icon.textContent = '✓';
+    else if (state === 'fail') icon.textContent = '✕';
+    else if (state === 'skipped') icon.textContent = '⊘';
+    else if (state === 'running') icon.textContent = '•';
+    else icon.textContent = n;
+  }
+}
+
+function _cclResetSteps() {
+  ['customer','docs','card','loan','esign'].forEach(k => _cclSetStep(k, 'pending', ''));
+  const final = document.getElementById('ccl-final');
+  if (final) { final.className = ''; final.textContent = ''; }
+}
+
+function _cclShowFinal(level, msg) {
+  const el = document.getElementById('ccl-final');
+  if (!el) return;
+  el.className = level;
+  el.textContent = msg;
+}
+
+async function openCreateCustomerLoanModal() {
+  const fbId = document.body.dataset.firebaseId || '';
+  if (!fbId) { toast('No applicant selected.', 'err'); return; }
+  _cclResetSteps();
+  const metaEl = document.getElementById('ccl-meta');
+  const noteEl = document.getElementById('ccl-note');
+  const amtEl  = document.getElementById('ccl-amount');
+  const dueEl  = document.getElementById('ccl-due-date');
+  const startBtn = document.getElementById('ccl-start');
+  const cancelBtn = document.getElementById('ccl-cancel');
+  if (metaEl) metaEl.textContent = 'Loading…';
+  if (startBtn) { startBtn.disabled = false; startBtn.style.opacity = ''; startBtn.innerHTML = '<svg class="icn"><use href="#i-zap"/></svg>Start Process'; }
+  if (cancelBtn) { cancelBtn.disabled = false; cancelBtn.textContent = 'Cancel'; }
+  [noteEl, amtEl, dueEl].forEach(el => { if (el) el.disabled = false; });
+  // Default due date = today + 14 (Vergent's CA payday minimum).
+  const minDue = new Date(); minDue.setDate(minDue.getDate() + 14);
+  const minStr = minDue.toISOString().slice(0, 10);
+  if (dueEl) { dueEl.min = minStr; dueEl.value = minStr; }
+  document.getElementById('ccl-ov').style.display = 'flex';
+  // Pre-fill from the live Firebase record (same pattern Create Loan uses).
+  let rec = {};
+  try {
+    const r = await fetch('/fb/reports/' + encodeURIComponent(fbId) + '.json', { credentials: 'include' });
+    if (r.ok) rec = (await r.json().catch(() => ({}))) || {};
+  } catch (e) { /* fall through */ }
+  const ad = rec.applicationData || {};
+  const fullName = ((ad.firstName || '') + ' ' + (ad.lastName || '')).trim() || '—';
+  if (metaEl) metaEl.textContent = 'Customer: ' + fullName;
+  // Amount pre-fill (same resolution order as Create Loan modal).
+  const approvedAmt = parseAmount(rec.amount);
+  const engineAmt   = parseAmount(rec.claudeAmount);
+  const reqAmt      = parseAmount(ad.requestedAmount);
+  const amt = approvedAmt != null ? approvedAmt
+            : engineAmt   != null ? engineAmt
+            : reqAmt      != null ? reqAmt
+            : 255;
+  const finalAmt = Math.max(100, Math.min(255, Math.round(amt)));
+  if (amtEl) amtEl.value = String(finalAmt);
+  if (noteEl) noteEl.value = 'Approved for $' + finalAmt;
+  // Stash for the orchestrator (avoids re-fetching).
+  window._cclRec = rec;
+  window._cclFbId = fbId;
+}
+
+function closeCreateCustomerLoanModal() {
+  const ov = document.getElementById('ccl-ov');
+  if (ov) ov.style.display = 'none';
+}
+
+async function startCreateCustomerLoan() {
+  const fbId = window._cclFbId || document.body.dataset.firebaseId || '';
+  if (!fbId) { _cclShowFinal('error', 'No applicant selected.'); return; }
+  const noteEl  = document.getElementById('ccl-note');
+  const amtEl   = document.getElementById('ccl-amount');
+  const dueEl   = document.getElementById('ccl-due-date');
+  const errEl   = document.getElementById('ccl-amount-err');
+  const startBtn  = document.getElementById('ccl-start');
+  const cancelBtn = document.getElementById('ccl-cancel');
+  if (errEl) errEl.textContent = '';
+  // Validate inputs.
+  const amount = Number(amtEl && amtEl.value);
+  if (!amount || amount < 100 || amount > 255) {
+    if (errEl) errEl.textContent = 'Loan amount must be between $100 and $255.';
+    return;
+  }
+  const dueRaw = (dueEl && dueEl.value || '').trim();
+  if (!dueRaw) { _cclShowFinal('error', 'Due date required.'); return; }
+  const minDueChk = new Date(); minDueChk.setHours(0,0,0,0);
+  minDueChk.setDate(minDueChk.getDate() + 14);
+  const picked = new Date(dueRaw + 'T00:00:00');
+  if (picked < minDueChk) {
+    _cclShowFinal('error', 'Due date must be at least 14 days from today (Vergent minimum).');
+    return;
+  }
+  const noteText = ((noteEl && noteEl.value) || '').trim();
+  // Lock the UI.
+  [noteEl, amtEl, dueEl].forEach(el => { if (el) el.disabled = true; });
+  if (startBtn)  { startBtn.disabled = true; startBtn.style.opacity = '.55'; startBtn.textContent = 'Running…'; }
+  if (cancelBtn) cancelBtn.textContent = 'Close';
+  _cclResetSteps();
+  // Steps 1+2+3 share one /api/push-to-vergent call (it creates the
+  // customer when missing AND attaches docs + card in one shot — see
+  // run_server.py do_POST patch). Mark all three as 'running' so the
+  // operator sees parallel activity rather than sequential ticks.
+  _cclSetStep('customer', 'running', 'Creating in Vergent…');
+  _cclSetStep('docs',     'running', 'Uploading…');
+  _cclSetStep('card',     'running', 'Saving card…');
+  // Hand the note off to #vg-note for parity with the existing Create
+  // Customer flow (the right-rail panel reads it from there).
+  const vgNoteEl = document.getElementById('vg-note');
+  if (vgNoteEl) vgNoteEl.value = noteText;
+  let vergentCid = '';
+  try {
+    const pushBody = {
+      firebase_id: fbId,
+      create_if_missing: true,
+      doc_kinds: ['drivers_license', 'bank_statement'],
+    };
+    if (noteText) pushBody.note = noteText;
+    const r = await fetch('/api/push-to-vergent', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(pushBody),
+    });
+    const d = await r.json().catch(() => ({}));
+    const ok = r.status >= 200 && r.status < 300 && (d.ok || d.success);
+    vergentCid = (d.vergentCustomerId || d.customerId || '').toString();
+    if (!ok) {
+      const msg = (d.body || d.detail || d.error || ('HTTP ' + r.status)).toString();
+      _cclSetStep('customer', 'fail', msg.slice(0, 80));
+      _cclSetStep('docs',     'skipped', 'Customer create failed');
+      _cclSetStep('card',     'skipped', 'Customer create failed');
+      _cclSetStep('loan',     'skipped', 'Cannot continue');
+      _cclSetStep('esign',    'skipped', 'Cannot continue');
+      _cclShowFinal('error', 'Customer create failed: ' + msg.slice(0, 180));
+      _cclEnableRetry();
+      return;
+    }
+    _cclSetStep('customer', 'success', 'Vergent #' + (vergentCid || '?'));
+    // Persist enrichment same way vergentPush does so the right-rail
+    // card-failed alert stays in sync.
+    const pop = d.populated || {};
+    try {
+      const enrich = { results: pop, at: Date.now() };
+      await _fbPatchRaw('reports/' + encodeURIComponent(fbId) + '.json',
+                        { vergentEnrichment: enrich });
+      const aMem = (typeof apps !== 'undefined' && apps)
+        ? apps.find(x => x.firebaseId === fbId) : null;
+      if (aMem) aMem.vergentEnrichment = enrich;
+    } catch (e) { /* non-fatal */ }
+    // Docs: success when both uploads landed; warn when one missed;
+    // fail when both missed (and there was data to push).
+    const dlR = pop.drivers_license || {};
+    const bsR = pop.bank_statement || {};
+    const dlOk = dlR.ok === true;
+    const bsOk = bsR.ok === true;
+    const dlSkipped = dlR.ok === false && (dlR.detail || '').toLowerCase().startsWith('no ');
+    const bsSkipped = bsR.ok === false && (bsR.detail || '').toLowerCase().startsWith('no ');
+    if (dlOk && bsOk) {
+      _cclSetStep('docs', 'success', 'DL + Statement uploaded');
+    } else if ((dlOk || dlSkipped) && (bsOk || bsSkipped)) {
+      const parts = [];
+      if (dlOk) parts.push('DL');
+      if (bsOk) parts.push('Statement');
+      _cclSetStep('docs', parts.length ? 'success' : 'skipped',
+                  parts.length ? parts.join(' + ') + ' uploaded' : 'No documents on file');
+    } else {
+      // At least one failure that isn't "no data". Non-fatal — loan
+      // can still proceed (operator can re-push docs later from the
+      // Vergent rail).
+      const fails = [];
+      if (dlR.ok === false && !dlSkipped) fails.push('DL');
+      if (bsR.ok === false && !bsSkipped) fails.push('Statement');
+      _cclSetStep('docs', 'fail', fails.join(' + ') + ' failed (continuing)');
+    }
+    // Card: this is the critical gate. populated.card.ok === false AND
+    // detail isn't "no card on file" means Vergent rejected the card —
+    // we MUST NOT proceed to loan create.
+    const cardR = pop.card || {};
+    const cardDetail = (cardR.detail || '').toLowerCase();
+    const cardNoData = cardDetail.startsWith('no ') ||
+                       cardDetail.includes('no card on file') ||
+                       cardDetail.includes('no debit card');
+    if (cardR.ok === true) {
+      const last4 = cardR.last4 ? (' ••• ' + cardR.last4) : '';
+      _cclSetStep('card', 'success', 'Saved to Vergent' + last4);
+    } else if (cardNoData) {
+      _cclSetStep('card', 'fail', 'No card on file from application');
+      _cclSetStep('loan',  'skipped', 'No card → cannot fund');
+      _cclSetStep('esign', 'skipped', 'No card → cannot fund');
+      _cclShowFinal('error',
+        'No debit card was captured during the application. The loan cannot be created without a card on file. Please ask the applicant to re-submit with their card.');
+      _cclEnableRetry();
+      return;
+    } else {
+      _cclSetStep('card', 'fail', (cardR.detail || 'Vergent rejected the card').slice(0, 80));
+      _cclSetStep('loan',  'skipped', 'Card not saved → cannot fund');
+      _cclSetStep('esign', 'skipped', 'Card not saved → cannot fund');
+      _cclShowFinal('error',
+        'Debit card failed to save on the Vergent customer: ' +
+        (cardR.detail || 'unknown reason').slice(0, 180) +
+        '. The loan cannot proceed without a saved card. Resolve in Vergent and retry.');
+      _cclEnableRetry();
+      return;
+    }
+  } catch (e) {
+    _cclSetStep('customer', 'fail', 'Network error');
+    _cclSetStep('docs',     'skipped', 'Customer create failed');
+    _cclSetStep('card',     'skipped', 'Customer create failed');
+    _cclSetStep('loan',     'skipped', 'Cannot continue');
+    _cclSetStep('esign',    'skipped', 'Cannot continue');
+    _cclShowFinal('error', 'Network error during customer create: ' + ((e && e.message) || String(e)));
+    _cclEnableRetry();
+    return;
+  }
+  // Step 4 + 5: create the loan + dispatch e-sign.
+  _cclSetStep('loan',  'running', 'Creating loan…');
+  _cclSetStep('esign', 'running', 'Queued…');
+  try {
+    const r = await fetch('/api/vergent-create-loan', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        firebase_id: fbId,
+        loan_amount: amount,
+        due_date: dueRaw + 'T00:00:00.000Z',
+        prepaid_card_id: 0,   // auto-resolve to the just-saved card
+        send_esign: true,
+      }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d && d.ok) {
+      const hdr = d.hdrId || '—';
+      _cclSetStep('loan', 'success', 'Loan #' + hdr);
+      if (d.esignDispatched) {
+        _cclSetStep('esign', 'success', 'Email will fire when docs are ready');
+      } else if (d.esignSent) {
+        _cclSetStep('esign', 'success', 'Email sent');
+      } else {
+        _cclSetStep('esign', 'fail', 'Dispatch unclear — check logs');
+      }
+      _cclShowFinal('success',
+        '✓ Customer created + loan #' + hdr + ' originated + e-sign dispatched.');
+      // Refresh detail in the background so the dashboard reflects the
+      // new state when the operator closes the modal.
+      try { renderDetail(fbId); } catch (e) { /* non-fatal */ }
+      try { loadVergentMatch(fbId); } catch (e) { /* non-fatal */ }
+      setTimeout(() => {
+        closeCreateCustomerLoanModal();
+        try { renderDetail(fbId); } catch (e) {}
+      }, 3500);
+    } else {
+      const upstream = d && d.status ? 'Vergent HTTP ' + d.status : '';
+      const snippet  = (d && (d.loanDetail || d.detail || d.error) || '').toString().trim();
+      const parts = [upstream, snippet].filter(Boolean);
+      const text  = parts.length ? parts.join(' — ') : 'HTTP ' + r.status + ' (no body)';
+      _cclSetStep('loan',  'fail', text.slice(0, 80));
+      _cclSetStep('esign', 'skipped', 'Loan create failed');
+      _cclShowFinal('error',
+        'Customer was created — loan failed: ' + text.slice(0, 200) +
+        '. You can fix the issue and retry; we\'ll skip the customer-create step.');
+      _cclEnableRetry();
+    }
+  } catch (e) {
+    _cclSetStep('loan',  'fail', 'Network error');
+    _cclSetStep('esign', 'skipped', 'Loan create failed');
+    _cclShowFinal('error',
+      'Customer was created — loan failed (network): ' + ((e && e.message) || String(e)));
+    _cclEnableRetry();
+  }
+}
+
+function _cclEnableRetry() {
+  const noteEl  = document.getElementById('ccl-note');
+  const amtEl   = document.getElementById('ccl-amount');
+  const dueEl   = document.getElementById('ccl-due-date');
+  const startBtn = document.getElementById('ccl-start');
+  [noteEl, amtEl, dueEl].forEach(el => { if (el) el.disabled = false; });
+  if (startBtn) {
+    startBtn.disabled = false;
+    startBtn.style.opacity = '';
+    startBtn.innerHTML = '<svg class="icn"><use href="#i-zap"/></svg>Retry';
+  }
+}
+
+document.getElementById('dv-create-cust-loan-btn')?.addEventListener('click', openCreateCustomerLoanModal);
+
+
 // ── Edit Applicant Info ──────────────────────────────────────────────
 // Correct application fields (e.g. a malformed DOB Vergent rejects)
 // before Create Customer / Create Loan. Writes applicationData via
@@ -4589,10 +5025,15 @@ function renderProfilePanel(fbId) {
   // error (operator re-checks first), and the loading state.
   const createCustBtn = document.getElementById('dv-create-customer-btn');
   const createCustExpand = document.getElementById('dv-create-customer-expand');
+  const createCustLoanBtn = document.getElementById('dv-create-cust-loan-btn');
   if (createCustBtn) {
     const ms = m ? (m.status || '').toLowerCase() : '';
     const showCreate = !!m && (ms === 'not_found' || ms === 'new');
     createCustBtn.style.display = showCreate ? 'inline-flex' : 'none';
+    // The combo Create Customer + Loan button follows the same
+    // visibility rule — it's only valid when there's no Vergent
+    // customer yet (it would just duplicate Create Loan otherwise).
+    if (createCustLoanBtn) createCustLoanBtn.style.display = showCreate ? 'inline-flex' : 'none';
     // Auto-collapse the expand panel when the button hides (e.g. status
     // flipped to found after auto-recheck).
     if (!showCreate && createCustExpand) createCustExpand.style.display = 'none';
