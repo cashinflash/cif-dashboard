@@ -345,3 +345,116 @@ ends from Part J.
 Many bugs span both repos (Bug 1 in particular). Read
 `cif-apply/CLAUDE.md` before starting any Vergent work — it has
 parallel sections covering the backend half of each bug.
+
+# ════════════════════════════════════════════════════════════
+# SESSION HANDOFF — current state & open items (2026-06-17)
+# Read this FIRST. Everything below reflects what's LIVE in production.
+# Branch: claude/epic-davinci-cdufn9 (all 3 repos). Render auto-deploys main.
+# Backend half of every item lives in cif-apply/CLAUDE.md SESSION HANDOFF.
+# ════════════════════════════════════════════════════════════
+
+## WHERE WE ARE: dashboard is on the v4 canonical model
+
+- **v4 is the LIVE primary engine** (cif-apply). The dashboard reads v4's
+  canonical fields (`claudeDecision`, `amount`, `v4ReasonLine`, `v4Tier`,
+  `v4Decision`, `humanAction`, `humanActionBy`, `autoDeclineBucket`). The
+  v4 report HTML (cif-apply engine_v4/report_html.py) is what renders in
+  the detail iframe — it is CANONICAL. Do NOT re-render through any v2
+  renderer.
+- Everything below shipped on `claude/epic-davinci-cdufn9` after the
+  v4 §8 dashboard changes documented above.
+
+## ACTION CENTER COCKPIT (app.html — renderActionCenter)
+
+- New operator cockpit rendered into `#activity-feed`. Two columns:
+  **Needs Review** (grouped: things to FUND / to REVIEW / to CONFIRM) and
+  **Auto-declined today**. Built mobile-first (operator works from phone).
+- Backed by `reviewQueue()` / `reviewGroups()` (deduped) and `counts()`
+  computed over `dedupedApps` — there is now ONE source of truth for "what
+  needs attention", not three divergent calcs.
+- `filteredApps` uses a fund-first ordering so the highest-value actions
+  surface at the top of the queue.
+
+## PENDING-COUNT BUG: FIXED (was the #1 operator complaint)
+
+Symptom was: the Pending chip showed N but clicking Pending showed an
+empty list, and the count drifted up all day. Root cause = THREE divergent
+"pending" definitions plus a catch-all `bucketStatus` that swept Error/
+Processing/retry records into "pending". Fixes (all in app.html):
+
+- **`bucketStatus` tightened**: `error → error`; `processing/retry/plaid →
+  processing`; ONLY a genuinely-undecided record → `pending`. No more
+  catch-all into pending.
+- **`isDecided()`** is the single predicate for "operator/engine/auto has
+  acted" (funded/declined/auto-declined). Used everywhere a count or queue
+  needs to exclude resolved apps.
+- **`reviewQueue()` dedupes** (same applicant can have multiple report
+  rows; one entry per applicant).
+- `counts()` now derives from `dedupedApps` + `isDecided()` so the chip
+  number and the filtered list ALWAYS agree.
+
+If a count looks wrong again, check these three functions FIRST — and make
+sure any NEW status string is classified in `bucketStatus` (an unhandled
+status silently falling into `pending` is exactly how this regressed).
+
+## AUTO-DECLINE VISIBILITY (app.html)
+
+- **AUTO badge** on rows the auto-decline system resolved (driven by
+  `humanActionBy === 'auto-system'` / `autoDeclineBucket`).
+- **"Auto-declined" filter** + the "Auto-declined today" column in the
+  Action Center.
+- Detail view shows **"declined automatically by system"** (with the
+  bucket: out_of_state / no_income / dead_balance) instead of a bare
+  "Declined", so the operator never mistakes an auto-decline for their own.
+- The denial email shows on the Communications page tagged `auto`.
+
+## OVERRIDE GATING: REMOVED — one-click approve/decline
+
+Per operator request (2026-06-15). `setStatus()` no longer opens the
+`#ovr-ov` forced-reason modal; the `dv-approve-btn` handler funds/declines
+directly. The SILENT stamp (`humanAction`/`humanActionAt`/`humanActionBy`
+via `POST /api/override`) is KEPT — it powers the auto-vs-manual labels and
+the reviewer audit log. `openOverrideModal` / `_needsOverride` / the
+`#ovr-ov` modal markup are now DEAD CODE (left in place, not wired). Do not
+re-introduce the gating without an explicit operator request.
+
+## REPORT PAGE CLEANUP (app.html)
+
+Operator screenshot review: the old v2 snapshot cards were noise under v4.
+Removed the dead **Obligations / FCF / DTI / Max Offer / Confidence** cards
+and the "Recommended Decision" block (v4 has no FCF/DTI/confidence model).
+**Verified Income + Bank Account** were kept and moved down into a slim
+facts strip lower in the report. Mobile-friendly throughout. If you re-add
+any metric card, confirm v4 actually writes that field first (most v2
+fields are no longer produced).
+
+## _INDEX_TOP_FIELDS LOCK-STEP (server.py)
+
+`_INDEX_TOP_FIELDS` (the compact reportsIndex projection) MUST stay
+identical to cif-apply's copy in `run_server.py`. Current additions:
+`humanActionBy`, `autoDeclineBucket` (plus the v4 fields `v4ReasonLine`/
+`v4Decision`/`v4Tier`/`humanAction`; `score` is OUT). If you add a field
+the dashboard reads off the index list, add it in BOTH files or the
+dashboard will read stale/missing data for that field.
+
+## OPEN ITEMS (dashboard-relevant; full list in cif-apply/CLAUDE.md)
+
+1. **[HIGH] Error filter + recovery surfacing.** Backend Open Item #1 adds
+   retry + an auto-heal sweep for Error/stuck-Processing records; the
+   dashboard side is an **Error filter** so the operator can see/triage
+   them (today Error rows are invisible — they fall outside every queue).
+   Wait for the backend recovery work, then add the filter + a re-run
+   action.
+2. Auto-decline phase 2 (pre-Plaid out-of-state short-circuit) is
+   backend-only; no dashboard change expected beyond the existing AUTO
+   surfacing.
+
+## HOW THIS SESSION WORKED (match the operator's style)
+
+- app.html is 315 KB — edit with SMALL Edits, and run `node --check` on
+  EVERY `<script>` block you touch before committing (a single syntax slip
+  white-screens the whole SPA). Match existing inline-style strings verbatim
+  (see "Style language conventions" above). Mobile matters — operator runs
+  this from their phone constantly. Merge-to-main immediately (squash) so
+  Render deploys; never leave a PR open. Tell the operator the plan and get
+  a final "go" before anything risky.
