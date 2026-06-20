@@ -2904,10 +2904,12 @@ function setRoute(name, fbId) {
   if (name === 'detail' && fbId) {
     location.hash = '#fb=' + encodeURIComponent(fbId);
   } else if (name === 'customers') {
-    // Preserve which sub-tab is active in the URL so back/forward and
-    // bookmarks both restore correctly. #applinks / #portallinks /
-    // #customers all route to view-customers via readRouteFromHash().
-    location.hash = '#' + (_custTab || 'customers');
+    // The canonical sub-tab hash (#customers / #applinks / #portallinks) is
+    // owned by setCustTab(), which was already called above. Do NOT re-write
+    // it here: setCustTab maps the Portal tab to #customers, while this block
+    // used to write #portal — so the two fought each other and the URL
+    // visibly flickered #customers <-> #portal (and polluted history) on
+    // every navigation into Customers.
   } else if (name !== 'detail') {
     location.hash = '#' + name;
   }
