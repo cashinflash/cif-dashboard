@@ -4683,8 +4683,16 @@ async function startCreateCustomerLoan() {
     return;
   }
   // Step 3 + 4: create the loan + dispatch e-sign.
-  _cclSetStep('loan',  'running', 'Creating loan…');
+  _cclSetStep('loan',  'running', 'Settling new Vergent customer…');
   _cclSetStep('esign', 'running', 'Queued…');
+  // Settling delay — Vergent commits the new customer to its query
+  // index asynchronously. Without this wait, loan-create fires too
+  // fast and ~60% of the time fails with "customer not found." The
+  // standalone "Create Loan" button works because by the time the
+  // operator clicks it, the customer has had several seconds to
+  // settle. 2.5s mirrors that natural gap.
+  await new Promise(r => setTimeout(r, 2500));
+  _cclSetStep('loan', 'running', 'Creating loan…');
   // The standalone Create Loan modal fetches the customer's cards list
   // FIRST and passes the real card id when creating the loan -- the
   // combo used to just pass 0 and hope Vergent picked the right card,
