@@ -2112,6 +2112,29 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        # Schedule a future payment (ACH or Card) — used by the
+        # Payments page detail modal's "Schedule Payment" button on
+        # declined-payment rows.
+        if path == '/api/vergent-schedule-payment':
+            try:
+                body = json.loads(raw) if raw else {}
+                payload = json.dumps(body).encode()
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/vergent-schedule-payment',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=30) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[SCHED-PMT UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[SCHED-PMT ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         # Fbid lookup by Vergent customer_id — used by the Payments
         # page detail modal's "Create Loan" button. cif-apply walks
         # /reports to find the matching firebase_id; we just pass

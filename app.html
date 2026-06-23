@@ -2020,6 +2020,47 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   </div>
 </div>
 
+<!-- SCHEDULE PAYMENT modal — opens from the Payments detail modal's
+     "Schedule Payment" button (declined-payment rows). Operator
+     picks a date, amount, and method (Card or ACH). Posts to
+     /api/vergent-schedule-payment. Mobile-friendly via .appr-ov. -->
+<div class="appr-ov" id="schp-ov">
+  <div class="appr-card" style="max-width:440px">
+    <div class="appr-head">
+      <div style="min-width:0">
+        <div class="appr-title" style="font-size:16px">Schedule Payment</div>
+        <div class="appr-meta" id="schp-meta" style="font-variant-numeric:tabular-nums">—</div>
+      </div>
+      <button onclick="closeSchedulePaymentModal()" style="background:transparent;border:none;font-size:24px;cursor:pointer;color:var(--muted);line-height:1;padding:4px 8px;min-width:36px;min-height:36px;border-radius:6px" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <div class="appr-body" style="max-height:calc(96vh - 200px);overflow-y:auto;padding:14px 16px;-webkit-overflow-scrolling:touch">
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Payment Method</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <label style="flex:1 1 140px;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px 14px;border:1px solid #6cb1e2;border-radius:8px;background:#e8f3f8;color:#1a4d6b;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px"><input type="radio" name="schp-method" value="card" checked style="margin:0">Card <span style="font-size:10.5px;color:#1a4d6b;opacity:.7;font-weight:600">(default)</span></label>
+          <label style="flex:1 1 140px;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px 14px;border:1px solid var(--border);border-radius:8px;background:#fafafa;color:var(--text);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px"><input type="radio" name="schp-method" value="ach" style="margin:0">ACH</label>
+        </div>
+      </div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Date</div>
+        <input type="date" id="schp-date" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:11px 13px;font-size:16px;font-family:inherit;min-height:44px;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Amount</div>
+        <div style="position:relative">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px;font-weight:700">$</span>
+          <input type="number" id="schp-amount" step="0.01" min="0.01" inputmode="decimal" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:11px 13px 11px 26px;font-size:16px;font-family:inherit;min-height:44px;box-sizing:border-box">
+        </div>
+      </div>
+      <div id="schp-status" style="margin-top:6px;font-size:12px;min-height:18px"></div>
+    </div>
+    <div class="appr-actions" style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button type="button" onclick="closeSchedulePaymentModal()" class="btn btn-ghost" style="min-height:44px">Cancel</button>
+      <button type="button" id="schp-submit" onclick="submitSchedulePayment()" style="background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px">Schedule</button>
+    </div>
+  </div>
+</div>
+
 <!-- FUNDING STATUS — mirrors Vergent's Loan Funding Queue (loans
      created but not yet funded) without opening Vergent. Built from
      /fundingQueue (every loan we originate, written by cif-apply's
@@ -10713,13 +10754,39 @@ async function _loadPayOvLoanHistory(row) {
       try { const dt = new Date(s); if (!isNaN(dt)) return dt.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'2-digit'}); } catch (e) {}
       return s;
     };
-    el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:380px">'
+    // Days-late readout — same logic as the hover-popup _loanHistRender
+    // (line ~11598). Vergent stores late status both as a numeric
+    // days_late + a label string ("1 Day Late" / "Not Late"); we use
+    // whichever yields the larger value as the current days-late, and
+    // max_days_late as the historical peak. >=31d -> red, 1-30d ->
+    // amber, 0d -> green.
+    const lateCell = (ln) => {
+      const dlRaw  = (ln.days_late_label && String(ln.days_late_label).trim()) || '';
+      const dlRawL = dlRaw.toLowerCase();
+      const dlIsZeroLabel = dlRawL === 'not late' || dlRawL === 'current'
+                              || dlRawL === 'ok' || dlRaw === '0' || dlRaw === '—';
+      const dlFromLabel = !dlIsZeroLabel && dlRaw
+        ? (parseInt((dlRaw.match(/-?\d+/) || ['0'])[0], 10) || 0)
+        : 0;
+      const dlCur  = Math.max(Number(ln.days_late) || 0, dlFromLabel);
+      const dlMax  = Number(ln.max_days_late) || 0;
+      const dl     = Math.max(dlCur, dlMax);
+      const isHistorical = dl > 0 && (Number(ln.days_late) || 0) === 0 && dlFromLabel === 0;
+      let txt, color;
+      if (dl >= 31)     { txt = dl + 'd'; color = 'var(--red)'; }
+      else if (dl >= 1) { txt = dl + 'd'; color = 'var(--amber-700)'; }
+      else              { txt = 'On time'; color = 'var(--green-dark)'; }
+      const tag = isHistorical ? ' <span style="color:var(--muted);font-weight:600;font-size:10px">prior</span>' : '';
+      return '<span style="color:' + color + ';font-weight:700">' + escapeHtml(txt) + '</span>' + tag;
+    };
+    el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:440px">'
       + '<thead><tr style="text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em">'
       + '<th style="padding:5px 6px;font-weight:700">Loan #</th>'
       + '<th style="padding:5px 6px;font-weight:700">Date</th>'
       + '<th style="padding:5px 6px;text-align:right;font-weight:700">Amount</th>'
       + '<th style="padding:5px 6px;text-align:right;font-weight:700">Balance</th>'
       + '<th style="padding:5px 6px;font-weight:700">Status</th>'
+      + '<th style="padding:5px 6px;font-weight:700">Late</th>'
       + '</tr></thead><tbody>'
       + loans.map(ln => '<tr style="border-top:1px solid var(--border)">'
         + '<td style="padding:6px;font-variant-numeric:tabular-nums">' + escapeHtml(ln.loan_number || ln.loan_id || '—') + '</td>'
@@ -10727,6 +10794,7 @@ async function _loadPayOvLoanHistory(row) {
         + '<td style="padding:6px;text-align:right;font-variant-numeric:tabular-nums">$' + Number(ln.amount || 0).toFixed(0) + '</td>'
         + '<td style="padding:6px;text-align:right;font-variant-numeric:tabular-nums;color:' + (Number(ln.balance || 0) > 0 ? 'var(--text)' : 'var(--muted)') + '">$' + Number(ln.balance || 0).toFixed(0) + '</td>'
         + '<td style="padding:6px">' + escapeHtml(ln.status || '—') + '</td>'
+        + '<td style="padding:6px;white-space:nowrap">' + lateCell(ln) + '</td>'
         + '</tr>').join('')
       + '</tbody></table>';
   } catch (e) {
@@ -10768,10 +10836,109 @@ async function payOvCreateLoan() {
 }
 
 function payOvSchedulePayment() {
-  // Wired in the next PR — opens a date+amount picker + posts to a
-  // new /api/vergent-schedule-payment endpoint that supports ACH +
-  // card. Placeholder so the button is wired up cleanly.
-  toast('Schedule Payment ships in the next update — both ACH + Card.', 'info');
+  if (!_payOvRow) return;
+  const row = _payOvRow;
+  // Pre-fill amount with the declined payment's amount (most common
+  // case) and date with tomorrow's date (default rescheduling window).
+  const dateEl = document.getElementById('schp-date');
+  const amtEl  = document.getElementById('schp-amount');
+  const metaEl = document.getElementById('schp-meta');
+  if (metaEl) {
+    metaEl.textContent = (row.customer || '—') + '  ·  Loan '
+      + (row.loan_id || '—');
+  }
+  if (amtEl) amtEl.value = Number(row.amount || 0).toFixed(2);
+  if (dateEl) {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    // YYYY-MM-DD in local TZ (avoid the UTC midnight gotcha).
+    const tz = tomorrow.getTimezoneOffset() * 60000;
+    dateEl.value = new Date(tomorrow.getTime() - tz).toISOString().slice(0, 10);
+    dateEl.min = new Date(Date.now() - tz).toISOString().slice(0, 10);
+  }
+  // Reset method to Card (the 99% case per operator).
+  document.querySelectorAll('input[name="schp-method"]').forEach(r => {
+    r.checked = (r.value === 'card');
+  });
+  // Visual selection sync between the two radio cards.
+  _schpSyncRadioStyles();
+  document.querySelectorAll('input[name="schp-method"]').forEach(r => {
+    r.onchange = _schpSyncRadioStyles;
+  });
+  const statusEl = document.getElementById('schp-status');
+  if (statusEl) statusEl.textContent = '';
+  const ov = document.getElementById('schp-ov');
+  if (ov) ov.classList.add('open');
+}
+
+function _schpSyncRadioStyles() {
+  document.querySelectorAll('input[name="schp-method"]').forEach(r => {
+    const lbl = r.closest('label');
+    if (!lbl) return;
+    if (r.checked) {
+      lbl.style.background = '#e8f3f8';
+      lbl.style.borderColor = '#6cb1e2';
+      lbl.style.color = '#1a4d6b';
+    } else {
+      lbl.style.background = '#fafafa';
+      lbl.style.borderColor = 'var(--border)';
+      lbl.style.color = 'var(--text)';
+    }
+  });
+}
+
+function closeSchedulePaymentModal() {
+  const ov = document.getElementById('schp-ov');
+  if (ov) ov.classList.remove('open');
+}
+
+async function submitSchedulePayment() {
+  if (!_payOvRow) return;
+  const row = _payOvRow;
+  const hid = row.loan_id;
+  const dateEl = document.getElementById('schp-date');
+  const amtEl  = document.getElementById('schp-amount');
+  const statusEl = document.getElementById('schp-status');
+  const submitBtn = document.getElementById('schp-submit');
+  const methodSel = document.querySelector('input[name="schp-method"]:checked');
+  const method = methodSel ? methodSel.value : 'card';
+  const dateVal = dateEl ? dateEl.value : '';
+  const amtVal  = amtEl  ? Number(amtEl.value) : 0;
+  if (!hid) { statusEl.innerHTML = '<span style="color:var(--red)">No loan ID on the row.</span>'; return; }
+  if (!dateVal) { statusEl.innerHTML = '<span style="color:var(--red)">Please pick a date.</span>'; return; }
+  if (!(amtVal > 0)) { statusEl.innerHTML = '<span style="color:var(--red)">Please enter an amount > 0.</span>'; return; }
+  submitBtn.disabled = true;
+  const origText = submitBtn.textContent;
+  submitBtn.textContent = 'Scheduling…';
+  statusEl.innerHTML = '<span style="color:var(--muted)">Sending to Vergent…</span>';
+  try {
+    const r = await fetch('/api/vergent-schedule-payment', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        hdr_id: String(hid),
+        amount: amtVal,
+        date:   dateVal,
+        method: method,
+      }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d && d.ok) {
+      statusEl.innerHTML = '<span style="color:var(--green-dark);font-weight:700">✓ Scheduled $' + amtVal.toFixed(2) + ' via ' + (method === 'ach' ? 'ACH' : 'Card') + ' for ' + escapeHtml(dateVal) + '.</span>';
+      toast('Payment scheduled', 'ok');
+      setTimeout(closeSchedulePaymentModal, 1200);
+    } else {
+      const detail = (d && (d.detail || d.error)) || ('HTTP ' + r.status);
+      statusEl.innerHTML = '<span style="color:var(--red)">Vergent rejected: ' + escapeHtml(String(detail).slice(0, 240)) + '</span>';
+      console.log('[SCHED-PMT]', d);
+      window.__lastScheduleResponse = d;
+    }
+  } catch (e) {
+    statusEl.innerHTML = '<span style="color:var(--red)">Request failed: ' + escapeHtml((e && e.message) || String(e)) + '</span>';
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = origText;
+  }
 }
 
 async function loadCommunications() {
