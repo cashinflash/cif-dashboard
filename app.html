@@ -1984,6 +1984,42 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   </div>
 </div>
 
+<!-- PAYMENTS — customer detail modal. Opens when a payment row is
+     tapped. Consolidates the old loan-history hover icon + the
+     customer-name-link-to-Vergent into one window. Mobile-friendly
+     by inheriting .appr-ov which already has a media query at line
+     1268 pinning width to calc(100vw - 16px) on small screens. -->
+<div class="appr-ov" id="pay-ov">
+  <div class="appr-card" style="max-width:540px">
+    <div class="appr-head">
+      <div style="min-width:0">
+        <div class="appr-title" id="pay-ov-name" style="font-size:16px;line-height:1.25;word-break:break-word">—</div>
+        <div class="appr-meta" id="pay-ov-meta" style="font-variant-numeric:tabular-nums">—</div>
+      </div>
+      <button onclick="closePaymentDetailModal()" style="background:transparent;border:none;font-size:24px;cursor:pointer;color:var(--muted);line-height:1;padding:4px 8px;min-width:36px;min-height:36px;border-radius:6px" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <div class="appr-body" style="max-height:calc(96vh - 130px);overflow-y:auto;padding:14px 16px;-webkit-overflow-scrolling:touch">
+      <div id="pay-ov-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+        <a id="pay-ov-vergent" href="#" target="_blank" rel="noopener" style="flex:1 1 140px;text-align:center;text-decoration:none;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Open in Vergent</a>
+        <button id="pay-ov-create-loan" type="button" onclick="payOvCreateLoan()" style="flex:1 1 140px;display:none;background:#e8f5ee;color:#1a6b3c;border:1px solid #6cc294;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Create New Loan</button>
+        <button id="pay-ov-schedule" type="button" onclick="payOvSchedulePayment()" style="flex:1 1 140px;display:none;background:#fff5e6;color:#5a3300;border:1px solid #f0b27a;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Schedule Payment</button>
+      </div>
+      <div style="background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
+        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">This Payment</div>
+        <div id="pay-ov-payment" style="font-size:13.5px;color:var(--text);line-height:1.4">—</div>
+      </div>
+      <div style="background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
+        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Next Scheduled Payment</div>
+        <div id="pay-ov-next" style="font-size:13.5px;color:var(--text);line-height:1.4">Loading…</div>
+      </div>
+      <div>
+        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Loan History</div>
+        <div id="pay-ov-loans" style="font-size:12.5px;color:var(--text);overflow-x:auto;-webkit-overflow-scrolling:touch">Loading…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- FUNDING STATUS — mirrors Vergent's Loan Funding Queue (loans
      created but not yet funded) without opening Vergent. Built from
      /fundingQueue (every loan we originate, written by cif-apply's
@@ -10305,26 +10341,22 @@ function renderPayments() {
     return `<span style="display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;background:#f3f4f6;color:#6b7280;font-size:11px;font-weight:700;letter-spacing:.04em">${escapeHtml((r.status || '?').toUpperCase())}</span>`;
   };
 
-  const rowHtml = (r) => {
-    const cid = r.customer_id || '';
-    const vlink = cid ? `https://shared.lms.vergentlms.com/customer/general?action=view&id=${encodeURIComponent(cid)}` : '';
-    const customerLink = cid
-      ? `<a href="${vlink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;font-weight:700" onclick="event.stopPropagation()">${escapeHtml(r.customer || '—')}</a>`
-      : `<span style="font-weight:700;color:var(--text)">${escapeHtml(r.customer || '—')}</span>`;
-    // Loan-history hover icon — same component used on Loans Due.
-    // _loanHistShow / _loanHistHide / _loanHistToggle live in the
-    // global JS module and fetch via /api/vergent-loans.
-    const histIcon = cid
-      ? `<span class="lns-hist-icn" data-cid="${escapeHtml(cid)}" data-name="${escapeHtml(r.customer || '')}" onmouseenter="_loanHistShow(this)" onmouseleave="_loanHistHide()" onclick="event.stopPropagation();_loanHistToggle(this)" title="Loan history" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;color:var(--muted);cursor:pointer;margin-left:6px;vertical-align:middle"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><polyline points="3 4 3 9 8 9"/><path d="M12 7v5l3 2"/></svg></span>`
-      : '';
-    const customerCell = customerLink + histIcon;
+  // Stash sorted rows so onclick handlers can look up by index without
+  // serialising the whole object into the HTML attribute.
+  window._payRowCache = sorted;
+  const rowHtml = (r, idx) => {
+    // Whole row is tappable -> opens the customer detail modal. Inline
+    // hover-icon for loan history is removed; everything's in the
+    // modal now (incl. an "Open in Vergent" button), per operator
+    // request to stop adding little icons.
+    const customerCell = `<span style="font-weight:700;color:var(--text)">${escapeHtml(r.customer || '—')}</span>`;
     const declineHtml = r.decline_reason
       ? `<div style="font-size:11px;color:var(--red);font-weight:600;margin-top:3px;line-height:1.3">${escapeHtml(r.decline_reason)}</div>`
       : '';
     const fundingHtml = r.kind === 'funding' && r.funding_txn_id
       ? `<div style="font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:2px">auth ${escapeHtml(r.funding_auth_code || '')} · txn ${escapeHtml(r.funding_txn_id || '')}</div>`
       : '';
-    return `<tr>
+    return `<tr style="cursor:pointer" onclick="openPaymentDetailModal(window._payRowCache[${idx}])" title="Tap to view customer details">
       <td style="white-space:nowrap;font-variant-numeric:tabular-nums">${escapeHtml(_payFmtTime(r.real_date))}</td>
       <td>${customerCell}<div style="font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:2px">${escapeHtml(r.loan_id || '')}</div></td>
       <td style="font-variant-numeric:tabular-nums;font-weight:700">${_payFmtMoney(r.amount)}</td>
@@ -10346,7 +10378,7 @@ function renderPayments() {
           <th style="width:130px">Store</th>
         </tr>
       </thead>
-      <tbody>${sorted.map(rowHtml).join('')}</tbody>
+      <tbody>${sorted.map((r, i) => rowHtml(r, i)).join('')}</tbody>
     </table>
   </div>`;
 }
@@ -10568,6 +10600,178 @@ async function removeFundingRow(hdrId, btn) {
     if (btn) { btn.disabled = false; btn.textContent = 'Clear'; }
     toast('Couldn\'t remove: ' + ((e && e.message) || e), 'err');
   }
+}
+
+// ── Payments page customer detail modal ────────────────────────────
+// Consolidates the per-row info (next pay date, loan history, link
+// to Vergent) + per-status actions (Create New Loan for approved
+// rows, Schedule Payment for declined rows). Mobile-first via the
+// existing .appr-ov pattern.
+let _payOvRow = null;
+
+function openPaymentDetailModal(row) {
+  if (!row) return;
+  _payOvRow = row;
+  const ov = document.getElementById('pay-ov');
+  if (!ov) return;
+  ov.classList.add('open');
+  document.getElementById('pay-ov-name').textContent = row.customer || '—';
+  document.getElementById('pay-ov-meta').textContent =
+    'Vergent ID: ' + (row.customer_id || '—')
+    + (row.loan_id ? '  ·  Loan ' + row.loan_id : '');
+  const cid = row.customer_id || '';
+  const vlink = cid
+    ? 'https://shared.lms.vergentlms.com/customer/general?action=view&id=' + encodeURIComponent(cid)
+    : '#';
+  const vergentBtn = document.getElementById('pay-ov-vergent');
+  vergentBtn.href = vlink;
+  vergentBtn.style.display = cid ? '' : 'none';
+  // Show action buttons conditionally on row state.
+  const createBtn = document.getElementById('pay-ov-create-loan');
+  const schedBtn  = document.getElementById('pay-ov-schedule');
+  const isApprovedPayment = row.status === 'approved' && row.kind === 'payment';
+  const isDeclined = row.status === 'declined';
+  createBtn.style.display = isApprovedPayment ? 'inline-flex' : 'none';
+  schedBtn.style.display  = isDeclined ? 'inline-flex' : 'none';
+  // Payment summary line.
+  const amtStr = '$' + Number(row.amount || 0).toFixed(2);
+  const statusStr = (row.kind === 'funding' ? 'FUNDED'
+                     : String(row.status || '?').toUpperCase());
+  const declineStr = row.decline_reason ? '  ·  ' + row.decline_reason : '';
+  let when = '—';
+  try { when = row.real_date ? new Date(row.real_date).toLocaleString(undefined, {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '—'; } catch (e) {}
+  document.getElementById('pay-ov-payment').textContent =
+    amtStr + '  ·  ' + statusStr + '  ·  ' + when + declineStr;
+  // Async loads in parallel.
+  _loadPayOvNextPayDate(row);
+  _loadPayOvLoanHistory(row);
+}
+
+function closePaymentDetailModal() {
+  const ov = document.getElementById('pay-ov');
+  if (ov) ov.classList.remove('open');
+  _payOvRow = null;
+}
+
+async function _loadPayOvNextPayDate(row) {
+  const nextEl = document.getElementById('pay-ov-next');
+  if (!nextEl) return;
+  if (!row.loan_id) { nextEl.textContent = 'No loan ID on this row'; return; }
+  nextEl.textContent = 'Loading…';
+  try {
+    const r = await fetch('/api/vergent-scheduled-payments', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hdr_id: String(row.loan_id) }),
+    });
+    const d = await r.json().catch(() => ({}));
+    const next = (d && d.next_card_payment)
+      || ((d.automatic_schedules || [])[0])
+      || ((d.manual_schedules || [])[0]);
+    if (!next) {
+      nextEl.innerHTML = '<span style="color:var(--muted)">No scheduled payment found.</span>';
+      return;
+    }
+    let dateStr = next.date || '—';
+    try {
+      if (next.date) {
+        const dt = new Date(next.date);
+        if (!isNaN(dt)) dateStr = dt.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'});
+      }
+    } catch (e) {}
+    nextEl.innerHTML =
+      '<div style="display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline">'
+      + '<div><span style="color:var(--muted);font-size:11px">Date:</span> <b style="font-variant-numeric:tabular-nums">' + escapeHtml(dateStr) + '</b></div>'
+      + '<div><span style="color:var(--muted);font-size:11px">Amount:</span> <b style="font-variant-numeric:tabular-nums">$' + Number(next.amount || 0).toFixed(2) + '</b></div>'
+      + '<div><span style="color:var(--muted);font-size:11px">Method:</span> <b>' + escapeHtml(next.method || '—') + '</b></div>'
+      + '</div>';
+  } catch (e) {
+    nextEl.innerHTML = '<span style="color:var(--red)">Couldn\'t load: ' + escapeHtml((e && e.message) || String(e)) + '</span>';
+  }
+}
+
+async function _loadPayOvLoanHistory(row) {
+  const el = document.getElementById('pay-ov-loans');
+  if (!el) return;
+  const cid = row.customer_id;
+  if (!cid) { el.textContent = 'No customer ID on this row'; return; }
+  el.textContent = 'Loading…';
+  try {
+    const r = await fetch('/api/vergent-loans', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customer_id: String(cid) }),
+    });
+    const d = await r.json().catch(() => ({}));
+    const loans = (d && d.loans) || [];
+    if (!loans.length) {
+      el.innerHTML = '<span style="color:var(--muted)">No prior loans.</span>';
+      return;
+    }
+    const fmtDate = (s) => {
+      if (!s) return '—';
+      try { const dt = new Date(s); if (!isNaN(dt)) return dt.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'2-digit'}); } catch (e) {}
+      return s;
+    };
+    el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:380px">'
+      + '<thead><tr style="text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em">'
+      + '<th style="padding:5px 6px;font-weight:700">Loan #</th>'
+      + '<th style="padding:5px 6px;font-weight:700">Date</th>'
+      + '<th style="padding:5px 6px;text-align:right;font-weight:700">Amount</th>'
+      + '<th style="padding:5px 6px;text-align:right;font-weight:700">Balance</th>'
+      + '<th style="padding:5px 6px;font-weight:700">Status</th>'
+      + '</tr></thead><tbody>'
+      + loans.map(ln => '<tr style="border-top:1px solid var(--border)">'
+        + '<td style="padding:6px;font-variant-numeric:tabular-nums">' + escapeHtml(ln.loan_number || ln.loan_id || '—') + '</td>'
+        + '<td style="padding:6px;font-variant-numeric:tabular-nums">' + escapeHtml(fmtDate(ln.date)) + '</td>'
+        + '<td style="padding:6px;text-align:right;font-variant-numeric:tabular-nums">$' + Number(ln.amount || 0).toFixed(0) + '</td>'
+        + '<td style="padding:6px;text-align:right;font-variant-numeric:tabular-nums;color:' + (Number(ln.balance || 0) > 0 ? 'var(--text)' : 'var(--muted)') + '">$' + Number(ln.balance || 0).toFixed(0) + '</td>'
+        + '<td style="padding:6px">' + escapeHtml(ln.status || '—') + '</td>'
+        + '</tr>').join('')
+      + '</tbody></table>';
+  } catch (e) {
+    el.innerHTML = '<span style="color:var(--red)">Couldn\'t load: ' + escapeHtml((e && e.message) || String(e)) + '</span>';
+  }
+}
+
+async function payOvCreateLoan() {
+  if (!_payOvRow) return;
+  const cid = _payOvRow.customer_id;
+  if (!cid) { toast('No Vergent customer ID on this row', 'err'); return; }
+  const btn = document.getElementById('pay-ov-create-loan');
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = 'Looking up applicant…';
+  try {
+    const r = await fetch('/api/lookup-fbid-by-vergent-cid', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cid: String(cid) }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.firebase_id) {
+      toast('No applicant record found for this Vergent customer. You can still create the loan directly in Vergent.', 'err');
+      return;
+    }
+    closePaymentDetailModal();
+    if (typeof openCreateLoanModal === 'function') {
+      openCreateLoanModal(d.firebase_id);
+    } else {
+      toast('Create Loan modal not available', 'err');
+    }
+  } catch (e) {
+    toast('Lookup failed: ' + ((e && e.message) || e), 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+}
+
+function payOvSchedulePayment() {
+  // Wired in the next PR — opens a date+amount picker + posts to a
+  // new /api/vergent-schedule-payment endpoint that supports ACH +
+  // card. Placeholder so the button is wired up cleanly.
+  toast('Schedule Payment ships in the next update — both ACH + Card.', 'info');
 }
 
 async function loadCommunications() {
