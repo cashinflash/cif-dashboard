@@ -2112,6 +2112,30 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        # Fbid lookup by Vergent customer_id — used by the Payments
+        # page detail modal's "Create Loan" button. cif-apply walks
+        # /reports to find the matching firebase_id; we just pass
+        # through with a snappy timeout.
+        if path == '/api/lookup-fbid-by-vergent-cid':
+            try:
+                body = json.loads(raw) if raw else {}
+                payload = json.dumps(body).encode()
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/lookup-fbid-by-vergent-cid',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=30) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[FBID-LOOKUP UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[FBID-LOOKUP ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         # Vergent scheduled payments — proxies to cif-apply's
         # /api/vergent-scheduled-payments. Body: {hdr_id}. Used by the
         # Loans Due table to show a card icon when a scheduled card
