@@ -10778,12 +10778,11 @@ function openPaymentDetailModal(row) {
     document.getElementById('pay-ov-payment').textContent =
       amtStr + '  ·  ' + statusStr + '  ·  ' + when + declineStr;
   }
-  // Kick off the firebase_id lookup ONLY when Create New Loan is
-  // showing — that handler needs the fbId stamped on body.dataset
-  // before calling openCreateLoanModal(). Open in Admin no longer
-  // depends on the lookup (it navigates to the Customers page
-  // filtered by the Vergent cid instead).
-  if (cid && isApprovedPayment) _payOvKickoffFbIdLookup(String(cid));
+  // Kick off the firebase_id lookup so Create New Loan (approved
+  // rows) and Open in Admin (any row) can navigate straight to the
+  // application detail page if we find a match. Fires for every row
+  // because Open in Admin is always visible.
+  if (cid) _payOvKickoffFbIdLookup(String(cid));
   // Async loads: scheduled payments (declined only) + next-pay-date
   // proxy (declined only) + loan history (always).
   if (isDeclined) {
@@ -11052,7 +11051,19 @@ function payOvOpenAdmin() {
   const cid = String(_payOvRow.customer_id || '');
   if (!cid) { toast('No Vergent customer ID on this row', 'err'); return; }
   closePaymentDetailModal();
-  _openCustomerInAdmin(cid);
+  // Prefer the application detail page (#fb=<fbId>) — that's the
+  // operator's full profile / report / application / debit card
+  // view. The background lookup kicked off when the modal opened
+  // is usually done by the time we get here. Fall back to the
+  // Customers page filtered by Vergent cid when we don't have a
+  // firebase_id (lookup miss, walk timeout, or a customer who
+  // never went through our application funnel).
+  const fbId = _payOvFbIdByCid[cid];
+  if (fbId && typeof fbId === 'string' && fbId !== '__loading__') {
+    location.hash = '#fb=' + encodeURIComponent(fbId);
+  } else {
+    _openCustomerInAdmin(cid);
+  }
 }
 async function payOvCreateLoan() {
   if (!_payOvRow) return;
@@ -12767,7 +12778,16 @@ function lnsOvOpenAdmin() {
   const cid = String(_lnsOvRow.CustomerId || '');
   if (!cid) { toast('No Vergent customer ID on this row', 'err'); return; }
   closeLoansDueDetailModal();
-  _openCustomerInAdmin(cid);
+  // Prefer the application detail page (#fb=<fbId>). Fall back to
+  // the Customers page when we don't have a firebase_id for this
+  // Vergent customer (lookup miss or customer never went through
+  // our application funnel).
+  const fbId = _lnsOvFbIdByCid[cid];
+  if (fbId && typeof fbId === 'string' && fbId !== '__loading__') {
+    location.hash = '#fb=' + encodeURIComponent(fbId);
+  } else {
+    _openCustomerInAdmin(cid);
+  }
 }
 // Shared: take the operator to the Customers page filtered to this
 // Vergent customer. We pre-fill the search box BEFORE calling
@@ -12898,9 +12918,10 @@ function openLoansDueDetailModal(row) {
     schBtn.disabled = false; schBtn.style.opacity = '';
   }
   _lnsOvRefreshAdminButton(cid);
-  // Loans Due modal no longer needs the firebase_id lookup — Open
-  // in Admin navigates to the Customers page filtered by Vergent
-  // cid, and Schedule Payment uses _lnsOvRow directly.
+  // Kick off the firebase_id lookup so Open in Admin can navigate
+  // straight to the application detail page if we find a match
+  // (with fallback to the Customers page filtered by cid otherwise).
+  if (cid) _lnsOvKickoffFbIdLookup(cid);
   // Snapshot — balance, days late, due, next pay
   const snap = document.getElementById('lns-ov-snapshot');
   const daysLate = _pastDueComputedDaysLate(row);
