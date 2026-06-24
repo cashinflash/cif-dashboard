@@ -10782,7 +10782,7 @@ function openPaymentDetailModal(row) {
   // rows) and Open in Admin (any row) can navigate straight to the
   // application detail page if we find a match. Fires for every row
   // because Open in Admin is always visible.
-  if (cid) _payOvKickoffFbIdLookup(String(cid));
+  if (cid) _payOvKickoffFbIdLookup(String(cid), String(row.loan_id || ''));
   // Async loads: scheduled payments (declined only) + next-pay-date
   // proxy (declined only) + loan history (always).
   if (isDeclined) {
@@ -10990,7 +10990,7 @@ async function _loadPayOvLoanHistory(row) {
 // clicks are usually instant. Values: undefined = not started,
 // '__loading__' = in flight, string = found, null = not found.
 const _payOvFbIdByCid = {};
-async function _payOvKickoffFbIdLookup(cid) {
+async function _payOvKickoffFbIdLookup(cid, loanId) {
   if (!cid) return;
   if (_payOvFbIdByCid[cid] != null && _payOvFbIdByCid[cid] !== '__loading__') {
     _payOvRefreshAdminButton(cid);
@@ -11002,7 +11002,11 @@ async function _payOvKickoffFbIdLookup(cid) {
     const r = await fetch('/api/lookup-fbid-by-vergent-cid', {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cid: String(cid) }),
+      // Pass loan_id too — the backend matches it against
+      // vergentLoan.hdrId / fundingQueue when the cid isn't on any
+      // report's vergentMatch (older loans created before the cid
+      // was written back). Makes the lookup hit far more often.
+      body: JSON.stringify({ cid: String(cid), loan_id: String(loanId || '') }),
     });
     const d = await r.json().catch(() => ({}));
     _payOvFbIdByCid[cid] = (r.ok && d.firebase_id) ? d.firebase_id : null;
@@ -11028,11 +11032,11 @@ function _payOvRefreshAdminButton(cid) {
   btn.disabled = false; btn.style.opacity = '';
   btn.title = 'Open this customer’s admin report';
 }
-async function _payOvAwaitFbId(cid, timeoutMs) {
+async function _payOvAwaitFbId(cid, timeoutMs, loanId) {
   if (!cid) return null;
   const cached = _payOvFbIdByCid[cid];
   if (cached && cached !== '__loading__') return cached;
-  if (cached !== '__loading__') _payOvKickoffFbIdLookup(cid);
+  if (cached !== '__loading__') _payOvKickoffFbIdLookup(cid, loanId);
   const start = (typeof performance !== 'undefined' && performance.now)
     ? performance.now() : new Date().getTime();
   const limit = Number(timeoutMs) || 25000;
@@ -11046,23 +11050,33 @@ async function _payOvAwaitFbId(cid, timeoutMs) {
     await new Promise(res => setTimeout(res, 150));
   }
 }
-function payOvOpenAdmin() {
+async function payOvOpenAdmin() {
   if (!_payOvRow) return;
   const cid = String(_payOvRow.customer_id || '');
+  const loanId = String(_payOvRow.loan_id || '');
   if (!cid) { toast('No Vergent customer ID on this row', 'err'); return; }
-  closePaymentDetailModal();
-  // Prefer the application detail page (#fb=<fbId>) — that's the
-  // operator's full profile / report / application / debit card
-  // view. The background lookup kicked off when the modal opened
-  // is usually done by the time we get here. Fall back to the
-  // Customers page filtered by Vergent cid when we don't have a
-  // firebase_id (lookup miss, walk timeout, or a customer who
-  // never went through our application funnel).
-  const fbId = _payOvFbIdByCid[cid];
-  if (fbId && typeof fbId === 'string' && fbId !== '__loading__') {
-    location.hash = '#fb=' + encodeURIComponent(fbId);
-  } else {
-    _openCustomerInAdmin(cid);
+  // Open the application detail page (#fb=<fbId>) — the operator's
+  // full profile / report / application / debit card view. The
+  // background lookup was kicked off on modal-open; AWAIT it here
+  // (with a button loading state) instead of bailing the instant
+  // it isn't ready — that race was dumping the operator on the
+  // Customers page. On a genuine miss we toast; we never silently
+  // navigate somewhere unexpected.
+  const btn = document.getElementById('pay-ov-open-admin');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.style.opacity = '.7'; btn.innerHTML = 'Opening…'; }
+  try {
+    const fbId = await _payOvAwaitFbId(cid, 25000, loanId);
+    if (fbId) {
+      closePaymentDetailModal();
+      location.hash = '#fb=' + encodeURIComponent(fbId);
+    } else {
+      toast('No application found in our system for this customer.', 'err');
+    }
+  } catch (e) {
+    toast('Lookup failed: ' + ((e && e.message) || e), 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = orig; }
   }
 }
 async function payOvCreateLoan() {
@@ -12675,7 +12689,7 @@ async function _ensureModal14dActivity() {
 // '__loading__' = in flight, string = found, null = not found.
 const _lnsOvFbIdByCid = {};
 let _lnsOvFbIdLookupSeq = 0;
-async function _lnsOvKickoffFbIdLookup(cid) {
+async function _lnsOvKickoffFbIdLookup(cid, loanId) {
   if (!cid) return;
   if (_lnsOvFbIdByCid[cid] != null && _lnsOvFbIdByCid[cid] !== '__loading__') return;
   if (_lnsOvFbIdByCid[cid] === '__loading__') return;
@@ -12685,7 +12699,9 @@ async function _lnsOvKickoffFbIdLookup(cid) {
     const r = await fetch('/api/lookup-fbid-by-vergent-cid', {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cid: String(cid) }),
+      // loan_id lets the backend match by vergentLoan.hdrId /
+      // fundingQueue when the cid isn't on any report's vergentMatch.
+      body: JSON.stringify({ cid: String(cid), loan_id: String(loanId || '') }),
     });
     const d = await r.json().catch(() => ({}));
     _lnsOvFbIdByCid[cid] = (r.ok && d.firebase_id) ? d.firebase_id : null;
@@ -12713,13 +12729,13 @@ function _lnsOvRefreshAdminButton(cid) {
   btn.style.opacity = '';
   btn.title = 'Open this customer’s admin report';
 }
-async function _lnsOvAwaitFbId(cid, timeoutMs) {
+async function _lnsOvAwaitFbId(cid, timeoutMs, loanId) {
   // Used by the click handlers to await the in-flight lookup with a
   // visible button state. Returns string fbId or null.
   if (!cid) return null;
   const cached = _lnsOvFbIdByCid[cid];
   if (cached && cached !== '__loading__') return cached;
-  if (cached !== '__loading__') _lnsOvKickoffFbIdLookup(cid);
+  if (cached !== '__loading__') _lnsOvKickoffFbIdLookup(cid, loanId);
   const start = (typeof performance !== 'undefined' && performance.now)
     ? performance.now() : new Date().getTime();
   const limit = Number(timeoutMs) || 30000;
@@ -12773,40 +12789,31 @@ function lnsOvSchedulePayment() {
   const ov = document.getElementById('schp-ov');
   if (ov) ov.classList.add('open');
 }
-function lnsOvOpenAdmin() {
+async function lnsOvOpenAdmin() {
   if (!_lnsOvRow) return;
   const cid = String(_lnsOvRow.CustomerId || '');
+  const loanId = String(_lnsOvRow.HdrId || _lnsOvRow.LoanId || '');
   if (!cid) { toast('No Vergent customer ID on this row', 'err'); return; }
-  closeLoansDueDetailModal();
-  // Prefer the application detail page (#fb=<fbId>). Fall back to
-  // the Customers page when we don't have a firebase_id for this
-  // Vergent customer (lookup miss or customer never went through
-  // our application funnel).
-  const fbId = _lnsOvFbIdByCid[cid];
-  if (fbId && typeof fbId === 'string' && fbId !== '__loading__') {
-    location.hash = '#fb=' + encodeURIComponent(fbId);
-  } else {
-    _openCustomerInAdmin(cid);
+  // Open the application detail page (#fb=<fbId>). AWAIT the lookup
+  // (kicked off on modal-open) instead of bailing to the Customers
+  // page the instant it isn't ready. Toast on a genuine miss.
+  const btn = document.getElementById('lns-ov-open-admin');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.style.opacity = '.7'; btn.innerHTML = 'Opening…'; }
+  try {
+    const fbId = await _lnsOvAwaitFbId(cid, 25000, loanId);
+    if (fbId) {
+      closeLoansDueDetailModal();
+      location.hash = '#fb=' + encodeURIComponent(fbId);
+    } else {
+      toast('No application found in our system for this customer.', 'err');
+    }
+  } catch (e) {
+    toast('Lookup failed: ' + ((e && e.message) || e), 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = orig; }
   }
 }
-// Shared: take the operator to the Customers page filtered to this
-// Vergent customer. We pre-fill the search box BEFORE calling
-// setRoute so setCustTab's first-load auto-search picks up the cid,
-// then call doCustomerSearch explicitly so subsequent opens (when
-// _custPortalLoaded is already true) still refresh the result list.
-function _openCustomerInAdmin(cid) {
-  const input = document.getElementById('cust-portal-q');
-  if (input) input.value = cid;
-  if (typeof setRoute === 'function') {
-    setRoute('customers', 'portal');
-  } else {
-    location.hash = '#customers';
-  }
-  if (typeof doCustomerSearch === 'function') {
-    try { doCustomerSearch('portal'); } catch (e) { /* non-fatal */ }
-  }
-}
-
 // Shared renderer: lists ALL payment attempts for a given loan as a
 // compact table. Used by both the Loans Due "Recent Payment Activity"
 // section and the Payments page declined-row "Payment Activity"
@@ -12919,9 +12926,10 @@ function openLoansDueDetailModal(row) {
   }
   _lnsOvRefreshAdminButton(cid);
   // Kick off the firebase_id lookup so Open in Admin can navigate
-  // straight to the application detail page if we find a match
-  // (with fallback to the Customers page filtered by cid otherwise).
-  if (cid) _lnsOvKickoffFbIdLookup(cid);
+  // straight to the application detail page. Pass the loan id too
+  // so the backend can match by loan when the cid isn't on any
+  // report's vergentMatch.
+  if (cid) _lnsOvKickoffFbIdLookup(cid, String(row.HdrId || row.LoanId || ''));
   // Snapshot — balance, days late, due, next pay
   const snap = document.getElementById('lns-ov-snapshot');
   const daysLate = _pastDueComputedDaysLate(row);
