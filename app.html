@@ -2009,7 +2009,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
         <div id="pay-ov-payment" style="font-size:13.5px;color:var(--text);line-height:1.4">—</div>
       </div>
       <div style="background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
-        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Next Scheduled Payment</div>
+        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Scheduled Payments</div>
         <div id="pay-ov-next" style="font-size:13.5px;color:var(--text);line-height:1.4">Loading…</div>
       </div>
       <div>
@@ -10706,26 +10706,55 @@ async function _loadPayOvNextPayDate(row) {
       body: JSON.stringify({ hdr_id: String(row.loan_id) }),
     });
     const d = await r.json().catch(() => ({}));
-    const next = (d && d.next_card_payment)
-      || ((d.automatic_schedules || [])[0])
-      || ((d.manual_schedules || [])[0]);
-    if (!next) {
-      nextEl.innerHTML = '<span style="color:var(--muted)">No scheduled payment found.</span>';
+    // Merge automatic + manual schedules; tag each by its source so
+    // operators can see which were system-scheduled vs hand-entered.
+    // Both card AND ACH show up in these arrays — the `method` field
+    // tells us which (and `is_card` is the server-derived bool).
+    const auto = (d && d.automatic_schedules) || [];
+    const manual = (d && d.manual_schedules) || [];
+    const all = []
+      .concat(auto.map(s => ({...s, _type: 'auto'})))
+      .concat(manual.map(s => ({...s, _type: 'manual'})));
+    // Sort by date ascending (soonest first).
+    all.sort((a, b) => {
+      const ta = new Date(a.date || 0).getTime();
+      const tb = new Date(b.date || 0).getTime();
+      return (ta || 0) - (tb || 0);
+    });
+    if (!all.length) {
+      nextEl.innerHTML = '<span style="color:var(--muted)">No scheduled payments.</span>';
       return;
     }
-    let dateStr = next.date || '—';
-    try {
-      if (next.date) {
-        const dt = new Date(next.date);
-        if (!isNaN(dt)) dateStr = dt.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'});
-      }
-    } catch (e) {}
-    nextEl.innerHTML =
-      '<div style="display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline">'
-      + '<div><span style="color:var(--muted);font-size:11px">Date:</span> <b style="font-variant-numeric:tabular-nums">' + escapeHtml(dateStr) + '</b></div>'
-      + '<div><span style="color:var(--muted);font-size:11px">Amount:</span> <b style="font-variant-numeric:tabular-nums">$' + Number(next.amount || 0).toFixed(2) + '</b></div>'
-      + '<div><span style="color:var(--muted);font-size:11px">Method:</span> <b>' + escapeHtml(next.method || '—') + '</b></div>'
-      + '</div>';
+    const fmtDate = (s) => {
+      if (!s) return '—';
+      try { const dt = new Date(s); if (!isNaN(dt)) return dt.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'2-digit'}); } catch (e) {}
+      return s;
+    };
+    const methodPill = (s) => {
+      const isCard = s.is_card || /card|credit|debit|cc/i.test(s.method || '');
+      return isCard
+        ? '<span style="display:inline-block;font-size:10px;background:#e8f3f8;color:#1a4d6b;padding:1px 7px;border-radius:4px;font-weight:700">CARD</span>'
+        : '<span style="display:inline-block;font-size:10px;background:#fff5e6;color:#5a3300;padding:1px 7px;border-radius:4px;font-weight:700">ACH</span>';
+    };
+    const sourcePill = (s) => {
+      return s._type === 'auto'
+        ? '<span style="font-size:10px;color:var(--muted);font-weight:600">auto</span>'
+        : '<span style="font-size:10px;color:var(--muted);font-weight:600">manual</span>';
+    };
+    nextEl.innerHTML = '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:320px">'
+      + '<thead><tr style="text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">'
+      + '<th style="padding:4px 6px;font-weight:700">Date</th>'
+      + '<th style="padding:4px 6px;text-align:right;font-weight:700">Amount</th>'
+      + '<th style="padding:4px 6px;font-weight:700">Method</th>'
+      + '<th style="padding:4px 6px;font-weight:700"></th>'
+      + '</tr></thead><tbody>'
+      + all.map(s => '<tr style="border-top:1px solid var(--border)">'
+        + '<td style="padding:5px 6px;font-variant-numeric:tabular-nums;font-weight:700">' + escapeHtml(fmtDate(s.date)) + '</td>'
+        + '<td style="padding:5px 6px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700">$' + Number(s.amount || 0).toFixed(2) + '</td>'
+        + '<td style="padding:5px 6px">' + methodPill(s) + '</td>'
+        + '<td style="padding:5px 6px">' + sourcePill(s) + '</td>'
+        + '</tr>').join('')
+      + '</tbody></table></div>';
   } catch (e) {
     nextEl.innerHTML = '<span style="color:var(--red)">Couldn\'t load: ' + escapeHtml((e && e.message) || String(e)) + '</span>';
   }
