@@ -1087,6 +1087,37 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   .bktile-count{font-size:18px}
 }
 
+/* Loans Due — phone-optimised layout (≤640px). Two changes:
+   1) KPI strip → 2x2 grid so all four numbers are visible without
+      horizontal scroll (the hero "To collect" card spans both
+      columns on top).
+   2) Bucket cards → single horizontally-scrolling chip rail per
+      section (Upcoming / Past Due), each tile collapses to a
+      pill-shaped chip showing label + count (dollar amount hidden;
+      tappable to filter the table below). Goes from ~280px of
+      chrome before the loan list to ~50px. Desktop layout
+      unchanged. */
+@media(max-width:640px){
+  #rpt-stats{grid-template-columns:repeat(2,1fr) !important;gap:8px !important;margin-bottom:14px !important}
+  #rpt-stats .stat{padding:10px 12px}
+  #rpt-stats .stat-value{font-size:20px}
+  #rpt-stats .stat-hero{grid-column:span 2}
+  #rpt-stats .stat-hero .stat-value{font-size:24px}
+  #rpt-stats .stat-hero-sub{font-size:11px;margin-top:2px}
+  #rpt-buckets .rpt-bucket-section{margin-bottom:6px}
+  #rpt-buckets .rpt-bucket-section + .rpt-bucket-section{margin-top:0}
+  #rpt-buckets .rpt-bucket-head{margin-bottom:5px;gap:6px}
+  #rpt-buckets .rpt-bucket-title{font-size:10px;letter-spacing:.05em}
+  #rpt-buckets .rpt-bucket-head .chip{padding:4px 9px;font-size:11px;min-height:30px}
+  #rpt-buckets .rpt-bucket-cards{display:flex !important;grid-template-columns:none;overflow-x:auto;-webkit-overflow-scrolling:touch;gap:6px;padding-bottom:4px;scroll-snap-type:x proximity;scrollbar-width:none}
+  #rpt-buckets .rpt-bucket-cards::-webkit-scrollbar{display:none}
+  #rpt-buckets .bktile{flex:0 0 auto;padding:7px 14px 7px 14px;border-radius:999px;flex-direction:row;align-items:baseline;gap:7px;scroll-snap-align:start;min-width:0;box-shadow:none}
+  #rpt-buckets .bktile-band{width:3px;border-radius:3px}
+  #rpt-buckets .bktile-label{font-size:10.5px;padding-left:4px;letter-spacing:.04em}
+  #rpt-buckets .bktile-count{font-size:14px;padding-left:0;line-height:1}
+  #rpt-buckets .bktile-amt{display:none}
+}
+
 /* Custom-range modal (Loans Due tab) */
 #rng-modal{display:none;position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.5);align-items:center;justify-content:center;padding:20px}
 #rng-modal.open{display:flex}
