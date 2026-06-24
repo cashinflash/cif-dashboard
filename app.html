@@ -10755,7 +10755,10 @@ function openPaymentDetailModal(row) {
   const isFunding         = row.kind === 'funding';
   createBtn.style.display = isApprovedPayment ? 'inline-flex' : 'none';
   schedBtn.style.display  = isDeclined ? 'inline-flex' : 'none';
-  if (adminBtn)  adminBtn.style.display = 'none';   // wakes up after fbId lookup
+  // Open in Admin: always visible when we have a cid (the click
+  // handler does its own lookup + toast on miss). _payOvRefresh
+  // AdminButton handles the cid presence check.
+  _payOvRefreshAdminButton(String(cid || ''));
   if (npdWrap)   npdWrap.style.display = isDeclined ? '' : 'none';
   if (schedWrap) schedWrap.style.display = isDeclined ? '' : 'none';
   // "This Payment" -> "Payment Activity" on declined (the section now
@@ -11009,20 +11012,19 @@ async function _payOvKickoffFbIdLookup(cid) {
   }
 }
 function _payOvRefreshAdminButton(cid) {
+  // Open in Admin stays VISIBLE for every row that has a Vergent
+  // customer id. Operators want a consistent target, even if the
+  // background lookup is still in flight or failed — the click
+  // handler does its own fresh lookup with a clear toast if no
+  // admin record exists. Previously we hid the button on null which
+  // made it appear-then-disappear (the brief flash the operator
+  // reported on Payments rows).
   const btn = document.getElementById('pay-ov-open-admin');
   if (!btn) return;
-  const fbId = _payOvFbIdByCid[cid];
-  if (fbId && typeof fbId === 'string') {
-    btn.style.display = 'inline-flex';
-    btn.disabled = false; btn.style.opacity = '';
-    btn.title = 'Open this customer’s admin report';
-  } else if (fbId === null) {
-    btn.style.display = 'none';
-  } else {
-    btn.style.display = 'inline-flex';
-    btn.disabled = true; btn.style.opacity = '.6';
-    btn.title = 'Looking up admin record…';
-  }
+  if (!cid) { btn.style.display = 'none'; return; }
+  btn.style.display = 'inline-flex';
+  btn.disabled = false; btn.style.opacity = '';
+  btn.title = 'Open this customer’s admin report';
 }
 async function _payOvAwaitFbId(cid, timeoutMs) {
   if (!cid) return null;
@@ -12695,27 +12697,18 @@ async function _lnsOvKickoffFbIdLookup(cid) {
   }
 }
 function _lnsOvRefreshAdminButton(cid) {
-  // Open in Admin only makes sense when a Firebase report exists for
-  // the Vergent customer. Show + enable accordingly.
+  // Open in Admin stays VISIBLE for every row that has a Vergent
+  // customer id (consistency for the operator). The click handler
+  // does its own fresh lookup and toasts a clear error if no admin
+  // record exists — previously we hid the button on null which made
+  // it appear-then-disappear.
   const btn = document.getElementById('lns-ov-open-admin');
   if (!btn) return;
-  const fbId = _lnsOvFbIdByCid[cid];
-  if (fbId && typeof fbId === 'string') {
-    btn.style.display = 'inline-flex';
-    btn.disabled = false;
-    btn.style.opacity = '';
-    btn.title = 'Open this customer’s admin report';
-  } else if (fbId === null) {
-    // Lookup completed, no report found — hide button so it's not a
-    // dead end.
-    btn.style.display = 'none';
-  } else {
-    // '__loading__' or undefined — show but greyed until we know.
-    btn.style.display = 'inline-flex';
-    btn.disabled = true;
-    btn.style.opacity = '.6';
-    btn.title = 'Looking up admin record…';
-  }
+  if (!cid) { btn.style.display = 'none'; return; }
+  btn.style.display = 'inline-flex';
+  btn.disabled = false;
+  btn.style.opacity = '';
+  btn.title = 'Open this customer’s admin report';
 }
 async function _lnsOvAwaitFbId(cid, timeoutMs) {
   // Used by the click handlers to await the in-flight lookup with a
