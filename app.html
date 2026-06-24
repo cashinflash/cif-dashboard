@@ -1513,8 +1513,10 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
                 <div class="profile-status-sub" id="profile-status-sub">Loading customer profile</div>
               </div>
               <span id="profile-bank-badge" style="display:none;align-items:center;gap:5px;background:var(--green-50);color:var(--green-dark);border:1px solid var(--green-200);padding:6px 11px;border-radius:999px;font-size:11.5px;font-weight:700;letter-spacing:.02em;margin-right:6px"><svg class="icn" style="width:13px;height:13px"><use href="#i-bank"/></svg>Bank Connected</span>
+              <button id="profile-balance-btn" onclick="checkPlaidBalance(window._profileFbId)" style="display:none;align-items:center;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-right:6px">Check balance</button>
               <a class="btn btn-ghost" id="profile-vergent-link" href="#" target="_blank" rel="noopener" style="display:none"><svg class="icn"><use href="#i-external"/></svg>Open in Vergent</a>
             </div>
+            <div id="profile-balance-result" style="display:none;font-size:13px;margin:8px 0 0;padding:9px 12px;border-radius:8px;background:#f4f7f9;border:1px solid var(--border);line-height:1.5"></div>
 
             <!-- Contact + Identity cards -->
             <div class="sec-h">Customer Information</div>
@@ -4370,6 +4372,44 @@ function customerHistory(fbId) {
 }
 
 // ───────── Profile panel ─────────
+// ── Live Plaid balance check ($0.10/call) — Loans Due / profile modal ──
+// Operator clicks "Check balance" before running a card/ACH. Only billed
+// on click; cif-apply caches the reading so a re-open shows it free.
+function _fmtMoney(n){ if(n==null||isNaN(n)) return '—'; return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function renderBalanceResult(d){
+  const el=document.getElementById('profile-balance-result');
+  if(!el) return;
+  el.style.display='block';
+  if(!d || d.ok===false){
+    el.style.background='#fff5e6';el.style.borderColor='#f2d46c';el.style.color='#5a3300';
+    el.textContent=(d&&d.message)||'Live balance unavailable.';
+    return;
+  }
+  el.style.background='#e8f5ee';el.style.borderColor='#bfe3cd';el.style.color='#1a6b3c';
+  const when=d.checkedAt?new Date(d.checkedAt).toLocaleString():'';
+  const rows=(d.accounts||[]).map(function(ac){
+    const amt=(ac.available!=null?ac.available:ac.current);
+    const nm=(ac.name||'Account')+(ac.mask?(' ('+ac.mask+')'):'');
+    return '<div style="display:flex;justify-content:space-between;gap:12px"><span></span><span style="font-weight:700"></span></div>'
+      .replace('<span></span>','<span>'+nm+'</span>')
+      .replace('<span style="font-weight:700"></span>','<span style="font-weight:700">'+_fmtMoney(amt)+' avail</span>');
+  }).join('');
+  el.innerHTML='<div style="font-weight:700;margin-bottom:4px">Live balance'+(d.institution?(' · '+d.institution):'')+'</div>'
+    +(rows||'<div>No deposit accounts returned</div>')
+    +'<div style="font-size:11px;opacity:.8;margin-top:5px">checked '+when+'</div>';
+}
+function checkPlaidBalance(fbId){
+  if(!fbId) return;
+  const btn=document.getElementById('profile-balance-btn');
+  const el=document.getElementById('profile-balance-result');
+  if(btn){btn.disabled=true;btn.textContent='Checking…';}
+  if(el){el.style.display='block';el.style.background='#f4f7f9';el.style.borderColor='var(--border)';el.style.color='var(--muted)';el.textContent='Checking live balance…';}
+  fetch('/api/plaid-balance',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({firebase_id:fbId})})
+    .then(function(r){return r.json();})
+    .then(function(d){renderBalanceResult(d);})
+    .catch(function(e){renderBalanceResult({ok:false,message:'Request failed: '+e});})
+    .finally(function(){if(btn){btn.disabled=false;btn.textContent='Check balance';}});
+}
 function renderProfilePanel(fbId) {
   const a = apps.find(x => x.firebaseId === fbId);
   if (!a) return;
@@ -4388,9 +4428,20 @@ function renderProfilePanel(fbId) {
   // reconnect). Asset-token-only records aren't "live" (token refers to
   // a single static snapshot), so they don't qualify.
   const bankBadgeEl = document.getElementById('profile-bank-badge');
+  const hasActivePlaid = !!(a.plaidAccessToken || ad.plaidAccessToken);
   if (bankBadgeEl) {
-    const hasActivePlaid = !!(a.plaidAccessToken || ad.plaidAccessToken);
     bankBadgeEl.style.display = hasActivePlaid ? 'inline-flex' : 'none';
+  }
+  // Balance-check button: only for Plaid-connected customers. On reopen,
+  // show the cached reading (no re-bill); the button forces a fresh check.
+  window._profileFbId = fbId;
+  const balBtn = document.getElementById('profile-balance-btn');
+  const balRes = document.getElementById('profile-balance-result');
+  if (balBtn) balBtn.style.display = hasActivePlaid ? 'inline-flex' : 'none';
+  if (balRes) {
+    if (hasActivePlaid && a.plaidBalance && a.plaidBalance.ok) {
+      renderBalanceResult(a.plaidBalance);
+    } else { balRes.style.display = 'none'; balRes.innerHTML = ''; }
   }
   if (linkEl) linkEl.style.display = 'none';
 
