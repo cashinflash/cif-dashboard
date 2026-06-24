@@ -3711,13 +3711,15 @@ function buildDocsPanel(a) {
   if (a.govIdUrl || a.bankStatementUrl || a.paystubUrl || ad.bankStatementUrl || ad.driverLicenseUrl || ad.dlUrl || ad.idDocumentUrl || ad.paystubUrl || ad.assetReportUrl) {
     html += urlSection('Government ID', a.govIdUrl || ad.idDocumentUrl || ad.driverLicenseUrl || ad.dlUrl, '🪪', 'drivers_license');
     html += urlSection('Plaid Asset Report / Bank Statement', a.bankStatementUrl || ad.bankStatementUrl || ad.assetReportUrl, '🏦', 'bank_statement');
+    html += plaidPdfGenCard(a, ad, fbId);
     html += urlSection('Proof of Income / Pay Stubs', a.paystubUrl || ad.paystubUrl, '📑', 'pay_stub');
   } else if (a.govIdB64 || a.bankStatementB64 || a.paystubB64) {
     html += b64Section('Government ID', a.govIdB64, 'image/jpeg', '🪪');
     html += b64Section('Bank Statement', a.bankStatementB64, 'application/pdf', '🏦');
     html += b64Section('Pay Stubs', a.paystubB64, 'image/jpeg', '📑');
   } else {
-    html += `<div class="doc-preview-empty"><div class="doc-preview-empty-icn">⏳</div><div style="font-weight:700;color:var(--text2);margin-bottom:5px">No documents on file</div><div>Files may still be uploading. Refresh in a moment if just submitted.</div></div>`;
+    html += plaidPdfGenCard(a, ad, fbId) ||
+      `<div class="doc-preview-empty"><div class="doc-preview-empty-icn">⏳</div><div style="font-weight:700;color:var(--text2);margin-bottom:5px">No documents on file</div><div>Files may still be uploading. Refresh in a moment if just submitted.</div></div>`;
   }
 
   // Slot for the "Documents on File (Vergent)" panel. Populated async
@@ -4409,6 +4411,37 @@ function checkPlaidBalance(fbId){
     .then(function(d){renderBalanceResult(d);})
     .catch(function(e){renderBalanceResult({ok:false,message:'Request failed: '+e});})
     .finally(function(){if(btn){btn.disabled=false;btn.textContent='Check balance';}});
+}
+
+// ── On-demand Plaid asset-report PDF ($0.99) ──
+// The submit-time PDF is deferred for cost; this pulls it when an operator
+// actually wants it. Idempotent on the backend (no re-bill if already there).
+function plaidPdfGenCard(a, ad, fbId){
+  const hasTok = !!(a && (a.plaidAssetToken || (ad && ad.plaidAssetToken)));
+  const hasUrl = !!(a && (a.bankStatementUrl || (ad && (ad.bankStatementUrl || ad.assetReportUrl))));
+  if(!hasTok || hasUrl || !fbId) return '';
+  return '<div class="doc-preview-card" id="plaid-pdf-gen-'+fbId+'"><div class="doc-preview-head">'
+    +'<div class="doc-preview-title">🏦 Plaid Asset Report</div>'
+    +'<div class="doc-preview-actions"><button class="doc-preview-btn doc-preview-btn-primary" onclick="generatePlaidPdf(\''+fbId+'\',this)"><svg class="icn" style="width:12px;height:12px"><use href="#i-download"/></svg>Generate &amp; view PDF</button></div></div>'
+    +'<div class="doc-preview-frame"><div class="doc-preview-empty"><div class="doc-preview-empty-icn">📄</div>PDF deferred to save cost — click to pull it now ($0.99).</div></div></div>';
+}
+function generatePlaidPdf(fbId, btn){
+  if(!fbId) return;
+  if(btn){btn.disabled=true;btn.textContent='Generating…';}
+  fetch('/api/generate-plaid-pdf',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({firebase_id:fbId})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d && d.ok && d.bankStatementUrl){
+        const a=apps.find(function(x){return x.firebaseId===fbId;});
+        if(a) a.bankStatementUrl=d.bankStatementUrl;
+        const grid=document.getElementById('dv-docs-grid');
+        if(a && grid) grid.innerHTML=buildDocsPanel(a);
+      } else {
+        if(btn){btn.disabled=false;btn.textContent='Generate & view PDF';}
+        alert((d&&d.message)||'Could not generate the PDF.');
+      }
+    })
+    .catch(function(e){ if(btn){btn.disabled=false;btn.textContent='Generate & view PDF';} alert('Request failed: '+e); });
 }
 function renderProfilePanel(fbId) {
   const a = apps.find(x => x.firebaseId === fbId);
