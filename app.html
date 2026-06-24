@@ -2061,6 +2061,44 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   </div>
 </div>
 
+<!-- LOANS DUE — customer detail modal. Opens when a row in the
+     Servicing / Loans Due page is tapped. Mirrors the Payments page
+     modal: name + Vergent link, today's payment activity (decline
+     reason if applicable), scheduled payments, loan history with
+     days-late column. Mobile-first via .appr-ov. -->
+<div class="appr-ov" id="lns-ov">
+  <div class="appr-card" style="max-width:540px">
+    <div class="appr-head">
+      <div style="min-width:0">
+        <div class="appr-title" id="lns-ov-name" style="font-size:16px;line-height:1.25;word-break:break-word">—</div>
+        <div class="appr-meta" id="lns-ov-meta" style="font-variant-numeric:tabular-nums">—</div>
+      </div>
+      <button onclick="closeLoansDueDetailModal()" style="background:transparent;border:none;font-size:24px;cursor:pointer;color:var(--muted);line-height:1;padding:4px 8px;min-width:36px;min-height:36px;border-radius:6px" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <div class="appr-body" style="max-height:calc(96vh - 130px);overflow-y:auto;padding:14px 16px;-webkit-overflow-scrolling:touch">
+      <div id="lns-ov-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+        <a id="lns-ov-vergent" href="#" target="_blank" rel="noopener" style="flex:1 1 140px;text-align:center;text-decoration:none;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Open in Vergent</a>
+      </div>
+      <div style="background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
+        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Loan Snapshot</div>
+        <div id="lns-ov-snapshot" style="font-size:13.5px;color:var(--text);line-height:1.5">—</div>
+      </div>
+      <div style="background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
+        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Today's Payment Activity</div>
+        <div id="lns-ov-today" style="font-size:13.5px;color:var(--text);line-height:1.4">—</div>
+      </div>
+      <div style="background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
+        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Scheduled Payments</div>
+        <div id="lns-ov-sched" style="font-size:13.5px;color:var(--text);line-height:1.4">Loading…</div>
+      </div>
+      <div>
+        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Loan History</div>
+        <div id="lns-ov-loans" style="font-size:12.5px;color:var(--text);overflow-x:auto;-webkit-overflow-scrolling:touch">Loading…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- FUNDING STATUS — mirrors Vergent's Loan Funding Queue (loans
      created but not yet funded) without opening Vergent. Built from
      /fundingQueue (every loan we originate, written by cif-apply's
@@ -12333,9 +12371,18 @@ function _loansDueRowHtml(r) {
   else if (daysLate >= 8) rowSev = 'lns-sev-8';
   else if (daysLate >= 2) rowSev = 'lns-sev-2';
   else if (daysLate >= 1) rowSev = 'lns-sev-1';
-  return `<tr class="lns-row${rowSev ? ' ' + rowSev : ''}">
+  // Whole row opens the customer detail modal. Per-row buttons keep
+  // event.stopPropagation() so they don't bubble. Inline loan-history
+  // hover icon is removed — history lives in the modal now (per
+  // operator request to consolidate scattered icons).
+  // Serialize the row through window._lnsRowCache to avoid HTML-attr
+  // escaping pain on the big nested object.
+  window._lnsRowCache = window._lnsRowCache || {};
+  const _rowKey = (cid || '') + '|' + (hdrId || '') + '|' + (r.LoanId || '');
+  window._lnsRowCache[_rowKey] = r;
+  return `<tr class="lns-row${rowSev ? ' ' + rowSev : ''}" style="cursor:pointer" onclick="openLoansDueDetailModal(window._lnsRowCache['${_rowKey}'])" title="Tap to view customer details">
     <td class="tbl-checkbox"><button class="appt-add-btn" title="Create appointment" data-cid="${escapeHtml(cid)}" data-hdr="${escapeHtml(hdrId)}" data-name="${escapeHtml(name)}" onclick="event.stopPropagation();openApptModalFromBtn(this)">+ Appt</button></td>
-    <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" onclick="event.stopPropagation()">${escapeHtml(name)}</a><span class="lns-hist-icn" data-cid="${escapeHtml(cid)}" data-name="${escapeHtml(name)}" onmouseenter="_loanHistShow(this)" onmouseleave="_loanHistHide()" onclick="event.stopPropagation();_loanHistToggle(this)" title="Loan history" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;color:var(--muted);cursor:pointer;margin-left:6px;vertical-align:middle"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><polyline points="3 4 3 9 8 9"/><path d="M12 7v5l3 2"/></svg></span><span class="lns-card-icn" data-hdr="${escapeHtml(hdrId)}" style="display:none"></span>${apptBadge}</div></td>
+    <td><div class="applicant-name"><span style="color:var(--text);font-weight:700">${escapeHtml(name)}</span><span class="lns-card-icn" data-hdr="${escapeHtml(hdrId)}" style="display:none"></span>${apptBadge}</div></td>
     <td><div class="app-info"><span class="app-type">${escapeHtml(r.LoanId || '—')}</span><span class="app-meta">${escapeHtml(r.LoanStatus || '')}${r.LoanSubStatus ? ' · ' + escapeHtml(r.LoanSubStatus) : ''}</span></div></td>
     <td>${daysCellHtml}</td>
     <td><span class="tbl-time" style="font-variant-numeric:tabular-nums">${_rptFmtMoney(r.Balance)}</span></td>
@@ -12343,6 +12390,222 @@ function _loansDueRowHtml(r) {
     <td><span class="tbl-time">${_rptFmtDate(r.NextPayDate)}</span></td>
     <td>${phoneHtml}</td>
   </tr>`;
+}
+
+// ── Loans Due page customer detail modal ───────────────────────────
+// Mirrors the Payments page modal pattern. Opens on row tap.
+// Surfaces: today's payment activity (so a decline today is visible
+// without leaving the page), scheduled payments, loan history with
+// the days-late column.
+let _lnsOvRow = null;
+
+function openLoansDueDetailModal(row) {
+  if (!row) return;
+  _lnsOvRow = row;
+  const ov = document.getElementById('lns-ov');
+  if (!ov) return;
+  ov.classList.add('open');
+  const name = ((row.FirstName || '') + ' ' + (row.LastName || '')).trim() || '—';
+  const cid = String(row.CustomerId || '');
+  const loanIdDisplay = row.LoanId || row.HdrId || '—';
+  document.getElementById('lns-ov-name').textContent = name;
+  document.getElementById('lns-ov-meta').textContent =
+    'Vergent ID: ' + (cid || '—') + '  ·  Loan ' + loanIdDisplay;
+  const vlink = cid
+    ? 'https://shared.lms.vergentlms.com/customer/general?action=view&id=' + encodeURIComponent(cid)
+    : '#';
+  const vBtn = document.getElementById('lns-ov-vergent');
+  vBtn.href = vlink;
+  vBtn.style.display = cid ? 'inline-flex' : 'none';
+  // Snapshot — balance, days late, due, next pay
+  const snap = document.getElementById('lns-ov-snapshot');
+  const daysLate = _pastDueComputedDaysLate(row);
+  let dlText;
+  if (daysLate >= 31)     dlText = '<span style="color:var(--red);font-weight:700">' + daysLate + 'd late</span>';
+  else if (daysLate >= 1) dlText = '<span style="color:var(--amber-700);font-weight:700">' + daysLate + 'd late</span>';
+  else if (daysLate === 0) dlText = '<span style="color:#b45309;font-weight:700">Due today</span>';
+  else                     dlText = '<span style="color:var(--green-dark);font-weight:700">in ' + Math.abs(daysLate) + 'd</span>';
+  snap.innerHTML =
+    '<div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline">'
+    + '<div><span style="color:var(--muted);font-size:11px">Balance:</span> <b style="font-variant-numeric:tabular-nums">' + escapeHtml(_rptFmtMoney(row.Balance)) + '</b></div>'
+    + '<div><span style="color:var(--muted);font-size:11px">Amount due:</span> <b style="font-variant-numeric:tabular-nums">' + escapeHtml(_rptFmtMoney(row.AmountDue)) + '</b></div>'
+    + '<div><span style="color:var(--muted);font-size:11px">Due:</span> <b>' + escapeHtml(_rptFmtDate(row.DueDate)) + '</b></div>'
+    + '<div><span style="color:var(--muted);font-size:11px">Next pay:</span> <b>' + escapeHtml(_rptFmtDate(row.NextPayDate)) + '</b></div>'
+    + '<div>' + dlText + '</div>'
+    + '</div>';
+  // Today's activity — scan the Payments cache if populated. No fetch
+  // — that's a heavy call. If operator hasn't visited Payments yet,
+  // they see a hint to do so.
+  _renderLnsOvToday(row);
+  // Async loads in parallel.
+  _loadLnsOvScheduled(row);
+  _loadLnsOvLoanHistory(row);
+}
+
+function closeLoansDueDetailModal() {
+  const ov = document.getElementById('lns-ov');
+  if (ov) ov.classList.remove('open');
+  _lnsOvRow = null;
+}
+
+function _renderLnsOvToday(row) {
+  const el = document.getElementById('lns-ov-today');
+  if (!el) return;
+  const cid = String(row.CustomerId || '');
+  const hdrId = String(row.HdrId || row.LoanId || '');
+  // Scan window._payCache (populated when operator visits Payments).
+  if (!_payCache || !_payCache.rows) {
+    el.innerHTML = '<span style="color:var(--muted)">Visit the Payments page once today to load activity here.</span>';
+    return;
+  }
+  // Filter to today's rows for this customer/loan.
+  const today = new Date();
+  const isSameDay = (d) => {
+    try { const x = new Date(d); return !isNaN(x) && x.toDateString() === today.toDateString(); } catch (e) { return false; }
+  };
+  const matches = _payCache.rows.filter(r => {
+    if (!isSameDay(r.real_date)) return false;
+    if (cid && r.customer_id && String(r.customer_id) === cid) return true;
+    if (hdrId && r.loan_id && String(r.loan_id).endsWith(hdrId)) return true;
+    return false;
+  });
+  if (!matches.length) {
+    el.innerHTML = '<span style="color:var(--muted)">No payment activity today.</span>';
+    return;
+  }
+  const fmtTime = (d) => {
+    try { const x = new Date(d); return !isNaN(x) ? x.toLocaleTimeString(undefined, {hour:'numeric',minute:'2-digit'}) : '—'; } catch (e) { return '—'; }
+  };
+  el.innerHTML = matches.map(r => {
+    const isDeclined = r.status === 'declined';
+    const isFunding = r.kind === 'funding';
+    const statusLabel = isFunding ? 'FUNDED'
+                        : isDeclined ? 'DECLINED'
+                        : (String(r.status || '?').toUpperCase());
+    const pillBg = isDeclined ? '#fee2e2' : isFunding ? '#dbeafe' : '#dcfce7';
+    const pillFg = isDeclined ? '#b91c1c' : isFunding ? '#1d4ed8' : '#15803d';
+    const reasonLine = r.decline_reason
+      ? '<div style="font-size:11.5px;color:var(--red);font-weight:600;margin-top:3px;line-height:1.35">' + escapeHtml(r.decline_reason) + '</div>'
+      : '';
+    return '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;padding:5px 0">'
+      + '<span style="display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;background:' + pillBg + ';color:' + pillFg + ';font-size:11px;font-weight:700;letter-spacing:.04em">' + statusLabel + '</span>'
+      + '<b style="font-variant-numeric:tabular-nums">$' + Number(r.amount || 0).toFixed(2) + '</b>'
+      + '<span style="color:var(--muted);font-size:12px">at ' + escapeHtml(fmtTime(r.real_date)) + '</span>'
+      + reasonLine
+      + '</div>';
+  }).join('');
+}
+
+async function _loadLnsOvScheduled(row) {
+  const el = document.getElementById('lns-ov-sched');
+  if (!el) return;
+  const hdrId = String(row.HdrId || row.LoanId || '');
+  if (!hdrId) { el.textContent = 'No loan ID'; return; }
+  el.textContent = 'Loading…';
+  try {
+    const r = await fetch('/api/vergent-scheduled-payments', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hdr_id: hdrId }),
+    });
+    const d = await r.json().catch(() => ({}));
+    const auto = (d && d.automatic_schedules) || [];
+    const manual = (d && d.manual_schedules) || [];
+    const all = []
+      .concat(auto.map(s => ({...s, _type: 'auto'})))
+      .concat(manual.map(s => ({...s, _type: 'manual'})));
+    all.sort((a, b) => (new Date(a.date || 0).getTime() || 0) - (new Date(b.date || 0).getTime() || 0));
+    if (!all.length) {
+      el.innerHTML = '<span style="color:var(--muted)">No scheduled payments.</span>';
+      return;
+    }
+    const fmtDate = (s) => {
+      if (!s) return '—';
+      try { const dt = new Date(s); if (!isNaN(dt)) return dt.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'2-digit'}); } catch (e) {}
+      return s;
+    };
+    const methodPill = (s) => {
+      const isCard = s.is_card || /card|credit|debit|cc/i.test(s.method || '');
+      return isCard
+        ? '<span style="display:inline-block;font-size:10px;background:#e8f3f8;color:#1a4d6b;padding:1px 7px;border-radius:4px;font-weight:700">CARD</span>'
+        : '<span style="display:inline-block;font-size:10px;background:#fff5e6;color:#5a3300;padding:1px 7px;border-radius:4px;font-weight:700">ACH</span>';
+    };
+    el.innerHTML = '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:320px">'
+      + '<thead><tr style="text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">'
+      + '<th style="padding:4px 6px;font-weight:700">Date</th>'
+      + '<th style="padding:4px 6px;text-align:right;font-weight:700">Amount</th>'
+      + '<th style="padding:4px 6px;font-weight:700">Method</th>'
+      + '<th style="padding:4px 6px;font-weight:700"></th>'
+      + '</tr></thead><tbody>'
+      + all.map(s => '<tr style="border-top:1px solid var(--border)">'
+        + '<td style="padding:5px 6px;font-variant-numeric:tabular-nums;font-weight:700">' + escapeHtml(fmtDate(s.date)) + '</td>'
+        + '<td style="padding:5px 6px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700">$' + Number(s.amount || 0).toFixed(2) + '</td>'
+        + '<td style="padding:5px 6px">' + methodPill(s) + '</td>'
+        + '<td style="padding:5px 6px"><span style="font-size:10px;color:var(--muted);font-weight:600">' + escapeHtml(s._type || '') + '</span></td>'
+        + '</tr>').join('')
+      + '</tbody></table></div>';
+  } catch (e) {
+    el.innerHTML = '<span style="color:var(--red)">Couldn\'t load: ' + escapeHtml((e && e.message) || String(e)) + '</span>';
+  }
+}
+
+async function _loadLnsOvLoanHistory(row) {
+  const el = document.getElementById('lns-ov-loans');
+  if (!el) return;
+  const cid = String(row.CustomerId || '');
+  if (!cid) { el.textContent = 'No customer ID'; return; }
+  el.textContent = 'Loading…';
+  try {
+    const r = await fetch('/api/vergent-loans', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customer_id: cid }),
+    });
+    const d = await r.json().catch(() => ({}));
+    const loans = (d && d.loans) || [];
+    if (!loans.length) { el.innerHTML = '<span style="color:var(--muted)">No prior loans.</span>'; return; }
+    const fmtDate = (s) => {
+      if (!s) return '—';
+      try { const dt = new Date(s); if (!isNaN(dt)) return dt.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'2-digit'}); } catch (e) {}
+      return s;
+    };
+    const lateCell = (ln) => {
+      const dlRaw  = (ln.days_late_label && String(ln.days_late_label).trim()) || '';
+      const dlRawL = dlRaw.toLowerCase();
+      const dlIsZeroLabel = dlRawL === 'not late' || dlRawL === 'current' || dlRawL === 'ok' || dlRaw === '0' || dlRaw === '—';
+      const dlFromLabel = !dlIsZeroLabel && dlRaw ? (parseInt((dlRaw.match(/-?\d+/) || ['0'])[0], 10) || 0) : 0;
+      const dlCur  = Math.max(Number(ln.days_late) || 0, dlFromLabel);
+      const dlMax  = Number(ln.max_days_late) || 0;
+      const dl     = Math.max(dlCur, dlMax);
+      const isHistorical = dl > 0 && (Number(ln.days_late) || 0) === 0 && dlFromLabel === 0;
+      let txt, color;
+      if (dl >= 31)     { txt = dl + 'd'; color = 'var(--red)'; }
+      else if (dl >= 1) { txt = dl + 'd'; color = 'var(--amber-700)'; }
+      else              { txt = 'On time'; color = 'var(--green-dark)'; }
+      const tag = isHistorical ? ' <span style="color:var(--muted);font-weight:600;font-size:10px">prior</span>' : '';
+      return '<span style="color:' + color + ';font-weight:700">' + escapeHtml(txt) + '</span>' + tag;
+    };
+    el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:440px">'
+      + '<thead><tr style="text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em">'
+      + '<th style="padding:5px 6px;font-weight:700">Loan #</th>'
+      + '<th style="padding:5px 6px;font-weight:700">Date</th>'
+      + '<th style="padding:5px 6px;text-align:right;font-weight:700">Amount</th>'
+      + '<th style="padding:5px 6px;text-align:right;font-weight:700">Balance</th>'
+      + '<th style="padding:5px 6px;font-weight:700">Status</th>'
+      + '<th style="padding:5px 6px;font-weight:700">Late</th>'
+      + '</tr></thead><tbody>'
+      + loans.map(ln => '<tr style="border-top:1px solid var(--border)">'
+        + '<td style="padding:6px;font-variant-numeric:tabular-nums">' + escapeHtml(ln.loan_number || ln.loan_id || '—') + '</td>'
+        + '<td style="padding:6px;font-variant-numeric:tabular-nums">' + escapeHtml(fmtDate(ln.date)) + '</td>'
+        + '<td style="padding:6px;text-align:right;font-variant-numeric:tabular-nums">$' + Number(ln.amount || 0).toFixed(0) + '</td>'
+        + '<td style="padding:6px;text-align:right;font-variant-numeric:tabular-nums;color:' + (Number(ln.balance || 0) > 0 ? 'var(--text)' : 'var(--muted)') + '">$' + Number(ln.balance || 0).toFixed(0) + '</td>'
+        + '<td style="padding:6px">' + escapeHtml(ln.status || '—') + '</td>'
+        + '<td style="padding:6px;white-space:nowrap">' + lateCell(ln) + '</td>'
+        + '</tr>').join('')
+      + '</tbody></table>';
+  } catch (e) {
+    el.innerHTML = '<span style="color:var(--red)">Couldn\'t load: ' + escapeHtml((e && e.message) || String(e)) + '</span>';
+  }
 }
 
 // Loans Due view — alias so setReportTab's two-tab dispatch reads cleanly.
