@@ -10755,9 +10755,9 @@ function openPaymentDetailModal(row) {
   const isFunding         = row.kind === 'funding';
   createBtn.style.display = isApprovedPayment ? 'inline-flex' : 'none';
   schedBtn.style.display  = isDeclined ? 'inline-flex' : 'none';
-  // Open in Admin: always visible when we have a cid (the click
-  // handler does its own lookup + toast on miss). _payOvRefresh
-  // AdminButton handles the cid presence check.
+  // Open in Admin: always visible when we have a cid. The click
+  // handler navigates straight to the Customers page filtered to
+  // this Vergent id — no firebase_id lookup needed.
   _payOvRefreshAdminButton(String(cid || ''));
   if (npdWrap)   npdWrap.style.display = isDeclined ? '' : 'none';
   if (schedWrap) schedWrap.style.display = isDeclined ? '' : 'none';
@@ -10778,9 +10778,12 @@ function openPaymentDetailModal(row) {
     document.getElementById('pay-ov-payment').textContent =
       amtStr + '  ·  ' + statusStr + '  ·  ' + when + declineStr;
   }
-  // Kick off fbId lookup so the Open in Admin button (and the Create
-  // New Loan handler) can resolve instantly when the operator clicks.
-  if (cid) _payOvKickoffFbIdLookup(String(cid));
+  // Kick off the firebase_id lookup ONLY when Create New Loan is
+  // showing — that handler needs the fbId stamped on body.dataset
+  // before calling openCreateLoanModal(). Open in Admin no longer
+  // depends on the lookup (it navigates to the Customers page
+  // filtered by the Vergent cid instead).
+  if (cid && isApprovedPayment) _payOvKickoffFbIdLookup(String(cid));
   // Async loads: scheduled payments (declined only) + next-pay-date
   // proxy (declined only) + loan history (always).
   if (isDeclined) {
@@ -11044,23 +11047,12 @@ async function _payOvAwaitFbId(cid, timeoutMs) {
     await new Promise(res => setTimeout(res, 150));
   }
 }
-async function payOvOpenAdmin() {
+function payOvOpenAdmin() {
   if (!_payOvRow) return;
   const cid = String(_payOvRow.customer_id || '');
   if (!cid) { toast('No Vergent customer ID on this row', 'err'); return; }
-  const btn = document.getElementById('pay-ov-open-admin');
-  const orig = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.style.opacity = '.7'; btn.innerHTML = 'Looking up…'; }
-  try {
-    const fbId = await _payOvAwaitFbId(cid, 25000);
-    if (!fbId) { toast('No admin record found for this Vergent customer.', 'err'); return; }
-    closePaymentDetailModal();
-    location.hash = '#fb=' + encodeURIComponent(fbId);
-  } catch (e) {
-    toast('Lookup failed: ' + ((e && e.message) || e), 'err');
-  } finally {
-    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = orig; }
-  }
+  closePaymentDetailModal();
+  _openCustomerInAdmin(cid);
 }
 async function payOvCreateLoan() {
   if (!_payOvRow) return;
@@ -12770,26 +12762,28 @@ function lnsOvSchedulePayment() {
   const ov = document.getElementById('schp-ov');
   if (ov) ov.classList.add('open');
 }
-async function lnsOvOpenAdmin() {
+function lnsOvOpenAdmin() {
   if (!_lnsOvRow) return;
   const cid = String(_lnsOvRow.CustomerId || '');
   if (!cid) { toast('No Vergent customer ID on this row', 'err'); return; }
-  const btn = document.getElementById('lns-ov-open-admin');
-  const orig = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.style.opacity = '.7'; btn.innerHTML = 'Looking up…'; }
-  try {
-    const fbId = await _lnsOvAwaitFbId(cid, 25000);
-    if (!fbId) {
-      toast('No admin record found for this Vergent customer.', 'err');
-      return;
-    }
-    closeLoansDueDetailModal();
-    // Same hash format the queue rows use (router lives at line ~3044).
-    location.hash = '#fb=' + encodeURIComponent(fbId);
-  } catch (e) {
-    toast('Lookup failed: ' + ((e && e.message) || e), 'err');
-  } finally {
-    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = orig; }
+  closeLoansDueDetailModal();
+  _openCustomerInAdmin(cid);
+}
+// Shared: take the operator to the Customers page filtered to this
+// Vergent customer. We pre-fill the search box BEFORE calling
+// setRoute so setCustTab's first-load auto-search picks up the cid,
+// then call doCustomerSearch explicitly so subsequent opens (when
+// _custPortalLoaded is already true) still refresh the result list.
+function _openCustomerInAdmin(cid) {
+  const input = document.getElementById('cust-portal-q');
+  if (input) input.value = cid;
+  if (typeof setRoute === 'function') {
+    setRoute('customers', 'portal');
+  } else {
+    location.hash = '#customers';
+  }
+  if (typeof doCustomerSearch === 'function') {
+    try { doCustomerSearch('portal'); } catch (e) { /* non-fatal */ }
   }
 }
 
@@ -12904,7 +12898,9 @@ function openLoansDueDetailModal(row) {
     schBtn.disabled = false; schBtn.style.opacity = '';
   }
   _lnsOvRefreshAdminButton(cid);
-  if (cid) _lnsOvKickoffFbIdLookup(cid);
+  // Loans Due modal no longer needs the firebase_id lookup — Open
+  // in Admin navigates to the Customers page filtered by Vergent
+  // cid, and Schedule Payment uses _lnsOvRow directly.
   // Snapshot — balance, days late, due, next pay
   const snap = document.getElementById('lns-ov-snapshot');
   const daysLate = _pastDueComputedDaysLate(row);
