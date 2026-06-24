@@ -2032,14 +2032,19 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     <div class="appr-body" style="max-height:calc(96vh - 130px);overflow-y:auto;padding:14px 16px;-webkit-overflow-scrolling:touch">
       <div id="pay-ov-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
         <a id="pay-ov-vergent" href="#" target="_blank" rel="noopener" style="flex:1 1 140px;text-align:center;text-decoration:none;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Open in Vergent</a>
+        <button id="pay-ov-open-admin" type="button" onclick="payOvOpenAdmin()" style="flex:1 1 140px;display:none;background:#f1f5f9;color:#334155;border:1px solid #94a3b8;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>Open in Admin</button>
         <button id="pay-ov-create-loan" type="button" onclick="payOvCreateLoan()" style="flex:1 1 140px;display:none;background:#e8f5ee;color:#1a6b3c;border:1px solid #6cc294;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Create New Loan</button>
         <button id="pay-ov-schedule" type="button" onclick="payOvSchedulePayment()" style="flex:1 1 140px;display:none;background:#fff5e6;color:#5a3300;border:1px solid #f0b27a;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Schedule Payment</button>
       </div>
-      <div style="background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
-        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">This Payment</div>
+      <div id="pay-ov-npd-wrap" style="display:none;background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
+        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Customer's Next Pay Date</div>
+        <div id="pay-ov-npd" style="font-size:13.5px;color:var(--text);line-height:1.4">—</div>
+      </div>
+      <div id="pay-ov-payment-wrap" style="background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
+        <div id="pay-ov-payment-label" style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">This Payment</div>
         <div id="pay-ov-payment" style="font-size:13.5px;color:var(--text);line-height:1.4">—</div>
       </div>
-      <div style="background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
+      <div id="pay-ov-sched-wrap" style="background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
         <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Scheduled Payments</div>
         <div id="pay-ov-next" style="font-size:13.5px;color:var(--text);line-height:1.4">Loading…</div>
       </div>
@@ -2110,7 +2115,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       <div id="lns-ov-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
         <a id="lns-ov-vergent" href="#" target="_blank" rel="noopener" style="flex:1 1 140px;text-align:center;text-decoration:none;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Open in Vergent</a>
         <button id="lns-ov-open-admin" type="button" onclick="lnsOvOpenAdmin()" style="flex:1 1 140px;display:none;background:#f1f5f9;color:#334155;border:1px solid #94a3b8;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>Open in Admin</button>
-        <button id="lns-ov-create-loan" type="button" onclick="lnsOvCreateLoan()" style="flex:1 1 140px;display:none;background:#e8f5ee;color:#1a6b3c;border:1px solid #6cc294;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Create New Loan</button>
+        <button id="lns-ov-schedule" type="button" onclick="lnsOvSchedulePayment()" style="flex:1 1 140px;display:none;background:#fff5e6;color:#5a3300;border:1px solid #f0b27a;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Schedule Payment</button>
       </div>
       <div style="background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
         <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Loan Snapshot</div>
@@ -10738,24 +10743,47 @@ function openPaymentDetailModal(row) {
   const vergentBtn = document.getElementById('pay-ov-vergent');
   vergentBtn.href = vlink;
   vergentBtn.style.display = cid ? '' : 'none';
-  // Show action buttons conditionally on row state.
-  const createBtn = document.getElementById('pay-ov-create-loan');
-  const schedBtn  = document.getElementById('pay-ov-schedule');
+  // Per-status action button + section visibility.
+  const createBtn   = document.getElementById('pay-ov-create-loan');
+  const schedBtn    = document.getElementById('pay-ov-schedule');
+  const adminBtn    = document.getElementById('pay-ov-open-admin');
+  const npdWrap     = document.getElementById('pay-ov-npd-wrap');
+  const schedWrap   = document.getElementById('pay-ov-sched-wrap');
+  const payLabel    = document.getElementById('pay-ov-payment-label');
   const isApprovedPayment = row.status === 'approved' && row.kind === 'payment';
-  const isDeclined = row.status === 'declined';
+  const isDeclined        = row.status === 'declined';
+  const isFunding         = row.kind === 'funding';
   createBtn.style.display = isApprovedPayment ? 'inline-flex' : 'none';
   schedBtn.style.display  = isDeclined ? 'inline-flex' : 'none';
-  // Payment summary line.
-  const amtStr = '$' + Number(row.amount || 0).toFixed(2);
-  const statusStr = (row.kind === 'funding' ? 'FUNDED'
-                     : String(row.status || '?').toUpperCase());
-  const declineStr = row.decline_reason ? '  ·  ' + row.decline_reason : '';
-  let when = '—';
-  try { when = row.real_date ? new Date(row.real_date).toLocaleString(undefined, {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '—'; } catch (e) {}
-  document.getElementById('pay-ov-payment').textContent =
-    amtStr + '  ·  ' + statusStr + '  ·  ' + when + declineStr;
-  // Async loads in parallel.
-  _loadPayOvNextPayDate(row);
+  if (adminBtn)  adminBtn.style.display = 'none';   // wakes up after fbId lookup
+  if (npdWrap)   npdWrap.style.display = isDeclined ? '' : 'none';
+  if (schedWrap) schedWrap.style.display = isDeclined ? '' : 'none';
+  // "This Payment" -> "Payment Activity" on declined (the section now
+  // shows the full attempt history for this loan, so the singular
+  // label was misleading).
+  if (payLabel) payLabel.textContent = isDeclined ? 'Payment Activity' : 'This Payment';
+  // Body: single line for approved/funded; full-loan attempt table
+  // for declined.
+  if (isDeclined) {
+    _renderPayOvActivityForLoan(row);
+  } else {
+    const amtStr = '$' + Number(row.amount || 0).toFixed(2);
+    const statusStr = (isFunding ? 'FUNDED' : String(row.status || '?').toUpperCase());
+    const declineStr = row.decline_reason ? '  ·  ' + row.decline_reason : '';
+    let when = '—';
+    try { when = row.real_date ? new Date(row.real_date).toLocaleString(undefined, {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '—'; } catch (e) {}
+    document.getElementById('pay-ov-payment').textContent =
+      amtStr + '  ·  ' + statusStr + '  ·  ' + when + declineStr;
+  }
+  // Kick off fbId lookup so the Open in Admin button (and the Create
+  // New Loan handler) can resolve instantly when the operator clicks.
+  if (cid) _payOvKickoffFbIdLookup(String(cid));
+  // Async loads: scheduled payments (declined only) + next-pay-date
+  // proxy (declined only) + loan history (always).
+  if (isDeclined) {
+    _loadPayOvNextPayDate(row);
+    _loadPayOvCustomerNextPayDate(row);
+  }
   _loadPayOvLoanHistory(row);
 }
 
@@ -10763,6 +10791,56 @@ function closePaymentDetailModal() {
   const ov = document.getElementById('pay-ov');
   if (ov) ov.classList.remove('open');
   _payOvRow = null;
+}
+
+async function _renderPayOvActivityForLoan(row) {
+  const el = document.getElementById('pay-ov-payment');
+  if (!el) return;
+  const hdrId = String(row.loan_id || '');
+  const cid   = String(row.customer_id || '');
+  el.innerHTML = '<span style="color:var(--muted)">Loading payment attempts…</span>';
+  const rows = await _ensureModal14dActivity();
+  // Guard against modal close / row swap mid-fetch.
+  if (!_payOvRow || String(_payOvRow.loan_id || '') !== hdrId) return;
+  _renderPaymentAttemptsTable(el, rows, hdrId, cid);
+}
+
+async function _loadPayOvCustomerNextPayDate(row) {
+  // Show the customer's next likely payday so the operator has a
+  // sensible target date for the Schedule Payment they're about to
+  // create. We proxy "next payday" via Vergent's next automatic
+  // scheduled payment — those are aligned with the customer's pay
+  // cycle. Manual entries are skipped (they're operator-set dates,
+  // not pay dates).
+  const el = document.getElementById('pay-ov-npd');
+  if (!el) return;
+  el.textContent = 'Loading…';
+  if (!row.loan_id) { el.textContent = '—'; return; }
+  try {
+    const r = await fetch('/api/vergent-scheduled-payments', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hdr_id: String(row.loan_id) }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!_payOvRow || String(_payOvRow.loan_id || '') !== String(row.loan_id)) return;
+    const auto = (d && d.automatic_schedules) || [];
+    if (!auto.length) {
+      el.innerHTML = '<span style="color:var(--muted)">No auto-schedule on file — Vergent hasn’t set the next pay date for this loan.</span>';
+      return;
+    }
+    auto.sort((a, b) => (new Date(a.date || 0).getTime() || 0) - (new Date(b.date || 0).getTime() || 0));
+    const now = Date.now();
+    const next = auto.find(s => (new Date(s.date || 0).getTime() || 0) >= now - 86400000) || auto[0];
+    const dt = new Date(next.date);
+    const dateStr = isNaN(dt) ? String(next.date || '—')
+      : dt.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric', year:'numeric'});
+    const amtStr = next.amount ? '  ·  $' + Number(next.amount).toFixed(2) : '';
+    el.innerHTML = '<b style="font-variant-numeric:tabular-nums">' + escapeHtml(dateStr) + '</b>'
+      + '<span style="color:var(--muted);font-size:12px">' + escapeHtml(amtStr) + '</span>';
+  } catch (e) {
+    el.innerHTML = '<span style="color:var(--red)">Couldn\'t load: ' + escapeHtml((e && e.message) || String(e)) + '</span>';
+  }
 }
 
 async function _loadPayOvNextPayDate(row) {
@@ -10902,14 +10980,19 @@ async function _loadPayOvLoanHistory(row) {
   }
 }
 
-async function payOvCreateLoan() {
-  if (!_payOvRow) return;
-  const cid = _payOvRow.customer_id;
-  if (!cid) { toast('No Vergent customer ID on this row', 'err'); return; }
-  const btn = document.getElementById('pay-ov-create-loan');
-  const orig = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = 'Looking up applicant…';
+// Cached firebase_id per Vergent customerId for the Payments modal.
+// Mirrors _lnsOvFbIdByCid: kicked off when the modal opens so button
+// clicks are usually instant. Values: undefined = not started,
+// '__loading__' = in flight, string = found, null = not found.
+const _payOvFbIdByCid = {};
+async function _payOvKickoffFbIdLookup(cid) {
+  if (!cid) return;
+  if (_payOvFbIdByCid[cid] != null && _payOvFbIdByCid[cid] !== '__loading__') {
+    _payOvRefreshAdminButton(cid);
+    return;
+  }
+  if (_payOvFbIdByCid[cid] === '__loading__') return;
+  _payOvFbIdByCid[cid] = '__loading__';
   try {
     const r = await fetch('/api/lookup-fbid-by-vergent-cid', {
       method: 'POST', credentials: 'include',
@@ -10917,13 +11000,88 @@ async function payOvCreateLoan() {
       body: JSON.stringify({ cid: String(cid) }),
     });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.firebase_id) {
+    _payOvFbIdByCid[cid] = (r.ok && d.firebase_id) ? d.firebase_id : null;
+  } catch (e) {
+    _payOvFbIdByCid[cid] = null;
+  }
+  if (_payOvRow && String(_payOvRow.customer_id || '') === String(cid)) {
+    _payOvRefreshAdminButton(cid);
+  }
+}
+function _payOvRefreshAdminButton(cid) {
+  const btn = document.getElementById('pay-ov-open-admin');
+  if (!btn) return;
+  const fbId = _payOvFbIdByCid[cid];
+  if (fbId && typeof fbId === 'string') {
+    btn.style.display = 'inline-flex';
+    btn.disabled = false; btn.style.opacity = '';
+    btn.title = 'Open this customer’s admin report';
+  } else if (fbId === null) {
+    btn.style.display = 'none';
+  } else {
+    btn.style.display = 'inline-flex';
+    btn.disabled = true; btn.style.opacity = '.6';
+    btn.title = 'Looking up admin record…';
+  }
+}
+async function _payOvAwaitFbId(cid, timeoutMs) {
+  if (!cid) return null;
+  const cached = _payOvFbIdByCid[cid];
+  if (cached && cached !== '__loading__') return cached;
+  if (cached !== '__loading__') _payOvKickoffFbIdLookup(cid);
+  const start = (typeof performance !== 'undefined' && performance.now)
+    ? performance.now() : new Date().getTime();
+  const limit = Number(timeoutMs) || 25000;
+  while (true) {
+    const v = _payOvFbIdByCid[cid];
+    if (v && v !== '__loading__') return v;
+    if (v === null) return null;
+    const now = (typeof performance !== 'undefined' && performance.now)
+      ? performance.now() : new Date().getTime();
+    if ((now - start) > limit) return null;
+    await new Promise(res => setTimeout(res, 150));
+  }
+}
+async function payOvOpenAdmin() {
+  if (!_payOvRow) return;
+  const cid = String(_payOvRow.customer_id || '');
+  if (!cid) { toast('No Vergent customer ID on this row', 'err'); return; }
+  const btn = document.getElementById('pay-ov-open-admin');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.style.opacity = '.7'; btn.innerHTML = 'Looking up…'; }
+  try {
+    const fbId = await _payOvAwaitFbId(cid, 25000);
+    if (!fbId) { toast('No admin record found for this Vergent customer.', 'err'); return; }
+    closePaymentDetailModal();
+    location.hash = '#fb=' + encodeURIComponent(fbId);
+  } catch (e) {
+    toast('Lookup failed: ' + ((e && e.message) || e), 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = orig; }
+  }
+}
+async function payOvCreateLoan() {
+  if (!_payOvRow) return;
+  const cid = _payOvRow.customer_id;
+  if (!cid) { toast('No Vergent customer ID on this row', 'err'); return; }
+  const btn = document.getElementById('pay-ov-create-loan');
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = 'Opening…';
+  try {
+    const fbId = await _payOvAwaitFbId(String(cid), 25000);
+    if (!fbId) {
       toast('No applicant record found for this Vergent customer. You can still create the loan directly in Vergent.', 'err');
       return;
     }
+    // Match the applicant-detail Quick Actions flow exactly: stamp
+    // the firebase_id on the body dataset and call the same modal
+    // opener. The fbId argument we used to pass was ignored —
+    // openCreateLoanModal reads body.dataset.firebaseId.
+    document.body.dataset.firebaseId = fbId;
     closePaymentDetailModal();
     if (typeof openCreateLoanModal === 'function') {
-      openCreateLoanModal(d.firebase_id);
+      openCreateLoanModal();
     } else {
       toast('Create Loan modal not available', 'err');
     }
@@ -10938,16 +11096,25 @@ async function payOvCreateLoan() {
 function payOvSchedulePayment() {
   if (!_payOvRow) return;
   const row = _payOvRow;
+  // Populate the shared schedule-modal context (same shape lnsOv
+  // populates). submitSchedulePayment reads from here, not from
+  // _payOvRow, so the same submit handler works for both launchers.
+  _schpCtx = {
+    customer:    row.customer || '—',
+    customer_id: String(row.customer_id || ''),
+    loan_id:     String(row.loan_id || ''),
+    amount:      Number(row.amount || 0),
+  };
   // Pre-fill amount with the declined payment's amount (most common
   // case) and date with tomorrow's date (default rescheduling window).
   const dateEl = document.getElementById('schp-date');
   const amtEl  = document.getElementById('schp-amount');
   const metaEl = document.getElementById('schp-meta');
   if (metaEl) {
-    metaEl.textContent = (row.customer || '—') + '  ·  Loan '
-      + (row.loan_id || '—');
+    metaEl.textContent = _schpCtx.customer + '  ·  Loan '
+      + (_schpCtx.loan_id || '—');
   }
-  if (amtEl) amtEl.value = Number(row.amount || 0).toFixed(2);
+  if (amtEl) amtEl.value = Number(_schpCtx.amount || 0).toFixed(2);
   if (dateEl) {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -10993,8 +11160,24 @@ function closeSchedulePaymentModal() {
 }
 
 async function submitSchedulePayment() {
-  if (!_payOvRow) return;
-  const row = _payOvRow;
+  // Read the launcher-populated context. Works whether the modal was
+  // opened from Payments (_payOvRow) OR Loans Due (_lnsOvRow) — both
+  // launchers stash the relevant fields here.
+  if (!_schpCtx) {
+    // Back-compat with old paths that might still race ahead: fall
+    // back to _payOvRow if context is unset.
+    if (_payOvRow) {
+      _schpCtx = {
+        customer: _payOvRow.customer || '—',
+        customer_id: String(_payOvRow.customer_id || ''),
+        loan_id: String(_payOvRow.loan_id || ''),
+        amount: Number(_payOvRow.amount || 0),
+      };
+    } else {
+      return;
+    }
+  }
+  const row = _schpCtx;
   const hid = row.loan_id;
   const dateEl = document.getElementById('schp-date');
   const amtEl  = document.getElementById('schp-amount');
@@ -12431,12 +12614,55 @@ function _loansDueRowHtml(r) {
 // without leaving the page), scheduled payments, loan history with
 // the days-late column.
 let _lnsOvRow = null;
-// Dedicated 14-day activity cache for the Loans Due modal so the
-// "Recent Payment Activity" block populates without forcing the
-// operator to visit the Payments page first. 5-min TTL.
-let _lnsOvActivityCache = null;  // { rows, fetchedAt }
-const _LNS_OV_ACTIVITY_TTL_MS = 5 * 60 * 1000;
-const _LNS_OV_ACTIVITY_WINDOW_DAYS = 14;
+// Shared 14-day Vergent card-activity cache for BOTH detail modals
+// (Payments + Loans Due). 5-min TTL keeps the second open instant.
+// We deliberately do NOT consult the global Payments-page _payCache
+// — its date range mirrors the operator's filter (often "Today"), so
+// it can miss the older declined attempts the modal needs to show.
+let _modalActivityCache = null;  // { rows, fetchedAt }
+const _MODAL_ACTIVITY_TTL_MS = 5 * 60 * 1000;
+const _MODAL_ACTIVITY_WINDOW_DAYS = 14;
+// Schedule Payment modal context — populated by the launcher
+// (payOvSchedulePayment OR lnsOvSchedulePayment) so submitSchedule
+// Payment works from either modal. {customer, customer_id, loan_id,
+// amount}. The legacy code read directly from _payOvRow, which
+// crashed when launching from Loans Due (where _payOvRow is null).
+let _schpCtx = null;
+async function _ensureModal14dActivity() {
+  const now = (typeof Date !== 'undefined' && Date.now) ? Date.now() : new Date().getTime();
+  if (_modalActivityCache
+      && Array.isArray(_modalActivityCache.rows)
+      && (now - (_modalActivityCache.fetchedAt || 0)) < _MODAL_ACTIVITY_TTL_MS) {
+    return _modalActivityCache.rows;
+  }
+  const today = new Date();
+  const start = new Date(today);
+  start.setDate(start.getDate() - (_MODAL_ACTIVITY_WINDOW_DAYS - 1));
+  try {
+    const r = await fetch('/api/vergent-card-payments', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        start_date: _payIsoDate(start),
+        end_date: _payIsoDate(today),
+      }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) {
+      console.warn('[modal-activity] fetch failed:',
+        d.detail || d.error || ('HTTP ' + r.status));
+      return [];
+    }
+    _modalActivityCache = {
+      rows: d.rows || [],
+      fetchedAt: (typeof Date !== 'undefined' && Date.now) ? Date.now() : new Date().getTime(),
+    };
+    return _modalActivityCache.rows;
+  } catch (e) {
+    console.warn('[modal-activity] network error:', e && e.message);
+    return [];
+  }
+}
 // Cached firebase_id per Vergent customerId. We kick off the lookup
 // when the modal opens so the Create New Loan + Open in Admin buttons
 // are instant — by the time the operator scans the modal and clicks,
@@ -12511,34 +12737,45 @@ async function _lnsOvAwaitFbId(cid, timeoutMs) {
     await new Promise(res => setTimeout(res, 150));
   }
 }
-async function lnsOvCreateLoan() {
+function lnsOvSchedulePayment() {
   if (!_lnsOvRow) return;
-  const cid = String(_lnsOvRow.CustomerId || '');
-  if (!cid) { toast('No Vergent customer ID on this row', 'err'); return; }
-  const btn = document.getElementById('lns-ov-create-loan');
-  const orig = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.style.opacity = '.7'; btn.innerHTML = 'Opening…'; }
-  try {
-    const fbId = await _lnsOvAwaitFbId(cid, 25000);
-    if (!fbId) {
-      toast('No applicant record found for this Vergent customer. Create the loan in Vergent directly.', 'err');
-      return;
-    }
-    // Match the Quick Actions flow exactly: stamp the firebase_id on
-    // the body dataset so openCreateLoanModal() picks it up the same
-    // way the applicant-detail sidebar button does.
-    document.body.dataset.firebaseId = fbId;
-    closeLoansDueDetailModal();
-    if (typeof openCreateLoanModal === 'function') {
-      openCreateLoanModal();
-    } else {
-      toast('Create Loan modal not available', 'err');
-    }
-  } catch (e) {
-    toast('Couldn’t open Create Loan: ' + ((e && e.message) || e), 'err');
-  } finally {
-    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = orig; }
+  const row = _lnsOvRow;
+  const hdrId = String(row.HdrId || row.LoanId || '');
+  if (!hdrId) { toast('No loan ID on this row', 'err'); return; }
+  // Populate the schedule-modal context the same shape the Payments
+  // page populates. submitSchedulePayment reads from _schpCtx, so we
+  // never depend on _payOvRow (which is null when launched from here).
+  _schpCtx = {
+    customer:    ((row.FirstName || '') + ' ' + (row.LastName || '')).trim() || '—',
+    customer_id: String(row.CustomerId || ''),
+    loan_id:     hdrId,
+    amount:      Number(row.AmountDue || 0) || Number(row.Balance || 0) || 0,
+  };
+  const metaEl = document.getElementById('schp-meta');
+  const amtEl  = document.getElementById('schp-amount');
+  const dateEl = document.getElementById('schp-date');
+  if (metaEl) {
+    metaEl.textContent = _schpCtx.customer + '  ·  Loan ' + hdrId;
   }
+  if (amtEl)  amtEl.value = Number(_schpCtx.amount || 0).toFixed(2);
+  if (dateEl) {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tz = tomorrow.getTimezoneOffset() * 60000;
+    dateEl.value = new Date(tomorrow.getTime() - tz).toISOString().slice(0, 10);
+    dateEl.min   = new Date(Date.now()       - tz).toISOString().slice(0, 10);
+  }
+  // Reset to Card (the 99% case per operator).
+  document.querySelectorAll('input[name="schp-method"]').forEach(r => {
+    r.checked = (r.value === 'card');
+    r.onchange = _schpSyncRadioStyles;
+  });
+  _schpSyncRadioStyles();
+  const statusEl = document.getElementById('schp-status');
+  if (statusEl) statusEl.textContent = '';
+  closeLoansDueDetailModal();
+  const ov = document.getElementById('schp-ov');
+  if (ov) ov.classList.add('open');
 }
 async function lnsOvOpenAdmin() {
   if (!_lnsOvRow) return;
@@ -12563,38 +12800,86 @@ async function lnsOvOpenAdmin() {
   }
 }
 
-async function _ensurePaymentActivityForLnsOv() {
-  // Prefer the global Payments cache if it's already populated — it
-  // saves an extra Vergent scrape and is usually fresher than ours.
-  if (_payCache && Array.isArray(_payCache.rows) && _payCache.rows.length) {
-    return _payCache.rows;
+// Shared renderer: lists ALL payment attempts for a given loan as a
+// compact table. Used by both the Loans Due "Recent Payment Activity"
+// section and the Payments page declined-row "Payment Activity"
+// section. `el` is the target div; `rows` is the full 14-day fetch;
+// `hdrId` is the loan id (matched against r.loan_id with an endsWith
+// fallback because Vergent sometimes returns "{co}-{model}-{hdr}").
+function _renderPaymentAttemptsTable(el, rows, hdrId, cid) {
+  if (!el) return;
+  if (!Array.isArray(rows) || !rows.length) {
+    el.innerHTML = '<span style="color:var(--muted)">No payment activity on record.</span>';
+    return;
   }
-  const now = Date.now();
-  if (_lnsOvActivityCache
-      && Array.isArray(_lnsOvActivityCache.rows)
-      && (now - (_lnsOvActivityCache.fetchedAt || 0)) < _LNS_OV_ACTIVITY_TTL_MS) {
-    return _lnsOvActivityCache.rows;
-  }
-  const today = new Date();
-  const start = new Date(today); start.setDate(start.getDate() - (_LNS_OV_ACTIVITY_WINDOW_DAYS - 1));
-  const range = { start: _payIsoDate(start), end: _payIsoDate(today) };
-  try {
-    const r = await fetch('/api/vergent-card-payments', {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ start_date: range.start, end_date: range.end }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.ok) {
-      console.warn('[lns-ov] activity fetch failed:', d.detail || d.error || ('HTTP ' + r.status));
-      return [];
+  const hdr = String(hdrId || '');
+  const c = String(cid || '');
+  const matches = rows.filter(r => {
+    if (hdr && r.loan_id && String(r.loan_id).endsWith(hdr)) return true;
+    return false;
+  });
+  if (!matches.length) {
+    // Loan-scoped strict mode — only show attempts that tie to this
+    // specific loan. Fall back to cid-wide if no loan matches (loan
+    // id might not be on the row for very old funded entries).
+    if (c) {
+      const byCid = rows.filter(r => r.customer_id && String(r.customer_id) === c);
+      if (byCid.length) {
+        return _renderPaymentAttemptsTable_render(el, byCid, true);
+      }
     }
-    _lnsOvActivityCache = { rows: d.rows || [], fetchedAt: Date.now() };
-    return _lnsOvActivityCache.rows;
-  } catch (e) {
-    console.warn('[lns-ov] activity fetch network error:', e && e.message);
-    return [];
+    el.innerHTML = '<span style="color:var(--muted)">No payment activity for this loan.</span>';
+    return;
   }
+  _renderPaymentAttemptsTable_render(el, matches, false);
+}
+function _renderPaymentAttemptsTable_render(el, list, cidFallbackNotice) {
+  list.sort((a, b) => {
+    const ta = new Date(a.real_date || 0).getTime() || 0;
+    const tb = new Date(b.real_date || 0).getTime() || 0;
+    return tb - ta;
+  });
+  const fmtWhen = (d) => {
+    try {
+      const x = new Date(d);
+      if (isNaN(x)) return '—';
+      const sameDay = x.toDateString() === new Date().toDateString();
+      return sameDay
+        ? 'Today ' + x.toLocaleTimeString(undefined, {hour:'numeric',minute:'2-digit'})
+        : x.toLocaleDateString(undefined, {month:'short',day:'numeric'})
+            + ' ' + x.toLocaleTimeString(undefined, {hour:'numeric',minute:'2-digit'});
+    } catch (e) { return '—'; }
+  };
+  const statusPill = (r) => {
+    const isDeclined = r.status === 'declined';
+    const isFunding  = r.kind === 'funding';
+    const label = isFunding ? 'FUNDED'
+                : isDeclined ? 'DECLINED'
+                : (String(r.status || '?').toUpperCase());
+    const bg = isDeclined ? '#fee2e2' : isFunding ? '#dbeafe' : '#dcfce7';
+    const fg = isDeclined ? '#b91c1c' : isFunding ? '#1d4ed8' : '#15803d';
+    return '<span style="display:inline-flex;align-items:center;padding:1px 7px;border-radius:999px;background:' + bg + ';color:' + fg + ';font-size:10px;font-weight:700;letter-spacing:.04em">' + escapeHtml(label) + '</span>';
+  };
+  const notice = cidFallbackNotice
+    ? '<div style="font-size:10.5px;color:var(--muted);margin-bottom:5px">Showing all attempts on this customer (no loan-scoped matches in the 14-day window).</div>'
+    : '';
+  el.innerHTML = notice + '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:320px">'
+    + '<thead><tr style="text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">'
+    + '<th style="padding:4px 6px;font-weight:700">When</th>'
+    + '<th style="padding:4px 6px;text-align:right;font-weight:700">Amount</th>'
+    + '<th style="padding:4px 6px;font-weight:700">Status</th>'
+    + '</tr></thead><tbody>'
+    + list.map(r => {
+        const reasonLine = r.decline_reason
+          ? '<div style="font-size:10.5px;color:var(--red);font-weight:600;margin-top:2px;line-height:1.3">' + escapeHtml(r.decline_reason) + '</div>'
+          : '';
+        return '<tr style="border-top:1px solid var(--border);vertical-align:top">'
+          + '<td style="padding:5px 6px;font-variant-numeric:tabular-nums">' + escapeHtml(fmtWhen(r.real_date)) + '</td>'
+          + '<td style="padding:5px 6px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700">$' + Number(r.amount || 0).toFixed(2) + '</td>'
+          + '<td style="padding:5px 6px">' + statusPill(r) + reasonLine + '</td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div>';
 }
 
 function openLoansDueDetailModal(row) {
@@ -12615,16 +12900,15 @@ function openLoansDueDetailModal(row) {
   const vBtn = document.getElementById('lns-ov-vergent');
   vBtn.href = vlink;
   vBtn.style.display = cid ? 'inline-flex' : 'none';
-  // Create New Loan + Open in Admin both need the customer's
-  // firebase_id. Kick off the lookup IMMEDIATELY so the buttons are
-  // ready by the time the operator clicks. Create New Loan stays
-  // visible because we don't strictly need a firebase report to
-  // attempt it (we toast a useful error otherwise); Open in Admin
-  // shows greyed until we know whether a report exists.
-  const clBtn = document.getElementById('lns-ov-create-loan');
-  if (clBtn) {
-    clBtn.style.display = cid ? 'inline-flex' : 'none';
-    clBtn.disabled = false; clBtn.style.opacity = '';
+  // Schedule Payment is always visible when we have a loan id (it's
+  // what the operator is here to do). Open in Admin is hidden until
+  // we know whether a firebase report exists — lookup is kicked off
+  // immediately so subsequent clicks are instant.
+  const schBtn = document.getElementById('lns-ov-schedule');
+  if (schBtn) {
+    const hasLoan = !!(row.HdrId || row.LoanId);
+    schBtn.style.display = hasLoan ? 'inline-flex' : 'none';
+    schBtn.disabled = false; schBtn.style.opacity = '';
   }
   _lnsOvRefreshAdminButton(cid);
   if (cid) _lnsOvKickoffFbIdLookup(cid);
@@ -12662,62 +12946,13 @@ async function _renderLnsOvToday(row) {
   if (!el) return;
   const cid = String(row.CustomerId || '');
   const hdrId = String(row.HdrId || row.LoanId || '');
-  // Auto-fetch the last 14 days of card activity so the operator
-  // sees the most recent attempt without having to leave for the
-  // Payments page. Helper reuses _payCache when available.
+  // Auto-fetch the last 14 days of card activity and render EVERY
+  // attempt that ties to this specific loan — operator needs to see
+  // all retries, not just the latest one, to plan the next move.
   el.innerHTML = '<span style="color:var(--muted)">Loading recent activity…</span>';
-  const rows = await _ensurePaymentActivityForLnsOv();
-  // Guard: the operator may have closed the modal or opened a
-  // different customer while the fetch was in flight.
+  const rows = await _ensureModal14dActivity();
   if (!_lnsOvRow || String(_lnsOvRow.CustomerId || '') !== cid) return;
-  if (!Array.isArray(rows) || !rows.length) {
-    el.innerHTML = '<span style="color:var(--muted)">No payment activity on record.</span>';
-    return;
-  }
-  const matches = rows.filter(r => {
-    if (cid && r.customer_id && String(r.customer_id) === cid) return true;
-    if (hdrId && r.loan_id && String(r.loan_id).endsWith(hdrId)) return true;
-    return false;
-  });
-  if (!matches.length) {
-    el.innerHTML = '<span style="color:var(--muted)">No payment activity on record.</span>';
-    return;
-  }
-  // Sort by real_date desc and take the most recent one only.
-  matches.sort((a, b) => {
-    const ta = new Date(a.real_date || 0).getTime() || 0;
-    const tb = new Date(b.real_date || 0).getTime() || 0;
-    return tb - ta;
-  });
-  const r = matches[0];
-  const fmtWhen = (d) => {
-    try {
-      const x = new Date(d);
-      if (isNaN(x)) return '—';
-      const sameDay = x.toDateString() === new Date().toDateString();
-      return sameDay
-        ? 'today at ' + x.toLocaleTimeString(undefined, {hour:'numeric',minute:'2-digit'})
-        : x.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'})
-            + ' at ' + x.toLocaleTimeString(undefined, {hour:'numeric',minute:'2-digit'});
-    } catch (e) { return '—'; }
-  };
-  const isDeclined = r.status === 'declined';
-  const isFunding = r.kind === 'funding';
-  const statusLabel = isFunding ? 'FUNDED'
-                      : isDeclined ? 'DECLINED'
-                      : (String(r.status || '?').toUpperCase());
-  const pillBg = isDeclined ? '#fee2e2' : isFunding ? '#dbeafe' : '#dcfce7';
-  const pillFg = isDeclined ? '#b91c1c' : isFunding ? '#1d4ed8' : '#15803d';
-  const reasonLine = r.decline_reason
-    ? '<div style="font-size:11.5px;color:var(--red);font-weight:600;margin-top:3px;line-height:1.35">' + escapeHtml(r.decline_reason) + '</div>'
-    : '';
-  el.innerHTML =
-    '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;padding:2px 0">'
-    + '<span style="display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;background:' + pillBg + ';color:' + pillFg + ';font-size:11px;font-weight:700;letter-spacing:.04em">' + statusLabel + '</span>'
-    + '<b style="font-variant-numeric:tabular-nums">$' + Number(r.amount || 0).toFixed(2) + '</b>'
-    + '<span style="color:var(--muted);font-size:12px">' + escapeHtml(fmtWhen(r.real_date)) + '</span>'
-    + reasonLine
-    + '</div>';
+  _renderPaymentAttemptsTable(el, rows, hdrId, cid);
 }
 
 async function _loadLnsOvScheduled(row) {
