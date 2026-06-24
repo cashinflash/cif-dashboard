@@ -2084,7 +2084,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
         <div id="lns-ov-snapshot" style="font-size:13.5px;color:var(--text);line-height:1.5">—</div>
       </div>
       <div style="background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
-        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Today's Payment Activity</div>
+        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Recent Payment Activity</div>
         <div id="lns-ov-today" style="font-size:13.5px;color:var(--text);line-height:1.4">—</div>
       </div>
       <div style="background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
@@ -12429,8 +12429,7 @@ function openLoansDueDetailModal(row) {
     '<div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline">'
     + '<div><span style="color:var(--muted);font-size:11px">Balance:</span> <b style="font-variant-numeric:tabular-nums">' + escapeHtml(_rptFmtMoney(row.Balance)) + '</b></div>'
     + '<div><span style="color:var(--muted);font-size:11px">Amount due:</span> <b style="font-variant-numeric:tabular-nums">' + escapeHtml(_rptFmtMoney(row.AmountDue)) + '</b></div>'
-    + '<div><span style="color:var(--muted);font-size:11px">Due:</span> <b>' + escapeHtml(_rptFmtDate(row.DueDate)) + '</b></div>'
-    + '<div><span style="color:var(--muted);font-size:11px">Next pay:</span> <b>' + escapeHtml(_rptFmtDate(row.NextPayDate)) + '</b></div>'
+    + '<div><span style="color:var(--muted);font-size:11px">Due date:</span> <b>' + escapeHtml(_rptFmtDate(row.NextPayDate || row.DueDate)) + '</b></div>'
     + '<div>' + dlText + '</div>'
     + '</div>';
   // Today's activity — scan the Payments cache if populated. No fetch
@@ -12453,47 +12452,58 @@ function _renderLnsOvToday(row) {
   if (!el) return;
   const cid = String(row.CustomerId || '');
   const hdrId = String(row.HdrId || row.LoanId || '');
-  // Scan window._payCache (populated when operator visits Payments).
+  // Scan _payCache (populated when operator visits Payments) for THIS
+  // customer's most recent payment attempt — regardless of day. Used
+  // to show the latest decline/approval at a glance without leaving
+  // the page.
   if (!_payCache || !_payCache.rows) {
-    el.innerHTML = '<span style="color:var(--muted)">Visit the Payments page once today to load activity here.</span>';
+    el.innerHTML = '<span style="color:var(--muted)">Visit the Payments page to load activity here.</span>';
     return;
   }
-  // Filter to today's rows for this customer/loan.
-  const today = new Date();
-  const isSameDay = (d) => {
-    try { const x = new Date(d); return !isNaN(x) && x.toDateString() === today.toDateString(); } catch (e) { return false; }
-  };
   const matches = _payCache.rows.filter(r => {
-    if (!isSameDay(r.real_date)) return false;
     if (cid && r.customer_id && String(r.customer_id) === cid) return true;
     if (hdrId && r.loan_id && String(r.loan_id).endsWith(hdrId)) return true;
     return false;
   });
   if (!matches.length) {
-    el.innerHTML = '<span style="color:var(--muted)">No payment activity today.</span>';
+    el.innerHTML = '<span style="color:var(--muted)">No payment activity on record.</span>';
     return;
   }
-  const fmtTime = (d) => {
-    try { const x = new Date(d); return !isNaN(x) ? x.toLocaleTimeString(undefined, {hour:'numeric',minute:'2-digit'}) : '—'; } catch (e) { return '—'; }
+  // Sort by real_date desc and take the most recent one only.
+  matches.sort((a, b) => {
+    const ta = new Date(a.real_date || 0).getTime() || 0;
+    const tb = new Date(b.real_date || 0).getTime() || 0;
+    return tb - ta;
+  });
+  const r = matches[0];
+  const fmtWhen = (d) => {
+    try {
+      const x = new Date(d);
+      if (isNaN(x)) return '—';
+      const sameDay = x.toDateString() === new Date().toDateString();
+      return sameDay
+        ? 'today at ' + x.toLocaleTimeString(undefined, {hour:'numeric',minute:'2-digit'})
+        : x.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'numeric'})
+            + ' at ' + x.toLocaleTimeString(undefined, {hour:'numeric',minute:'2-digit'});
+    } catch (e) { return '—'; }
   };
-  el.innerHTML = matches.map(r => {
-    const isDeclined = r.status === 'declined';
-    const isFunding = r.kind === 'funding';
-    const statusLabel = isFunding ? 'FUNDED'
-                        : isDeclined ? 'DECLINED'
-                        : (String(r.status || '?').toUpperCase());
-    const pillBg = isDeclined ? '#fee2e2' : isFunding ? '#dbeafe' : '#dcfce7';
-    const pillFg = isDeclined ? '#b91c1c' : isFunding ? '#1d4ed8' : '#15803d';
-    const reasonLine = r.decline_reason
-      ? '<div style="font-size:11.5px;color:var(--red);font-weight:600;margin-top:3px;line-height:1.35">' + escapeHtml(r.decline_reason) + '</div>'
-      : '';
-    return '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;padding:5px 0">'
-      + '<span style="display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;background:' + pillBg + ';color:' + pillFg + ';font-size:11px;font-weight:700;letter-spacing:.04em">' + statusLabel + '</span>'
-      + '<b style="font-variant-numeric:tabular-nums">$' + Number(r.amount || 0).toFixed(2) + '</b>'
-      + '<span style="color:var(--muted);font-size:12px">at ' + escapeHtml(fmtTime(r.real_date)) + '</span>'
-      + reasonLine
-      + '</div>';
-  }).join('');
+  const isDeclined = r.status === 'declined';
+  const isFunding = r.kind === 'funding';
+  const statusLabel = isFunding ? 'FUNDED'
+                      : isDeclined ? 'DECLINED'
+                      : (String(r.status || '?').toUpperCase());
+  const pillBg = isDeclined ? '#fee2e2' : isFunding ? '#dbeafe' : '#dcfce7';
+  const pillFg = isDeclined ? '#b91c1c' : isFunding ? '#1d4ed8' : '#15803d';
+  const reasonLine = r.decline_reason
+    ? '<div style="font-size:11.5px;color:var(--red);font-weight:600;margin-top:3px;line-height:1.35">' + escapeHtml(r.decline_reason) + '</div>'
+    : '';
+  el.innerHTML =
+    '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;padding:2px 0">'
+    + '<span style="display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;background:' + pillBg + ';color:' + pillFg + ';font-size:11px;font-weight:700;letter-spacing:.04em">' + statusLabel + '</span>'
+    + '<b style="font-variant-numeric:tabular-nums">$' + Number(r.amount || 0).toFixed(2) + '</b>'
+    + '<span style="color:var(--muted);font-size:12px">' + escapeHtml(fmtWhen(r.real_date)) + '</span>'
+    + reasonLine
+    + '</div>';
 }
 
 async function _loadLnsOvScheduled(row) {
