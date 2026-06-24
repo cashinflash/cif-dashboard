@@ -12429,6 +12429,46 @@ function _loansDueRowHtml(r) {
 // without leaving the page), scheduled payments, loan history with
 // the days-late column.
 let _lnsOvRow = null;
+// Dedicated 14-day activity cache for the Loans Due modal so the
+// "Recent Payment Activity" block populates without forcing the
+// operator to visit the Payments page first. 5-min TTL.
+let _lnsOvActivityCache = null;  // { rows, fetchedAt }
+const _LNS_OV_ACTIVITY_TTL_MS = 5 * 60 * 1000;
+const _LNS_OV_ACTIVITY_WINDOW_DAYS = 14;
+
+async function _ensurePaymentActivityForLnsOv() {
+  // Prefer the global Payments cache if it's already populated — it
+  // saves an extra Vergent scrape and is usually fresher than ours.
+  if (_payCache && Array.isArray(_payCache.rows) && _payCache.rows.length) {
+    return _payCache.rows;
+  }
+  const now = Date.now();
+  if (_lnsOvActivityCache
+      && Array.isArray(_lnsOvActivityCache.rows)
+      && (now - (_lnsOvActivityCache.fetchedAt || 0)) < _LNS_OV_ACTIVITY_TTL_MS) {
+    return _lnsOvActivityCache.rows;
+  }
+  const today = new Date();
+  const start = new Date(today); start.setDate(start.getDate() - (_LNS_OV_ACTIVITY_WINDOW_DAYS - 1));
+  const range = { start: _payIsoDate(start), end: _payIsoDate(today) };
+  try {
+    const r = await fetch('/api/vergent-card-payments', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ start_date: range.start, end_date: range.end }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) {
+      console.warn('[lns-ov] activity fetch failed:', d.detail || d.error || ('HTTP ' + r.status));
+      return [];
+    }
+    _lnsOvActivityCache = { rows: d.rows || [], fetchedAt: Date.now() };
+    return _lnsOvActivityCache.rows;
+  } catch (e) {
+    console.warn('[lns-ov] activity fetch network error:', e && e.message);
+    return [];
+  }
+}
 
 function openLoansDueDetailModal(row) {
   if (!row) return;
@@ -12463,9 +12503,8 @@ function openLoansDueDetailModal(row) {
     + '<div><span style="color:var(--muted);font-size:11px">Due date:</span> <b>' + escapeHtml(_rptFmtDate(row.NextPayDate || row.DueDate)) + '</b></div>'
     + '<div>' + dlText + '</div>'
     + '</div>';
-  // Today's activity — scan the Payments cache if populated. No fetch
-  // — that's a heavy call. If operator hasn't visited Payments yet,
-  // they see a hint to do so.
+  // Recent activity — auto-fetches a 14-day window via Vergent if
+  // the global Payments cache isn't populated yet. Fire-and-forget.
   _renderLnsOvToday(row);
   // Async loads in parallel.
   _loadLnsOvScheduled(row);
@@ -12478,20 +12517,24 @@ function closeLoansDueDetailModal() {
   _lnsOvRow = null;
 }
 
-function _renderLnsOvToday(row) {
+async function _renderLnsOvToday(row) {
   const el = document.getElementById('lns-ov-today');
   if (!el) return;
   const cid = String(row.CustomerId || '');
   const hdrId = String(row.HdrId || row.LoanId || '');
-  // Scan _payCache (populated when operator visits Payments) for THIS
-  // customer's most recent payment attempt — regardless of day. Used
-  // to show the latest decline/approval at a glance without leaving
-  // the page.
-  if (!_payCache || !_payCache.rows) {
-    el.innerHTML = '<span style="color:var(--muted)">Visit the Payments page to load activity here.</span>';
+  // Auto-fetch the last 14 days of card activity so the operator
+  // sees the most recent attempt without having to leave for the
+  // Payments page. Helper reuses _payCache when available.
+  el.innerHTML = '<span style="color:var(--muted)">Loading recent activity…</span>';
+  const rows = await _ensurePaymentActivityForLnsOv();
+  // Guard: the operator may have closed the modal or opened a
+  // different customer while the fetch was in flight.
+  if (!_lnsOvRow || String(_lnsOvRow.CustomerId || '') !== cid) return;
+  if (!Array.isArray(rows) || !rows.length) {
+    el.innerHTML = '<span style="color:var(--muted)">No payment activity on record.</span>';
     return;
   }
-  const matches = _payCache.rows.filter(r => {
+  const matches = rows.filter(r => {
     if (cid && r.customer_id && String(r.customer_id) === cid) return true;
     if (hdrId && r.loan_id && String(r.loan_id).endsWith(hdrId)) return true;
     return false;
