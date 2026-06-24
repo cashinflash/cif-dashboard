@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Cash in Flash — Underwriting Dashboard Web Server"""
 import collections, hashlib, hmac, http.client, json, os, re, secrets, ssl, time, urllib.error, urllib.request
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
 
 PORT = int(os.environ.get('PORT', 8080))
 FB_BASE = 'https://cashinflash-a1dce-default-rtdb.firebaseio.com'
@@ -2821,4 +2821,12 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == '__main__':
     print(f'CIF Dashboard on port {PORT}')
     print(f'Users configured: {sorted(USERS.keys())}')
-    HTTPServer(('0.0.0.0', PORT), Handler).serve_forever()
+    # ThreadingHTTPServer — one thread per request. cif-apply already
+    # uses this; we were on the single-threaded HTTPServer, which
+    # meant any slow upstream call (Vergent ASPX scrape ~5-10s,
+    # /reports walk on cif-apply, anything else proxied) blocked
+    # every other request — including Render's health-check probes.
+    # When the probe timed out, Render flagged the instance
+    # unhealthy and restarted it, producing the
+    # "dial tcp ... i/o timeout" alerts the operator reported.
+    ThreadingHTTPServer(('0.0.0.0', PORT), Handler).serve_forever()
