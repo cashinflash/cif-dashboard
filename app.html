@@ -5468,14 +5468,20 @@ function _normPhone(p){ const d=String(p||'').replace(/\D/g,''); return d.length
 function _normName(s){ return String(s||'').toLowerCase().replace(/[^a-z]/g,''); }
 function findAppByIdentity(row){
   if(!row || typeof apps==='undefined' || !Array.isArray(apps) || !apps.length) return null;
+  // reportsIndex FLATTENS applicationData fields to the top level (a.phone,
+  // a.firstName, a.lastName); hydrated full records nest them under
+  // a.applicationData. Read both so the match works for either shape.
+  function appPhone(a){ return _normPhone(a.phone || (a.applicationData||{}).phone); }
+  function appFirst(a){ return _normName(a.firstName || (a.applicationData||{}).firstName); }
+  function appLast(a){ return _normName(a.lastName || (a.applicationData||{}).lastName); }
   const ph=_normPhone(row.Phone || row.CellPhone || row.phone || row.HomePhone);
   if(ph && ph.length===10){
-    const byPhone=apps.find(function(a){ return _normPhone((a.applicationData||{}).phone)===ph; });
+    const byPhone=apps.find(function(a){ return appPhone(a)===ph; });
     if(byPhone) return byPhone.firebaseId;
   }
   const fn=_normName(row.FirstName||row.firstName), ln=_normName(row.LastName||row.lastName);
   if(fn && ln){
-    const byName=apps.find(function(a){ const ad=a.applicationData||{}; return _normName(ad.firstName)===fn && _normName(ad.lastName)===ln; });
+    const byName=apps.find(function(a){ return appFirst(a)===fn && appLast(a)===ln; });
     if(byName) return byName.firebaseId;  // apps is sorted newest-first
   }
   return null;
