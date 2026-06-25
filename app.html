@@ -5430,16 +5430,29 @@ function renderBalanceResult(d, elId){
   }
   el.style.background='#e8f5ee';el.style.borderColor='#bfe3cd';el.style.color='#1a6b3c';
   const when=d.checkedAt?new Date(d.checkedAt).toLocaleString():'';
-  const rows=(d.accounts||[]).map(function(ac){
+  // Surface the account on file (from the application) first, with an "On
+  // file" badge + highlight, so the operator reads "their" account's balance
+  // without opening the report. on_file is set server-side by matching the
+  // application's account-number last-4 against each Plaid account's mask.
+  const accts=(d.accounts||[]).slice().sort(function(a,b){return (b.on_file?1:0)-(a.on_file?1:0);});
+  const rows=accts.map(function(ac){
     const avail=(ac.available!=null?ac.available:ac.current);
     const nm=escapeHtml((ac.name||'Account')+(ac.mask?(' ('+ac.mask+')'):''));
-    return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:4px 0;border-top:1px solid rgba(26,107,60,.12)">'
-      +'<span>'+nm+'</span>'
+    const badge=ac.on_file?' <span style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#1a4d6b;background:#e8f3f8;border:1px solid #6cb1e2;border-radius:6px;padding:1px 5px;vertical-align:middle">On file</span>':'';
+    const wrap=ac.on_file?'background:#daf0e2;border-radius:6px;padding:5px 6px;margin-top:2px':'padding:4px 0;border-top:1px solid rgba(26,107,60,.12)';
+    return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;'+wrap+'">'
+      +'<span'+(ac.on_file?' style="font-weight:700"':'')+'>'+nm+badge+'</span>'
       +'<span style="white-space:nowrap"><b style="font-size:14px">'+_fmtMoney(avail)+'</b> <span style="font-size:11px;opacity:.7">available</span></span></div>';
   }).join('');
+  // Know the on-file last-4 but Plaid didn't return a matching account: tell
+  // the operator which last-4 to look for instead of silently showing no badge.
+  const note=(d.accountOnFileLast4 && !d.accountOnFileMatched)
+    ? '<div style="font-size:11px;color:#5a3300;background:#fff5e6;border:1px solid #f2d46c;border-radius:6px;padding:4px 6px;margin-top:6px">Account on file ends ••'+escapeHtml(d.accountOnFileLast4)+' — not among the accounts Plaid returned.</div>'
+    : '';
   el.innerHTML='<div style="font-weight:800;margin-bottom:2px">Live balance'
     +(d.institution?(' <span style="font-weight:600;opacity:.8">· '+escapeHtml(d.institution)+'</span>'):'')+'</div>'
     +(rows||'<div style="padding-top:4px">No deposit accounts returned</div>')
+    +note
     +'<div style="font-size:11px;opacity:.7;margin-top:6px">Checked '+escapeHtml(when)+'</div>';
 }
 function checkPlaidBalance(fbId){
