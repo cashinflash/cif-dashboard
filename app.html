@@ -5459,6 +5459,27 @@ function checkPlaidBalance(fbId){
 // Same balance check, from the Loans Due servicing modal (#lns-ov). That
 // modal is Vergent-sourced, so resolve the firebase_id via the same lookup
 // the "Open in Admin" button uses, then hit the same endpoint.
+// Match a Loans Due / Vergent row to its EXISTING application in the loaded
+// reports index (`apps`) by identity — phone first (most unique), then full
+// name. Every applicant came through our form, so they're in reportsIndex; no
+// Vergent customer-id or backend lookup needed. This is the same firebaseId
+// the reports page uses, so Open-in-Admin and Check-balance work identically.
+function _normPhone(p){ const d=String(p||'').replace(/\D/g,''); return d.length>10?d.slice(-10):d; }
+function _normName(s){ return String(s||'').toLowerCase().replace(/[^a-z]/g,''); }
+function findAppByIdentity(row){
+  if(!row || typeof apps==='undefined' || !Array.isArray(apps) || !apps.length) return null;
+  const ph=_normPhone(row.Phone || row.CellPhone || row.phone || row.HomePhone);
+  if(ph && ph.length===10){
+    const byPhone=apps.find(function(a){ return _normPhone((a.applicationData||{}).phone)===ph; });
+    if(byPhone) return byPhone.firebaseId;
+  }
+  const fn=_normName(row.FirstName||row.firstName), ln=_normName(row.LastName||row.lastName);
+  if(fn && ln){
+    const byName=apps.find(function(a){ const ad=a.applicationData||{}; return _normName(ad.firstName)===fn && _normName(ad.lastName)===ln; });
+    if(byName) return byName.firebaseId;  // apps is sorted newest-first
+  }
+  return null;
+}
 async function checkLoansDueBalance(btn){
   const row=_lnsOvRow; if(!row) return;
   const cid=String(row.CustomerId||'');
@@ -5466,8 +5487,10 @@ async function checkLoansDueBalance(btn){
   if(btn){btn.disabled=true;btn.style.opacity='.6';}
   if(el){el.style.display='block';el.style.background='#f4f7f9';el.style.borderColor='var(--border)';el.style.color='var(--muted)';el.textContent='Resolving customer…';}
   try{
-    const fbId=await _lnsOvAwaitFbId(cid, 8000, String(row.HdrId||row.LoanId||''));
-    if(!fbId){ renderBalanceResult({ok:false,message:'No linked CashinFlash application found for this customer — live balance unavailable.'}, 'lns-ov-balance-result'); return; }
+    // Identity match first (instant, no Vergent); Vergent-id lookup only as
+    // a fallback if name/phone didn't match a loaded application.
+    const fbId=findAppByIdentity(row) || await _lnsOvAwaitFbId(cid, 8000, String(row.HdrId||row.LoanId||''));
+    if(!fbId){ renderBalanceResult({ok:false,message:'No matching application found in the dashboard for this customer — live balance unavailable.'}, 'lns-ov-balance-result'); return; }
     if(el) el.textContent='Checking live balance…';
     const d=await (await fetch('/api/plaid-balance',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({firebase_id:fbId})})).json();
     renderBalanceResult(d, 'lns-ov-balance-result');
@@ -12846,7 +12869,9 @@ function _lnsOvRefreshAdminButton(cid) {
   // it appear-then-disappear.
   const btn = document.getElementById('lns-ov-open-admin');
   if (!btn) return;
-  if (!cid) { btn.style.display = 'none'; return; }
+  // Show when there's a cid OR a name we can identity-match in the dashboard.
+  const canIdentity = _lnsOvRow && (_lnsOvRow.FirstName || _lnsOvRow.LastName);
+  if (!cid && !canIdentity) { btn.style.display = 'none'; return; }
   btn.style.display = 'inline-flex';
   btn.disabled = false;
   btn.style.opacity = '';
@@ -12916,15 +12941,15 @@ async function lnsOvOpenAdmin() {
   if (!_lnsOvRow) return;
   const cid = String(_lnsOvRow.CustomerId || '');
   const loanId = String(_lnsOvRow.HdrId || _lnsOvRow.LoanId || '');
-  if (!cid) { toast('No Vergent customer ID on this row', 'err'); return; }
-  // Open the application detail page (#fb=<fbId>). AWAIT the lookup
-  // (kicked off on modal-open) instead of bailing to the Customers
-  // page the instant it isn't ready. Toast on a genuine miss.
+  // Identity match first: open the EXISTING application by name/phone from
+  // the loaded reports index — no Vergent id needed. Fall back to the
+  // Vergent-id lookup only if identity doesn't match a loaded application.
   const btn = document.getElementById('lns-ov-open-admin');
   const orig = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.style.opacity = '.7'; btn.innerHTML = 'Opening…'; }
   try {
-    const fbId = await _lnsOvAwaitFbId(cid, 25000, loanId);
+    let fbId = findAppByIdentity(_lnsOvRow);
+    if (!fbId && cid) fbId = await _lnsOvAwaitFbId(cid, 25000, loanId);
     if (fbId) {
       closeLoansDueDetailModal();
       location.hash = '#fb=' + encodeURIComponent(fbId);
