@@ -5511,6 +5511,36 @@ function findAppByIdentity(row){
   }
   return null;
 }
+// Shared "last balance reading persists" helper for the servicing modals
+// (Loans Due + Payments). Mirrors the profile page: show the most recent
+// reading and keep it displayed until a new Check balance replaces it.
+// Preference order: (1) this session's in-memory cache, (2) the reading
+// already hydrated onto the matched application, (3) the reading persisted
+// on the application's Firebase record by /api/plaid-balance. Steps 2-3
+// only READ the last reading — they never re-bill Plaid (an explicit click
+// is the only thing that bills). This is what makes the card survive a page
+// reload / first open, exactly like the profile panel's a.plaidBalance.
+var _modalBalHydrateSeq = 0;
+function _hydrateModalBalanceCard(row, cache, cid, resultElId, stillCurrent){
+  if(cache[cid] && cache[cid].ok){ renderBalanceResult(cache[cid], resultElId); return; }
+  const el=document.getElementById(resultElId);
+  if(el){ el.style.display='none'; el.innerHTML=''; }   // clear any prior customer's card
+  const fbId=findAppByIdentity(row);
+  if(!fbId) return;
+  const app=(typeof apps!=='undefined'&&Array.isArray(apps))?apps.find(function(x){return x.firebaseId===fbId;}):null;
+  if(app && app.plaidBalance && app.plaidBalance.ok){
+    cache[cid]=app.plaidBalance; renderBalanceResult(app.plaidBalance, resultElId); return;
+  }
+  const seq=(++_modalBalHydrateSeq);
+  fetch('/fb/reports/'+encodeURIComponent(fbId)+'/plaidBalance.json',{credentials:'same-origin'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(seq!==_modalBalHydrateSeq) return;                              // a newer open superseded us
+      if(typeof stillCurrent==='function' && !stillCurrent()) return;    // customer switched / modal closed
+      if(d && d.ok){ cache[cid]=d; renderBalanceResult(d, resultElId); }
+    })
+    .catch(function(){});
+}
 var _lnsOvBalanceCache = {};  // CustomerId -> last live balance (persists the card)
 async function checkLoansDueBalance(btn){
   const row=_lnsOvRow; if(!row) return;
@@ -5525,7 +5555,9 @@ async function checkLoansDueBalance(btn){
     if(!fbId){ renderBalanceResult({ok:false,message:'No matching application found in the dashboard for this customer — live balance unavailable.'}, 'lns-ov-balance-result'); return; }
     if(el) el.textContent='Checking live balance…';
     const d=await (await fetch('/api/plaid-balance',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({firebase_id:fbId})})).json();
-    if(d && d.ok) _lnsOvBalanceCache[cid]=d;  // keep the card until a new check replaces it
+    if(d && d.ok){ _lnsOvBalanceCache[cid]=d;  // keep the card until a new check replaces it
+      const _ap=(typeof apps!=='undefined'&&Array.isArray(apps))?apps.find(function(x){return x.firebaseId===fbId;}):null;
+      if(_ap) _ap.plaidBalance=d; }            // mirror onto the app so other views show it too
     renderBalanceResult(d, 'lns-ov-balance-result');
   }catch(e){ renderBalanceResult({ok:false,message:'Request failed: '+e}, 'lns-ov-balance-result'); }
   finally{ if(btn){btn.disabled=false;btn.style.opacity='';} }
@@ -10938,9 +10970,11 @@ function openPaymentDetailModal(row) {
   // cached reading (persists until a new check), else clear.
   const payBalBtn = document.getElementById('pay-ov-balance');
   if (payBalBtn) payBalBtn.style.display = isDeclined ? 'inline-flex' : 'none';
-  const _payCachedBal = _payOvBalanceCache[String(row.customer_id || '')];
-  if (isDeclined && _payCachedBal) { renderBalanceResult(_payCachedBal, 'pay-ov-balance-result'); }
-  else { const _pbr = document.getElementById('pay-ov-balance-result'); if (_pbr) { _pbr.style.display = 'none'; _pbr.innerHTML = ''; } }
+  if (isDeclined) {
+    _hydrateModalBalanceCard(row, _payOvBalanceCache, String(row.customer_id || ''),
+      'pay-ov-balance-result',
+      function(){ return _payOvRow && String(_payOvRow.customer_id || '') === String(row.customer_id || '') && _payOvRow.status === 'declined'; });
+  } else { const _pbr = document.getElementById('pay-ov-balance-result'); if (_pbr) { _pbr.style.display = 'none'; _pbr.innerHTML = ''; } }
   // Open in Admin: always visible when we have a cid. The click
   // handler navigates straight to the Customers page filtered to
   // this Vergent id — no firebase_id lookup needed.
@@ -11251,7 +11285,9 @@ async function checkPaymentBalance(btn){
     if(!fbId){ renderBalanceResult({ok:false,message:'No matching application found in the dashboard for this customer — live balance unavailable.'}, 'pay-ov-balance-result'); return; }
     if(el) el.textContent='Checking live balance…';
     const d=await (await fetch('/api/plaid-balance',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({firebase_id:fbId})})).json();
-    if(d && d.ok) _payOvBalanceCache[cid]=d;  // keep the card until a new check replaces it
+    if(d && d.ok){ _payOvBalanceCache[cid]=d;  // keep the card until a new check replaces it
+      const _ap=(typeof apps!=='undefined'&&Array.isArray(apps))?apps.find(function(x){return x.firebaseId===fbId;}):null;
+      if(_ap) _ap.plaidBalance=d; }            // mirror onto the app so other views show it too
     renderBalanceResult(d, 'pay-ov-balance-result');
   }catch(e){ renderBalanceResult({ok:false,message:'Request failed: '+e}, 'pay-ov-balance-result'); }
   finally{ if(btn){btn.disabled=false;btn.style.opacity='';} }
@@ -13109,9 +13145,9 @@ function openLoansDueDetailModal(row) {
   // clear any previous customer's card.
   const _balBtn = document.getElementById('lns-ov-balance');
   if (_balBtn) { _balBtn.disabled = false; _balBtn.style.opacity = ''; }
-  const _cachedBal = _lnsOvBalanceCache[String(row.CustomerId || '')];
-  if (_cachedBal) { renderBalanceResult(_cachedBal, 'lns-ov-balance-result'); }
-  else { const _balRes = document.getElementById('lns-ov-balance-result'); if (_balRes) { _balRes.style.display = 'none'; _balRes.innerHTML = ''; } }
+  _hydrateModalBalanceCard(row, _lnsOvBalanceCache, String(row.CustomerId || ''),
+    'lns-ov-balance-result',
+    function(){ return _lnsOvRow && String(_lnsOvRow.CustomerId || '') === String(row.CustomerId || ''); });
   const name = ((row.FirstName || '') + ' ' + (row.LastName || '')).trim() || '—';
   const cid = String(row.CustomerId || '');
   const loanIdDisplay = row.LoanId || row.HdrId || '—';
