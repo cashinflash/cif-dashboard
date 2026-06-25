@@ -1513,10 +1513,12 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
                 <div class="profile-status-sub" id="profile-status-sub">Loading customer profile</div>
               </div>
               <span id="profile-bank-badge" style="display:none;align-items:center;gap:5px;background:var(--green-50);color:var(--green-dark);border:1px solid var(--green-200);padding:6px 11px;border-radius:999px;font-size:11.5px;font-weight:700;letter-spacing:.02em;margin-right:6px"><svg class="icn" style="width:13px;height:13px"><use href="#i-bank"/></svg>Bank Connected</span>
-              <button id="profile-balance-btn" onclick="checkPlaidBalance(window._profileFbId)" style="display:none;align-items:center;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-right:6px">Check balance</button>
               <a class="btn btn-ghost" id="profile-vergent-link" href="#" target="_blank" rel="noopener" style="display:none"><svg class="icn"><use href="#i-external"/></svg>Open in Vergent</a>
             </div>
-            <div id="profile-balance-result" style="display:none;font-size:13px;margin:8px 0 0;padding:9px 12px;border-radius:8px;background:#f4f7f9;border:1px solid var(--border);line-height:1.5"></div>
+            <div id="profile-balance-row" style="display:none;margin-top:12px">
+              <button id="profile-balance-btn" onclick="checkPlaidBalance(window._profileFbId)" style="display:inline-flex;align-items:center;gap:6px;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;border-radius:8px;padding:9px 14px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit"><svg class="icn" style="width:14px;height:14px"><use href="#i-bank"/></svg>Check balance</button>
+              <div id="profile-balance-result" style="display:none;font-size:13px;margin-top:10px;padding:11px 13px;border-radius:10px;background:#f4f7f9;border:1px solid var(--border);line-height:1.55;word-break:break-word"></div>
+            </div>
 
             <!-- Contact + Identity cards -->
             <div class="sec-h">Customer Information</div>
@@ -4390,15 +4392,16 @@ function renderBalanceResult(d){
   el.style.background='#e8f5ee';el.style.borderColor='#bfe3cd';el.style.color='#1a6b3c';
   const when=d.checkedAt?new Date(d.checkedAt).toLocaleString():'';
   const rows=(d.accounts||[]).map(function(ac){
-    const amt=(ac.available!=null?ac.available:ac.current);
-    const nm=(ac.name||'Account')+(ac.mask?(' ('+ac.mask+')'):'');
-    return '<div style="display:flex;justify-content:space-between;gap:12px"><span></span><span style="font-weight:700"></span></div>'
-      .replace('<span></span>','<span>'+nm+'</span>')
-      .replace('<span style="font-weight:700"></span>','<span style="font-weight:700">'+_fmtMoney(amt)+' avail</span>');
+    const avail=(ac.available!=null?ac.available:ac.current);
+    const nm=escapeHtml((ac.name||'Account')+(ac.mask?(' ('+ac.mask+')'):''));
+    return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:4px 0;border-top:1px solid rgba(26,107,60,.12)">'
+      +'<span>'+nm+'</span>'
+      +'<span style="white-space:nowrap"><b style="font-size:14px">'+_fmtMoney(avail)+'</b> <span style="font-size:11px;opacity:.7">available</span></span></div>';
   }).join('');
-  el.innerHTML='<div style="font-weight:700;margin-bottom:4px">Live balance'+(d.institution?(' · '+d.institution):'')+'</div>'
-    +(rows||'<div>No deposit accounts returned</div>')
-    +'<div style="font-size:11px;opacity:.8;margin-top:5px">checked '+when+'</div>';
+  el.innerHTML='<div style="font-weight:800;margin-bottom:2px">Live balance'
+    +(d.institution?(' <span style="font-weight:600;opacity:.8">· '+escapeHtml(d.institution)+'</span>'):'')+'</div>'
+    +(rows||'<div style="padding-top:4px">No deposit accounts returned</div>')
+    +'<div style="font-size:11px;opacity:.7;margin-top:6px">Checked '+escapeHtml(when)+'</div>';
 }
 function checkPlaidBalance(fbId){
   if(!fbId) return;
@@ -4468,9 +4471,9 @@ function renderProfilePanel(fbId) {
   // Balance-check button: only for Plaid-connected customers. On reopen,
   // show the cached reading (no re-bill); the button forces a fresh check.
   window._profileFbId = fbId;
-  const balBtn = document.getElementById('profile-balance-btn');
+  const balRow = document.getElementById('profile-balance-row');
   const balRes = document.getElementById('profile-balance-result');
-  if (balBtn) balBtn.style.display = hasActivePlaid ? 'inline-flex' : 'none';
+  if (balRow) balRow.style.display = hasActivePlaid ? 'block' : 'none';
   if (balRes) {
     if (hasActivePlaid && a.plaidBalance && a.plaidBalance.ok) {
       renderBalanceResult(a.plaidBalance);
