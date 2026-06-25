@@ -5452,7 +5452,14 @@ function checkPlaidBalance(fbId){
   if(el){el.style.display='block';el.style.background='#f4f7f9';el.style.borderColor='var(--border)';el.style.color='var(--muted)';el.textContent='Checking live balance…';}
   fetch('/api/plaid-balance',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({firebase_id:fbId})})
     .then(function(r){return r.json();})
-    .then(function(d){renderBalanceResult(d);})
+    .then(function(d){
+      // Persist on the in-memory app so the panel's poll/async re-renders
+      // keep showing it (renderProfilePanel re-shows a.plaidBalance) — the
+      // card now stays until the next Check balance replaces it.
+      const app=apps.find(function(x){return x.firebaseId===fbId;});
+      if(app && d && d.ok) app.plaidBalance=d;
+      renderBalanceResult(d);
+    })
     .catch(function(e){renderBalanceResult({ok:false,message:'Request failed: '+e});})
     .finally(function(){if(btn){btn.disabled=false;btn.style.opacity='';}});
 }
@@ -5486,6 +5493,7 @@ function findAppByIdentity(row){
   }
   return null;
 }
+var _lnsOvBalanceCache = {};  // CustomerId -> last live balance (persists the card)
 async function checkLoansDueBalance(btn){
   const row=_lnsOvRow; if(!row) return;
   const cid=String(row.CustomerId||'');
@@ -5499,6 +5507,7 @@ async function checkLoansDueBalance(btn){
     if(!fbId){ renderBalanceResult({ok:false,message:'No matching application found in the dashboard for this customer — live balance unavailable.'}, 'lns-ov-balance-result'); return; }
     if(el) el.textContent='Checking live balance…';
     const d=await (await fetch('/api/plaid-balance',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({firebase_id:fbId})})).json();
+    if(d && d.ok) _lnsOvBalanceCache[cid]=d;  // keep the card until a new check replaces it
     renderBalanceResult(d, 'lns-ov-balance-result');
   }catch(e){ renderBalanceResult({ok:false,message:'Request failed: '+e}, 'lns-ov-balance-result'); }
   finally{ if(btn){btn.disabled=false;btn.style.opacity='';} }
@@ -12957,8 +12966,8 @@ async function lnsOvOpenAdmin() {
     let fbId = findAppByIdentity(_lnsOvRow);
     if (!fbId && cid) fbId = await _lnsOvAwaitFbId(cid, 25000, loanId);
     if (fbId) {
-      closeLoansDueDetailModal();
-      location.hash = '#fb=' + encodeURIComponent(fbId);
+      // Open the application in a NEW tab; leave the Loans Due modal open.
+      window.open(location.pathname + location.search + '#fb=' + encodeURIComponent(fbId), '_blank');
     } else {
       toast('No application found in our system for this customer.', 'err');
     }
@@ -13056,11 +13065,14 @@ function openLoansDueDetailModal(row) {
   const ov = document.getElementById('lns-ov');
   if (!ov) return;
   ov.classList.add('open');
-  // Reset the live-balance result so a previous customer's reading doesn't linger.
-  const _balRes = document.getElementById('lns-ov-balance-result');
-  if (_balRes) { _balRes.style.display = 'none'; _balRes.innerHTML = ''; }
+  // Live-balance card: re-show this customer's last reading if we have one
+  // (persists across re-opens until a new Check balance replaces it); else
+  // clear any previous customer's card.
   const _balBtn = document.getElementById('lns-ov-balance');
   if (_balBtn) { _balBtn.disabled = false; _balBtn.style.opacity = ''; }
+  const _cachedBal = _lnsOvBalanceCache[String(row.CustomerId || '')];
+  if (_cachedBal) { renderBalanceResult(_cachedBal, 'lns-ov-balance-result'); }
+  else { const _balRes = document.getElementById('lns-ov-balance-result'); if (_balRes) { _balRes.style.display = 'none'; _balRes.innerHTML = ''; } }
   const name = ((row.FirstName || '') + ' ' + (row.LastName || '')).trim() || '—';
   const cid = String(row.CustomerId || '');
   const loanIdDisplay = row.LoanId || row.HdrId || '—';
