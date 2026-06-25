@@ -3817,10 +3817,26 @@ function toggleV4Report() {
   if (_reportViewFbId) renderDetail(_reportViewFbId);
 }
 
+var _detailHydrateState = {};
 function renderDetail(fbId) {
   const a = apps.find(x => x.firebaseId === fbId);
   if (!a) {
     document.getElementById('dv-name').textContent = 'Loading…';
+    // Not in the loaded queue — common for older funded loans opened from
+    // Loans Due / Payments (via the customer-lookup -> #fb=<id>). Fetch the
+    // full record once from Firebase, then re-render so it actually opens
+    // instead of sticking on "Loading…". Guarded so a genuinely-missing
+    // record shows a message rather than looping.
+    const st = _detailHydrateState[fbId];
+    if (!st) {
+      _detailHydrateState[fbId] = 'loading';
+      hydrateFullRecord(fbId).then(function () {
+        _detailHydrateState[fbId] = apps.find(function (x) { return x.firebaseId === fbId; }) ? 'done' : 'failed';
+        if (document.body.dataset.firebaseId === fbId) renderDetail(fbId);
+      });
+    } else if (st === 'failed') {
+      document.getElementById('dv-name').textContent = 'Application not found';
+    }
     return;
   }
   // Stage 2: the list/poll only carries the lightweight index entry
