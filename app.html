@@ -713,9 +713,11 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 .src-badge{display:inline-flex;align-items:center;font-size:9.5px;font-weight:800;letter-spacing:.06em;padding:2px 7px;border-radius:5px;text-transform:uppercase;line-height:1.4;flex-shrink:0;white-space:nowrap}
 .src-badge.src-apply{background:var(--green-100);color:var(--green-800);border:1px solid var(--green-200)}
 .src-badge.src-docs{background:var(--blue-100);color:var(--blue-700);border:1px solid var(--blue-100)}
+.src-badge.src-portalrl{background:#fff5e6;color:#5a3300;border:1px solid #f0c98a}
 /* On the green hero the contrast flips — both variants get a translucent white background. */
 .dv-hero .src-badge{background:rgba(255,255,255,.92);color:var(--green-dark);border-color:rgba(255,255,255,.6)}
 .dv-hero .src-badge.src-docs{color:var(--blue-700)}
+.dv-hero .src-badge.src-portalrl{color:#8a5200}
 
 /* Queue group-by-day header rows */
 .queue-group td{padding:14px 14px 6px !important;background:var(--bg) !important;border-bottom:none !important;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
@@ -2751,10 +2753,13 @@ function _sourceOf(a) {
   // apply submission path was the original; "docs" was added later, so
   // older records may have null/empty source and should land on apply.
   const s = (a && (a.source || '')).toLowerCase().trim();
+  if (s === 'portal_reloan') return 'portal_reloan';
   return s === 'docs' ? 'docs' : 'apply';
 }
 function sourceBadge(a) {
   const src = _sourceOf(a);
+  if (src === 'portal_reloan')
+    return '<span class="src-badge src-portalrl" title="Re-loan submitted from the customer portal (returning customer, Fast Re-Apply)">RL</span>';
   return src === 'docs'
     ? '<span class="src-badge src-docs" title="Submitted via docs.cashinflash.com (returning customer)">DOCS</span>'
     : '<span class="src-badge src-apply" title="Submitted via apply.cashinflash.com (full new-applicant form)">CASHINFLASH</span>';
