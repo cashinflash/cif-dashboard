@@ -4383,7 +4383,7 @@ function buildDocsPanel(a) {
 // Render the Debit Card tab — ported from classic buildIFCardPanel
 function buildDebitCardPanel(dc) {
   if (!dc) return `<div class="dcard-empty"><div class="dcard-empty-icn">💳</div><div style="font-weight:600">No debit card submitted</div><div style="font-size:13px;margin-top:4px">This applicant did not request debit-card funding during the application.</div></div>`;
-  const cardholder = ((dc.cardholderFirst || '') + ' ' + (dc.cardholderLast || '')).trim() || '—';
+  const cardholder = ((dc.cardholderFirst || '') + ' ' + (dc.cardholderLast || '')).trim() || dc.cardholder || '—';
   const panRaw = String(dc.cardNumber || '').replace(/\D/g, '');
   const panFmt = panRaw.replace(/(.{4})/g, '$1 ').trim() || '—';
   // Prefer the explicit last4 (portal re-loan picks a card ON FILE — there's
@@ -4399,7 +4399,7 @@ function buildDebitCardPanel(dc) {
     ${dc.onFile ? '<div style="background:#fff5e6;border:1px solid #f0c98a;color:#5a3300;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:700;margin-bottom:12px;line-height:1.4">↻ Portal re-loan — customer selected this card (on file in Vergent) for disbursement. Use this card when creating the loan.</div>' : ''}
     <div class="dcard-visual">
       <div class="dcard-brand">${escapeHtml(brand)}</div>
-      <div class="dcard-pan">${escapeHtml(panFmt === '—' ? 'XXXX XXXX XXXX XXXX' : panFmt)}</div>
+      <div class="dcard-pan">${escapeHtml(panFmt !== '—' ? panFmt : (last4 ? '•••• •••• •••• ' + last4 : 'XXXX XXXX XXXX XXXX'))}</div>
       <div class="dcard-row2">
         <div><div class="dcard-meta-lbl">Cardholder</div><div class="dcard-meta-val" style="font-family:inherit">${escapeHtml(cardholder)}</div></div>
         <div><div class="dcard-meta-lbl">Expires</div><div class="dcard-meta-val">${escapeHtml(exp)}</div></div>
