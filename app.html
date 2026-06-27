@@ -4265,7 +4265,20 @@ function buildAppDetails(d) {
     return `<div class="app-data-row"><span class="app-data-label">${escapeHtml(label)}</span><span class="app-data-value" id="${eid}">${escapeHtml(value)}</span><button class="app-data-copy" onclick="copyField('${eid}', this)">Copy</button></div>`;
   }
   function sec(title) { return `<div class="app-data-section">${escapeHtml(title)}</div>`; }
+  // Portal re-loan bank-match flag: the customer is warned but not blocked at
+  // intake, so the operator confirms the exact account here before funding
+  // (Vergent has no API to overwrite the account on file).
+  function bankMatchBanner(bm) {
+    if (!bm || typeof bm !== 'object') return '';
+    const conn = escapeHtml(bm.connectedLast4 || ''), file = escapeHtml(bm.onFileLast4 || '');
+    if (!conn || !file) return '';
+    if (bm.matches) {
+      return `<div style="background:#e8f5ee;border:1px solid #bfe3cd;color:#1a6b3c;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;margin-bottom:8px">✓ Bank verified — connected account matches the one on file (••••${conn}).</div>`;
+    }
+    return `<div style="background:#fde7e7;border:1px solid #f0b3b3;color:#5a0d0d;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:700;margin-bottom:8px;line-height:1.45">⚠ Bank mismatch — customer connected ••••${conn} via Plaid, but Vergent has ••••${file} on file. Confirm the correct account before funding.</div>`;
+  }
   return `<div class="app-data">
+    ${bankMatchBanner(d.bankMatch)}
     <div style="display:flex;justify-content:flex-end;margin-bottom:4px"><button onclick="openEditAppModal()" style="background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit" title="Correct application fields (e.g. a wrong DOB) before pushing to Vergent">✏️ Edit Info</button></div>
     ${sec('Personal Information')}
     ${row('First Name', d.firstName, 'fname')}
