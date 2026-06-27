@@ -2911,7 +2911,7 @@ function _sourceOf(a) {
 function sourceBadge(a) {
   const src = _sourceOf(a);
   if (src === 'portal_reloan')
-    return '<span class="src-badge src-portalrl" title="Re-loan submitted from the customer portal (returning customer, Fast Re-Apply)">&#8635; RE-LOAN</span>';
+    return '<span class="src-badge src-portalrl" title="Submitted from the customer portal (returning customer re-loan)">PORTAL</span>';
   return src === 'docs'
     ? '<span class="src-badge src-docs" title="Submitted via docs.cashinflash.com (returning customer)">DOCS</span>'
     : '<span class="src-badge src-apply" title="Submitted via apply.cashinflash.com (full new-applicant form)">CASHINFLASH</span>';
@@ -4386,7 +4386,9 @@ function buildDebitCardPanel(dc) {
   const cardholder = ((dc.cardholderFirst || '') + ' ' + (dc.cardholderLast || '')).trim() || '—';
   const panRaw = String(dc.cardNumber || '').replace(/\D/g, '');
   const panFmt = panRaw.replace(/(.{4})/g, '$1 ').trim() || '—';
-  const last4 = panRaw.slice(-4);
+  // Prefer the explicit last4 (portal re-loan picks a card ON FILE — there's
+  // no full PAN, only last4/brand/exp from Vergent), else derive from the PAN.
+  const last4 = panRaw.slice(-4) || String(dc.last4 || '');
   const mm = String(dc.expMonth || '').padStart(2, '0').slice(-2);
   const yy = String(dc.expYear || '').slice(-2);
   const exp = (mm && yy) ? mm + '/' + yy : '—';
@@ -4394,6 +4396,7 @@ function buildDebitCardPanel(dc) {
   const submittedAt = dc.optedInAt ? new Date(dc.optedInAt).toLocaleString() : (dc.submittedAt ? new Date(dc.submittedAt).toLocaleString() : '—');
 
   return `<div class="dcard">
+    ${dc.onFile ? '<div style="background:#fff5e6;border:1px solid #f0c98a;color:#5a3300;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:700;margin-bottom:12px;line-height:1.4">↻ Portal re-loan — customer selected this card (on file in Vergent) for disbursement. Use this card when creating the loan.</div>' : ''}
     <div class="dcard-visual">
       <div class="dcard-brand">${escapeHtml(brand)}</div>
       <div class="dcard-pan">${escapeHtml(panFmt === '—' ? 'XXXX XXXX XXXX XXXX' : panFmt)}</div>
