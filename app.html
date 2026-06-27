@@ -3554,7 +3554,7 @@ function renderActionCenter() {
   const row = (a, icon, cls, sub) =>
     `<div class="activity-row" data-fb="${escapeHtml(a.firebaseId)}">
        <div class="act-icon ${cls}">${icon}</div>
-       <div class="act-text"><div class="act-label">${escapeHtml(a.name || 'Unnamed')}</div>
+       <div class="act-text"><div class="act-label">${escapeHtml(a.name || 'Unnamed')}${_sourceOf(a) === 'portal_reloan' ? ' ' + sourceBadge(a) : ''}</div>
        <div class="act-sub">${escapeHtml(sub || '')}</div></div>
        <div class="act-time">${fmtTimeAgo(a.createdAt)}</div></div>`;
 
