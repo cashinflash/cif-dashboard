@@ -2738,13 +2738,10 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 <!-- CUSTOMERS — unified hub. Three panels:
        • Portal Support — admin search of the portal customer base
          (Cognito-sourced via cif-portal /api/admin/customers/search).
-       • App Links — Plaid connections from cif-apply applications.
        • Portal Links — Plaid items connected through the customer portal.
-     App Links + Portal Links were previously their own "Connections"
-     route; consolidated here so operators have one customer hub.
-     Inner element IDs (plaid-list, plaid-search, portal-plaid-list,
-     portal-plaid-search) are preserved so the existing loaders /
-     filters keep working byte-for-byte. -->
+     (The legacy "App Links" tab was removed — see the tab strip below.
+     Its loader/render functions remain defined but are no longer wired
+     to any UI.) -->
 <div class="view" id="view-customers">
   <div class="main full">
     <div class="greet">
@@ -2754,10 +2751,13 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       </div>
     </div>
 
-    <!-- Inner tab strip — Portal Support · App Links · Portal Links. -->
+    <!-- Inner tab strip — Portal Support · Portal Links.
+         (The legacy "App Links" tab was removed — it pulled the entire
+         /reports tree through a 10s proxy and timed out as data grew,
+         and the Plaid rerun action it existed for now lives on the
+         application detail page.) -->
     <div class="conn-tabs" style="display:flex;gap:5px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;width:max-content;max-width:100%;flex-wrap:wrap;box-shadow:var(--shadow-xs)">
       <button class="tf-btn active" data-cust-tab="portal" onclick="setCustTab('portal')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-bolt"/></svg>Portal Support</button>
-      <button class="tf-btn" data-cust-tab="applinks" onclick="setCustTab('applinks')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-bank"/></svg>App Links</button>
       <button class="tf-btn" data-cust-tab="portallinks" onclick="setCustTab('portallinks')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-bank"/></svg>Portal Links</button>
     </div>
 
@@ -2776,16 +2776,6 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       </div>
       <div id="cust-portal-meta" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
       <div id="cust-portal-results" style="display:flex;flex-direction:column;gap:8px"></div>
-    </div>
-
-    <!-- App Links panel (Plaid connections from cif-apply applications). -->
-    <div id="cust-panel-applinks" style="display:none">
-      <div style="margin-bottom:14px">
-        <input type="text" id="plaid-search" placeholder="Search by name, phone or email..." oninput="filterPlaidCustomers(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
-      </div>
-      <div id="plaid-list">
-        <div class="tbl-loading">Loading…</div>
-      </div>
     </div>
 
     <!-- Portal Links panel (Plaid items connected through the customer portal). -->
@@ -2812,6 +2802,11 @@ let _currentUser = '';
 let _currentRole = 'user';
 let pollTimer = null;
 let _lastDetailFbId = null;
+// Fingerprint of the document URLs last rendered into the Documents
+// grid. Lets the grid re-render when a doc changes (e.g. a fresh Plaid
+// asset-report PDF lands after Refresh from Plaid) WITHOUT re-rendering
+// on every 8s poll (which would reload the iframes and flicker).
+let _lastDocsFingerprint = null;
 // Stage 2 cost fix: the list/poll now reads the compact /reportsIndex
 // (≈150 bytes/applicant) instead of the whole /reports tree (which
 // embeds the heavy engine-report HTML + Plaid blobs). The full record
@@ -3092,10 +3087,10 @@ function readRouteFromHash() {
   if (h === '#communications') return ['communications', null];
   // All Customers-related hashes resolve to the unified view; the
   // 2nd tuple element selects the inner sub-tab. Legacy Connections
-  // hashes (#connections, #applinks, #plaid, #portallinks, #portal-plaid)
-  // redirect into view-customers so existing bookmarks still land in
-  // the right place.
-  if (h === '#applinks' || h === '#plaid' || h === '#connections') return ['customers', 'applinks'];
+  // hashes redirect into view-customers so existing bookmarks still
+  // land in the right place. The App Links tab was removed, so its old
+  // hashes (#applinks, #plaid, #connections) now land on Portal Support.
+  if (h === '#applinks' || h === '#plaid' || h === '#connections') return ['customers', 'portal'];
   if (h === '#portallinks' || h === '#portal-plaid') return ['customers', 'portallinks'];
   if (h === '#customers' || h === '#portal-support' || h === '#portal') return ['customers', 'portal'];
   return ['dashboard', null];
@@ -4146,7 +4141,29 @@ function renderDetail(fbId) {
   if (isNewApplicant) {
     document.getElementById('dv-app-data').innerHTML = buildAppDetails(ad);
     document.getElementById('dv-debit-card').innerHTML = buildDebitCardPanel(dc);
+  }
+  // Documents grid — re-render on applicant switch OR whenever a doc
+  // URL changes (e.g. a fresh Plaid PDF landed after Refresh from
+  // Plaid). The fingerprint guard means routine polls don't touch the
+  // grid (no iframe flicker); only a genuine doc change repaints it.
+  const docsFingerprint = [
+    a.govIdUrl, a.bankStatementUrl, a.paystubUrl,
+    ad.bankStatementUrl, ad.assetReportUrl, ad.driverLicenseUrl,
+    ad.dlUrl, ad.idDocumentUrl, ad.paystubUrl,
+    a.plaidAssetReportPdfRefreshedAt,
+  ].join('|');
+  if (isNewApplicant || docsFingerprint !== _lastDocsFingerprint) {
     document.getElementById('dv-docs-grid').innerHTML = buildDocsPanel(a);
+    _lastDocsFingerprint = docsFingerprint;
+    // The Vergent "Documents on File" sub-panel lives inside the grid we
+    // just rebuilt, so re-trigger its async load when there's a matched
+    // customer (no-op otherwise).
+    if (typeof loadVergentCustomerDocs === 'function') {
+      try {
+        const _vm = (_vergentMatchCache && _vergentMatchCache[fbId]) || null;
+        if (_vm && _vm.customerId) loadVergentCustomerDocs(_vm.customerId, fbId);
+      } catch (e) { /* non-fatal */ }
+    }
   }
 
   // History tab — current activity + previous applications from same customer
@@ -7216,7 +7233,7 @@ function dvShowRerunLoading(label) {
     el.innerHTML =
       '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;text-align:center">' +
       '<div style="width:46px;height:46px;border:4px solid var(--green-200);border-top-color:var(--green);border-radius:50%;animation:spin .9s linear infinite;margin-bottom:18px"></div>' +
-      '<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">' + label + '</div>' +
+      '<div id="dv-rerun-label" style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">' + label + '</div>' +
       '<div style="font-size:12.5px;color:var(--text2);line-height:1.55;max-width:420px">This can take up to ~2 minutes. The report updates here automatically when it’s done — you can keep working in other tabs meanwhile.</div>' +
       '</div>';
   }
@@ -7317,8 +7334,47 @@ async function reExtractPdf(fbId) {
   }
 }
 
+// Update the live stage line inside the rerun spinner.
+function dvUpdateRerunStage(text) {
+  const el = document.getElementById('dv-rerun-label');
+  if (el && text) el.textContent = text;
+}
+
+// Persistent corner chip for the slow PDF download phase. The engine
+// report appears as soon as it's ready; this chip keeps the operator
+// informed while the fresh bank-statement PDF finishes downloading
+// (Plaid can take a few minutes). Visible on any tab; survives
+// re-renders because it lives on <body>, not inside the detail view.
+function _showDocsRefreshing(on, doneText, isError) {
+  let chip = document.getElementById('plaid-pdf-chip');
+  if (on) {
+    if (!chip) {
+      chip = document.createElement('div');
+      chip.id = 'plaid-pdf-chip';
+      chip.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:9999;background:#0f2942;color:#fff;border-radius:10px;padding:11px 14px;font-size:12.5px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.28);display:flex;align-items:center;gap:9px;max-width:300px;font-family:inherit;line-height:1.35';
+      document.body.appendChild(chip);
+    }
+    chip.style.background = '#0f2942';
+    chip.innerHTML =
+      '<div style="width:15px;height:15px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .9s linear infinite;flex:none"></div>' +
+      '<div>Downloading the fresh bank statement…<div style="font-weight:400;opacity:.8;margin-top:2px">Appears in the Documents tab automatically</div></div>';
+    return;
+  }
+  if (!chip) return;
+  if (doneText) {
+    chip.style.background = isError ? '#7a2230' : '#1a6b3c';
+    chip.innerHTML = '<div style="flex:none;font-size:15px">' + (isError ? '⚠' : '✓') + '</div><div>' + doneText + '</div>';
+    setTimeout(function () {
+      const c = document.getElementById('plaid-pdf-chip');
+      if (c) c.remove();
+    }, 4500);
+  } else {
+    chip.remove();
+  }
+}
+
 async function refreshFromPlaid(fbId) {
-  toast('Refreshing from Plaid…');
+  toast('Starting fresh Plaid pull…');
   dvShowRerunLoading('Pulling a fresh Plaid asset report & re-running…');
   try {
     const r = await fetch('/api/refresh-from-plaid', {
@@ -7327,16 +7383,113 @@ async function refreshFromPlaid(fbId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ firebase_id: fbId })
     });
-    if (!r.ok) throw new Error('Refresh failed');
-    toast('Plaid refreshed — re-running engine', 'ok');
-    await loadReports();
-    _rehydrateForV4Shadow(fbId);
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      // 400 no_plaid_connection, 404 not found, etc. Surface the
+      // backend's human-readable detail.
+      const msg = d.detail || d.error || ('HTTP ' + r.status);
+      toast('Refresh failed: ' + msg, 'err');
+      dvEndRerunLoading();
+      _lastReportHtml = null;
+      rerender();
+      return;
+    }
+    // Background job kicked off — poll plaidRefreshStatus for progress.
+    await _pollPlaidRefresh(fbId, d.pdf_refreshable !== false);
   } catch (e) {
-    toast('Refresh failed: ' + e.message, 'err');
+    toast('Refresh failed: ' + ((e && e.message) || e), 'err');
+    dvEndRerunLoading();
     _lastReportHtml = null;
     rerender();
-  } finally {
+  }
+}
+
+// Poll the background Plaid-refresh job. Two phases:
+//   Phase 1 (engine): big spinner with live stage text until the engine
+//     finishes (plaidRefreshStatus 'engine_done' or 'done'), then we
+//     show the fresh report and drop the spinner.
+//   Phase 2 (PDF): a corner chip until the fresh PDF lands, at which
+//     point the Documents grid auto-repaints (via the fingerprint).
+async function _pollPlaidRefresh(fbId, pdfRefreshable) {
+  let engineShown = false;
+  const MAX_TRIES = 72;          // 72 × 5s ≈ 6 minutes
+  for (let i = 0; i < MAX_TRIES; i++) {
+    await new Promise(res => setTimeout(res, 5000));
+    // Operator navigated to a different applicant — stop quietly; the
+    // job keeps running server-side and the result is on the record.
+    const viewing = document.body.dataset.firebaseId;
+    if (viewing && viewing !== fbId) {
+      if (!engineShown) dvEndRerunLoading();
+      _showDocsRefreshing(false);
+      return;
+    }
+    let rec;
+    try { rec = await fbGet(`reports/${fbId}.json`); } catch (e) { continue; }
+    if (!rec) continue;
+    const st = rec.plaidRefreshStatus;
+    const stage = rec.plaidRefreshStage || '';
+    const pdfState = rec.plaidRefreshPdf;
+
+    if (st === 'error') {
+      toast('Refresh failed: ' + (rec.plaidRefreshError || 'unknown error'), 'err');
+      dvEndRerunLoading();
+      _showDocsRefreshing(false);
+      await hydrateFullRecord(fbId);
+      _lastReportHtml = null;
+      rerender();
+      return;
+    }
+
+    if (!engineShown) {
+      if (st === 'engine_done' || st === 'done') {
+        // The fresh report is live — show it and drop the big spinner.
+        engineShown = true;
+        await hydrateFullRecord(fbId);
+        _lastReportHtml = null;
+        rerender();
+        dvEndRerunLoading();
+        toast('Report updated from fresh Plaid data', 'ok');
+        // Nothing more to wait for if the PDF is already settled.
+        if (st === 'done' || pdfState === 'done' || pdfState === 'skipped' || pdfState === 'error') {
+          _finishPlaidPdf(rec);
+          return;
+        }
+        // Otherwise the PDF is still downloading — show the corner chip.
+        _showDocsRefreshing(true);
+      } else {
+        // Still working — surface the live stage in the spinner.
+        dvUpdateRerunStage(stage || 'Working…');
+      }
+    } else {
+      // Engine already shown; we're only waiting on the PDF now.
+      if (st === 'done' || pdfState === 'done' || pdfState === 'error' || pdfState === 'skipped') {
+        await hydrateFullRecord(fbId);
+        rerender();   // fingerprint change → Documents grid repaints with the new PDF
+        _finishPlaidPdf(rec);
+        return;
+      }
+    }
+  }
+  // Timed out waiting.
+  if (!engineShown) {
+    toast('Still running — give it another minute, then reopen this applicant', 'err');
     dvEndRerunLoading();
+  } else {
+    _showDocsRefreshing(false, 'The fresh PDF is taking longer than usual — it’ll appear in Documents when ready', true);
+  }
+}
+
+function _finishPlaidPdf(rec) {
+  const pdfState = rec.plaidRefreshPdf;
+  if (pdfState === 'done') {
+    _showDocsRefreshing(false, 'Bank statement updated in Documents');
+  } else if (pdfState === 'error') {
+    _showDocsRefreshing(false, 'Report updated, but the fresh PDF failed — the previous PDF was kept', true);
+  } else if (pdfState === 'skipped') {
+    _showDocsRefreshing(false);
+    if (rec.plaidRefreshNote) toast(rec.plaidRefreshNote, 'err');
+  } else {
+    _showDocsRefreshing(false);
   }
 }
 
@@ -8657,14 +8810,15 @@ function loadCustomers() {
 }
 
 function setCustTab(name) {
-  if (name !== 'portal' && name !== 'applinks' && name !== 'portallinks') name = 'portal';
+  // 'applinks' was removed — fold any lingering reference into Portal.
+  if (name === 'applinks') name = 'portal';
+  if (name !== 'portal' && name !== 'portallinks') name = 'portal';
   _custTab = name;
   document.querySelectorAll('[data-cust-tab]').forEach(function(b) {
     b.classList.toggle('active', b.getAttribute('data-cust-tab') === name);
   });
   const panels = {
     portal:      document.getElementById('cust-panel-portal'),
-    applinks:    document.getElementById('cust-panel-applinks'),
     portallinks: document.getElementById('cust-panel-portallinks'),
   };
   Object.keys(panels).forEach(function(k) {
@@ -8674,14 +8828,12 @@ function setCustTab(name) {
   if (sub) {
     sub.innerHTML = name === 'portal'
       ? 'Customers who registered at <b>apply.cashinflash.com</b>. Search by customer ID, email, or last name — or browse the full list below.'
-      : name === 'applinks'
-        ? 'Plaid connections from <b>cif-apply</b> applications — open a row to re-run reports or push to Vergent.'
-        : 'Plaid items connected through the <b>customer portal</b> — view balances and re-pull data anytime.';
+      : 'Plaid items connected through the <b>customer portal</b> — view balances and re-pull data anytime.';
   }
   // Portal Support tab auto-loads the full list on first activation so
   // the operator sees every registered customer without having to type.
-  // App Links / Portal Links kick off their own loaders here so the
-  // panel content is ready by the time the tab is visible.
+  // Portal Links kicks off its own loader here so the panel content is
+  // ready by the time the tab is visible.
   if (name === 'portal') {
     const input = document.getElementById('cust-portal-q');
     if (input) input.focus();
@@ -8689,8 +8841,6 @@ function setCustTab(name) {
       _custPortalLoaded = true;
       doCustomerSearch('portal');  // empty-q → list-all from backend
     }
-  } else if (name === 'applinks') {
-    loadPlaidCustomers();
   } else if (name === 'portallinks') {
     loadPortalPlaid();
   }
