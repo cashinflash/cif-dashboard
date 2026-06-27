@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Cash in Flash — Underwriting Dashboard Web Server"""
 import collections, hashlib, hmac, http.client, json, os, re, secrets, ssl, time, urllib.error, urllib.request
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import HTTPServer, ThreadingHTTPServer, BaseHTTPRequestHandler
 
 PORT = int(os.environ.get('PORT', 8080))
 FB_BASE = 'https://cashinflash-a1dce-default-rtdb.firebaseio.com'
@@ -2057,6 +2057,55 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        # Live Plaid balance check ($0.10/call) for the customer modal —
+        # forwards {firebase_id} to cif-apply's /api/plaid-balance. Only
+        # called when the operator clicks "Check balance"; cif-apply caches
+        # the reading so a re-open doesn't re-bill.
+        if path == '/api/plaid-balance':
+            try:
+                body = json.loads(raw)
+                payload = json.dumps(body).encode()
+                print('[PLAID-BALANCE PROXY] Forwarding to cif-apply...', flush=True)
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/plaid-balance',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=30) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[PLAID-BALANCE UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[PLAID-BALANCE ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
+        # On-demand Plaid asset-report PDF ($0.99) — forwards {firebase_id}
+        # to cif-apply's /api/generate-plaid-pdf. Powers the "View asset PDF"
+        # button for applicants whose submit-time PDF was deferred for cost.
+        if path == '/api/generate-plaid-pdf':
+            try:
+                body = json.loads(raw)
+                payload = json.dumps(body).encode()
+                print('[GEN-PLAID-PDF PROXY] Forwarding to cif-apply...', flush=True)
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/generate-plaid-pdf',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=60) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[GEN-PLAID-PDF UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[GEN-PLAID-PDF ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         # Push a single free-text note to a Vergent customer. Used by the
         # Notes tab on the dashboard — every operator-posted note also
         # lands in Vergent (with the Must-Read flag so it surfaces on the
@@ -2109,6 +2158,53 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(e.code, err_body)
             except Exception as e:
                 print(f'[VERGENT-CARD-PAYMENTS ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
+        # Schedule a future payment (ACH or Card) — used by the
+        # Payments page detail modal's "Schedule Payment" button on
+        # declined-payment rows.
+        if path == '/api/vergent-schedule-payment':
+            try:
+                body = json.loads(raw) if raw else {}
+                payload = json.dumps(body).encode()
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/vergent-schedule-payment',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=30) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[SCHED-PMT UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[SCHED-PMT ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
+        # Fbid lookup by Vergent customer_id — used by the Payments
+        # page detail modal's "Create Loan" button. cif-apply walks
+        # /reports to find the matching firebase_id; we just pass
+        # through with a snappy timeout.
+        if path == '/api/lookup-fbid-by-vergent-cid':
+            try:
+                body = json.loads(raw) if raw else {}
+                payload = json.dumps(body).encode()
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/lookup-fbid-by-vergent-cid',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=30) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[FBID-LOOKUP UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[FBID-LOOKUP ERROR] {e}', flush=True)
                 self.send_json(500, {'error': str(e)})
             return
 
@@ -2774,4 +2870,12 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == '__main__':
     print(f'CIF Dashboard on port {PORT}')
     print(f'Users configured: {sorted(USERS.keys())}')
-    HTTPServer(('0.0.0.0', PORT), Handler).serve_forever()
+    # ThreadingHTTPServer — one thread per request. cif-apply already
+    # uses this; we were on the single-threaded HTTPServer, which
+    # meant any slow upstream call (Vergent ASPX scrape ~5-10s,
+    # /reports walk on cif-apply, anything else proxied) blocked
+    # every other request — including Render's health-check probes.
+    # When the probe timed out, Render flagged the instance
+    # unhealthy and restarted it, producing the
+    # "dial tcp ... i/o timeout" alerts the operator reported.
+    ThreadingHTTPServer(('0.0.0.0', PORT), Handler).serve_forever()

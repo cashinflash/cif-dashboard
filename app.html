@@ -1089,6 +1089,37 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   .bktile-count{font-size:18px}
 }
 
+/* Loans Due — phone-optimised layout (≤640px). Two changes:
+   1) KPI strip → 2x2 grid so all four numbers are visible without
+      horizontal scroll (the hero "To collect" card spans both
+      columns on top).
+   2) Bucket cards → single horizontally-scrolling chip rail per
+      section (Upcoming / Past Due), each tile collapses to a
+      pill-shaped chip showing label + count (dollar amount hidden;
+      tappable to filter the table below). Goes from ~280px of
+      chrome before the loan list to ~50px. Desktop layout
+      unchanged. */
+@media(max-width:640px){
+  #rpt-stats{grid-template-columns:repeat(2,1fr) !important;gap:8px !important;margin-bottom:14px !important}
+  #rpt-stats .stat{padding:10px 12px}
+  #rpt-stats .stat-value{font-size:20px}
+  #rpt-stats .stat-hero{grid-column:span 2}
+  #rpt-stats .stat-hero .stat-value{font-size:24px}
+  #rpt-stats .stat-hero-sub{font-size:11px;margin-top:2px}
+  #rpt-buckets .rpt-bucket-section{margin-bottom:6px}
+  #rpt-buckets .rpt-bucket-section + .rpt-bucket-section{margin-top:0}
+  #rpt-buckets .rpt-bucket-head{margin-bottom:5px;gap:6px}
+  #rpt-buckets .rpt-bucket-title{font-size:10px;letter-spacing:.05em}
+  #rpt-buckets .rpt-bucket-head .chip{padding:4px 9px;font-size:11px;min-height:30px}
+  #rpt-buckets .rpt-bucket-cards{display:flex !important;grid-template-columns:none;overflow-x:auto;-webkit-overflow-scrolling:touch;gap:6px;padding-bottom:4px;scroll-snap-type:x proximity;scrollbar-width:none}
+  #rpt-buckets .rpt-bucket-cards::-webkit-scrollbar{display:none}
+  #rpt-buckets .bktile{flex:0 0 auto;padding:7px 14px 7px 14px;border-radius:999px;flex-direction:row;align-items:baseline;gap:7px;scroll-snap-align:start;min-width:0;box-shadow:none}
+  #rpt-buckets .bktile-band{width:3px;border-radius:3px}
+  #rpt-buckets .bktile-label{font-size:10.5px;padding-left:4px;letter-spacing:.04em}
+  #rpt-buckets .bktile-count{font-size:14px;padding-left:0;line-height:1}
+  #rpt-buckets .bktile-amt{display:none}
+}
+
 /* Custom-range modal (Loans Due tab) */
 #rng-modal{display:none;position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.5);align-items:center;justify-content:center;padding:20px}
 #rng-modal.open{display:flex}
@@ -1718,6 +1749,10 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
               <button class="btn btn-ghost" id="profile-vergent-recheck" type="button" title="Re-check Vergent for an existing customer record" style="display:none"><svg class="icn"><use href="#i-refresh"/></svg>Re-check</button>
               <a class="btn btn-ghost" id="profile-vergent-link" href="#" target="_blank" rel="noopener" style="display:none"><svg class="icn"><use href="#i-external"/></svg>Open in Vergent</a>
             </div>
+            <div id="profile-balance-row" style="display:none;margin-top:12px">
+              <button id="profile-balance-btn" onclick="checkPlaidBalance(window._profileFbId)" style="display:inline-flex;align-items:center;gap:6px;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;border-radius:8px;padding:9px 14px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit"><svg class="icn" style="width:14px;height:14px"><use href="#i-bank"/></svg>Check balance</button>
+              <div id="profile-balance-result" style="display:none;font-size:13px;margin-top:10px;padding:11px 13px;border-radius:10px;background:#f4f7f9;border:1px solid var(--border);line-height:1.55;word-break:break-word"></div>
+            </div>
 
             <!-- Contact + Identity cards -->
             <div class="sec-h">Customer Information</div>
@@ -1982,6 +2017,128 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     <div id="pay-status" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
     <div id="pay-table">
       <div class="tbl-loading">Loading payments…</div>
+    </div>
+  </div>
+</div>
+
+<!-- PAYMENTS — customer detail modal. Opens when a payment row is
+     tapped. Consolidates the old loan-history hover icon + the
+     customer-name-link-to-Vergent into one window. Mobile-friendly
+     by inheriting .appr-ov which already has a media query at line
+     1268 pinning width to calc(100vw - 16px) on small screens. -->
+<div class="appr-ov" id="pay-ov">
+  <div class="appr-card" style="max-width:540px">
+    <div class="appr-head">
+      <div style="min-width:0">
+        <div class="appr-title" id="pay-ov-name" style="font-size:16px;line-height:1.25;word-break:break-word">—</div>
+        <div class="appr-meta" id="pay-ov-meta" style="font-variant-numeric:tabular-nums">—</div>
+      </div>
+      <button onclick="closePaymentDetailModal()" style="background:transparent;border:none;font-size:24px;cursor:pointer;color:var(--muted);line-height:1;padding:4px 8px;min-width:36px;min-height:36px;border-radius:6px" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <div class="appr-body" style="max-height:calc(96vh - 130px);overflow-y:auto;padding:14px 16px;-webkit-overflow-scrolling:touch">
+      <div id="pay-ov-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+        <a id="pay-ov-vergent" href="#" target="_blank" rel="noopener" style="flex:1 1 140px;text-align:center;text-decoration:none;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Open in Vergent</a>
+        <button id="pay-ov-open-admin" type="button" onclick="payOvOpenAdmin()" style="flex:1 1 140px;display:none;background:#f1f5f9;color:#334155;border:1px solid #94a3b8;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>Open in Admin</button>
+        <button id="pay-ov-create-loan" type="button" onclick="payOvCreateLoan()" style="flex:1 1 140px;display:none;background:#e8f5ee;color:#1a6b3c;border:1px solid #6cc294;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Create New Loan</button>
+        <button id="pay-ov-schedule" type="button" onclick="payOvSchedulePayment()" style="flex:1 1 140px;display:none;background:#fff5e6;color:#5a3300;border:1px solid #f0b27a;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Schedule Payment</button>
+        <button id="pay-ov-balance" type="button" onclick="checkPaymentBalance(this)" style="flex:1 1 140px;display:none;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Check balance</button>
+      </div>
+      <div id="pay-ov-balance-result" style="display:none;font-size:13px;padding:11px 13px;border-radius:10px;border:1px solid var(--border);margin-bottom:10px;line-height:1.55;word-break:break-word"></div>
+      <div id="pay-ov-payment-wrap" style="background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
+        <div id="pay-ov-payment-label" style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">This Payment</div>
+        <div id="pay-ov-payment" style="font-size:13.5px;color:var(--text);line-height:1.4">—</div>
+      </div>
+      <div id="pay-ov-sched-wrap" style="background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
+        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Scheduled Payments</div>
+        <div id="pay-ov-next" style="font-size:13.5px;color:var(--text);line-height:1.4">Loading…</div>
+      </div>
+      <div>
+        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Loan History</div>
+        <div id="pay-ov-loans" style="font-size:12.5px;color:var(--text);overflow-x:auto;-webkit-overflow-scrolling:touch">Loading…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCHEDULE PAYMENT modal — opens from the Payments detail modal's
+     "Schedule Payment" button (declined-payment rows). Operator
+     picks a date, amount, and method (Card or ACH). Posts to
+     /api/vergent-schedule-payment. Mobile-friendly via .appr-ov. -->
+<div class="appr-ov" id="schp-ov">
+  <div class="appr-card" style="max-width:440px">
+    <div class="appr-head">
+      <div style="min-width:0">
+        <div class="appr-title" style="font-size:16px">Schedule Payment</div>
+        <div class="appr-meta" id="schp-meta" style="font-variant-numeric:tabular-nums">—</div>
+      </div>
+      <button onclick="closeSchedulePaymentModal()" style="background:transparent;border:none;font-size:24px;cursor:pointer;color:var(--muted);line-height:1;padding:4px 8px;min-width:36px;min-height:36px;border-radius:6px" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <div class="appr-body" style="max-height:calc(96vh - 200px);overflow-y:auto;padding:14px 16px;-webkit-overflow-scrolling:touch">
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Payment Method</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <label style="flex:1 1 140px;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px 14px;border:1px solid #6cb1e2;border-radius:8px;background:#e8f3f8;color:#1a4d6b;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px"><input type="radio" name="schp-method" value="card" checked style="margin:0">Card <span style="font-size:10.5px;color:#1a4d6b;opacity:.7;font-weight:600">(default)</span></label>
+          <label style="flex:1 1 140px;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px 14px;border:1px solid var(--border);border-radius:8px;background:#fafafa;color:var(--text);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px"><input type="radio" name="schp-method" value="ach" style="margin:0">ACH</label>
+        </div>
+      </div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Date</div>
+        <input type="date" id="schp-date" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:11px 13px;font-size:16px;font-family:inherit;min-height:44px;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Amount</div>
+        <div style="position:relative">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px;font-weight:700">$</span>
+          <input type="number" id="schp-amount" step="0.01" min="0.01" inputmode="decimal" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:11px 13px 11px 26px;font-size:16px;font-family:inherit;min-height:44px;box-sizing:border-box">
+        </div>
+      </div>
+      <div id="schp-status" style="margin-top:6px;font-size:12px;min-height:18px"></div>
+    </div>
+    <div class="appr-actions" style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button type="button" onclick="closeSchedulePaymentModal()" class="btn btn-ghost" style="min-height:44px">Cancel</button>
+      <button type="button" id="schp-submit" onclick="submitSchedulePayment()" style="background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px">Schedule</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOANS DUE — customer detail modal. Opens when a row in the
+     Servicing / Loans Due page is tapped. Mirrors the Payments page
+     modal: name + Vergent link, today's payment activity (decline
+     reason if applicable), scheduled payments, loan history with
+     days-late column. Mobile-first via .appr-ov. -->
+<div class="appr-ov" id="lns-ov">
+  <div class="appr-card" style="max-width:540px">
+    <div class="appr-head">
+      <div style="min-width:0">
+        <div class="appr-title" id="lns-ov-name" style="font-size:16px;line-height:1.25;word-break:break-word">—</div>
+        <div class="appr-meta" id="lns-ov-meta" style="font-variant-numeric:tabular-nums">—</div>
+      </div>
+      <button onclick="closeLoansDueDetailModal()" style="background:transparent;border:none;font-size:24px;cursor:pointer;color:var(--muted);line-height:1;padding:4px 8px;min-width:36px;min-height:36px;border-radius:6px" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <div class="appr-body" style="max-height:calc(96vh - 130px);overflow-y:auto;padding:14px 16px;-webkit-overflow-scrolling:touch">
+      <div id="lns-ov-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+        <a id="lns-ov-vergent" href="#" target="_blank" rel="noopener" style="flex:1 1 140px;text-align:center;text-decoration:none;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Open in Vergent</a>
+        <button id="lns-ov-open-admin" type="button" onclick="lnsOvOpenAdmin()" style="flex:1 1 140px;display:none;background:#f1f5f9;color:#334155;border:1px solid #94a3b8;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>Open in Admin</button>
+        <button id="lns-ov-schedule" type="button" onclick="lnsOvSchedulePayment()" style="flex:1 1 140px;display:none;background:#fff5e6;color:#5a3300;border:1px solid #f0b27a;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Schedule Payment</button>
+        <button id="lns-ov-balance" type="button" onclick="checkLoansDueBalance(this)" style="flex:1 1 140px;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Check balance</button>
+      </div>
+      <div id="lns-ov-balance-result" style="display:none;font-size:13px;padding:11px 13px;border-radius:10px;border:1px solid var(--border);margin-bottom:10px;line-height:1.55;word-break:break-word"></div>
+      <div style="background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
+        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Loan Snapshot</div>
+        <div id="lns-ov-snapshot" style="font-size:13.5px;color:var(--text);line-height:1.5">—</div>
+      </div>
+      <div style="background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
+        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Recent Payment Activity</div>
+        <div id="lns-ov-today" style="font-size:13.5px;color:var(--text);line-height:1.4">—</div>
+      </div>
+      <div style="background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:10px">
+        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Scheduled Payments</div>
+        <div id="lns-ov-sched" style="font-size:13.5px;color:var(--text);line-height:1.4">Loading…</div>
+      </div>
+      <div>
+        <div style="font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Loan History</div>
+        <div id="lns-ov-loans" style="font-size:12.5px;color:var(--text);overflow-x:auto;-webkit-overflow-scrolling:touch">Loading…</div>
+      </div>
     </div>
   </div>
 </div>
@@ -2581,13 +2738,10 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 <!-- CUSTOMERS — unified hub. Three panels:
        • Portal Support — admin search of the portal customer base
          (Cognito-sourced via cif-portal /api/admin/customers/search).
-       • App Links — Plaid connections from cif-apply applications.
        • Portal Links — Plaid items connected through the customer portal.
-     App Links + Portal Links were previously their own "Connections"
-     route; consolidated here so operators have one customer hub.
-     Inner element IDs (plaid-list, plaid-search, portal-plaid-list,
-     portal-plaid-search) are preserved so the existing loaders /
-     filters keep working byte-for-byte. -->
+     (The legacy "App Links" tab was removed — see the tab strip below.
+     Its loader/render functions remain defined but are no longer wired
+     to any UI.) -->
 <div class="view" id="view-customers">
   <div class="main full">
     <div class="greet">
@@ -2597,10 +2751,13 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       </div>
     </div>
 
-    <!-- Inner tab strip — Portal Support · App Links · Portal Links. -->
+    <!-- Inner tab strip — Portal Support · Portal Links.
+         (The legacy "App Links" tab was removed — it pulled the entire
+         /reports tree through a 10s proxy and timed out as data grew,
+         and the Plaid rerun action it existed for now lives on the
+         application detail page.) -->
     <div class="conn-tabs" style="display:flex;gap:5px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;width:max-content;max-width:100%;flex-wrap:wrap;box-shadow:var(--shadow-xs)">
       <button class="tf-btn active" data-cust-tab="portal" onclick="setCustTab('portal')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-bolt"/></svg>Portal Support</button>
-      <button class="tf-btn" data-cust-tab="applinks" onclick="setCustTab('applinks')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-bank"/></svg>App Links</button>
       <button class="tf-btn" data-cust-tab="portallinks" onclick="setCustTab('portallinks')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-bank"/></svg>Portal Links</button>
     </div>
 
@@ -2619,16 +2776,6 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       </div>
       <div id="cust-portal-meta" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
       <div id="cust-portal-results" style="display:flex;flex-direction:column;gap:8px"></div>
-    </div>
-
-    <!-- App Links panel (Plaid connections from cif-apply applications). -->
-    <div id="cust-panel-applinks" style="display:none">
-      <div style="margin-bottom:14px">
-        <input type="text" id="plaid-search" placeholder="Search by name, phone or email..." oninput="filterPlaidCustomers(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
-      </div>
-      <div id="plaid-list">
-        <div class="tbl-loading">Loading…</div>
-      </div>
     </div>
 
     <!-- Portal Links panel (Plaid items connected through the customer portal). -->
@@ -2655,6 +2802,11 @@ let _currentUser = '';
 let _currentRole = 'user';
 let pollTimer = null;
 let _lastDetailFbId = null;
+// Fingerprint of the document URLs last rendered into the Documents
+// grid. Lets the grid re-render when a doc changes (e.g. a fresh Plaid
+// asset-report PDF lands after Refresh from Plaid) WITHOUT re-rendering
+// on every 8s poll (which would reload the iframes and flicker).
+let _lastDocsFingerprint = null;
 // Stage 2 cost fix: the list/poll now reads the compact /reportsIndex
 // (≈150 bytes/applicant) instead of the whole /reports tree (which
 // embeds the heavy engine-report HTML + Plaid blobs). The full record
@@ -2935,10 +3087,10 @@ function readRouteFromHash() {
   if (h === '#communications') return ['communications', null];
   // All Customers-related hashes resolve to the unified view; the
   // 2nd tuple element selects the inner sub-tab. Legacy Connections
-  // hashes (#connections, #applinks, #plaid, #portallinks, #portal-plaid)
-  // redirect into view-customers so existing bookmarks still land in
-  // the right place.
-  if (h === '#applinks' || h === '#plaid' || h === '#connections') return ['customers', 'applinks'];
+  // hashes redirect into view-customers so existing bookmarks still
+  // land in the right place. The App Links tab was removed, so its old
+  // hashes (#applinks, #plaid, #connections) now land on Portal Support.
+  if (h === '#applinks' || h === '#plaid' || h === '#connections') return ['customers', 'portal'];
   if (h === '#portallinks' || h === '#portal-plaid') return ['customers', 'portallinks'];
   if (h === '#customers' || h === '#portal-support' || h === '#portal') return ['customers', 'portal'];
   return ['dashboard', null];
@@ -3663,10 +3815,26 @@ function toggleV4Report() {
   if (_reportViewFbId) renderDetail(_reportViewFbId);
 }
 
+var _detailHydrateState = {};
 function renderDetail(fbId) {
   const a = apps.find(x => x.firebaseId === fbId);
   if (!a) {
     document.getElementById('dv-name').textContent = 'Loading…';
+    // Not in the loaded queue — common for older funded loans opened from
+    // Loans Due / Payments (via the customer-lookup -> #fb=<id>). Fetch the
+    // full record once from Firebase, then re-render so it actually opens
+    // instead of sticking on "Loading…". Guarded so a genuinely-missing
+    // record shows a message rather than looping.
+    const st = _detailHydrateState[fbId];
+    if (!st) {
+      _detailHydrateState[fbId] = 'loading';
+      hydrateFullRecord(fbId).then(function () {
+        _detailHydrateState[fbId] = apps.find(function (x) { return x.firebaseId === fbId; }) ? 'done' : 'failed';
+        if (document.body.dataset.firebaseId === fbId) renderDetail(fbId);
+      });
+    } else if (st === 'failed') {
+      document.getElementById('dv-name').textContent = 'Application not found';
+    }
     return;
   }
   // Stage 2: the list/poll only carries the lightweight index entry
@@ -3973,7 +4141,29 @@ function renderDetail(fbId) {
   if (isNewApplicant) {
     document.getElementById('dv-app-data').innerHTML = buildAppDetails(ad);
     document.getElementById('dv-debit-card').innerHTML = buildDebitCardPanel(dc);
+  }
+  // Documents grid — re-render on applicant switch OR whenever a doc
+  // URL changes (e.g. a fresh Plaid PDF landed after Refresh from
+  // Plaid). The fingerprint guard means routine polls don't touch the
+  // grid (no iframe flicker); only a genuine doc change repaints it.
+  const docsFingerprint = [
+    a.govIdUrl, a.bankStatementUrl, a.paystubUrl,
+    ad.bankStatementUrl, ad.assetReportUrl, ad.driverLicenseUrl,
+    ad.dlUrl, ad.idDocumentUrl, ad.paystubUrl,
+    a.plaidAssetReportPdfRefreshedAt,
+  ].join('|');
+  if (isNewApplicant || docsFingerprint !== _lastDocsFingerprint) {
     document.getElementById('dv-docs-grid').innerHTML = buildDocsPanel(a);
+    _lastDocsFingerprint = docsFingerprint;
+    // The Vergent "Documents on File" sub-panel lives inside the grid we
+    // just rebuilt, so re-trigger its async load when there's a matched
+    // customer (no-op otherwise).
+    if (typeof loadVergentCustomerDocs === 'function') {
+      try {
+        const _vm = (_vergentMatchCache && _vergentMatchCache[fbId]) || null;
+        if (_vm && _vm.customerId) loadVergentCustomerDocs(_vm.customerId, fbId);
+      } catch (e) { /* non-fatal */ }
+    }
   }
 
   // History tab — current activity + previous applications from same customer
@@ -4170,13 +4360,15 @@ function buildDocsPanel(a) {
   if (a.govIdUrl || a.bankStatementUrl || a.paystubUrl || ad.bankStatementUrl || ad.driverLicenseUrl || ad.dlUrl || ad.idDocumentUrl || ad.paystubUrl || ad.assetReportUrl) {
     html += urlSection('Government ID', a.govIdUrl || ad.idDocumentUrl || ad.driverLicenseUrl || ad.dlUrl, '🪪', 'drivers_license');
     html += urlSection('Plaid Asset Report / Bank Statement', a.bankStatementUrl || ad.bankStatementUrl || ad.assetReportUrl, '🏦', 'bank_statement');
+    html += plaidPdfGenCard(a, ad, fbId);
     html += urlSection('Proof of Income / Pay Stubs', a.paystubUrl || ad.paystubUrl, '📑', 'pay_stub');
   } else if (a.govIdB64 || a.bankStatementB64 || a.paystubB64) {
     html += b64Section('Government ID', a.govIdB64, 'image/jpeg', '🪪');
     html += b64Section('Bank Statement', a.bankStatementB64, 'application/pdf', '🏦');
     html += b64Section('Pay Stubs', a.paystubB64, 'image/jpeg', '📑');
   } else {
-    html += `<div class="doc-preview-empty"><div class="doc-preview-empty-icn">⏳</div><div style="font-weight:700;color:var(--text2);margin-bottom:5px">No documents on file</div><div>Files may still be uploading. Refresh in a moment if just submitted.</div></div>`;
+    html += plaidPdfGenCard(a, ad, fbId) ||
+      `<div class="doc-preview-empty"><div class="doc-preview-empty-icn">⏳</div><div style="font-weight:700;color:var(--text2);margin-bottom:5px">No documents on file</div><div>Files may still be uploading. Refresh in a moment if just submitted.</div></div>`;
   }
 
   // Slot for the "Documents on File (Vergent)" panel. Populated async
@@ -4688,8 +4880,16 @@ async function startCreateCustomerLoan() {
     return;
   }
   // Step 3 + 4: create the loan + dispatch e-sign.
-  _cclSetStep('loan',  'running', 'Creating loan…');
+  _cclSetStep('loan',  'running', 'Settling new Vergent customer…');
   _cclSetStep('esign', 'running', 'Queued…');
+  // Settling delay — Vergent commits the new customer to its query
+  // index asynchronously. Without this wait, loan-create fires too
+  // fast and ~60% of the time fails with "customer not found." The
+  // standalone "Create Loan" button works because by the time the
+  // operator clicks it, the customer has had several seconds to
+  // settle. 2.5s mirrors that natural gap.
+  await new Promise(r => setTimeout(r, 2500));
+  _cclSetStep('loan', 'running', 'Creating loan…');
   // The standalone Create Loan modal fetches the customer's cards list
   // FIRST and passes the real card id when creating the loan -- the
   // combo used to just pass 0 and hope Vergent picked the right card,
@@ -5237,6 +5437,182 @@ function customerHistory(fbId) {
 }
 
 // ───────── Profile panel ─────────
+// ── Live Plaid balance check ($0.10/call) — customer modal ──
+// Operator clicks "Check balance" before running a card/ACH. Only billed
+// on click; cif-apply caches the reading so a re-open shows it free.
+function _fmtMoney(n){ if(n==null||isNaN(n)) return '—'; return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function renderBalanceResult(d, elId){
+  const el=document.getElementById(elId||'profile-balance-result');
+  if(!el) return;
+  el.style.display='block';
+  if(!d || d.ok===false){
+    el.style.background='#fff5e6';el.style.borderColor='#f2d46c';el.style.color='#5a3300';
+    el.textContent=(d&&d.message)||'Live balance unavailable.';
+    return;
+  }
+  el.style.background='#e8f5ee';el.style.borderColor='#bfe3cd';el.style.color='#1a6b3c';
+  const when=d.checkedAt?new Date(d.checkedAt).toLocaleString():'';
+  // Surface the account on file (from the application) first, with an "On
+  // file" badge + highlight, so the operator reads "their" account's balance
+  // without opening the report. on_file is set server-side by matching the
+  // application's account-number last-4 against each Plaid account's mask.
+  const accts=(d.accounts||[]).slice().sort(function(a,b){return (b.on_file?1:0)-(a.on_file?1:0);});
+  const rows=accts.map(function(ac){
+    const avail=(ac.available!=null?ac.available:ac.current);
+    const nm=escapeHtml((ac.name||'Account')+(ac.mask?(' ('+ac.mask+')'):''));
+    const badge=ac.on_file?' <span style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#1a4d6b;background:#e8f3f8;border:1px solid #6cb1e2;border-radius:6px;padding:1px 5px;vertical-align:middle">On file</span>':'';
+    const wrap=ac.on_file?'background:#daf0e2;border-radius:6px;padding:5px 6px;margin-top:2px':'padding:4px 0;border-top:1px solid rgba(26,107,60,.12)';
+    return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;'+wrap+'">'
+      +'<span'+(ac.on_file?' style="font-weight:700"':'')+'>'+nm+badge+'</span>'
+      +'<span style="white-space:nowrap"><b style="font-size:14px">'+_fmtMoney(avail)+'</b> <span style="font-size:11px;opacity:.7">available</span></span></div>';
+  }).join('');
+  // Know the on-file last-4 but Plaid didn't return a matching account: tell
+  // the operator which last-4 to look for instead of silently showing no badge.
+  const note=(d.accountOnFileLast4 && !d.accountOnFileMatched)
+    ? '<div style="font-size:11px;color:#5a3300;background:#fff5e6;border:1px solid #f2d46c;border-radius:6px;padding:4px 6px;margin-top:6px">Account on file ends ••'+escapeHtml(d.accountOnFileLast4)+' — not among the accounts Plaid returned.</div>'
+    : '';
+  el.innerHTML='<div style="font-weight:800;margin-bottom:2px">Live balance'
+    +(d.institution?(' <span style="font-weight:600;opacity:.8">· '+escapeHtml(d.institution)+'</span>'):'')+'</div>'
+    +(rows||'<div style="padding-top:4px">No deposit accounts returned</div>')
+    +note
+    +'<div style="font-size:11px;opacity:.7;margin-top:6px">Checked '+escapeHtml(when)+'</div>';
+}
+function checkPlaidBalance(fbId){
+  if(!fbId) return;
+  const btn=document.getElementById('profile-balance-btn');
+  const el=document.getElementById('profile-balance-result');
+  if(btn){btn.disabled=true;btn.style.opacity='.6';}
+  if(el){el.style.display='block';el.style.background='#f4f7f9';el.style.borderColor='var(--border)';el.style.color='var(--muted)';el.textContent='Checking live balance…';}
+  fetch('/api/plaid-balance',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({firebase_id:fbId})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      // Persist on the in-memory app so the panel's poll/async re-renders
+      // keep showing it (renderProfilePanel re-shows a.plaidBalance) — the
+      // card now stays until the next Check balance replaces it.
+      const app=apps.find(function(x){return x.firebaseId===fbId;});
+      if(app && d && d.ok) app.plaidBalance=d;
+      renderBalanceResult(d);
+    })
+    .catch(function(e){renderBalanceResult({ok:false,message:'Request failed: '+e});})
+    .finally(function(){if(btn){btn.disabled=false;btn.style.opacity='';}});
+}
+// Same balance check, from the Loans Due servicing modal (#lns-ov). That
+// modal is Vergent-sourced, so resolve the firebase_id via the same lookup
+// the "Open in Admin" button uses, then hit the same endpoint.
+// Match a Loans Due / Vergent row to its EXISTING application in the loaded
+// reports index (`apps`) by identity — phone first (most unique), then full
+// name. Every applicant came through our form, so they're in reportsIndex; no
+// Vergent customer-id or backend lookup needed. This is the same firebaseId
+// the reports page uses, so Open-in-Admin and Check-balance work identically.
+function _normPhone(p){ const d=String(p||'').replace(/\D/g,''); return d.length>10?d.slice(-10):d; }
+function _normName(s){ return String(s||'').toLowerCase().replace(/[^a-z]/g,''); }
+function findAppByIdentity(row){
+  if(!row || typeof apps==='undefined' || !Array.isArray(apps) || !apps.length) return null;
+  // reportsIndex FLATTENS applicationData fields to the top level (a.phone,
+  // a.firstName, a.lastName); hydrated full records nest them under
+  // a.applicationData. Read both so the match works for either shape.
+  function appPhone(a){ return _normPhone(a.phone || (a.applicationData||{}).phone); }
+  function appFirst(a){ return _normName(a.firstName || (a.applicationData||{}).firstName); }
+  function appLast(a){ return _normName(a.lastName || (a.applicationData||{}).lastName); }
+  const ph=_normPhone(row.Phone || row.CellPhone || row.phone || row.HomePhone);
+  if(ph && ph.length===10){
+    const byPhone=apps.find(function(a){ return appPhone(a)===ph; });
+    if(byPhone) return byPhone.firebaseId;
+  }
+  const fn=_normName(row.FirstName||row.firstName), ln=_normName(row.LastName||row.lastName);
+  if(fn && ln){
+    const byName=apps.find(function(a){ return appFirst(a)===fn && appLast(a)===ln; });
+    if(byName) return byName.firebaseId;  // apps is sorted newest-first
+  }
+  // Full-name fallback — Payments rows carry a combined `customer` name
+  // rather than first/last. Match against the app's top-level `name`.
+  const full=_normName(row.customer || ((row.FirstName||row.firstName||'')+' '+(row.LastName||row.lastName||'')));
+  if(full && full.length>=4){
+    const byFull=apps.find(function(a){ return _normName(a.name)===full; });
+    if(byFull) return byFull.firebaseId;
+  }
+  return null;
+}
+// Shared "last balance reading persists" helper for the servicing modals
+// (Loans Due + Payments). Mirrors the profile page: show the most recent
+// reading and keep it displayed until a new Check balance replaces it.
+// Preference order: (1) this session's in-memory cache, (2) the reading
+// already hydrated onto the matched application, (3) the reading persisted
+// on the application's Firebase record by /api/plaid-balance. Steps 2-3
+// only READ the last reading — they never re-bill Plaid (an explicit click
+// is the only thing that bills). This is what makes the card survive a page
+// reload / first open, exactly like the profile panel's a.plaidBalance.
+var _modalBalHydrateSeq = 0;
+function _hydrateModalBalanceCard(row, cache, cid, resultElId, stillCurrent){
+  if(cache[cid] && cache[cid].ok){ renderBalanceResult(cache[cid], resultElId); return; }
+  const el=document.getElementById(resultElId);
+  if(el){ el.style.display='none'; el.innerHTML=''; }   // clear any prior customer's card
+  const fbId=findAppByIdentity(row);
+  if(!fbId) return;
+  const app=(typeof apps!=='undefined'&&Array.isArray(apps))?apps.find(function(x){return x.firebaseId===fbId;}):null;
+  if(app && app.plaidBalance && app.plaidBalance.ok){
+    cache[cid]=app.plaidBalance; renderBalanceResult(app.plaidBalance, resultElId); return;
+  }
+  const seq=(++_modalBalHydrateSeq);
+  fetch('/fb/reports/'+encodeURIComponent(fbId)+'/plaidBalance.json',{credentials:'same-origin'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(seq!==_modalBalHydrateSeq) return;                              // a newer open superseded us
+      if(typeof stillCurrent==='function' && !stillCurrent()) return;    // customer switched / modal closed
+      if(d && d.ok){ cache[cid]=d; renderBalanceResult(d, resultElId); }
+    })
+    .catch(function(){});
+}
+var _lnsOvBalanceCache = {};  // CustomerId -> last live balance (persists the card)
+async function checkLoansDueBalance(btn){
+  const row=_lnsOvRow; if(!row) return;
+  const cid=String(row.CustomerId||'');
+  const el=document.getElementById('lns-ov-balance-result');
+  if(btn){btn.disabled=true;btn.style.opacity='.6';}
+  if(el){el.style.display='block';el.style.background='#f4f7f9';el.style.borderColor='var(--border)';el.style.color='var(--muted)';el.textContent='Resolving customer…';}
+  try{
+    // Identity match first (instant, no Vergent); Vergent-id lookup only as
+    // a fallback if name/phone didn't match a loaded application.
+    const fbId=findAppByIdentity(row) || await _lnsOvAwaitFbId(cid, 8000, String(row.HdrId||row.LoanId||''));
+    if(!fbId){ renderBalanceResult({ok:false,message:'No matching application found in the dashboard for this customer — live balance unavailable.'}, 'lns-ov-balance-result'); return; }
+    if(el) el.textContent='Checking live balance…';
+    const d=await (await fetch('/api/plaid-balance',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({firebase_id:fbId})})).json();
+    if(d && d.ok){ _lnsOvBalanceCache[cid]=d;  // keep the card until a new check replaces it
+      const _ap=(typeof apps!=='undefined'&&Array.isArray(apps))?apps.find(function(x){return x.firebaseId===fbId;}):null;
+      if(_ap) _ap.plaidBalance=d; }            // mirror onto the app so other views show it too
+    renderBalanceResult(d, 'lns-ov-balance-result');
+  }catch(e){ renderBalanceResult({ok:false,message:'Request failed: '+e}, 'lns-ov-balance-result'); }
+  finally{ if(btn){btn.disabled=false;btn.style.opacity='';} }
+}
+// On-demand Plaid asset-report PDF ($0.99) — submit-time PDF is deferred;
+// this pulls it when an operator wants it. Idempotent backend (no re-bill).
+function plaidPdfGenCard(a, ad, fbId){
+  const hasTok = !!(a && (a.plaidAssetToken || (ad && ad.plaidAssetToken)));
+  const hasUrl = !!(a && (a.bankStatementUrl || (ad && (ad.bankStatementUrl || ad.assetReportUrl))));
+  if(!hasTok || hasUrl || !fbId) return '';
+  return '<div class="doc-preview-card" id="plaid-pdf-gen-'+fbId+'"><div class="doc-preview-head">'
+    +'<div class="doc-preview-title">🏦 Plaid Asset Report</div>'
+    +'<div class="doc-preview-actions"><button class="doc-preview-btn doc-preview-btn-primary" onclick="generatePlaidPdf(\''+fbId+'\',this)"><svg class="icn" style="width:12px;height:12px"><use href="#i-download"/></svg>Generate &amp; view PDF</button></div></div>'
+    +'<div class="doc-preview-frame"><div class="doc-preview-empty"><div class="doc-preview-empty-icn">📄</div>PDF deferred to save cost — click to pull it now ($0.99).</div></div></div>';
+}
+function generatePlaidPdf(fbId, btn){
+  if(!fbId) return;
+  if(btn){btn.disabled=true;btn.textContent='Generating…';}
+  fetch('/api/generate-plaid-pdf',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({firebase_id:fbId})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d && d.ok && d.bankStatementUrl){
+        const a=apps.find(function(x){return x.firebaseId===fbId;});
+        if(a) a.bankStatementUrl=d.bankStatementUrl;
+        const grid=document.getElementById('dv-docs-grid');
+        if(a && grid) grid.innerHTML=buildDocsPanel(a);
+      } else {
+        if(btn){btn.disabled=false;btn.textContent='Generate & view PDF';}
+        alert((d&&d.message)||'Could not generate the PDF.');
+      }
+    })
+    .catch(function(e){ if(btn){btn.disabled=false;btn.textContent='Generate & view PDF';} alert('Request failed: '+e); });
+}
 function renderProfilePanel(fbId) {
   const a = apps.find(x => x.firebaseId === fbId);
   if (!a) return;
@@ -5252,6 +5628,19 @@ function renderProfilePanel(fbId) {
   // (Bank Connected badge removed -- the right-rail Documents section
   // already shows Plaid vs Bank Statement accurately.)
   if (linkEl) linkEl.style.display = 'none';
+  // Live balance ($0.10) — button shows only for Plaid-connected customers
+  // (a live access_token is required). On reopen, show the cached reading
+  // (no re-bill); the button forces a fresh check.
+  window._profileFbId = fbId;
+  const hasActivePlaid = !!(a.plaidAccessToken || ad.plaidAccessToken);
+  const balRow = document.getElementById('profile-balance-row');
+  const balRes = document.getElementById('profile-balance-result');
+  if (balRow) balRow.style.display = hasActivePlaid ? 'block' : 'none';
+  if (balRes) {
+    if (hasActivePlaid && a.plaidBalance && a.plaidBalance.ok) {
+      renderBalanceResult(a.plaidBalance);
+    } else { balRes.style.display = 'none'; balRes.innerHTML = ''; }
+  }
   // Re-check button: visible only when there's NOT a matched Vergent
   // customer yet (status: not_found / new / ambiguous / error / pending).
   // Hidden on 'found' since the operator has nothing left to re-check.
@@ -6844,7 +7233,7 @@ function dvShowRerunLoading(label) {
     el.innerHTML =
       '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;text-align:center">' +
       '<div style="width:46px;height:46px;border:4px solid var(--green-200);border-top-color:var(--green);border-radius:50%;animation:spin .9s linear infinite;margin-bottom:18px"></div>' +
-      '<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">' + label + '</div>' +
+      '<div id="dv-rerun-label" style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">' + label + '</div>' +
       '<div style="font-size:12.5px;color:var(--text2);line-height:1.55;max-width:420px">This can take up to ~2 minutes. The report updates here automatically when it’s done — you can keep working in other tabs meanwhile.</div>' +
       '</div>';
   }
@@ -6945,8 +7334,47 @@ async function reExtractPdf(fbId) {
   }
 }
 
+// Update the live stage line inside the rerun spinner.
+function dvUpdateRerunStage(text) {
+  const el = document.getElementById('dv-rerun-label');
+  if (el && text) el.textContent = text;
+}
+
+// Persistent corner chip for the slow PDF download phase. The engine
+// report appears as soon as it's ready; this chip keeps the operator
+// informed while the fresh bank-statement PDF finishes downloading
+// (Plaid can take a few minutes). Visible on any tab; survives
+// re-renders because it lives on <body>, not inside the detail view.
+function _showDocsRefreshing(on, doneText, isError) {
+  let chip = document.getElementById('plaid-pdf-chip');
+  if (on) {
+    if (!chip) {
+      chip = document.createElement('div');
+      chip.id = 'plaid-pdf-chip';
+      chip.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:9999;background:#0f2942;color:#fff;border-radius:10px;padding:11px 14px;font-size:12.5px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.28);display:flex;align-items:center;gap:9px;max-width:300px;font-family:inherit;line-height:1.35';
+      document.body.appendChild(chip);
+    }
+    chip.style.background = '#0f2942';
+    chip.innerHTML =
+      '<div style="width:15px;height:15px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .9s linear infinite;flex:none"></div>' +
+      '<div>Downloading the fresh bank statement…<div style="font-weight:400;opacity:.8;margin-top:2px">Appears in the Documents tab automatically</div></div>';
+    return;
+  }
+  if (!chip) return;
+  if (doneText) {
+    chip.style.background = isError ? '#7a2230' : '#1a6b3c';
+    chip.innerHTML = '<div style="flex:none;font-size:15px">' + (isError ? '⚠' : '✓') + '</div><div>' + doneText + '</div>';
+    setTimeout(function () {
+      const c = document.getElementById('plaid-pdf-chip');
+      if (c) c.remove();
+    }, 4500);
+  } else {
+    chip.remove();
+  }
+}
+
 async function refreshFromPlaid(fbId) {
-  toast('Refreshing from Plaid…');
+  toast('Starting fresh Plaid pull…');
   dvShowRerunLoading('Pulling a fresh Plaid asset report & re-running…');
   try {
     const r = await fetch('/api/refresh-from-plaid', {
@@ -6955,16 +7383,113 @@ async function refreshFromPlaid(fbId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ firebase_id: fbId })
     });
-    if (!r.ok) throw new Error('Refresh failed');
-    toast('Plaid refreshed — re-running engine', 'ok');
-    await loadReports();
-    _rehydrateForV4Shadow(fbId);
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      // 400 no_plaid_connection, 404 not found, etc. Surface the
+      // backend's human-readable detail.
+      const msg = d.detail || d.error || ('HTTP ' + r.status);
+      toast('Refresh failed: ' + msg, 'err');
+      dvEndRerunLoading();
+      _lastReportHtml = null;
+      rerender();
+      return;
+    }
+    // Background job kicked off — poll plaidRefreshStatus for progress.
+    await _pollPlaidRefresh(fbId, d.pdf_refreshable !== false);
   } catch (e) {
-    toast('Refresh failed: ' + e.message, 'err');
+    toast('Refresh failed: ' + ((e && e.message) || e), 'err');
+    dvEndRerunLoading();
     _lastReportHtml = null;
     rerender();
-  } finally {
+  }
+}
+
+// Poll the background Plaid-refresh job. Two phases:
+//   Phase 1 (engine): big spinner with live stage text until the engine
+//     finishes (plaidRefreshStatus 'engine_done' or 'done'), then we
+//     show the fresh report and drop the spinner.
+//   Phase 2 (PDF): a corner chip until the fresh PDF lands, at which
+//     point the Documents grid auto-repaints (via the fingerprint).
+async function _pollPlaidRefresh(fbId, pdfRefreshable) {
+  let engineShown = false;
+  const MAX_TRIES = 72;          // 72 × 5s ≈ 6 minutes
+  for (let i = 0; i < MAX_TRIES; i++) {
+    await new Promise(res => setTimeout(res, 5000));
+    // Operator navigated to a different applicant — stop quietly; the
+    // job keeps running server-side and the result is on the record.
+    const viewing = document.body.dataset.firebaseId;
+    if (viewing && viewing !== fbId) {
+      if (!engineShown) dvEndRerunLoading();
+      _showDocsRefreshing(false);
+      return;
+    }
+    let rec;
+    try { rec = await fbGet(`reports/${fbId}.json`); } catch (e) { continue; }
+    if (!rec) continue;
+    const st = rec.plaidRefreshStatus;
+    const stage = rec.plaidRefreshStage || '';
+    const pdfState = rec.plaidRefreshPdf;
+
+    if (st === 'error') {
+      toast('Refresh failed: ' + (rec.plaidRefreshError || 'unknown error'), 'err');
+      dvEndRerunLoading();
+      _showDocsRefreshing(false);
+      await hydrateFullRecord(fbId);
+      _lastReportHtml = null;
+      rerender();
+      return;
+    }
+
+    if (!engineShown) {
+      if (st === 'engine_done' || st === 'done') {
+        // The fresh report is live — show it and drop the big spinner.
+        engineShown = true;
+        await hydrateFullRecord(fbId);
+        _lastReportHtml = null;
+        rerender();
+        dvEndRerunLoading();
+        toast('Report updated from fresh Plaid data', 'ok');
+        // Nothing more to wait for if the PDF is already settled.
+        if (st === 'done' || pdfState === 'done' || pdfState === 'skipped' || pdfState === 'error') {
+          _finishPlaidPdf(rec);
+          return;
+        }
+        // Otherwise the PDF is still downloading — show the corner chip.
+        _showDocsRefreshing(true);
+      } else {
+        // Still working — surface the live stage in the spinner.
+        dvUpdateRerunStage(stage || 'Working…');
+      }
+    } else {
+      // Engine already shown; we're only waiting on the PDF now.
+      if (st === 'done' || pdfState === 'done' || pdfState === 'error' || pdfState === 'skipped') {
+        await hydrateFullRecord(fbId);
+        rerender();   // fingerprint change → Documents grid repaints with the new PDF
+        _finishPlaidPdf(rec);
+        return;
+      }
+    }
+  }
+  // Timed out waiting.
+  if (!engineShown) {
+    toast('Still running — give it another minute, then reopen this applicant', 'err');
     dvEndRerunLoading();
+  } else {
+    _showDocsRefreshing(false, 'The fresh PDF is taking longer than usual — it’ll appear in Documents when ready', true);
+  }
+}
+
+function _finishPlaidPdf(rec) {
+  const pdfState = rec.plaidRefreshPdf;
+  if (pdfState === 'done') {
+    _showDocsRefreshing(false, 'Bank statement updated in Documents');
+  } else if (pdfState === 'error') {
+    _showDocsRefreshing(false, 'Report updated, but the fresh PDF failed — the previous PDF was kept', true);
+  } else if (pdfState === 'skipped') {
+    _showDocsRefreshing(false);
+    if (rec.plaidRefreshNote) toast(rec.plaidRefreshNote, 'err');
+  } else {
+    _showDocsRefreshing(false);
   }
 }
 
@@ -8285,14 +8810,15 @@ function loadCustomers() {
 }
 
 function setCustTab(name) {
-  if (name !== 'portal' && name !== 'applinks' && name !== 'portallinks') name = 'portal';
+  // 'applinks' was removed — fold any lingering reference into Portal.
+  if (name === 'applinks') name = 'portal';
+  if (name !== 'portal' && name !== 'portallinks') name = 'portal';
   _custTab = name;
   document.querySelectorAll('[data-cust-tab]').forEach(function(b) {
     b.classList.toggle('active', b.getAttribute('data-cust-tab') === name);
   });
   const panels = {
     portal:      document.getElementById('cust-panel-portal'),
-    applinks:    document.getElementById('cust-panel-applinks'),
     portallinks: document.getElementById('cust-panel-portallinks'),
   };
   Object.keys(panels).forEach(function(k) {
@@ -8302,14 +8828,12 @@ function setCustTab(name) {
   if (sub) {
     sub.innerHTML = name === 'portal'
       ? 'Customers who registered at <b>apply.cashinflash.com</b>. Search by customer ID, email, or last name — or browse the full list below.'
-      : name === 'applinks'
-        ? 'Plaid connections from <b>cif-apply</b> applications — open a row to re-run reports or push to Vergent.'
-        : 'Plaid items connected through the <b>customer portal</b> — view balances and re-pull data anytime.';
+      : 'Plaid items connected through the <b>customer portal</b> — view balances and re-pull data anytime.';
   }
   // Portal Support tab auto-loads the full list on first activation so
   // the operator sees every registered customer without having to type.
-  // App Links / Portal Links kick off their own loaders here so the
-  // panel content is ready by the time the tab is visible.
+  // Portal Links kicks off its own loader here so the panel content is
+  // ready by the time the tab is visible.
   if (name === 'portal') {
     const input = document.getElementById('cust-portal-q');
     if (input) input.focus();
@@ -8317,8 +8841,6 @@ function setCustTab(name) {
       _custPortalLoaded = true;
       doCustomerSearch('portal');  // empty-q → list-all from backend
     }
-  } else if (name === 'applinks') {
-    loadPlaidCustomers();
   } else if (name === 'portallinks') {
     loadPortalPlaid();
   }
@@ -10302,26 +10824,22 @@ function renderPayments() {
     return `<span style="display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;background:#f3f4f6;color:#6b7280;font-size:11px;font-weight:700;letter-spacing:.04em">${escapeHtml((r.status || '?').toUpperCase())}</span>`;
   };
 
-  const rowHtml = (r) => {
-    const cid = r.customer_id || '';
-    const vlink = cid ? `https://shared.lms.vergentlms.com/customer/general?action=view&id=${encodeURIComponent(cid)}` : '';
-    const customerLink = cid
-      ? `<a href="${vlink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;font-weight:700" onclick="event.stopPropagation()">${escapeHtml(r.customer || '—')}</a>`
-      : `<span style="font-weight:700;color:var(--text)">${escapeHtml(r.customer || '—')}</span>`;
-    // Loan-history hover icon — same component used on Loans Due.
-    // _loanHistShow / _loanHistHide / _loanHistToggle live in the
-    // global JS module and fetch via /api/vergent-loans.
-    const histIcon = cid
-      ? `<span class="lns-hist-icn" data-cid="${escapeHtml(cid)}" data-name="${escapeHtml(r.customer || '')}" onmouseenter="_loanHistShow(this)" onmouseleave="_loanHistHide()" onclick="event.stopPropagation();_loanHistToggle(this)" title="Loan history" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;color:var(--muted);cursor:pointer;margin-left:6px;vertical-align:middle"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><polyline points="3 4 3 9 8 9"/><path d="M12 7v5l3 2"/></svg></span>`
-      : '';
-    const customerCell = customerLink + histIcon;
+  // Stash sorted rows so onclick handlers can look up by index without
+  // serialising the whole object into the HTML attribute.
+  window._payRowCache = sorted;
+  const rowHtml = (r, idx) => {
+    // Whole row is tappable -> opens the customer detail modal. Inline
+    // hover-icon for loan history is removed; everything's in the
+    // modal now (incl. an "Open in Vergent" button), per operator
+    // request to stop adding little icons.
+    const customerCell = `<span style="font-weight:700;color:var(--text)">${escapeHtml(r.customer || '—')}</span>`;
     const declineHtml = r.decline_reason
       ? `<div style="font-size:11px;color:var(--red);font-weight:600;margin-top:3px;line-height:1.3">${escapeHtml(r.decline_reason)}</div>`
       : '';
     const fundingHtml = r.kind === 'funding' && r.funding_txn_id
       ? `<div style="font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:2px">auth ${escapeHtml(r.funding_auth_code || '')} · txn ${escapeHtml(r.funding_txn_id || '')}</div>`
       : '';
-    return `<tr>
+    return `<tr style="cursor:pointer" onclick="openPaymentDetailModal(window._payRowCache[${idx}])" title="Tap to view customer details">
       <td style="white-space:nowrap;font-variant-numeric:tabular-nums">${escapeHtml(_payFmtTime(r.real_date))}</td>
       <td>${customerCell}<div style="font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:2px">${escapeHtml(r.loan_id || '')}</div></td>
       <td style="font-variant-numeric:tabular-nums;font-weight:700">${_payFmtMoney(r.amount)}</td>
@@ -10343,7 +10861,7 @@ function renderPayments() {
           <th style="width:130px">Store</th>
         </tr>
       </thead>
-      <tbody>${sorted.map(rowHtml).join('')}</tbody>
+      <tbody>${sorted.map((r, i) => rowHtml(r, i)).join('')}</tbody>
     </table>
   </div>`;
 }
@@ -10564,6 +11082,555 @@ async function removeFundingRow(hdrId, btn) {
   } catch (e) {
     if (btn) { btn.disabled = false; btn.textContent = 'Clear'; }
     toast('Couldn\'t remove: ' + ((e && e.message) || e), 'err');
+  }
+}
+
+// ── Payments page customer detail modal ────────────────────────────
+// Consolidates the per-row info (next pay date, loan history, link
+// to Vergent) + per-status actions (Create New Loan for approved
+// rows, Schedule Payment for declined rows). Mobile-first via the
+// existing .appr-ov pattern.
+let _payOvRow = null;
+
+function openPaymentDetailModal(row) {
+  if (!row) return;
+  _payOvRow = row;
+  const ov = document.getElementById('pay-ov');
+  if (!ov) return;
+  ov.classList.add('open');
+  document.getElementById('pay-ov-name').textContent = row.customer || '—';
+  document.getElementById('pay-ov-meta').textContent =
+    'Vergent ID: ' + (row.customer_id || '—')
+    + (row.loan_id ? '  ·  Loan ' + row.loan_id : '');
+  const cid = row.customer_id || '';
+  const vlink = cid
+    ? 'https://shared.lms.vergentlms.com/customer/general?action=view&id=' + encodeURIComponent(cid)
+    : '#';
+  const vergentBtn = document.getElementById('pay-ov-vergent');
+  vergentBtn.href = vlink;
+  vergentBtn.style.display = cid ? '' : 'none';
+  // Per-status action button + section visibility.
+  const createBtn   = document.getElementById('pay-ov-create-loan');
+  const schedBtn    = document.getElementById('pay-ov-schedule');
+  const adminBtn    = document.getElementById('pay-ov-open-admin');
+  const npdWrap     = document.getElementById('pay-ov-npd-wrap');
+  const schedWrap   = document.getElementById('pay-ov-sched-wrap');
+  const payLabel    = document.getElementById('pay-ov-payment-label');
+  const isApprovedPayment = row.status === 'approved' && row.kind === 'payment';
+  const isDeclined        = row.status === 'declined';
+  const isFunding         = row.kind === 'funding';
+  createBtn.style.display = isApprovedPayment ? 'inline-flex' : 'none';
+  schedBtn.style.display  = isDeclined ? 'inline-flex' : 'none';
+  // Check balance — declined transactions only. Re-show this customer's
+  // cached reading (persists until a new check), else clear.
+  const payBalBtn = document.getElementById('pay-ov-balance');
+  if (payBalBtn) payBalBtn.style.display = isDeclined ? 'inline-flex' : 'none';
+  if (isDeclined) {
+    _hydrateModalBalanceCard(row, _payOvBalanceCache, String(row.customer_id || ''),
+      'pay-ov-balance-result',
+      function(){ return _payOvRow && String(_payOvRow.customer_id || '') === String(row.customer_id || '') && _payOvRow.status === 'declined'; });
+  } else { const _pbr = document.getElementById('pay-ov-balance-result'); if (_pbr) { _pbr.style.display = 'none'; _pbr.innerHTML = ''; } }
+  // Open in Admin: always visible when we have a cid. The click
+  // handler navigates straight to the Customers page filtered to
+  // this Vergent id — no firebase_id lookup needed.
+  _payOvRefreshAdminButton(String(cid || ''));
+  if (npdWrap)   npdWrap.style.display = isDeclined ? '' : 'none';
+  if (schedWrap) schedWrap.style.display = isDeclined ? '' : 'none';
+  // "This Payment" -> "Payment Activity" on declined (the section now
+  // shows the full attempt history for this loan, so the singular
+  // label was misleading).
+  if (payLabel) payLabel.textContent = isDeclined ? 'Payment Activity' : 'This Payment';
+  // Body: single line for approved/funded; full-loan attempt table
+  // for declined.
+  if (isDeclined) {
+    _renderPayOvActivityForLoan(row);
+  } else {
+    const amtStr = '$' + Number(row.amount || 0).toFixed(2);
+    const statusStr = (isFunding ? 'FUNDED' : String(row.status || '?').toUpperCase());
+    const declineStr = row.decline_reason ? '  ·  ' + row.decline_reason : '';
+    let when = '—';
+    try { when = row.real_date ? new Date(row.real_date).toLocaleString(undefined, {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '—'; } catch (e) {}
+    document.getElementById('pay-ov-payment').textContent =
+      amtStr + '  ·  ' + statusStr + '  ·  ' + when + declineStr;
+  }
+  // Kick off the firebase_id lookup so Create New Loan (approved
+  // rows) and Open in Admin (any row) can navigate straight to the
+  // application detail page if we find a match. Fires for every row
+  // because Open in Admin is always visible.
+  if (cid) _payOvKickoffFbIdLookup(String(cid), String(row.loan_id || ''));
+  // Async loads: scheduled payments (declined only) + next-pay-date
+  // proxy (declined only) + loan history (always).
+  if (isDeclined) {
+    _loadPayOvNextPayDate(row);
+    // (Customer's Next Pay Date section removed — Vergent has no per-loan
+    //  next-pay-date API; the scheduled-payments proxy rarely had it.)
+  }
+  _loadPayOvLoanHistory(row);
+}
+
+function closePaymentDetailModal() {
+  const ov = document.getElementById('pay-ov');
+  if (ov) ov.classList.remove('open');
+  _payOvRow = null;
+}
+
+async function _renderPayOvActivityForLoan(row) {
+  const el = document.getElementById('pay-ov-payment');
+  if (!el) return;
+  const hdrId = String(row.loan_id || '');
+  const cid   = String(row.customer_id || '');
+  el.innerHTML = '<span style="color:var(--muted)">Loading payment attempts…</span>';
+  const rows = await _ensureModal14dActivity();
+  // Guard against modal close / row swap mid-fetch.
+  if (!_payOvRow || String(_payOvRow.loan_id || '') !== hdrId) return;
+  _renderPaymentAttemptsTable(el, rows, hdrId, cid);
+}
+
+async function _loadPayOvCustomerNextPayDate(row) {
+  // Show the customer's next likely payday so the operator has a
+  // sensible target date for the Schedule Payment they're about to
+  // create. We proxy "next payday" via Vergent's next automatic
+  // scheduled payment — those are aligned with the customer's pay
+  // cycle. Manual entries are skipped (they're operator-set dates,
+  // not pay dates).
+  const el = document.getElementById('pay-ov-npd');
+  if (!el) return;
+  el.textContent = 'Loading…';
+  if (!row.loan_id) { el.textContent = '—'; return; }
+  try {
+    const r = await fetch('/api/vergent-scheduled-payments', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hdr_id: String(row.loan_id) }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!_payOvRow || String(_payOvRow.loan_id || '') !== String(row.loan_id)) return;
+    const auto = (d && d.automatic_schedules) || [];
+    if (!auto.length) {
+      el.innerHTML = '<span style="color:var(--muted)">No auto-schedule on file — Vergent hasn’t set the next pay date for this loan.</span>';
+      return;
+    }
+    auto.sort((a, b) => (new Date(a.date || 0).getTime() || 0) - (new Date(b.date || 0).getTime() || 0));
+    const now = Date.now();
+    const next = auto.find(s => (new Date(s.date || 0).getTime() || 0) >= now - 86400000) || auto[0];
+    const dt = new Date(next.date);
+    const dateStr = isNaN(dt) ? String(next.date || '—')
+      : dt.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric', year:'numeric'});
+    const amtStr = next.amount ? '  ·  $' + Number(next.amount).toFixed(2) : '';
+    el.innerHTML = '<b style="font-variant-numeric:tabular-nums">' + escapeHtml(dateStr) + '</b>'
+      + '<span style="color:var(--muted);font-size:12px">' + escapeHtml(amtStr) + '</span>';
+  } catch (e) {
+    el.innerHTML = '<span style="color:var(--red)">Couldn\'t load: ' + escapeHtml((e && e.message) || String(e)) + '</span>';
+  }
+}
+
+async function _loadPayOvNextPayDate(row) {
+  const nextEl = document.getElementById('pay-ov-next');
+  if (!nextEl) return;
+  if (!row.loan_id) { nextEl.textContent = 'No loan ID on this row'; return; }
+  nextEl.textContent = 'Loading…';
+  try {
+    const r = await fetch('/api/vergent-scheduled-payments', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hdr_id: String(row.loan_id) }),
+    });
+    const d = await r.json().catch(() => ({}));
+    // Merge automatic + manual schedules; tag each by its source so
+    // operators can see which were system-scheduled vs hand-entered.
+    // Both card AND ACH show up in these arrays — the `method` field
+    // tells us which (and `is_card` is the server-derived bool).
+    const auto = (d && d.automatic_schedules) || [];
+    const manual = (d && d.manual_schedules) || [];
+    const all = []
+      .concat(auto.map(s => ({...s, _type: 'auto'})))
+      .concat(manual.map(s => ({...s, _type: 'manual'})));
+    // Sort by date ascending (soonest first).
+    all.sort((a, b) => {
+      const ta = new Date(a.date || 0).getTime();
+      const tb = new Date(b.date || 0).getTime();
+      return (ta || 0) - (tb || 0);
+    });
+    if (!all.length) {
+      nextEl.innerHTML = '<span style="color:var(--muted)">No scheduled payments.</span>';
+      return;
+    }
+    const fmtDate = (s) => {
+      if (!s) return '—';
+      try { const dt = new Date(s); if (!isNaN(dt)) return dt.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'2-digit'}); } catch (e) {}
+      return s;
+    };
+    const methodPill = (s) => {
+      const isCard = s.is_card || /card|credit|debit|cc/i.test(s.method || '');
+      return isCard
+        ? '<span style="display:inline-block;font-size:10px;background:#e8f3f8;color:#1a4d6b;padding:1px 7px;border-radius:4px;font-weight:700">CARD</span>'
+        : '<span style="display:inline-block;font-size:10px;background:#fff5e6;color:#5a3300;padding:1px 7px;border-radius:4px;font-weight:700">ACH</span>';
+    };
+    const sourcePill = (s) => {
+      return s._type === 'auto'
+        ? '<span style="font-size:10px;color:var(--muted);font-weight:600">auto</span>'
+        : '<span style="font-size:10px;color:var(--muted);font-weight:600">manual</span>';
+    };
+    nextEl.innerHTML = '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:320px">'
+      + '<thead><tr style="text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">'
+      + '<th style="padding:4px 6px;font-weight:700">Date</th>'
+      + '<th style="padding:4px 6px;text-align:right;font-weight:700">Amount</th>'
+      + '<th style="padding:4px 6px;font-weight:700">Method</th>'
+      + '<th style="padding:4px 6px;font-weight:700"></th>'
+      + '</tr></thead><tbody>'
+      + all.map(s => '<tr style="border-top:1px solid var(--border)">'
+        + '<td style="padding:5px 6px;font-variant-numeric:tabular-nums;font-weight:700">' + escapeHtml(fmtDate(s.date)) + '</td>'
+        + '<td style="padding:5px 6px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700">$' + Number(s.amount || 0).toFixed(2) + '</td>'
+        + '<td style="padding:5px 6px">' + methodPill(s) + '</td>'
+        + '<td style="padding:5px 6px">' + sourcePill(s) + '</td>'
+        + '</tr>').join('')
+      + '</tbody></table></div>';
+  } catch (e) {
+    nextEl.innerHTML = '<span style="color:var(--red)">Couldn\'t load: ' + escapeHtml((e && e.message) || String(e)) + '</span>';
+  }
+}
+
+async function _loadPayOvLoanHistory(row) {
+  const el = document.getElementById('pay-ov-loans');
+  if (!el) return;
+  const cid = row.customer_id;
+  if (!cid) { el.textContent = 'No customer ID on this row'; return; }
+  el.textContent = 'Loading…';
+  try {
+    const r = await fetch('/api/vergent-loans', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customer_id: String(cid) }),
+    });
+    const d = await r.json().catch(() => ({}));
+    const loans = (d && d.loans) || [];
+    if (!loans.length) {
+      el.innerHTML = '<span style="color:var(--muted)">No prior loans.</span>';
+      return;
+    }
+    const fmtDate = (s) => {
+      if (!s) return '—';
+      try { const dt = new Date(s); if (!isNaN(dt)) return dt.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'2-digit'}); } catch (e) {}
+      return s;
+    };
+    // Days-late readout — same logic as the hover-popup _loanHistRender
+    // (line ~11598). Vergent stores late status both as a numeric
+    // days_late + a label string ("1 Day Late" / "Not Late"); we use
+    // whichever yields the larger value as the current days-late, and
+    // max_days_late as the historical peak. >=31d -> red, 1-30d ->
+    // amber, 0d -> green.
+    const lateCell = (ln) => {
+      const dlRaw  = (ln.days_late_label && String(ln.days_late_label).trim()) || '';
+      const dlRawL = dlRaw.toLowerCase();
+      const dlIsZeroLabel = dlRawL === 'not late' || dlRawL === 'current'
+                              || dlRawL === 'ok' || dlRaw === '0' || dlRaw === '—';
+      const dlFromLabel = !dlIsZeroLabel && dlRaw
+        ? (parseInt((dlRaw.match(/-?\d+/) || ['0'])[0], 10) || 0)
+        : 0;
+      const dlCur  = Math.max(Number(ln.days_late) || 0, dlFromLabel);
+      const dlMax  = Number(ln.max_days_late) || 0;
+      const dl     = Math.max(dlCur, dlMax);
+      const isHistorical = dl > 0 && (Number(ln.days_late) || 0) === 0 && dlFromLabel === 0;
+      let txt, color;
+      if (dl >= 31)     { txt = dl + 'd'; color = 'var(--red)'; }
+      else if (dl >= 1) { txt = dl + 'd'; color = 'var(--amber-700)'; }
+      else              { txt = 'On time'; color = 'var(--green-dark)'; }
+      const tag = isHistorical ? ' <span style="color:var(--muted);font-weight:600;font-size:10px">prior</span>' : '';
+      return '<span style="color:' + color + ';font-weight:700">' + escapeHtml(txt) + '</span>' + tag;
+    };
+    el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:440px">'
+      + '<thead><tr style="text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em">'
+      + '<th style="padding:5px 6px;font-weight:700">Loan #</th>'
+      + '<th style="padding:5px 6px;font-weight:700">Date</th>'
+      + '<th style="padding:5px 6px;text-align:right;font-weight:700">Amount</th>'
+      + '<th style="padding:5px 6px;text-align:right;font-weight:700">Balance</th>'
+      + '<th style="padding:5px 6px;font-weight:700">Status</th>'
+      + '<th style="padding:5px 6px;font-weight:700">Late</th>'
+      + '</tr></thead><tbody>'
+      + loans.map(ln => '<tr style="border-top:1px solid var(--border)">'
+        + '<td style="padding:6px;font-variant-numeric:tabular-nums">' + escapeHtml(ln.loan_number || ln.loan_id || '—') + '</td>'
+        + '<td style="padding:6px;font-variant-numeric:tabular-nums">' + escapeHtml(fmtDate(ln.date)) + '</td>'
+        + '<td style="padding:6px;text-align:right;font-variant-numeric:tabular-nums">$' + Number(ln.amount || 0).toFixed(0) + '</td>'
+        + '<td style="padding:6px;text-align:right;font-variant-numeric:tabular-nums;color:' + (Number(ln.balance || 0) > 0 ? 'var(--text)' : 'var(--muted)') + '">$' + Number(ln.balance || 0).toFixed(0) + '</td>'
+        + '<td style="padding:6px">' + escapeHtml(ln.status || '—') + '</td>'
+        + '<td style="padding:6px;white-space:nowrap">' + lateCell(ln) + '</td>'
+        + '</tr>').join('')
+      + '</tbody></table>';
+  } catch (e) {
+    el.innerHTML = '<span style="color:var(--red)">Couldn\'t load: ' + escapeHtml((e && e.message) || String(e)) + '</span>';
+  }
+}
+
+// Cached firebase_id per Vergent customerId for the Payments modal.
+// Mirrors _lnsOvFbIdByCid: kicked off when the modal opens so button
+// clicks are usually instant. Values: undefined = not started,
+// '__loading__' = in flight, string = found, null = not found.
+const _payOvFbIdByCid = {};
+async function _payOvKickoffFbIdLookup(cid, loanId) {
+  if (!cid) return;
+  if (_payOvFbIdByCid[cid] != null && _payOvFbIdByCid[cid] !== '__loading__') {
+    _payOvRefreshAdminButton(cid);
+    return;
+  }
+  if (_payOvFbIdByCid[cid] === '__loading__') return;
+  _payOvFbIdByCid[cid] = '__loading__';
+  try {
+    const r = await fetch('/api/lookup-fbid-by-vergent-cid', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      // Pass loan_id too — the backend matches it against
+      // vergentLoan.hdrId / fundingQueue when the cid isn't on any
+      // report's vergentMatch (older loans created before the cid
+      // was written back). Makes the lookup hit far more often.
+      body: JSON.stringify({ cid: String(cid), loan_id: String(loanId || '') }),
+    });
+    const d = await r.json().catch(() => ({}));
+    _payOvFbIdByCid[cid] = (r.ok && d.firebase_id) ? d.firebase_id : null;
+  } catch (e) {
+    _payOvFbIdByCid[cid] = null;
+  }
+  if (_payOvRow && String(_payOvRow.customer_id || '') === String(cid)) {
+    _payOvRefreshAdminButton(cid);
+  }
+}
+function _payOvRefreshAdminButton(cid) {
+  // Open in Admin stays VISIBLE for every row that has a Vergent
+  // customer id. Operators want a consistent target, even if the
+  // background lookup is still in flight or failed — the click
+  // handler does its own fresh lookup with a clear toast if no
+  // admin record exists. Previously we hid the button on null which
+  // made it appear-then-disappear (the brief flash the operator
+  // reported on Payments rows).
+  const btn = document.getElementById('pay-ov-open-admin');
+  if (!btn) return;
+  if (!cid) { btn.style.display = 'none'; return; }
+  btn.style.display = 'inline-flex';
+  btn.disabled = false; btn.style.opacity = '';
+  btn.title = 'Open this customer’s admin report';
+}
+async function _payOvAwaitFbId(cid, timeoutMs, loanId) {
+  if (!cid) return null;
+  const cached = _payOvFbIdByCid[cid];
+  if (cached && cached !== '__loading__') return cached;
+  if (cached !== '__loading__') _payOvKickoffFbIdLookup(cid, loanId);
+  const start = (typeof performance !== 'undefined' && performance.now)
+    ? performance.now() : new Date().getTime();
+  const limit = Number(timeoutMs) || 25000;
+  while (true) {
+    const v = _payOvFbIdByCid[cid];
+    if (v && v !== '__loading__') return v;
+    if (v === null) return null;
+    const now = (typeof performance !== 'undefined' && performance.now)
+      ? performance.now() : new Date().getTime();
+    if ((now - start) > limit) return null;
+    await new Promise(res => setTimeout(res, 150));
+  }
+}
+var _payOvBalanceCache = {};  // customer_id -> last live balance (persists the card)
+// Check balance from the Payments declined-transaction modal — same as the
+// Loans Due one: resolve the application by identity, then hit the endpoint.
+async function checkPaymentBalance(btn){
+  const row=_payOvRow; if(!row) return;
+  const cid=String(row.customer_id||'');
+  const el=document.getElementById('pay-ov-balance-result');
+  if(btn){btn.disabled=true;btn.style.opacity='.6';}
+  if(el){el.style.display='block';el.style.background='#f4f7f9';el.style.borderColor='var(--border)';el.style.color='var(--muted)';el.textContent='Resolving customer…';}
+  try{
+    const fbId=findAppByIdentity(row) || await _payOvAwaitFbId(cid, 8000, String(row.loan_id||''));
+    if(!fbId){ renderBalanceResult({ok:false,message:'No matching application found in the dashboard for this customer — live balance unavailable.'}, 'pay-ov-balance-result'); return; }
+    if(el) el.textContent='Checking live balance…';
+    const d=await (await fetch('/api/plaid-balance',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({firebase_id:fbId})})).json();
+    if(d && d.ok){ _payOvBalanceCache[cid]=d;  // keep the card until a new check replaces it
+      const _ap=(typeof apps!=='undefined'&&Array.isArray(apps))?apps.find(function(x){return x.firebaseId===fbId;}):null;
+      if(_ap) _ap.plaidBalance=d; }            // mirror onto the app so other views show it too
+    renderBalanceResult(d, 'pay-ov-balance-result');
+  }catch(e){ renderBalanceResult({ok:false,message:'Request failed: '+e}, 'pay-ov-balance-result'); }
+  finally{ if(btn){btn.disabled=false;btn.style.opacity='';} }
+}
+async function payOvOpenAdmin() {
+  if (!_payOvRow) return;
+  const cid = String(_payOvRow.customer_id || '');
+  const loanId = String(_payOvRow.loan_id || '');
+  // Identity match first (instant, no Vergent id needed); Vergent-id lookup
+  // only as a fallback. Opens the application in a NEW tab, modal stays open.
+  const btn = document.getElementById('pay-ov-open-admin');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.style.opacity = '.7'; btn.innerHTML = 'Opening…'; }
+  try {
+    let fbId = findAppByIdentity(_payOvRow);
+    if (!fbId && cid) fbId = await _payOvAwaitFbId(cid, 25000, loanId);
+    if (fbId) {
+      window.open(location.pathname + location.search + '#fb=' + encodeURIComponent(fbId), '_blank');
+    } else {
+      toast('No application found in our system for this customer.', 'err');
+    }
+  } catch (e) {
+    toast('Lookup failed: ' + ((e && e.message) || e), 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = orig; }
+  }
+}
+async function payOvCreateLoan() {
+  if (!_payOvRow) return;
+  const cid = _payOvRow.customer_id;
+  if (!cid) { toast('No Vergent customer ID on this row', 'err'); return; }
+  const btn = document.getElementById('pay-ov-create-loan');
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = 'Opening…';
+  try {
+    const fbId = await _payOvAwaitFbId(String(cid), 25000);
+    if (!fbId) {
+      toast('No applicant record found for this Vergent customer. You can still create the loan directly in Vergent.', 'err');
+      return;
+    }
+    // Match the applicant-detail Quick Actions flow exactly: stamp
+    // the firebase_id on the body dataset and call the same modal
+    // opener. The fbId argument we used to pass was ignored —
+    // openCreateLoanModal reads body.dataset.firebaseId.
+    document.body.dataset.firebaseId = fbId;
+    closePaymentDetailModal();
+    if (typeof openCreateLoanModal === 'function') {
+      openCreateLoanModal();
+    } else {
+      toast('Create Loan modal not available', 'err');
+    }
+  } catch (e) {
+    toast('Lookup failed: ' + ((e && e.message) || e), 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+}
+
+function payOvSchedulePayment() {
+  if (!_payOvRow) return;
+  const row = _payOvRow;
+  // Populate the shared schedule-modal context (same shape lnsOv
+  // populates). submitSchedulePayment reads from here, not from
+  // _payOvRow, so the same submit handler works for both launchers.
+  _schpCtx = {
+    customer:    row.customer || '—',
+    customer_id: String(row.customer_id || ''),
+    loan_id:     String(row.loan_id || ''),
+    amount:      Number(row.amount || 0),
+  };
+  // Pre-fill amount with the declined payment's amount (most common
+  // case) and date with tomorrow's date (default rescheduling window).
+  const dateEl = document.getElementById('schp-date');
+  const amtEl  = document.getElementById('schp-amount');
+  const metaEl = document.getElementById('schp-meta');
+  if (metaEl) {
+    metaEl.textContent = _schpCtx.customer + '  ·  Loan '
+      + (_schpCtx.loan_id || '—');
+  }
+  if (amtEl) amtEl.value = Number(_schpCtx.amount || 0).toFixed(2);
+  if (dateEl) {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    // YYYY-MM-DD in local TZ (avoid the UTC midnight gotcha).
+    const tz = tomorrow.getTimezoneOffset() * 60000;
+    dateEl.value = new Date(tomorrow.getTime() - tz).toISOString().slice(0, 10);
+    dateEl.min = new Date(Date.now() - tz).toISOString().slice(0, 10);
+  }
+  // Reset method to Card (the 99% case per operator).
+  document.querySelectorAll('input[name="schp-method"]').forEach(r => {
+    r.checked = (r.value === 'card');
+  });
+  // Visual selection sync between the two radio cards.
+  _schpSyncRadioStyles();
+  document.querySelectorAll('input[name="schp-method"]').forEach(r => {
+    r.onchange = _schpSyncRadioStyles;
+  });
+  const statusEl = document.getElementById('schp-status');
+  if (statusEl) statusEl.textContent = '';
+  const ov = document.getElementById('schp-ov');
+  if (ov) ov.classList.add('open');
+}
+
+function _schpSyncRadioStyles() {
+  document.querySelectorAll('input[name="schp-method"]').forEach(r => {
+    const lbl = r.closest('label');
+    if (!lbl) return;
+    if (r.checked) {
+      lbl.style.background = '#e8f3f8';
+      lbl.style.borderColor = '#6cb1e2';
+      lbl.style.color = '#1a4d6b';
+    } else {
+      lbl.style.background = '#fafafa';
+      lbl.style.borderColor = 'var(--border)';
+      lbl.style.color = 'var(--text)';
+    }
+  });
+}
+
+function closeSchedulePaymentModal() {
+  const ov = document.getElementById('schp-ov');
+  if (ov) ov.classList.remove('open');
+}
+
+async function submitSchedulePayment() {
+  // Read the launcher-populated context. Works whether the modal was
+  // opened from Payments (_payOvRow) OR Loans Due (_lnsOvRow) — both
+  // launchers stash the relevant fields here.
+  if (!_schpCtx) {
+    // Back-compat with old paths that might still race ahead: fall
+    // back to _payOvRow if context is unset.
+    if (_payOvRow) {
+      _schpCtx = {
+        customer: _payOvRow.customer || '—',
+        customer_id: String(_payOvRow.customer_id || ''),
+        loan_id: String(_payOvRow.loan_id || ''),
+        amount: Number(_payOvRow.amount || 0),
+      };
+    } else {
+      return;
+    }
+  }
+  const row = _schpCtx;
+  const hid = row.loan_id;
+  const dateEl = document.getElementById('schp-date');
+  const amtEl  = document.getElementById('schp-amount');
+  const statusEl = document.getElementById('schp-status');
+  const submitBtn = document.getElementById('schp-submit');
+  const methodSel = document.querySelector('input[name="schp-method"]:checked');
+  const method = methodSel ? methodSel.value : 'card';
+  const dateVal = dateEl ? dateEl.value : '';
+  const amtVal  = amtEl  ? Number(amtEl.value) : 0;
+  if (!hid) { statusEl.innerHTML = '<span style="color:var(--red)">No loan ID on the row.</span>'; return; }
+  if (!dateVal) { statusEl.innerHTML = '<span style="color:var(--red)">Please pick a date.</span>'; return; }
+  if (!(amtVal > 0)) { statusEl.innerHTML = '<span style="color:var(--red)">Please enter an amount > 0.</span>'; return; }
+  submitBtn.disabled = true;
+  const origText = submitBtn.textContent;
+  submitBtn.textContent = 'Scheduling…';
+  statusEl.innerHTML = '<span style="color:var(--muted)">Sending to Vergent…</span>';
+  try {
+    const r = await fetch('/api/vergent-schedule-payment', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        hdr_id: String(hid),
+        amount: amtVal,
+        date:   dateVal,
+        method: method,
+      }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d && d.ok) {
+      statusEl.innerHTML = '<span style="color:var(--green-dark);font-weight:700">✓ Scheduled $' + amtVal.toFixed(2) + ' via ' + (method === 'ach' ? 'ACH' : 'Card') + ' for ' + escapeHtml(dateVal) + '.</span>';
+      toast('Payment scheduled', 'ok');
+      setTimeout(closeSchedulePaymentModal, 1200);
+    } else {
+      const detail = (d && (d.detail || d.error)) || ('HTTP ' + r.status);
+      statusEl.innerHTML = '<span style="color:var(--red)">Vergent rejected: ' + escapeHtml(String(detail).slice(0, 240)) + '</span>';
+      console.log('[SCHED-PMT]', d);
+      window.__lastScheduleResponse = d;
+    }
+  } catch (e) {
+    statusEl.innerHTML = '<span style="color:var(--red)">Request failed: ' + escapeHtml((e && e.message) || String(e)) + '</span>';
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = origText;
   }
 }
 
@@ -11930,9 +12997,18 @@ function _loansDueRowHtml(r) {
   else if (daysLate >= 8) rowSev = 'lns-sev-8';
   else if (daysLate >= 2) rowSev = 'lns-sev-2';
   else if (daysLate >= 1) rowSev = 'lns-sev-1';
-  return `<tr class="lns-row${rowSev ? ' ' + rowSev : ''}">
+  // Whole row opens the customer detail modal. Per-row buttons keep
+  // event.stopPropagation() so they don't bubble. Inline loan-history
+  // hover icon is removed — history lives in the modal now (per
+  // operator request to consolidate scattered icons).
+  // Serialize the row through window._lnsRowCache to avoid HTML-attr
+  // escaping pain on the big nested object.
+  window._lnsRowCache = window._lnsRowCache || {};
+  const _rowKey = (cid || '') + '|' + (hdrId || '') + '|' + (r.LoanId || '');
+  window._lnsRowCache[_rowKey] = r;
+  return `<tr class="lns-row${rowSev ? ' ' + rowSev : ''}" style="cursor:pointer" onclick="openLoansDueDetailModal(window._lnsRowCache['${_rowKey}'])" title="Tap to view customer details">
     <td class="tbl-checkbox"><button class="appt-add-btn" title="Create appointment" data-cid="${escapeHtml(cid)}" data-hdr="${escapeHtml(hdrId)}" data-name="${escapeHtml(name)}" onclick="event.stopPropagation();openApptModalFromBtn(this)">+ Appt</button></td>
-    <td><div class="applicant-name"><a href="${vergentLink}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" onclick="event.stopPropagation()">${escapeHtml(name)}</a><span class="lns-hist-icn" data-cid="${escapeHtml(cid)}" data-name="${escapeHtml(name)}" onmouseenter="_loanHistShow(this)" onmouseleave="_loanHistHide()" onclick="event.stopPropagation();_loanHistToggle(this)" title="Loan history" style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;color:var(--muted);cursor:pointer;margin-left:6px;vertical-align:middle"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><polyline points="3 4 3 9 8 9"/><path d="M12 7v5l3 2"/></svg></span><span class="lns-card-icn" data-hdr="${escapeHtml(hdrId)}" style="display:none"></span>${apptBadge}</div></td>
+    <td><div class="applicant-name"><span style="color:var(--text);font-weight:700">${escapeHtml(name)}</span><span class="lns-card-icn" data-hdr="${escapeHtml(hdrId)}" style="display:none"></span>${apptBadge}</div></td>
     <td><div class="app-info"><span class="app-type">${escapeHtml(r.LoanId || '—')}</span><span class="app-meta">${escapeHtml(r.LoanStatus || '')}${r.LoanSubStatus ? ' · ' + escapeHtml(r.LoanSubStatus) : ''}</span></div></td>
     <td>${daysCellHtml}</td>
     <td><span class="tbl-time" style="font-variant-numeric:tabular-nums">${_rptFmtMoney(r.Balance)}</span></td>
@@ -11940,6 +13016,474 @@ function _loansDueRowHtml(r) {
     <td><span class="tbl-time">${_rptFmtDate(r.NextPayDate)}</span></td>
     <td>${phoneHtml}</td>
   </tr>`;
+}
+
+// ── Loans Due page customer detail modal ───────────────────────────
+// Mirrors the Payments page modal pattern. Opens on row tap.
+// Surfaces: today's payment activity (so a decline today is visible
+// without leaving the page), scheduled payments, loan history with
+// the days-late column.
+let _lnsOvRow = null;
+// Shared 14-day Vergent card-activity cache for BOTH detail modals
+// (Payments + Loans Due). 5-min TTL keeps the second open instant.
+// We deliberately do NOT consult the global Payments-page _payCache
+// — its date range mirrors the operator's filter (often "Today"), so
+// it can miss the older declined attempts the modal needs to show.
+let _modalActivityCache = null;  // { rows, fetchedAt }
+const _MODAL_ACTIVITY_TTL_MS = 5 * 60 * 1000;
+const _MODAL_ACTIVITY_WINDOW_DAYS = 14;
+// Schedule Payment modal context — populated by the launcher
+// (payOvSchedulePayment OR lnsOvSchedulePayment) so submitSchedule
+// Payment works from either modal. {customer, customer_id, loan_id,
+// amount}. The legacy code read directly from _payOvRow, which
+// crashed when launching from Loans Due (where _payOvRow is null).
+let _schpCtx = null;
+async function _ensureModal14dActivity() {
+  const now = (typeof Date !== 'undefined' && Date.now) ? Date.now() : new Date().getTime();
+  if (_modalActivityCache
+      && Array.isArray(_modalActivityCache.rows)
+      && (now - (_modalActivityCache.fetchedAt || 0)) < _MODAL_ACTIVITY_TTL_MS) {
+    return _modalActivityCache.rows;
+  }
+  const today = new Date();
+  const start = new Date(today);
+  start.setDate(start.getDate() - (_MODAL_ACTIVITY_WINDOW_DAYS - 1));
+  try {
+    const r = await fetch('/api/vergent-card-payments', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        start_date: _payIsoDate(start),
+        end_date: _payIsoDate(today),
+      }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) {
+      console.warn('[modal-activity] fetch failed:',
+        d.detail || d.error || ('HTTP ' + r.status));
+      return [];
+    }
+    _modalActivityCache = {
+      rows: d.rows || [],
+      fetchedAt: (typeof Date !== 'undefined' && Date.now) ? Date.now() : new Date().getTime(),
+    };
+    return _modalActivityCache.rows;
+  } catch (e) {
+    console.warn('[modal-activity] network error:', e && e.message);
+    return [];
+  }
+}
+// Cached firebase_id per Vergent customerId. We kick off the lookup
+// when the modal opens so the Create New Loan + Open in Admin buttons
+// are instant — by the time the operator scans the modal and clicks,
+// the lookup is usually done. Values: undefined = not started,
+// '__loading__' = in flight, string = found, null = not found.
+const _lnsOvFbIdByCid = {};
+let _lnsOvFbIdLookupSeq = 0;
+async function _lnsOvKickoffFbIdLookup(cid, loanId) {
+  if (!cid) return;
+  if (_lnsOvFbIdByCid[cid] != null && _lnsOvFbIdByCid[cid] !== '__loading__') return;
+  if (_lnsOvFbIdByCid[cid] === '__loading__') return;
+  _lnsOvFbIdByCid[cid] = '__loading__';
+  const seq = ++_lnsOvFbIdLookupSeq;
+  try {
+    const r = await fetch('/api/lookup-fbid-by-vergent-cid', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      // loan_id lets the backend match by vergentLoan.hdrId /
+      // fundingQueue when the cid isn't on any report's vergentMatch.
+      body: JSON.stringify({ cid: String(cid), loan_id: String(loanId || '') }),
+    });
+    const d = await r.json().catch(() => ({}));
+    _lnsOvFbIdByCid[cid] = (r.ok && d.firebase_id) ? d.firebase_id : null;
+  } catch (e) {
+    _lnsOvFbIdByCid[cid] = null;
+  }
+  // If the operator is still viewing this customer's modal, refresh
+  // button state so disabled/visible flags reflect the lookup result.
+  if (seq === _lnsOvFbIdLookupSeq && _lnsOvRow
+      && String(_lnsOvRow.CustomerId || '') === String(cid)) {
+    _lnsOvRefreshAdminButton(cid);
+  }
+}
+function _lnsOvRefreshAdminButton(cid) {
+  // Open in Admin stays VISIBLE for every row that has a Vergent
+  // customer id (consistency for the operator). The click handler
+  // does its own fresh lookup and toasts a clear error if no admin
+  // record exists — previously we hid the button on null which made
+  // it appear-then-disappear.
+  const btn = document.getElementById('lns-ov-open-admin');
+  if (!btn) return;
+  // Show when there's a cid OR a name we can identity-match in the dashboard.
+  const canIdentity = _lnsOvRow && (_lnsOvRow.FirstName || _lnsOvRow.LastName);
+  if (!cid && !canIdentity) { btn.style.display = 'none'; return; }
+  btn.style.display = 'inline-flex';
+  btn.disabled = false;
+  btn.style.opacity = '';
+  btn.title = 'Open this customer’s admin report';
+}
+async function _lnsOvAwaitFbId(cid, timeoutMs, loanId) {
+  // Used by the click handlers to await the in-flight lookup with a
+  // visible button state. Returns string fbId or null.
+  if (!cid) return null;
+  const cached = _lnsOvFbIdByCid[cid];
+  if (cached && cached !== '__loading__') return cached;
+  if (cached !== '__loading__') _lnsOvKickoffFbIdLookup(cid, loanId);
+  const start = (typeof performance !== 'undefined' && performance.now)
+    ? performance.now() : new Date().getTime();
+  const limit = Number(timeoutMs) || 30000;
+  while (true) {
+    const v = _lnsOvFbIdByCid[cid];
+    if (v && v !== '__loading__') return v;
+    if (v === null) return null;
+    const now = (typeof performance !== 'undefined' && performance.now)
+      ? performance.now() : new Date().getTime();
+    if ((now - start) > limit) return null;
+    await new Promise(res => setTimeout(res, 150));
+  }
+}
+function lnsOvSchedulePayment() {
+  if (!_lnsOvRow) return;
+  const row = _lnsOvRow;
+  const hdrId = String(row.HdrId || row.LoanId || '');
+  if (!hdrId) { toast('No loan ID on this row', 'err'); return; }
+  // Populate the schedule-modal context the same shape the Payments
+  // page populates. submitSchedulePayment reads from _schpCtx, so we
+  // never depend on _payOvRow (which is null when launched from here).
+  _schpCtx = {
+    customer:    ((row.FirstName || '') + ' ' + (row.LastName || '')).trim() || '—',
+    customer_id: String(row.CustomerId || ''),
+    loan_id:     hdrId,
+    amount:      Number(row.AmountDue || 0) || Number(row.Balance || 0) || 0,
+  };
+  const metaEl = document.getElementById('schp-meta');
+  const amtEl  = document.getElementById('schp-amount');
+  const dateEl = document.getElementById('schp-date');
+  if (metaEl) {
+    metaEl.textContent = _schpCtx.customer + '  ·  Loan ' + hdrId;
+  }
+  if (amtEl)  amtEl.value = Number(_schpCtx.amount || 0).toFixed(2);
+  if (dateEl) {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tz = tomorrow.getTimezoneOffset() * 60000;
+    dateEl.value = new Date(tomorrow.getTime() - tz).toISOString().slice(0, 10);
+    dateEl.min   = new Date(Date.now()       - tz).toISOString().slice(0, 10);
+  }
+  // Reset to Card (the 99% case per operator).
+  document.querySelectorAll('input[name="schp-method"]').forEach(r => {
+    r.checked = (r.value === 'card');
+    r.onchange = _schpSyncRadioStyles;
+  });
+  _schpSyncRadioStyles();
+  const statusEl = document.getElementById('schp-status');
+  if (statusEl) statusEl.textContent = '';
+  closeLoansDueDetailModal();
+  const ov = document.getElementById('schp-ov');
+  if (ov) ov.classList.add('open');
+}
+async function lnsOvOpenAdmin() {
+  if (!_lnsOvRow) return;
+  const cid = String(_lnsOvRow.CustomerId || '');
+  const loanId = String(_lnsOvRow.HdrId || _lnsOvRow.LoanId || '');
+  // Identity match first: open the EXISTING application by name/phone from
+  // the loaded reports index — no Vergent id needed. Fall back to the
+  // Vergent-id lookup only if identity doesn't match a loaded application.
+  const btn = document.getElementById('lns-ov-open-admin');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.style.opacity = '.7'; btn.innerHTML = 'Opening…'; }
+  try {
+    let fbId = findAppByIdentity(_lnsOvRow);
+    if (!fbId && cid) fbId = await _lnsOvAwaitFbId(cid, 25000, loanId);
+    if (fbId) {
+      // Open the application in a NEW tab; leave the Loans Due modal open.
+      window.open(location.pathname + location.search + '#fb=' + encodeURIComponent(fbId), '_blank');
+    } else {
+      toast('No application found in our system for this customer.', 'err');
+    }
+  } catch (e) {
+    toast('Lookup failed: ' + ((e && e.message) || e), 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = orig; }
+  }
+}
+// Shared renderer: lists ALL payment attempts for a given loan as a
+// compact table. Used by both the Loans Due "Recent Payment Activity"
+// section and the Payments page declined-row "Payment Activity"
+// section. `el` is the target div; `rows` is the full 14-day fetch;
+// `hdrId` is the loan id (matched against r.loan_id with an endsWith
+// fallback because Vergent sometimes returns "{co}-{model}-{hdr}").
+function _renderPaymentAttemptsTable(el, rows, hdrId, cid) {
+  if (!el) return;
+  if (!Array.isArray(rows) || !rows.length) {
+    el.innerHTML = '<span style="color:var(--muted)">No payment activity on record.</span>';
+    return;
+  }
+  const hdr = String(hdrId || '');
+  const c = String(cid || '');
+  const matches = rows.filter(r => {
+    if (hdr && r.loan_id && String(r.loan_id).endsWith(hdr)) return true;
+    return false;
+  });
+  if (!matches.length) {
+    // Loan-scoped strict mode — only show attempts that tie to this
+    // specific loan. Fall back to cid-wide if no loan matches (loan
+    // id might not be on the row for very old funded entries).
+    if (c) {
+      const byCid = rows.filter(r => r.customer_id && String(r.customer_id) === c);
+      if (byCid.length) {
+        return _renderPaymentAttemptsTable_render(el, byCid, true);
+      }
+    }
+    el.innerHTML = '<span style="color:var(--muted)">No payment activity for this loan.</span>';
+    return;
+  }
+  _renderPaymentAttemptsTable_render(el, matches, false);
+}
+function _renderPaymentAttemptsTable_render(el, list, cidFallbackNotice) {
+  list.sort((a, b) => {
+    const ta = new Date(a.real_date || 0).getTime() || 0;
+    const tb = new Date(b.real_date || 0).getTime() || 0;
+    return tb - ta;
+  });
+  const fmtWhen = (d) => {
+    try {
+      const x = new Date(d);
+      if (isNaN(x)) return '—';
+      const sameDay = x.toDateString() === new Date().toDateString();
+      return sameDay
+        ? 'Today ' + x.toLocaleTimeString(undefined, {hour:'numeric',minute:'2-digit'})
+        : x.toLocaleDateString(undefined, {month:'short',day:'numeric'})
+            + ' ' + x.toLocaleTimeString(undefined, {hour:'numeric',minute:'2-digit'});
+    } catch (e) { return '—'; }
+  };
+  const statusPill = (r) => {
+    const isDeclined = r.status === 'declined';
+    const isFunding  = r.kind === 'funding';
+    const label = isFunding ? 'FUNDED'
+                : isDeclined ? 'DECLINED'
+                : (String(r.status || '?').toUpperCase());
+    const bg = isDeclined ? '#fee2e2' : isFunding ? '#dbeafe' : '#dcfce7';
+    const fg = isDeclined ? '#b91c1c' : isFunding ? '#1d4ed8' : '#15803d';
+    return '<span style="display:inline-flex;align-items:center;padding:1px 7px;border-radius:999px;background:' + bg + ';color:' + fg + ';font-size:10px;font-weight:700;letter-spacing:.04em">' + escapeHtml(label) + '</span>';
+  };
+  const notice = cidFallbackNotice
+    ? '<div style="font-size:10.5px;color:var(--muted);margin-bottom:5px">Showing all attempts on this customer (no loan-scoped matches in the 14-day window).</div>'
+    : '';
+  el.innerHTML = notice + '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:320px">'
+    + '<thead><tr style="text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">'
+    + '<th style="padding:4px 6px;font-weight:700">When</th>'
+    + '<th style="padding:4px 6px;text-align:right;font-weight:700">Amount</th>'
+    + '<th style="padding:4px 6px;font-weight:700">Status</th>'
+    + '</tr></thead><tbody>'
+    + list.map(r => {
+        const reasonLine = r.decline_reason
+          ? '<div style="font-size:10.5px;color:var(--red);font-weight:600;margin-top:2px;line-height:1.3">' + escapeHtml(r.decline_reason) + '</div>'
+          : '';
+        return '<tr style="border-top:1px solid var(--border);vertical-align:top">'
+          + '<td style="padding:5px 6px;font-variant-numeric:tabular-nums">' + escapeHtml(fmtWhen(r.real_date)) + '</td>'
+          + '<td style="padding:5px 6px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700">$' + Number(r.amount || 0).toFixed(2) + '</td>'
+          + '<td style="padding:5px 6px">' + statusPill(r) + reasonLine + '</td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div>';
+}
+
+function openLoansDueDetailModal(row) {
+  if (!row) return;
+  _lnsOvRow = row;
+  const ov = document.getElementById('lns-ov');
+  if (!ov) return;
+  ov.classList.add('open');
+  // Live-balance card: re-show this customer's last reading if we have one
+  // (persists across re-opens until a new Check balance replaces it); else
+  // clear any previous customer's card.
+  const _balBtn = document.getElementById('lns-ov-balance');
+  if (_balBtn) { _balBtn.disabled = false; _balBtn.style.opacity = ''; }
+  _hydrateModalBalanceCard(row, _lnsOvBalanceCache, String(row.CustomerId || ''),
+    'lns-ov-balance-result',
+    function(){ return _lnsOvRow && String(_lnsOvRow.CustomerId || '') === String(row.CustomerId || ''); });
+  const name = ((row.FirstName || '') + ' ' + (row.LastName || '')).trim() || '—';
+  const cid = String(row.CustomerId || '');
+  const loanIdDisplay = row.LoanId || row.HdrId || '—';
+  document.getElementById('lns-ov-name').textContent = name;
+  document.getElementById('lns-ov-meta').textContent =
+    'Vergent ID: ' + (cid || '—') + '  ·  Loan ' + loanIdDisplay;
+  const vlink = cid
+    ? 'https://shared.lms.vergentlms.com/customer/general?action=view&id=' + encodeURIComponent(cid)
+    : '#';
+  const vBtn = document.getElementById('lns-ov-vergent');
+  vBtn.href = vlink;
+  vBtn.style.display = cid ? 'inline-flex' : 'none';
+  // Schedule Payment is always visible when we have a loan id (it's
+  // what the operator is here to do). Open in Admin is hidden until
+  // we know whether a firebase report exists — lookup is kicked off
+  // immediately so subsequent clicks are instant.
+  const schBtn = document.getElementById('lns-ov-schedule');
+  if (schBtn) {
+    const hasLoan = !!(row.HdrId || row.LoanId);
+    schBtn.style.display = hasLoan ? 'inline-flex' : 'none';
+    schBtn.disabled = false; schBtn.style.opacity = '';
+  }
+  _lnsOvRefreshAdminButton(cid);
+  // Kick off the firebase_id lookup so Open in Admin can navigate
+  // straight to the application detail page. Pass the loan id too
+  // so the backend can match by loan when the cid isn't on any
+  // report's vergentMatch.
+  if (cid) _lnsOvKickoffFbIdLookup(cid, String(row.HdrId || row.LoanId || ''));
+  // Snapshot — balance, days late, due, next pay
+  const snap = document.getElementById('lns-ov-snapshot');
+  const daysLate = _pastDueComputedDaysLate(row);
+  let dlText;
+  if (daysLate >= 31)     dlText = '<span style="color:var(--red);font-weight:700">' + daysLate + 'd late</span>';
+  else if (daysLate >= 1) dlText = '<span style="color:var(--amber-700);font-weight:700">' + daysLate + 'd late</span>';
+  else if (daysLate === 0) dlText = '<span style="color:#b45309;font-weight:700">Due today</span>';
+  else                     dlText = '<span style="color:var(--green-dark);font-weight:700">in ' + Math.abs(daysLate) + 'd</span>';
+  snap.innerHTML =
+    '<div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline">'
+    + '<div><span style="color:var(--muted);font-size:11px">Balance:</span> <b style="font-variant-numeric:tabular-nums">' + escapeHtml(_rptFmtMoney(row.Balance)) + '</b></div>'
+    + '<div><span style="color:var(--muted);font-size:11px">Amount due:</span> <b style="font-variant-numeric:tabular-nums">' + escapeHtml(_rptFmtMoney(row.AmountDue)) + '</b></div>'
+    + '<div><span style="color:var(--muted);font-size:11px">Due date:</span> <b>' + escapeHtml(_rptFmtDate(row.NextPayDate || row.DueDate)) + '</b></div>'
+    + '<div>' + dlText + '</div>'
+    + '</div>';
+  // Recent activity — auto-fetches a 14-day window via Vergent if
+  // the global Payments cache isn't populated yet. Fire-and-forget.
+  _renderLnsOvToday(row);
+  // Async loads in parallel.
+  _loadLnsOvScheduled(row);
+  _loadLnsOvLoanHistory(row);
+}
+
+function closeLoansDueDetailModal() {
+  const ov = document.getElementById('lns-ov');
+  if (ov) ov.classList.remove('open');
+  _lnsOvRow = null;
+}
+
+async function _renderLnsOvToday(row) {
+  const el = document.getElementById('lns-ov-today');
+  if (!el) return;
+  const cid = String(row.CustomerId || '');
+  const hdrId = String(row.HdrId || row.LoanId || '');
+  // Auto-fetch the last 14 days of card activity and render EVERY
+  // attempt that ties to this specific loan — operator needs to see
+  // all retries, not just the latest one, to plan the next move.
+  el.innerHTML = '<span style="color:var(--muted)">Loading recent activity…</span>';
+  const rows = await _ensureModal14dActivity();
+  if (!_lnsOvRow || String(_lnsOvRow.CustomerId || '') !== cid) return;
+  _renderPaymentAttemptsTable(el, rows, hdrId, cid);
+}
+
+async function _loadLnsOvScheduled(row) {
+  const el = document.getElementById('lns-ov-sched');
+  if (!el) return;
+  const hdrId = String(row.HdrId || row.LoanId || '');
+  if (!hdrId) { el.textContent = 'No loan ID'; return; }
+  el.textContent = 'Loading…';
+  try {
+    const r = await fetch('/api/vergent-scheduled-payments', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hdr_id: hdrId }),
+    });
+    const d = await r.json().catch(() => ({}));
+    const auto = (d && d.automatic_schedules) || [];
+    const manual = (d && d.manual_schedules) || [];
+    const all = []
+      .concat(auto.map(s => ({...s, _type: 'auto'})))
+      .concat(manual.map(s => ({...s, _type: 'manual'})));
+    all.sort((a, b) => (new Date(a.date || 0).getTime() || 0) - (new Date(b.date || 0).getTime() || 0));
+    if (!all.length) {
+      el.innerHTML = '<span style="color:var(--muted)">No scheduled payments.</span>';
+      return;
+    }
+    const fmtDate = (s) => {
+      if (!s) return '—';
+      try { const dt = new Date(s); if (!isNaN(dt)) return dt.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'2-digit'}); } catch (e) {}
+      return s;
+    };
+    const methodPill = (s) => {
+      const isCard = s.is_card || /card|credit|debit|cc/i.test(s.method || '');
+      return isCard
+        ? '<span style="display:inline-block;font-size:10px;background:#e8f3f8;color:#1a4d6b;padding:1px 7px;border-radius:4px;font-weight:700">CARD</span>'
+        : '<span style="display:inline-block;font-size:10px;background:#fff5e6;color:#5a3300;padding:1px 7px;border-radius:4px;font-weight:700">ACH</span>';
+    };
+    el.innerHTML = '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:320px">'
+      + '<thead><tr style="text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">'
+      + '<th style="padding:4px 6px;font-weight:700">Date</th>'
+      + '<th style="padding:4px 6px;text-align:right;font-weight:700">Amount</th>'
+      + '<th style="padding:4px 6px;font-weight:700">Method</th>'
+      + '<th style="padding:4px 6px;font-weight:700"></th>'
+      + '</tr></thead><tbody>'
+      + all.map(s => '<tr style="border-top:1px solid var(--border)">'
+        + '<td style="padding:5px 6px;font-variant-numeric:tabular-nums;font-weight:700">' + escapeHtml(fmtDate(s.date)) + '</td>'
+        + '<td style="padding:5px 6px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700">$' + Number(s.amount || 0).toFixed(2) + '</td>'
+        + '<td style="padding:5px 6px">' + methodPill(s) + '</td>'
+        + '<td style="padding:5px 6px"><span style="font-size:10px;color:var(--muted);font-weight:600">' + escapeHtml(s._type || '') + '</span></td>'
+        + '</tr>').join('')
+      + '</tbody></table></div>';
+  } catch (e) {
+    el.innerHTML = '<span style="color:var(--red)">Couldn\'t load: ' + escapeHtml((e && e.message) || String(e)) + '</span>';
+  }
+}
+
+async function _loadLnsOvLoanHistory(row) {
+  const el = document.getElementById('lns-ov-loans');
+  if (!el) return;
+  const cid = String(row.CustomerId || '');
+  if (!cid) { el.textContent = 'No customer ID'; return; }
+  el.textContent = 'Loading…';
+  try {
+    const r = await fetch('/api/vergent-loans', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customer_id: cid }),
+    });
+    const d = await r.json().catch(() => ({}));
+    const loans = (d && d.loans) || [];
+    if (!loans.length) { el.innerHTML = '<span style="color:var(--muted)">No prior loans.</span>'; return; }
+    const fmtDate = (s) => {
+      if (!s) return '—';
+      try { const dt = new Date(s); if (!isNaN(dt)) return dt.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'2-digit'}); } catch (e) {}
+      return s;
+    };
+    const lateCell = (ln) => {
+      const dlRaw  = (ln.days_late_label && String(ln.days_late_label).trim()) || '';
+      const dlRawL = dlRaw.toLowerCase();
+      const dlIsZeroLabel = dlRawL === 'not late' || dlRawL === 'current' || dlRawL === 'ok' || dlRaw === '0' || dlRaw === '—';
+      const dlFromLabel = !dlIsZeroLabel && dlRaw ? (parseInt((dlRaw.match(/-?\d+/) || ['0'])[0], 10) || 0) : 0;
+      const dlCur  = Math.max(Number(ln.days_late) || 0, dlFromLabel);
+      const dlMax  = Number(ln.max_days_late) || 0;
+      const dl     = Math.max(dlCur, dlMax);
+      const isHistorical = dl > 0 && (Number(ln.days_late) || 0) === 0 && dlFromLabel === 0;
+      let txt, color;
+      if (dl >= 31)     { txt = dl + 'd'; color = 'var(--red)'; }
+      else if (dl >= 1) { txt = dl + 'd'; color = 'var(--amber-700)'; }
+      else              { txt = 'On time'; color = 'var(--green-dark)'; }
+      const tag = isHistorical ? ' <span style="color:var(--muted);font-weight:600;font-size:10px">prior</span>' : '';
+      return '<span style="color:' + color + ';font-weight:700">' + escapeHtml(txt) + '</span>' + tag;
+    };
+    el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:440px">'
+      + '<thead><tr style="text-align:left;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em">'
+      + '<th style="padding:5px 6px;font-weight:700">Loan #</th>'
+      + '<th style="padding:5px 6px;font-weight:700">Date</th>'
+      + '<th style="padding:5px 6px;text-align:right;font-weight:700">Amount</th>'
+      + '<th style="padding:5px 6px;text-align:right;font-weight:700">Balance</th>'
+      + '<th style="padding:5px 6px;font-weight:700">Status</th>'
+      + '<th style="padding:5px 6px;font-weight:700">Late</th>'
+      + '</tr></thead><tbody>'
+      + loans.map(ln => '<tr style="border-top:1px solid var(--border)">'
+        + '<td style="padding:6px;font-variant-numeric:tabular-nums">' + escapeHtml(ln.loan_number || ln.loan_id || '—') + '</td>'
+        + '<td style="padding:6px;font-variant-numeric:tabular-nums">' + escapeHtml(fmtDate(ln.date)) + '</td>'
+        + '<td style="padding:6px;text-align:right;font-variant-numeric:tabular-nums">$' + Number(ln.amount || 0).toFixed(0) + '</td>'
+        + '<td style="padding:6px;text-align:right;font-variant-numeric:tabular-nums;color:' + (Number(ln.balance || 0) > 0 ? 'var(--text)' : 'var(--muted)') + '">$' + Number(ln.balance || 0).toFixed(0) + '</td>'
+        + '<td style="padding:6px">' + escapeHtml(ln.status || '—') + '</td>'
+        + '<td style="padding:6px;white-space:nowrap">' + lateCell(ln) + '</td>'
+        + '</tr>').join('')
+      + '</tbody></table>';
+  } catch (e) {
+    el.innerHTML = '<span style="color:var(--red)">Couldn\'t load: ' + escapeHtml((e && e.message) || String(e)) + '</span>';
+  }
 }
 
 // Loans Due view — alias so setReportTab's two-tab dispatch reads cleanly.
