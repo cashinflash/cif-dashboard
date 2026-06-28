@@ -1873,6 +1873,38 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        # ── Marketing Campaigns — proxy all /api/marketing/* to cif-apply.
+        # Operator-only (valid session). For send-campaign we stamp the
+        # logged-in operator as created_by server-side so the audit trail
+        # records who blasted.
+        if path.startswith('/api/marketing/'):
+            if not valid_session(token):
+                self.send_json(401, {'error': 'Unauthorized'}); return
+            try:
+                import urllib.request as ur
+                try:
+                    body = json.loads(raw) if raw else {}
+                except Exception:
+                    body = {}
+                if path == '/api/marketing/send-campaign':
+                    s = sessions.get(token, {})
+                    body['created_by'] = s.get('user', '') or body.get('created_by', '')
+                payload = json.dumps(body).encode()
+                req = ur.Request('https://cif-apply.onrender.com' + path,
+                    data=payload, headers={'Content-Type': 'application/json'},
+                    method='POST')
+                with ur.urlopen(req, timeout=120) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[MARKETING PROXY ERROR] {path}: {e}', flush=True)
+                self.send_json(502, {'error': str(e)})
+            return
+
         if path == '/api/refresh-from-plaid':
             try:
                 body = json.loads(raw)
