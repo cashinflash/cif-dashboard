@@ -4214,7 +4214,7 @@ function renderDetail(fbId) {
   const dc = ad.debitCard;
   if (isNewApplicant) {
     document.getElementById('dv-app-data').innerHTML = buildAppDetails(ad);
-    document.getElementById('dv-debit-card').innerHTML = buildDebitCardPanel(dc);
+    document.getElementById('dv-debit-card').innerHTML = buildDebitCardPanel(dc, fbId);
   }
   // Documents grid — re-render on applicant switch OR whenever a doc
   // URL changes (e.g. a fresh Plaid PDF landed after Refresh from
@@ -4468,8 +4468,34 @@ function buildDocsPanel(a) {
 }
 
 // Render the Debit Card tab — ported from classic buildIFCardPanel
-function buildDebitCardPanel(dc) {
-  if (!dc) return `<div class="dcard-empty"><div class="dcard-empty-icn">💳</div><div style="font-weight:600">No debit card submitted</div><div style="font-size:13px;margin-top:4px">This applicant did not request debit-card funding during the application.</div></div>`;
+async function requestCardFromCustomer(fbId) {
+  if (!fbId) return;
+  if (!confirm('Email this customer a link to add their debit card at cashinflash.com/if?\n\nThe link is tied to their Vergent record so the card saves to the right account.')) return;
+  const res = document.getElementById('reqcard-result');
+  if (res) { res.style.color = 'var(--muted)'; res.textContent = 'Sending…'; }
+  try {
+    const r = await fetch('/api/send-card-request', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firebase_id: fbId }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.ok) {
+      const link = d.hardLinked ? ' (linked to Vergent #' + d.vergentCustomerId + ')' : ' — note: no Vergent customer linked yet';
+      if (res) { res.style.color = 'var(--green-dark)'; res.textContent = 'Sent to ' + (d.to || 'the customer') + link; }
+      toast('Card request email sent', 'ok');
+    } else {
+      if (res) { res.style.color = 'var(--red)'; res.textContent = 'Failed: ' + (d.detail || d.error || ('HTTP ' + r.status)); }
+    }
+  } catch (e) {
+    if (res) { res.style.color = 'var(--red)'; res.textContent = 'Network error: ' + ((e && e.message) || e); }
+  }
+}
+
+function buildDebitCardPanel(dc, fbId) {
+  if (!dc) return `<div class="dcard-empty"><div class="dcard-empty-icn">💳</div><div style="font-weight:600">No debit card submitted</div><div style="font-size:13px;margin-top:4px">This applicant didn’t submit a debit card during the application.</div>`
+    + (fbId ? `<div style="margin-top:16px"><button onclick="requestCardFromCustomer('${escapeHtml(fbId)}')" style="background:#e8f5ee;color:#1a6b3c;border:1px solid #6cc294;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:42px;display:inline-flex;align-items:center;gap:7px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Request Card from Customer</button><div style="font-size:11.5px;color:var(--muted);margin-top:7px;max-width:380px;margin-left:auto;margin-right:auto;line-height:1.5">Emails an approved customer a link to add their card. The link ties their submission to the right Vergent account.</div><div id="reqcard-result" style="font-size:12px;color:var(--muted);margin-top:8px"></div></div>` : '')
+    + `</div>`;
   const cardholder = ((dc.cardholderFirst || '') + ' ' + (dc.cardholderLast || '')).trim() || dc.cardholder || '—';
   const panRaw = String(dc.cardNumber || '').replace(/\D/g, '');
   const panFmt = panRaw.replace(/(.{4})/g, '$1 ').trim() || '—';
