@@ -2201,6 +2201,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       <button class="chip"        data-comm-kind="funds_sent"          onclick="setCommFilter('funds_sent')">Funds Sent</button>
       <button class="chip"        data-comm-kind="denial"              onclick="setCommFilter('denial')">Denial</button>
       <button class="chip"        data-comm-kind="card_failed"         onclick="setCommFilter('card_failed')">Invalid Card</button>
+      <button class="chip"        data-comm-kind="registration"        onclick="setCommFilter('registration')">Registration</button>
       <input type="text" id="comm-search" placeholder="Search recipient, loan id, subject…" oninput="renderCommunications()" style="margin-left:8px;flex:1;min-width:240px;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;font-family:inherit;outline:none">
     </div>
 
@@ -2243,6 +2244,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
           <option value="returned_payment">Returned Payment</option>
           <option value="denial">Denial</option>
           <option value="card_failed">Invalid Card</option>
+          <option value="registration">Portal Registration (magic link)</option>
         </select>
       </label>
       <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Send to
@@ -2251,7 +2253,11 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Recipient name
         <input type="text" id="ct-name" placeholder="Test User" style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit">
       </label>
-      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Loan ID <span style="font-weight:500;color:var(--muted2);text-transform:none">(optional)</span>
+      <label id="ct-cid-label" style="display:none;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Vergent customer ID <span style="font-weight:500;color:var(--muted2);text-transform:none">(registration only — whose magic link to mint)</span>
+        <input type="text" id="ct-cid" placeholder="590391" style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit">
+        <span style="display:block;margin-top:4px;font-weight:500;color:var(--muted2);text-transform:none;font-size:11px;line-height:1.4">The email goes to the address above, but the link inside is built for this customer. Use one of your real customers, then click the link to confirm it opens — don't finish setting a password unless it's actually your account.</span>
+      </label>
+      <label id="ct-loan-label" style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Loan ID <span style="font-weight:500;color:var(--muted2);text-transform:none">(optional)</span>
         <input type="text" id="ct-loan" placeholder="1-3781-4834757" style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit">
       </label>
       <label id="ct-balance-label" style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Loan balance <span style="font-weight:500;color:var(--muted2);text-transform:none">(optional, returned-payment only)</span>
@@ -10920,6 +10926,7 @@ const _COMM_KIND_LABELS = {
   funds_sent:        'Funds Sent',
   denial:            'Denial',
   card_failed:       'Invalid Card',
+  registration:      'Registration',
 };
 const _COMM_KIND_COLORS = {
   approval:          { bg: '#bbf7d0', fg: '#14532d' },
@@ -10931,6 +10938,9 @@ const _COMM_KIND_COLORS = {
   // separate "applicant declined" (denial) from "approved but card
   // bounced" (card_failed) at a glance.
   card_failed:       { bg: '#fed7aa', fg: '#9a3412' },
+  // Indigo — portal-registration / magic-link sends, visually distinct
+  // from the transactional (green/red/amber) emails.
+  registration:      { bg: '#e0e7ff', fg: '#4338ca' },
 };
 
 // ───────── Funding Status page ─────────
@@ -11814,10 +11824,17 @@ function openCommTestModal() {
 }
 function _commUpdateTestModalForKind() {
   const k = document.getElementById('ct-kind')?.value || 'thank_you_payment';
+  const isReg = (k === 'registration');
   const balLabel = document.getElementById('ct-balance-label');
   const reasonsLabel = document.getElementById('ct-reasons-label');
+  const cidLabel = document.getElementById('ct-cid-label');
+  const loanLabel = document.getElementById('ct-loan-label');
   if (balLabel)     balLabel.style.display     = (k === 'returned_payment') ? '' : 'none';
   if (reasonsLabel) reasonsLabel.style.display = (k === 'denial')           ? '' : 'none';
+  // Registration mints a per-customer link; loan id / balance / reasons
+  // don't apply, so swap those for the customer-id field.
+  if (cidLabel)  cidLabel.style.display  = isReg ? '' : 'none';
+  if (loanLabel) loanLabel.style.display = isReg ? 'none' : '';
 }
 function closeCommTestModal() {
   document.getElementById('comm-test-modal').style.display = 'none';
@@ -11831,7 +11848,12 @@ async function sendCommTest() {
   const loanId  = (document.getElementById('ct-loan').value || '').trim();
   const balance = (document.getElementById('ct-balance').value || '').trim();
   const reasonsRaw = (document.getElementById('ct-reasons').value || '').trim();
+  const custId  = (document.getElementById('ct-cid').value || '').trim();
   if (!toEmail) { result.textContent = 'Recipient email is required.'; result.style.color = 'var(--red)'; return; }
+  if (kind === 'registration' && !custId) {
+    result.textContent = 'Vergent customer ID is required for a registration test (it decides whose magic link gets minted).';
+    result.style.color = 'var(--red)'; return;
+  }
   result.style.color = 'var(--muted)';
   result.textContent = 'Sending…';
   btn.disabled = true;
@@ -11839,6 +11861,7 @@ async function sendCommTest() {
                  : kind === 'returned_payment' ? '/api/send-returned-payment'
                  : kind === 'approval' ? '/api/send-approval'
                  : kind === 'card_failed' ? '/api/send-card-failed'
+                 : kind === 'registration' ? '/api/send-registration'
                  : '/api/send-thank-you-payment';
   const body = kind === 'denial'
     ? { email: toEmail, name: toName, reasons: reasonsRaw.split('\n').map(s => s.trim()).filter(Boolean), test: true }
@@ -11849,6 +11872,11 @@ async function sendCommTest() {
     // to the generic cashinflash.com/if/ (no ?fb= auto-link param) —
     // that's expected for a test.
     ? { to_email: toEmail, to_name: toName, test: true }
+    : kind === 'registration'
+    // cif-apply mints the per-customer magic link from customer_id, then
+    // sends to to_email. force_resend so repeated same-day test sends to
+    // the same inbox aren't swallowed by the dedup gate.
+    ? { to_email: toEmail, to_name: toName, customer_id: custId, force_resend: true, test: true }
     : { to_email: toEmail, to_name: toName, loan_id: loanId, loan_balance: balance, test: true };
   try {
     const r = await fetch(endpoint, {

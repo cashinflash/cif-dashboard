@@ -1853,6 +1853,30 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        # Portal-registration email with a per-customer magic link. Own
+        # branch (not the tuple above) because cif-apply has to mint the
+        # onboarding link first — a server-to-server round-trip to the
+        # portal — before it can send, so this needs a longer timeout than
+        # the plain template sends. Body: {to_email, to_name?, customer_id?,
+        # force_resend?, test?}. Forwarded verbatim to cif-apply.
+        if path == '/api/send-registration':
+            try:
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/send-registration',
+                    data=raw, headers={'Content-Type': 'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=90) as r:
+                    result = r.read()
+                self.send_json(200, json.loads(result))
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[REGISTRATION PROXY {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[REGISTRATION PROXY ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         if path == '/api/rerun-plaid':
             try:
                 body = json.loads(raw)
