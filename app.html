@@ -2197,6 +2197,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       </div>
       <div class="greet-actions">
         <button class="btn btn-ghost" onclick="loadCommunications()" title="Refresh"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-refresh"/></svg>Refresh</button>
+        <button class="btn btn-ghost" onclick="openCampaignsModal()" title="Send a marketing email to all customers"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-message"/></svg>Campaigns</button>
         <button class="btn btn-primary" onclick="openCommTestModal()"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-message"/></svg>Send Test Email</button>
       </div>
     </div>
@@ -2283,6 +2284,79 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 22px;border-top:1px solid var(--border)">
       <button class="btn btn-ghost" onclick="closeCommTestModal()">Cancel</button>
       <button class="btn btn-primary" id="ct-send-btn" onclick="sendCommTest()">Send Test</button>
+    </div>
+  </div>
+</div>
+
+<!-- MARKETING CAMPAIGNS modal — compose + blast a marketing email to ALL
+     customers. Audience comes from cif-apply's /marketingAudienceData
+     (synced from Vergent GetCustomers). The compliant footer + a working
+     unsubscribe link are added SERVER-SIDE; the operator writes only the
+     subject + body. Opt-outs are skipped automatically at send. -->
+<div id="mkt-modal" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:20px"
+     onclick="if(event.target.id==='mkt-modal')closeCampaignsModal()">
+  <div style="background:white;border-radius:14px;width:100%;max-width:760px;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 22px;border-bottom:1px solid var(--border)">
+      <div style="font-size:15px;font-weight:700;color:var(--text)">📣 Marketing Campaign</div>
+      <button onclick="closeCampaignsModal()" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1" title="Close">&times;</button>
+    </div>
+    <div style="padding:18px 22px;overflow-y:auto;display:flex;flex-direction:column;gap:14px">
+      <!-- Audience -->
+      <div style="display:flex;align-items:center;gap:10px;background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:10px 14px;flex-wrap:wrap">
+        <div style="font-size:13.5px"><b id="mkt-aud-count" style="font-size:16px;color:var(--text)">—</b> customers in the audience</div>
+        <div id="mkt-aud-synced" style="font-size:11.5px;color:var(--muted)"></div>
+        <button class="btn btn-ghost" style="margin-left:auto;padding:6px 12px" onclick="mktRefreshAudience()"><svg class="icn" style="width:13px;height:13px;vertical-align:-2px;margin-right:4px"><use href="#i-refresh"/></svg>Refresh list from Vergent</button>
+      </div>
+      <!-- Saved templates -->
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+        <label style="flex:1;min-width:200px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Saved templates
+          <select id="mkt-tmpl-select" onchange="mktApplyTemplate(this.value)" style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit;background:white">
+            <option value="">— New email —</option>
+          </select>
+        </label>
+        <button class="btn btn-ghost" style="padding:8px 12px" onclick="mktDeleteTemplate()">Delete</button>
+      </div>
+      <!-- Subject -->
+      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Subject
+        <input type="text" id="mkt-subject" placeholder="Happy 4th of July from Cash in Flash!" oninput="mktPreview()" style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit">
+      </label>
+      <!-- Body -->
+      <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Email body (HTML)
+        <textarea id="mkt-body" rows="8" oninput="mktPreview()" placeholder="&lt;h1&gt;Happy 4th, {{first_name}}!&lt;/h1&gt;&lt;p&gt;Thanks for being a Cash in Flash customer…&lt;/p&gt;" style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;font-family:ui-monospace,Menlo,Consolas,monospace;resize:vertical;line-height:1.5"></textarea>
+        <div style="font-size:11px;color:var(--muted);margin-top:5px">Use <b>{{first_name}}</b> to personalize each email. An unsubscribe link and your business address are added automatically.</div>
+      </label>
+      <!-- Preview -->
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Live preview</div>
+        <iframe id="mkt-preview" style="width:100%;height:220px;border:1px solid var(--border);border-radius:8px;background:white"></iframe>
+      </div>
+      <!-- Save as template -->
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+        <label style="flex:1;min-width:200px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Save as template
+          <input type="text" id="mkt-tmpl-name" placeholder="July 4th blast" style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit">
+        </label>
+        <button class="btn btn-ghost" style="padding:8px 12px" onclick="mktSaveTemplate()">Save template</button>
+      </div>
+      <!-- Test send -->
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:10px 14px">
+        <label style="flex:1;min-width:200px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Send a test to yourself first
+          <input type="email" id="mkt-test-email" placeholder="you@cashinflash.com" style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit">
+        </label>
+        <button class="btn btn-ghost" style="padding:8px 12px" onclick="mktTestSend()">Send test</button>
+      </div>
+      <div id="mkt-result" style="font-size:12.5px;color:var(--muted);min-height:18px;line-height:1.45"></div>
+      <!-- Progress -->
+      <div id="mkt-progress" style="display:none">
+        <div style="height:10px;background:#eef2f7;border-radius:999px;overflow:hidden"><div id="mkt-progress-bar" style="height:100%;width:0%;background:var(--green);transition:width .3s"></div></div>
+        <div id="mkt-progress-text" style="font-size:12px;color:var(--muted);margin-top:6px;font-variant-numeric:tabular-nums"></div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 22px;border-top:1px solid var(--border);flex-wrap:wrap">
+      <div style="font-size:11.5px;color:var(--muted)">Sends to <b id="mkt-foot-count">—</b> customers · opt-outs skipped automatically</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" onclick="closeCampaignsModal()">Close</button>
+        <button class="btn btn-primary" id="mkt-send-btn" onclick="mktSendCampaign()">Send to all customers</button>
+      </div>
     </div>
   </div>
 </div>
@@ -4158,7 +4232,7 @@ function renderDetail(fbId) {
   const dc = ad.debitCard;
   if (isNewApplicant) {
     document.getElementById('dv-app-data').innerHTML = buildAppDetails(ad);
-    document.getElementById('dv-debit-card').innerHTML = buildDebitCardPanel(dc);
+    document.getElementById('dv-debit-card').innerHTML = buildDebitCardPanel(dc, fbId);
   }
   // Documents grid — re-render on applicant switch OR whenever a doc
   // URL changes (e.g. a fresh Plaid PDF landed after Refresh from
@@ -4412,8 +4486,34 @@ function buildDocsPanel(a) {
 }
 
 // Render the Debit Card tab — ported from classic buildIFCardPanel
-function buildDebitCardPanel(dc) {
-  if (!dc) return `<div class="dcard-empty"><div class="dcard-empty-icn">💳</div><div style="font-weight:600">No debit card submitted</div><div style="font-size:13px;margin-top:4px">This applicant did not request debit-card funding during the application.</div></div>`;
+async function requestCardFromCustomer(fbId) {
+  if (!fbId) return;
+  if (!confirm('Email this customer a link to add their debit card at cashinflash.com/if?\n\nThe link is tied to their Vergent record so the card saves to the right account.')) return;
+  const res = document.getElementById('reqcard-result');
+  if (res) { res.style.color = 'var(--muted)'; res.textContent = 'Sending…'; }
+  try {
+    const r = await fetch('/api/send-card-request', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firebase_id: fbId }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.ok) {
+      const link = d.hardLinked ? ' (linked to Vergent #' + d.vergentCustomerId + ')' : ' — note: no Vergent customer linked yet';
+      if (res) { res.style.color = 'var(--green-dark)'; res.textContent = 'Sent to ' + (d.to || 'the customer') + link; }
+      toast('Card request email sent', 'ok');
+    } else {
+      if (res) { res.style.color = 'var(--red)'; res.textContent = 'Failed: ' + (d.detail || d.error || ('HTTP ' + r.status)); }
+    }
+  } catch (e) {
+    if (res) { res.style.color = 'var(--red)'; res.textContent = 'Network error: ' + ((e && e.message) || e); }
+  }
+}
+
+function buildDebitCardPanel(dc, fbId) {
+  if (!dc) return `<div class="dcard-empty"><div class="dcard-empty-icn">💳</div><div style="font-weight:600">No debit card submitted</div><div style="font-size:13px;margin-top:4px">This applicant didn’t submit a debit card during the application.</div>`
+    + (fbId ? `<div style="margin-top:16px"><button onclick="requestCardFromCustomer('${escapeHtml(fbId)}')" style="background:#e8f5ee;color:#1a6b3c;border:1px solid #6cc294;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;min-height:42px;display:inline-flex;align-items:center;gap:7px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Request Card from Customer</button><div style="font-size:11.5px;color:var(--muted);margin-top:7px;max-width:380px;margin-left:auto;margin-right:auto;line-height:1.5">Emails an approved customer a link to add their card. The link ties their submission to the right Vergent account.</div><div id="reqcard-result" style="font-size:12px;color:var(--muted);margin-top:8px"></div></div>` : '')
+    + `</div>`;
   const cardholder = ((dc.cardholderFirst || '') + ' ' + (dc.cardholderLast || '')).trim() || dc.cardholder || '—';
   const panRaw = String(dc.cardNumber || '').replace(/\D/g, '');
   const panFmt = panRaw.replace(/(.{4})/g, '$1 ').trim() || '—';
@@ -9396,26 +9496,30 @@ function _ifNameKey(first, last) {
 }
 
 // Resolve the Vergent customer id an IF card-submission should be saved
-// to, WITHOUT the operator hunting for it. Tries, in order:
-//   Path 0 — vergent_customer_id baked onto the row (new /card + /if
-//            forms forward ?cid=).
-//   Path 1 — firebase_id on the row -> the linked application's match.
-//   Path 2 — submissionId -> applicationData.ifSubmissionId match.
-//   Path 3 — fuzzy name match: the borrower/cardholder name maps to a
-//            known applicant. Only auto-resolves when UNAMBIGUOUS — all
-//            name-matched applicants must point at the SAME single
-//            Vergent customer id. Name collisions (two different Vergent
-//            customers) return '' so the caller shows the picker.
+// to — using ONLY trustworthy, hard links. Tries, in order:
+//   Path 0 — vergent_customer_id baked onto the row (the ?cid= the
+//            card-failed / request-card email embeds, or a prior
+//            VERIFIED save). Authoritative.
+//   Path 1 — firebase_id on the row -> the linked application's
+//            CONFIRMED ('found') Vergent match.
+//   Path 2 — submissionId -> applicationData.ifSubmissionId, same.
+// There is NO name-based matching. Names alone NEVER auto-resolve a
+// customer — that is exactly how a card landed on the wrong account.
+// When no hard link exists this returns '' and the operator picks the
+// customer in the picker; the BACKEND then verifies the name against the
+// Vergent record before writing anything (defense in depth).
 function _ifResolveVergentCid(ifRow) {
   if (!ifRow) return '';
-  // Path 0 — IF row carries vergent_customer_id directly.
+  // Path 0 — IF row carries a hard vergent_customer_id directly.
   const direct_cid = String(ifRow.vergentCustomerId || ifRow.vergent_customer_id || '').trim();
   if (direct_cid && /^\d+$/.test(direct_cid)) return direct_cid;
   if (typeof apps === 'undefined' || !Array.isArray(apps)) return '';
+  // Only a CONFIRMED ('found') match supplies a cid. We deliberately do
+  // NOT fall back to a stray vergentCustomerId on an ambiguous/not_found
+  // record — that leak fed the wrong-customer bug.
   const _cidOf = (a) => {
     const vm = a.vergentMatch || {};
     if ((vm.status || '').toLowerCase() === 'found' && vm.customerId) return String(vm.customerId);
-    if (a.vergentCustomerId) return String(a.vergentCustomerId);
     return '';
   };
   const submissionId = (ifRow.submissionId || '').trim();
@@ -9423,7 +9527,7 @@ function _ifResolveVergentCid(ifRow) {
   const direct = (ifRow.firebase_id || ifRow.firebaseId_app || '').trim();
   let linked = null;
   if (direct) linked = apps.find(a => a.firebaseId === direct);
-  // Path 2 — submissionId → application search.
+  // Path 2 — submissionId → the application that recorded it.
   if (!linked && submissionId) {
     linked = apps.find(a => {
       const ad = a.applicationData || {};
@@ -9434,22 +9538,7 @@ function _ifResolveVergentCid(ifRow) {
     const id = _cidOf(linked);
     if (id && /^\d+$/.test(id)) return id;
   }
-  // Path 3 — fuzzy name match (unambiguous only).
-  const nameKey = _ifNameKey(ifRow.borrowerFirst, ifRow.borrowerLast)
-               || _ifNameKey(ifRow.cardholderFirst, ifRow.cardholderLast);
-  if (nameKey) {
-    const ids = new Set();
-    apps.forEach(a => {
-      const ad = a.applicationData || {};
-      const k = _ifNameKey(ad.firstName, ad.lastName)
-             || (a.name || '').trim().toLowerCase().replace(/\s+/g, ' ');
-      if (k && k === nameKey) {
-        const id = _cidOf(a);
-        if (id && /^\d+$/.test(id)) ids.add(id);
-      }
-    });
-    if (ids.size === 1) return Array.from(ids)[0];
-  }
+  // No hard link → don't guess. Operator picks; backend verifies.
   return '';
 }
 
@@ -9473,7 +9562,7 @@ async function saveIFCardToVergent(rowKey, btn) {
 
 // The actual Vergent save. Shared by the auto-resolve path, the picker
 // selection, and the manual-id escape hatch.
-async function _ifDoSaveCard(rowKey, cid, autoResolved, btn) {
+async function _ifDoSaveCard(rowKey, cid, autoResolved, btn, force) {
   const resultEl = document.getElementById('if-save-card-result');
   const setMsg = (color, text) => {
     if (!resultEl) return;
@@ -9492,14 +9581,38 @@ async function _ifDoSaveCard(rowKey, cid, autoResolved, btn) {
     const r = await fetch('/api/vergent-save-card-if', {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ row_key: rowKey, vergent_customer_id: cid }),
+      body: JSON.stringify({
+        row_key: rowKey,
+        vergent_customer_id: cid,
+        confirm_name_mismatch: !!force,
+      }),
     });
     const d = await r.json().catch(() => ({}));
     if (r.ok && d && d.ok) {
       const last4 = d.last4 ? ' (••••' + d.last4 + ')' : '';
-      setMsg('#1a6b3c', 'Saved to customer #' + (d.vergentCustomerId || cid) + last4);
+      const who = d.vergentCustomerName ? ' — ' + d.vergentCustomerName : '';
+      setMsg('#1a6b3c', 'Saved to customer #' + (d.vergentCustomerId || cid) + who + last4);
       toast('Card saved to Vergent', 'ok');
       loadIFSubmissions();
+    } else if (r.status === 409 && d && d.error === 'name_mismatch') {
+      // The identity gate blocked this — the names don't match. Make the
+      // operator look at both and explicitly override (no silent saves).
+      const el = document.getElementById('if-save-card-result');
+      if (el) {
+        el.style.color = '#5a0d0d';
+        el.innerHTML =
+          '<div style="background:#fde7e7;border:1px solid #f4b4b4;border-radius:8px;padding:10px 12px;line-height:1.5">'
+          + '<div style="font-weight:700;margin-bottom:4px">⚠ Name does not match — not saved.</div>'
+          + '<div style="font-size:12.5px">Card submission: <b>' + escapeHtml(d.submissionName || '?') + '</b><br>'
+          + 'Vergent #' + escapeHtml(String(d.vergentCustomerId || cid)) + ': <b>' + escapeHtml(d.vergentName || '?') + '</b></div>'
+          + '<div style="font-size:12px;color:#7a2330;margin-top:6px">If these are truly the same person (e.g. a name change), you can override.</div>'
+          + '<div style="margin-top:8px;display:flex;gap:8px">'
+          + '<button onclick="_ifForceSaveCard(\'' + escapeHtml(rowKey) + '\',\'' + escapeHtml(String(cid)) + '\')" style="background:#fff5e6;color:#5a3300;border:1px solid #f0b27a;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Save anyway — I confirm</button>'
+          + '<button onclick="(document.getElementById(\'if-save-card-result\')||{}).textContent=\'\'" style="background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Cancel</button>'
+          + '</div></div>';
+      }
+    } else if (r.status === 502 && d && d.error === 'verify_lookup_failed') {
+      setMsg('#5a0d0d', (d.detail || 'Could not verify the customer — nothing was saved. Try again.').slice(0, 240));
     } else {
       const upstream = d && d.status ? 'Vergent HTTP ' + d.status : '';
       const snippet  = (d && (d.detail || d.error) || '').toString().trim();
@@ -9512,6 +9625,14 @@ async function _ifDoSaveCard(rowKey, cid, autoResolved, btn) {
   } finally {
     if (btn) { btn.disabled = false; btn.style.opacity = ''; }
   }
+}
+
+// Explicit operator override after seeing a name mismatch. Re-runs the
+// save with confirm_name_mismatch so the backend allows it (and audits
+// it as an override). A double-confirm so it can never be an accident.
+function _ifForceSaveCard(rowKey, cid) {
+  if (!confirm('Save this card to Vergent #' + cid + ' even though the names do not match?\n\nOnly do this if you are certain it is the same person.')) return;
+  _ifDoSaveCard(rowKey, cid, false, null, true);
 }
 
 // Reveal + populate the inline customer picker. The operator types a
@@ -9564,8 +9685,7 @@ function _ifRenderCidResults(rowKey, query) {
   const _cidOf = (a) => {
     const vm = a.vergentMatch || {};
     if ((vm.status || '').toLowerCase() === 'found' && vm.customerId) return String(vm.customerId);
-    if (a.vergentCustomerId) return String(a.vergentCustomerId);
-    return '';
+    return '';   // only a CONFIRMED match — never a stray vergentCustomerId
   };
   box.innerHTML = list.map(a => {
     const ad = a.applicationData || {};
@@ -11889,6 +12009,201 @@ function closeCommPreview() {
   document.getElementById('comm-preview-modal').style.display = 'none';
   const ifr = document.getElementById('comm-preview-iframe');
   if (ifr) ifr.srcdoc = '';   // free memory
+}
+
+// ── Marketing Campaigns ─────────────────────────────────────────────
+// Compose + blast a marketing email to ALL customers. Audience + send
+// run on cif-apply; footer/unsubscribe are added server-side.
+let _mktAudCount = 0;
+let _mktTemplates = {};
+
+function openCampaignsModal() {
+  const m = document.getElementById('mkt-modal');
+  if (!m) return;
+  m.style.display = 'flex';
+  const res = document.getElementById('mkt-result'); if (res) res.textContent = '';
+  const prog = document.getElementById('mkt-progress'); if (prog) prog.style.display = 'none';
+  // Default test recipient to the operator's email if it looks like one.
+  const me = document.getElementById('user-name')?.textContent || '';
+  const teEl = document.getElementById('mkt-test-email');
+  if (teEl && !teEl.value && me.includes('@')) teEl.value = me.trim();
+  mktLoadAudienceStats();
+  mktLoadTemplates();
+  mktPreview();
+}
+function closeCampaignsModal() {
+  const m = document.getElementById('mkt-modal');
+  if (m) m.style.display = 'none';
+  const f = document.getElementById('mkt-preview'); if (f) f.srcdoc = '';
+}
+async function _mktPost(path, bodyObj) {
+  const r = await fetch(path, {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(bodyObj || {}),
+  });
+  const data = await r.json().catch(() => ({}));
+  return { ok: r.ok, status: r.status, data };
+}
+async function mktLoadAudienceStats() {
+  const countEl = document.getElementById('mkt-aud-count');
+  const footEl = document.getElementById('mkt-foot-count');
+  const syncEl = document.getElementById('mkt-aud-synced');
+  try {
+    const { data } = await _mktPost('/api/marketing/audience-stats', {});
+    const n = data.count || 0;
+    _mktAudCount = n;
+    if (countEl) countEl.textContent = n.toLocaleString();
+    if (footEl) footEl.textContent = n.toLocaleString();
+    if (syncEl) {
+      if (data.lastSyncedAt) {
+        let when = '';
+        try { when = new Date(data.lastSyncedAt).toLocaleString(); } catch (e) {}
+        syncEl.textContent = 'list synced ' + when;
+      } else {
+        syncEl.textContent = 'never synced — click “Refresh list from Vergent”';
+      }
+    }
+  } catch (e) {
+    if (countEl) countEl.textContent = '—';
+  }
+}
+async function mktRefreshAudience() {
+  const res = document.getElementById('mkt-result');
+  if (res) { res.style.color = 'var(--muted)'; res.textContent = 'Pulling the customer list from Vergent… (this can take a minute)'; }
+  try { await _mktPost('/api/marketing/refresh-audience', {}); } catch (e) {}
+  for (let i = 0; i < 40; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    let data;
+    try { data = (await _mktPost('/api/marketing/audience-stats', {})).data; } catch (e) { continue; }
+    if (data.syncStatus === 'done') {
+      await mktLoadAudienceStats();
+      if (res) { res.style.color = 'var(--green-dark)'; res.textContent = 'Audience updated: ' + (data.count || 0).toLocaleString() + ' customers.'; }
+      return;
+    }
+    if (data.syncStatus === 'error') {
+      if (res) { res.style.color = 'var(--red)'; res.textContent = 'Refresh failed: ' + (data.syncError || 'unknown error'); }
+      return;
+    }
+  }
+  if (res) res.textContent = 'Still syncing — check back in a minute, then reopen this window.';
+}
+async function mktLoadTemplates() {
+  try {
+    const { data } = await _mktPost('/api/marketing/list-templates', {});
+    const sel = document.getElementById('mkt-tmpl-select');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— New email —</option>';
+    _mktTemplates = {};
+    (data.templates || []).forEach(t => {
+      _mktTemplates[t.id] = t;
+      const o = document.createElement('option');
+      o.value = t.id; o.textContent = t.name || '(unnamed)';
+      sel.appendChild(o);
+    });
+    sel.value = cur;
+  } catch (e) {}
+}
+function mktApplyTemplate(id) {
+  const t = _mktTemplates[id];
+  if (!t) return;
+  document.getElementById('mkt-subject').value = t.subject || '';
+  document.getElementById('mkt-body').value = t.html || '';
+  document.getElementById('mkt-tmpl-name').value = t.name || '';
+  mktPreview();
+}
+async function mktSaveTemplate() {
+  const name = document.getElementById('mkt-tmpl-name').value.trim();
+  const subject = document.getElementById('mkt-subject').value.trim();
+  const html = document.getElementById('mkt-body').value;
+  const res = document.getElementById('mkt-result');
+  if (!name) { res.style.color = 'var(--red)'; res.textContent = 'Enter a template name to save.'; return; }
+  const id = document.getElementById('mkt-tmpl-select').value || '';
+  const { ok, data } = await _mktPost('/api/marketing/save-template', { id, name, subject, html });
+  if (ok && data.ok) { res.style.color = 'var(--green-dark)'; res.textContent = 'Template “' + name + '” saved.'; mktLoadTemplates(); }
+  else { res.style.color = 'var(--red)'; res.textContent = 'Save failed: ' + (data.error || ''); }
+}
+async function mktDeleteTemplate() {
+  const sel = document.getElementById('mkt-tmpl-select');
+  const id = sel.value;
+  if (!id) return;
+  if (!confirm('Delete this saved template?')) return;
+  await _mktPost('/api/marketing/delete-template', { id });
+  sel.value = '';
+  mktLoadTemplates();
+}
+function mktPreview() {
+  const subject = document.getElementById('mkt-subject')?.value || '(no subject)';
+  let body = document.getElementById('mkt-body')?.value || '';
+  body = body.replace(/\{\{\s*first_name\s*\}\}/gi, 'Barbara');  // sample name
+  const footer = '<div style="margin-top:28px;padding-top:16px;border-top:1px solid #e5e7eb;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:#9ca3af">You’re receiving this email because you’re a Cash in Flash customer.<br>Cash in Flash · 13937B Van Nuys Blvd, Arleta, CA 91331<br><a href="#" style="color:#6b7280;text-decoration:underline">Unsubscribe</a> from marketing emails.</div>';
+  const doc = '<div style="font-family:Arial,Helvetica,sans-serif;padding:14px;color:#111827">'
+    + '<div style="font-size:12px;color:#9ca3af;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #f0f0f0">Subject: <b style="color:#374151">' + escapeHtml(subject) + '</b></div>'
+    + body + footer + '</div>';
+  const f = document.getElementById('mkt-preview');
+  if (f) f.srcdoc = doc;
+}
+async function mktTestSend() {
+  const to = document.getElementById('mkt-test-email').value.trim();
+  const subject = document.getElementById('mkt-subject').value.trim();
+  const html = document.getElementById('mkt-body').value;
+  const res = document.getElementById('mkt-result');
+  if (!to) { res.style.color = 'var(--red)'; res.textContent = 'Enter your email to send a test.'; return; }
+  if (!html.trim()) { res.style.color = 'var(--red)'; res.textContent = 'Write the email body first.'; return; }
+  res.style.color = 'var(--muted)'; res.textContent = 'Sending test to ' + to + '…';
+  const { ok, data } = await _mktPost('/api/marketing/test-send', { to_email: to, subject: subject || 'Cash in Flash', html, first_name: 'Barbara' });
+  if (ok && data.ok) { res.style.color = 'var(--green-dark)'; res.textContent = 'Test sent to ' + to + '. Check your inbox (and spam).'; }
+  else { res.style.color = 'var(--red)'; res.textContent = 'Test failed: ' + (data.error || ('HTTP ' + data.status)); }
+}
+async function mktSendCampaign() {
+  const subject = document.getElementById('mkt-subject').value.trim();
+  const html = document.getElementById('mkt-body').value;
+  const res = document.getElementById('mkt-result');
+  if (!subject) { res.style.color = 'var(--red)'; res.textContent = 'Enter a subject.'; return; }
+  if (!html.trim()) { res.style.color = 'var(--red)'; res.textContent = 'Write the email body.'; return; }
+  const n = _mktAudCount || 0;
+  if (!n) { res.style.color = 'var(--red)'; res.textContent = 'Audience is empty — click “Refresh list from Vergent” first.'; return; }
+  const typed = prompt('This will email ALL ' + n.toLocaleString() + ' customers (anyone who unsubscribed is skipped automatically).\n\nType SEND to confirm:');
+  if ((typed || '').trim().toUpperCase() !== 'SEND') { res.style.color = 'var(--muted)'; res.textContent = 'Cancelled.'; return; }
+  const btn = document.getElementById('mkt-send-btn');
+  btn.disabled = true; btn.style.opacity = '.6';
+  res.style.color = 'var(--muted)'; res.textContent = 'Starting…';
+  const { ok, data } = await _mktPost('/api/marketing/send-campaign', { subject, html });
+  if (!ok || !data.campaign_id) {
+    res.style.color = 'var(--red)'; res.textContent = 'Send failed: ' + (data.error || '');
+    btn.disabled = false; btn.style.opacity = ''; return;
+  }
+  const cid = data.campaign_id;
+  const prog = document.getElementById('mkt-progress');
+  const bar = document.getElementById('mkt-progress-bar');
+  const ptext = document.getElementById('mkt-progress-text');
+  if (prog) prog.style.display = 'block';
+  res.style.color = 'var(--muted)';
+  res.textContent = 'Sending in the background — you can close this window; it keeps running.';
+  for (let i = 0; i < 4000; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    let st;
+    try { st = (await _mktPost('/api/marketing/campaign-status', { campaign_id: cid })).data; } catch (e) { continue; }
+    const total = st.total || n;
+    const processed = st.processed || 0;
+    const pct = total ? Math.round(processed / total * 100) : 0;
+    if (bar) bar.style.width = pct + '%';
+    if (ptext) ptext.textContent = 'Sent ' + (st.sent || 0).toLocaleString() + ' · skipped ' + (st.skipped || 0).toLocaleString() + ' · ' + processed.toLocaleString() + '/' + total.toLocaleString();
+    if (st.status === 'done') {
+      if (bar) bar.style.width = '100%';
+      res.style.color = 'var(--green-dark)';
+      res.textContent = 'Done! Sent ' + (st.sent || 0).toLocaleString() + ', skipped ' + (st.skipped || 0).toLocaleString() + (st.failed ? (', failed ' + st.failed) : '') + '.';
+      btn.disabled = false; btn.style.opacity = '';
+      return;
+    }
+    if (st.status === 'error') {
+      res.style.color = 'var(--red)'; res.textContent = 'Campaign error: ' + (st.error || 'unknown');
+      btn.disabled = false; btn.style.opacity = '';
+      return;
+    }
+  }
+  btn.disabled = false; btn.style.opacity = '';
 }
 
 function openCommTestModal() {
