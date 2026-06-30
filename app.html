@@ -2345,6 +2345,9 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
         <label style="flex:1;min-width:200px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Send a test to yourself first
           <input type="email" id="mkt-test-email" placeholder="you@cashinflash.com" style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit">
         </label>
+        <label style="flex:0 1 170px;min-width:150px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Customer ID <span style="font-weight:500;color:var(--muted2);text-transform:none">(magic-link test)</span>
+          <input type="text" id="mkt-test-cid" placeholder="e.g. 590391" title="For the Portal Invite template: a real Vergent customer ID so the test shows that customer's real magic link instead of a sample." style="margin-top:4px;width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;font-family:inherit">
+        </label>
         <button class="btn btn-ghost" style="padding:8px 12px" onclick="mktTestSend()">Send test</button>
       </div>
       <div id="mkt-result" style="font-size:12.5px;color:var(--muted);min-height:18px;line-height:1.45"></div>
@@ -12239,7 +12242,11 @@ async function mktTestSend() {
   if (!to) { res.style.color = 'var(--red)'; res.textContent = 'Enter your email to send a test.'; return; }
   if (!html.trim()) { res.style.color = 'var(--red)'; res.textContent = 'Write the email body first.'; return; }
   res.style.color = 'var(--muted)'; res.textContent = 'Sending test to ' + to + '…';
-  const { ok, data } = await _mktPost('/api/marketing/test-send', { to_email: to, subject: subject || 'Cash in Flash', html, first_name: 'Barbara' });
+  // Optional Vergent customer id → the Portal Invite template's test renders
+  // that customer's REAL magic link (else a labeled sample).
+  const cidEl = document.getElementById('mkt-test-cid');
+  const customer_id = (cidEl && cidEl.value || '').trim();
+  const { ok, data } = await _mktPost('/api/marketing/test-send', { to_email: to, subject: subject || 'Cash in Flash', html, first_name: 'Barbara', customer_id });
   if (ok && data.ok) { res.style.color = 'var(--green-dark)'; res.textContent = 'Test sent to ' + to + '. Check your inbox (and spam).'; }
   else { res.style.color = 'var(--red)'; res.textContent = 'Test failed: ' + (data.error || ('HTTP ' + data.status)); }
 }
