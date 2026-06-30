@@ -2307,7 +2307,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       <div style="display:flex;align-items:center;gap:10px;background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:10px 14px;flex-wrap:wrap">
         <div style="font-size:13.5px"><b id="mkt-aud-count" style="font-size:16px;color:var(--text)">—</b> active-loan customers in the audience</div>
         <div id="mkt-aud-synced" style="font-size:11.5px;color:var(--muted)"></div>
-        <button class="btn btn-ghost" style="margin-left:auto;padding:6px 12px" onclick="mktRefreshAudience()"><svg class="icn" style="width:13px;height:13px;vertical-align:-2px;margin-right:4px"><use href="#i-refresh"/></svg>Refresh list from Vergent</button>
+        <button id="mkt-refresh-btn" class="btn btn-ghost" style="margin-left:auto;padding:6px 12px" onclick="mktRefreshAudience()"><svg class="icn" style="width:13px;height:13px;vertical-align:-2px;margin-right:4px"><use href="#i-refresh"/></svg>Refresh list from Vergent</button>
         <div id="mkt-aud-breakdown" style="flex-basis:100%;font-size:11.5px;color:var(--muted);line-height:1.5"></div>
       </div>
       <!-- Saved templates -->
@@ -12090,38 +12090,55 @@ function _mktBreakdownHtml(s) {
   if (s.roster_ok === false) tail += ' · <span style="color:var(--red)">roster lookup failed</span>';
   return tail;
 }
+let _mktRefreshing = false;
 async function mktRefreshAudience() {
   const res = document.getElementById('mkt-result');
-  if (res) { res.style.color = 'var(--muted)'; res.textContent = 'Building the active-loan list from Vergent… (this can take a couple minutes)'; }
-  try { await _mktPost('/api/marketing/refresh-audience', {}); } catch (e) {}
-  // Budget ~4 min: the sync resolves each active-loan customer's email,
-  // which can mean hundreds of per-customer Vergent lookups.
-  for (let i = 0; i < 80; i++) {
-    await new Promise(r => setTimeout(r, 3000));
-    let data;
-    try { data = (await _mktPost('/api/marketing/audience-stats', {})).data; } catch (e) { continue; }
-    if (data.syncStatus === 'done') {
-      await mktLoadAudienceStats();
-      if (res) { res.style.color = 'var(--green-dark)'; res.textContent = 'Audience updated: ' + (data.count || 0).toLocaleString() + ' active-loan customers emailable.'; }
-      return;
-    }
-    if (data.syncStatus === 'error') {
-      if (res) { res.style.color = 'var(--red)'; res.textContent = 'Refresh failed: ' + (data.syncError || 'unknown error'); }
-      return;
-    }
-    // Live progress while it runs: stage + per-customer email lookup count.
-    if (res) {
-      let msg = 'Building the active-loan list from Vergent…';
-      if (data.syncStage === 'emails') {
-        msg = 'Looking up customer emails…';
-        if (data.lookupTotal) msg += ' ' + (data.lookupDone || 0).toLocaleString() + '/' + Number(data.lookupTotal).toLocaleString();
-      } else if (data.syncStage === 'loans') {
-        msg = 'Pulling the active-loan list…';
-      }
-      res.textContent = msg;
-    }
+  const btn = document.getElementById('mkt-refresh-btn');
+  // Re-entrancy guard: a second click while a refresh is already polling
+  // must NOT fire another /refresh-audience — overlapping syncs stomp each
+  // other's progress counter (the "restart from 25" bug). The backend also
+  // coalesces, but blocking here keeps the UI honest.
+  if (_mktRefreshing) {
+    if (res) { res.style.color = 'var(--muted)'; res.textContent = 'A refresh is already running — hang tight.'; }
+    return;
   }
-  if (res) res.textContent = 'Still syncing — check back in a minute, then reopen this window.';
+  _mktRefreshing = true;
+  if (btn) { btn.disabled = true; btn.style.opacity = '.6'; btn.style.cursor = 'default'; }
+  if (res) { res.style.color = 'var(--muted)'; res.textContent = 'Building the active-loan list from Vergent… (this can take a couple minutes)'; }
+  try {
+    try { await _mktPost('/api/marketing/refresh-audience', {}); } catch (e) {}
+    // Budget ~4 min: the sync resolves each active-loan customer's email,
+    // which can mean hundreds of per-customer Vergent lookups.
+    for (let i = 0; i < 80; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      let data;
+      try { data = (await _mktPost('/api/marketing/audience-stats', {})).data; } catch (e) { continue; }
+      if (data.syncStatus === 'done') {
+        await mktLoadAudienceStats();
+        if (res) { res.style.color = 'var(--green-dark)'; res.textContent = 'Audience updated: ' + (data.count || 0).toLocaleString() + ' active-loan customers emailable.'; }
+        return;
+      }
+      if (data.syncStatus === 'error') {
+        if (res) { res.style.color = 'var(--red)'; res.textContent = 'Refresh failed: ' + (data.syncError || 'unknown error'); }
+        return;
+      }
+      // Live progress while it runs: stage + per-customer email lookup count.
+      if (res) {
+        let msg = 'Building the active-loan list from Vergent…';
+        if (data.syncStage === 'emails') {
+          msg = 'Looking up customer emails…';
+          if (data.lookupTotal) msg += ' ' + (data.lookupDone || 0).toLocaleString() + '/' + Number(data.lookupTotal).toLocaleString();
+        } else if (data.syncStage === 'loans') {
+          msg = 'Pulling the active-loan list…';
+        }
+        res.textContent = msg;
+      }
+    }
+    if (res) res.textContent = 'Still syncing — check back in a minute, then reopen this window.';
+  } finally {
+    _mktRefreshing = false;
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; }
+  }
 }
 async function mktLoadTemplates() {
   try {
