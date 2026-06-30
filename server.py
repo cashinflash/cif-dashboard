@@ -1877,6 +1877,28 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        # Portal-account status: does this Vergent customer already have a
+        # portal account? Drives the "Portal Invite" button + status chip in
+        # the application detail. Forwarded verbatim to cif-apply (which proxies
+        # to the portal with the shared key). Body: {customer_id|customerId} or
+        # {email}. Never mints or sends.
+        if path == '/api/portal-status':
+            try:
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/portal-status',
+                    data=raw, headers={'Content-Type': 'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=30) as r:
+                    result = r.read()
+                self.send_json(200, json.loads(result))
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[PORTAL-STATUS PROXY ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         if path == '/api/rerun-plaid':
             try:
                 body = json.loads(raw)
