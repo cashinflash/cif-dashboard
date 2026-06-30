@@ -5777,7 +5777,9 @@ function sendPortalInvite(fbId, cid) {
   fetch('/api/send-registration', {
     method: 'POST', credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ customer_id: cid }),
+    // Operator-initiated invite: allow a re-send (the dedup gate is there to
+    // stop accidental auto/double sends, not a deliberate operator click).
+    body: JSON.stringify({ customer_id: cid, force_resend: true }),
   }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }).catch(function () { return { ok: r.ok, d: null }; }); })
     .then(function (x) {
       const d = x.d || {};
