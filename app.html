@@ -2843,17 +2843,9 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       </div>
     </div>
 
-    <!-- Inner tab strip — Portal Support · Portal Links.
-         (The legacy "App Links" tab was removed — it pulled the entire
-         /reports tree through a 10s proxy and timed out as data grew,
-         and the Plaid rerun action it existed for now lives on the
-         application detail page.) -->
-    <div class="conn-tabs" style="display:flex;gap:5px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;width:max-content;max-width:100%;flex-wrap:wrap;box-shadow:var(--shadow-xs)">
-      <button class="tf-btn active" data-cust-tab="portal" onclick="setCustTab('portal')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-bolt"/></svg>Portal Support</button>
-      <button class="tf-btn" data-cust-tab="portallinks" onclick="setCustTab('portallinks')"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:5px"><use href="#i-bank"/></svg>Portal Links</button>
-    </div>
-
-    <!-- Portal Support panel (Cognito-sourced) — was "Portal Customers". -->
+    <!-- Single section: portal-registered customers (Cognito-sourced).
+         The "Portal Links" (Plaid items) tab was removed per operator
+         request; the legacy "App Links" tab was removed earlier. -->
     <div id="cust-panel-portal">
       <div style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <form id="cust-portal-form" onsubmit="event.preventDefault(); doCustomerSearch('portal');" style="display:flex;gap:10px;align-items:center;flex:1 1 240px;min-width:0;flex-wrap:wrap">
@@ -2870,15 +2862,6 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       <div id="cust-portal-results" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
 
-    <!-- Portal Links panel (Plaid items connected through the customer portal). -->
-    <div id="cust-panel-portallinks" style="display:none">
-      <div style="margin-bottom:14px">
-        <input type="text" id="portal-plaid-search" placeholder="Search by name, email, customer id, bank, or source…" oninput="filterPortalPlaid(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
-      </div>
-      <div id="portal-plaid-list">
-        <div class="tbl-loading">Loading…</div>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -5763,6 +5746,12 @@ function refreshPortalStatus(fbId, cid) {
       const wrap = document.getElementById('dv-portal-invite-wrap');
       if (wrap && wrap.getAttribute('data-cid') !== String(cid)) return;  // operator switched applicants
       d = d || {};
+      // Already a portal user → no invite to send: hide the button (+ its
+      // result line), the chip alone says they're set up. Otherwise show it.
+      const inviteBtn = document.getElementById('dv-portal-invite-btn');
+      const inviteRes = document.getElementById('dv-portal-invite-result');
+      if (inviteBtn) inviteBtn.style.display = d.registered ? 'none' : '';
+      if (inviteRes && d.registered) inviteRes.textContent = '';
       if (d.registered) {
         chip.innerHTML = '<span style="color:var(--green-dark)">✓ Portal user</span>'
           + (d.masked ? ' · ' + escapeHtml(d.masked) : '');
@@ -5866,7 +5855,8 @@ function renderProfilePanel(fbId) {
       portalWrap.style.display = '';
       portalWrap.setAttribute('data-cid', foundCid);
       const ib = document.getElementById('dv-portal-invite-btn');
-      if (ib) { ib.disabled = false; ib.onclick = function () { sendPortalInvite(fbId, foundCid); }; }
+      // Default visible; refreshPortalStatus() hides it if already registered.
+      if (ib) { ib.disabled = false; ib.style.display = ''; ib.onclick = function () { sendPortalInvite(fbId, foundCid); }; }
       const rr = document.getElementById('dv-portal-invite-result');
       if (rr) { rr.textContent = ''; rr.style.color = 'var(--muted)'; }
       refreshPortalStatus(fbId, foundCid);
@@ -9017,43 +9007,26 @@ function loadCustomers() {
 }
 
 function setCustTab(name) {
-  // 'applinks' was removed — fold any lingering reference into Portal.
-  if (name === 'applinks') name = 'portal';
-  if (name !== 'portal' && name !== 'portallinks') name = 'portal';
-  _custTab = name;
-  document.querySelectorAll('[data-cust-tab]').forEach(function(b) {
-    b.classList.toggle('active', b.getAttribute('data-cust-tab') === name);
-  });
-  const panels = {
-    portal:      document.getElementById('cust-panel-portal'),
-    portallinks: document.getElementById('cust-panel-portallinks'),
-  };
-  Object.keys(panels).forEach(function(k) {
-    if (panels[k]) panels[k].style.display = (k === name) ? '' : 'none';
-  });
+  // Only the portal-registered customers section remains (the "Portal Links"
+  // and "App Links" tabs were removed). Coerce any legacy tab name to portal
+  // so old #portallinks / #applinks bookmarks still land somewhere valid.
+  _custTab = 'portal';
+  const panel = document.getElementById('cust-panel-portal');
+  if (panel) panel.style.display = '';
   const sub = document.getElementById('cust-greet-sub');
   if (sub) {
-    sub.innerHTML = name === 'portal'
-      ? 'Customers who registered at <b>apply.cashinflash.com</b>. Search by customer ID, email, or last name — or browse the full list below.'
-      : 'Plaid items connected through the <b>customer portal</b> — view balances and re-pull data anytime.';
+    sub.innerHTML = 'Customers who registered for an online account. Search by customer ID, email, or last name — or browse the full list below.';
   }
-  // Portal Support tab auto-loads the full list on first activation so
-  // the operator sees every registered customer without having to type.
-  // Portal Links kicks off its own loader here so the panel content is
-  // ready by the time the tab is visible.
-  if (name === 'portal') {
-    const input = document.getElementById('cust-portal-q');
-    if (input) input.focus();
-    if (!_custPortalLoaded) {
-      _custPortalLoaded = true;
-      doCustomerSearch('portal');  // empty-q → list-all from backend
-    }
-  } else if (name === 'portallinks') {
-    loadPortalPlaid();
+  // Auto-load the full list on first activation so the operator sees every
+  // registered customer without having to type.
+  const input = document.getElementById('cust-portal-q');
+  if (input) input.focus();
+  if (!_custPortalLoaded) {
+    _custPortalLoaded = true;
+    doCustomerSearch('portal');  // empty-q → list-all from backend
   }
-  // Mirror the active sub-tab in the hash so the URL is shareable.
-  const target = '#' + (name === 'portal' ? 'customers' : name);
-  if (location.hash !== target) location.hash = target;
+  // Mirror the section in the hash so the URL stays shareable.
+  if (location.hash !== '#customers') location.hash = '#customers';
 }
 
 async function doCustomerSearch(source) {
@@ -9160,31 +9133,91 @@ function renderCustomerSearchResults(source, rows) {
         '<div style="font-size:15px;font-weight:700;color:var(--text)">' + name + statusPill + '</div>' +
         '<div style="font-size:12px;color:var(--muted);margin-top:4px">Customer #' + cid + ' · ' + email + ' · ' + phoneLast4 + metaTail + '</div>' +
       '</div>';
-    // "View as customer" — only show for portal-source rows (Vergent
-    // rows don't carry a cognitoSub so we can't impersonate them).
+    // Action buttons (right side): View as customer · Open in Vergent ·
+    // Open in Admin. They share one flex group so they wrap cleanly.
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;align-items:center';
+    const btnStyle = 'padding:8px 14px;font-size:12px;font-weight:700;font-family:inherit';
+    // "View as customer" — only for portal-source rows (Vergent rows don't
+    // carry a cognitoSub so we can't impersonate them).
     if (row.source === 'portal' && (row.cognitoSub || row.customerId)) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'btn btn-primary';
       btn.textContent = 'View as customer';
-      btn.style.cssText = 'padding:8px 14px;font-size:12px;font-weight:700;font-family:inherit';
-      // Capture both — backend prefers cognitoSub but falls back to
-      // customerId via the Cognito pool scan.
+      btn.style.cssText = btnStyle;
       const sub = row.cognitoSub || '';
       const cidArg = row.customerId || '';
       btn.addEventListener('click', function() {
         impersonateCustomer(btn, { cognitoSub: sub, customerId: cidArg });
       });
-      card.appendChild(btn);
-    } else {
-      const note = document.createElement('span');
-      note.style.cssText = 'font-size:11px;color:var(--muted)';
-      note.textContent = row.source === 'vergent'
-        ? '(no portal account)' : '';
-      card.appendChild(note);
+      actions.appendChild(btn);
     }
+    // "Open in Vergent" — direct to the customer's Vergent profile (new tab).
+    if (row.customerId) {
+      const vbtn = document.createElement('button');
+      vbtn.type = 'button';
+      vbtn.className = 'btn btn-ghost';
+      vbtn.textContent = 'Open in Vergent';
+      vbtn.style.cssText = btnStyle;
+      const vcid = String(row.customerId);
+      vbtn.addEventListener('click', function() {
+        window.open('https://shared.lms.vergentlms.com/customer/general?action=view&id='
+          + encodeURIComponent(vcid), '_blank', 'noopener');
+      });
+      actions.appendChild(vbtn);
+    }
+    // "Open in Admin" — jump to this customer's application detail in this
+    // dashboard (matched by email against the loaded applications index).
+    if (row.email) {
+      const abtn = document.createElement('button');
+      abtn.type = 'button';
+      abtn.className = 'btn btn-ghost';
+      abtn.textContent = 'Open in Admin';
+      abtn.style.cssText = btnStyle;
+      const aEmail = String(row.email);
+      abtn.addEventListener('click', function() {
+        openCustomerInAdmin(aEmail, abtn);
+      });
+      actions.appendChild(abtn);
+    }
+    card.appendChild(actions);
     box.appendChild(card);
   }
+}
+
+// "Open in Admin" — find this customer's application in the loaded index
+// (matched by applicant email) and open its detail. Applications are never
+// deleted, so there is always one on file; if several match, open the newest.
+function openCustomerInAdmin(email, btn) {
+  const emLc = (email || '').trim().toLowerCase();
+  if (!emLc) return;
+  const orig = btn ? btn.textContent : '';
+  const matches = (typeof apps !== 'undefined' && Array.isArray(apps))
+    ? apps.filter(function(a) {
+        const ae = ((a.email || (a.applicationData && a.applicationData.email) || '') + '').trim().toLowerCase();
+        return ae && ae === emLc;
+      })
+    : [];
+  if (!matches.length) {
+    if (btn) {
+      btn.textContent = 'No application found';
+      btn.disabled = true;
+      setTimeout(function() { btn.textContent = orig; btn.disabled = false; }, 2400);
+    }
+    return;
+  }
+  // Newest first (createdAt/updatedAt, then date).
+  matches.sort(function(a, b) {
+    const ka = a.createdAt || a.updatedAt || a.date || '';
+    const kb = b.createdAt || b.updatedAt || b.date || '';
+    return kb > ka ? 1 : (kb < ka ? -1 : 0);
+  });
+  const fbId = matches[0].firebaseId;
+  if (!fbId) return;
+  // Open the application detail the same way the code itself does (the
+  // hashchange router maps #fb=<id> to the detail view + renderDetail).
+  location.hash = '#fb=' + encodeURIComponent(fbId);
 }
 
 async function impersonateCustomer(btn, target) {
