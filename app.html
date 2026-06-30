@@ -2197,7 +2197,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       </div>
       <div class="greet-actions">
         <button class="btn btn-ghost" onclick="loadCommunications()" title="Refresh"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-refresh"/></svg>Refresh</button>
-        <button class="btn btn-ghost" onclick="openCampaignsModal()" title="Send a marketing email to all customers"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-message"/></svg>Campaigns</button>
+        <button class="btn btn-ghost" onclick="openCampaignsModal()" title="Send a marketing email to your active-loan customers"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-message"/></svg>Campaigns</button>
         <button class="btn btn-primary" onclick="openCommTestModal()"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-message"/></svg>Send Test Email</button>
       </div>
     </div>
@@ -2288,11 +2288,13 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   </div>
 </div>
 
-<!-- MARKETING CAMPAIGNS modal — compose + blast a marketing email to ALL
-     customers. Audience comes from cif-apply's /marketingAudienceData
-     (synced from Vergent GetCustomers). The compliant footer + a working
-     unsubscribe link are added SERVER-SIDE; the operator writes only the
-     subject + body. Opt-outs are skipped automatically at send. -->
+<!-- MARKETING CAMPAIGNS modal — compose + blast a marketing email to the
+     ACTIVE-LOAN customers (the same servicing book as the Loans Due page).
+     Audience comes from cif-apply's /marketingAudienceData, built from
+     Vergent's active-loan report with each customer's email resolved by
+     CustomerId. The compliant footer + a working unsubscribe link are
+     added SERVER-SIDE; the operator writes only the subject + body.
+     Opt-outs are skipped automatically at send. -->
 <div id="mkt-modal" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:20px"
      onclick="if(event.target.id==='mkt-modal')closeCampaignsModal()">
   <div style="background:white;border-radius:14px;width:100%;max-width:760px;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25)">
@@ -2303,9 +2305,10 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     <div style="padding:18px 22px;overflow-y:auto;display:flex;flex-direction:column;gap:14px">
       <!-- Audience -->
       <div style="display:flex;align-items:center;gap:10px;background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:10px 14px;flex-wrap:wrap">
-        <div style="font-size:13.5px"><b id="mkt-aud-count" style="font-size:16px;color:var(--text)">—</b> customers in the audience</div>
+        <div style="font-size:13.5px"><b id="mkt-aud-count" style="font-size:16px;color:var(--text)">—</b> active-loan customers in the audience</div>
         <div id="mkt-aud-synced" style="font-size:11.5px;color:var(--muted)"></div>
         <button class="btn btn-ghost" style="margin-left:auto;padding:6px 12px" onclick="mktRefreshAudience()"><svg class="icn" style="width:13px;height:13px;vertical-align:-2px;margin-right:4px"><use href="#i-refresh"/></svg>Refresh list from Vergent</button>
+        <div id="mkt-aud-breakdown" style="flex-basis:100%;font-size:11.5px;color:var(--muted);line-height:1.5"></div>
       </div>
       <!-- Saved templates -->
       <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
@@ -2352,10 +2355,10 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       </div>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 22px;border-top:1px solid var(--border);flex-wrap:wrap">
-      <div style="font-size:11.5px;color:var(--muted)">Sends to <b id="mkt-foot-count">—</b> customers · opt-outs skipped automatically</div>
+      <div style="font-size:11.5px;color:var(--muted)">Sends to <b id="mkt-foot-count">—</b> active-loan customers · opt-outs skipped automatically</div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-ghost" onclick="closeCampaignsModal()">Close</button>
-        <button class="btn btn-primary" id="mkt-send-btn" onclick="mktSendCampaign()">Send to all customers</button>
+        <button class="btn btn-primary" id="mkt-send-btn" onclick="mktSendCampaign()">Send to active-loan customers</button>
       </div>
     </div>
   </div>
@@ -12049,6 +12052,7 @@ async function mktLoadAudienceStats() {
   const countEl = document.getElementById('mkt-aud-count');
   const footEl = document.getElementById('mkt-foot-count');
   const syncEl = document.getElementById('mkt-aud-synced');
+  const bdEl = document.getElementById('mkt-aud-breakdown');
   try {
     const { data } = await _mktPost('/api/marketing/audience-stats', {});
     const n = data.count || 0;
@@ -12064,26 +12068,57 @@ async function mktLoadAudienceStats() {
         syncEl.textContent = 'never synced — click “Refresh list from Vergent”';
       }
     }
+    if (bdEl) bdEl.innerHTML = _mktBreakdownHtml(data.syncStats || {});
   } catch (e) {
     if (countEl) countEl.textContent = '—';
   }
 }
+
+// Transparency line: how the active-loan book narrows to the emailable
+// audience, so the operator sees exactly where contacts drop off (e.g.
+// active-loan customers with no email on file in Vergent).
+function _mktBreakdownHtml(s) {
+  if (!s || typeof s !== 'object') return '';
+  const loans = s.total_active_loans, custs = s.unique_customers;
+  if (loans == null && custs == null) return '';
+  const parts = [];
+  if (loans != null) parts.push('<b>' + Number(loans).toLocaleString() + '</b> active loans');
+  if (custs != null) parts.push('<b>' + Number(custs).toLocaleString() + '</b> customers');
+  if (s.usable != null) parts.push('<b>' + Number(s.usable).toLocaleString() + '</b> emailable');
+  let tail = parts.join(' · ');
+  if (s.no_email_on_file) tail += ' · <span style="color:var(--amber-700)">' + Number(s.no_email_on_file).toLocaleString() + ' with no email on file</span>';
+  if (s.roster_ok === false) tail += ' · <span style="color:var(--red)">roster lookup failed</span>';
+  return tail;
+}
 async function mktRefreshAudience() {
   const res = document.getElementById('mkt-result');
-  if (res) { res.style.color = 'var(--muted)'; res.textContent = 'Pulling the customer list from Vergent… (this can take a minute)'; }
+  if (res) { res.style.color = 'var(--muted)'; res.textContent = 'Building the active-loan list from Vergent… (this can take a couple minutes)'; }
   try { await _mktPost('/api/marketing/refresh-audience', {}); } catch (e) {}
-  for (let i = 0; i < 40; i++) {
+  // Budget ~4 min: the sync resolves each active-loan customer's email,
+  // which can mean hundreds of per-customer Vergent lookups.
+  for (let i = 0; i < 80; i++) {
     await new Promise(r => setTimeout(r, 3000));
     let data;
     try { data = (await _mktPost('/api/marketing/audience-stats', {})).data; } catch (e) { continue; }
     if (data.syncStatus === 'done') {
       await mktLoadAudienceStats();
-      if (res) { res.style.color = 'var(--green-dark)'; res.textContent = 'Audience updated: ' + (data.count || 0).toLocaleString() + ' customers.'; }
+      if (res) { res.style.color = 'var(--green-dark)'; res.textContent = 'Audience updated: ' + (data.count || 0).toLocaleString() + ' active-loan customers emailable.'; }
       return;
     }
     if (data.syncStatus === 'error') {
       if (res) { res.style.color = 'var(--red)'; res.textContent = 'Refresh failed: ' + (data.syncError || 'unknown error'); }
       return;
+    }
+    // Live progress while it runs: stage + per-customer email lookup count.
+    if (res) {
+      let msg = 'Building the active-loan list from Vergent…';
+      if (data.syncStage === 'emails') {
+        msg = 'Looking up customer emails…';
+        if (data.lookupTotal) msg += ' ' + (data.lookupDone || 0).toLocaleString() + '/' + Number(data.lookupTotal).toLocaleString();
+      } else if (data.syncStage === 'loans') {
+        msg = 'Pulling the active-loan list…';
+      }
+      res.textContent = msg;
     }
   }
   if (res) res.textContent = 'Still syncing — check back in a minute, then reopen this window.';
@@ -12164,7 +12199,7 @@ async function mktSendCampaign() {
   if (!html.trim()) { res.style.color = 'var(--red)'; res.textContent = 'Write the email body.'; return; }
   const n = _mktAudCount || 0;
   if (!n) { res.style.color = 'var(--red)'; res.textContent = 'Audience is empty — click “Refresh list from Vergent” first.'; return; }
-  const typed = prompt('This will email ALL ' + n.toLocaleString() + ' customers (anyone who unsubscribed is skipped automatically).\n\nType SEND to confirm:');
+  const typed = prompt('This will email all ' + n.toLocaleString() + ' active-loan customers (anyone who unsubscribed is skipped automatically).\n\nType SEND to confirm:');
   if ((typed || '').trim().toUpperCase() !== 'SEND') { res.style.color = 'var(--muted)'; res.textContent = 'Cancelled.'; return; }
   const btn = document.getElementById('mkt-send-btn');
   btn.disabled = true; btn.style.opacity = '.6';
