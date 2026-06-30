@@ -9037,18 +9037,25 @@ function setCustTab(name) {
   if (location.hash !== '#customers') location.hash = '#customers';
 }
 
-async function doCustomerSearch(source) {
+async function doCustomerSearch(source, opts) {
   // Portal Support is the only remaining customer source; the legacy
   // "vergent" branch was removed when the Vergent Customers tab was
   // dropped. The source param is accepted for back-compat with callers
   // but always coerced to 'portal'.
+  // opts.silent: a background presence refresh — don't flash "Loading…",
+  // don't clear the list, and leave the existing results untouched on any
+  // error/empty result (so the live online dots update in place).
+  opts = opts || {};
+  const silent = opts.silent === true;
   source = 'portal';
   const qEl = document.getElementById('cust-portal-q');
   const meta = document.getElementById('cust-portal-meta');
   const results = document.getElementById('cust-portal-results');
   const q = (qEl && qEl.value || '').trim();
-  if (meta) meta.textContent = q ? 'Searching…' : 'Loading all portal customers…';
-  if (results) results.innerHTML = '';
+  if (!silent) {
+    if (meta) meta.textContent = q ? 'Searching…' : 'Loading all portal customers…';
+    if (results) results.innerHTML = '';
+  }
   try {
     const url = '/api/portal-customers/search'
       + '?q=' + encodeURIComponent(q)
@@ -9056,7 +9063,7 @@ async function doCustomerSearch(source) {
     const r = await fetch(url, { credentials: 'include' });
     const d = await r.json();
     if (!r.ok) {
-      if (meta) meta.textContent = 'Error: ' + (d.error || ('HTTP ' + r.status));
+      if (!silent && meta) meta.textContent = 'Error: ' + (d.error || ('HTTP ' + r.status));
       return;
     }
     const rows = (d.results || []);
@@ -9064,10 +9071,13 @@ async function doCustomerSearch(source) {
     // failure). Surface the error inline so misconfigured deploys
     // don't look like "no matches."
     if (d.error && rows.length === 0) {
-      if (meta) meta.textContent = 'Backend error: ' + d.error;
+      if (!silent && meta) meta.textContent = 'Backend error: ' + d.error;
       return;
     }
     if (rows.length === 0) {
+      // A background refresh that comes back empty leaves the existing
+      // list alone — never blank out a working view from a transient blip.
+      if (silent) return;
       if (meta) {
         meta.textContent = q
           ? 'No matches for "' + q + '".'
@@ -9075,16 +9085,38 @@ async function doCustomerSearch(source) {
       }
       return;
     }
-    if (meta) {
+    if (!silent && meta) {
       const errSuffix = d.error ? ' · partial: ' + d.error : '';
       meta.textContent = q
         ? rows.length + ' match' + (rows.length === 1 ? '' : 'es') + ' for "' + q + '".' + errSuffix
         : 'Showing ' + rows.length + ' portal customer' + (rows.length === 1 ? '' : 's') + ' (newest signup first).' + errSuffix;
     }
     renderCustomerSearchResults(source, rows);
+    startCustomerPresenceRefresh();
   } catch (e) {
-    if (meta) meta.textContent = 'Error: ' + e.message;
+    if (!silent && meta) meta.textContent = 'Error: ' + e.message;
   }
+}
+
+// Keep the online/offline dots live without the operator re-searching:
+// every 30s silently re-run the current portal query and re-render in
+// place. Self-guards so it costs nothing when the panel isn't being
+// looked at — paused when the Customers panel is hidden, the browser tab
+// is backgrounded, or the operator is mid-interaction inside the list.
+let _custPresenceTimer = null;
+function startCustomerPresenceRefresh() {
+  if (_custPresenceTimer) return;
+  _custPresenceTimer = setInterval(function () {
+    try {
+      const box = document.getElementById('cust-portal-results');
+      if (!box || box.offsetParent === null) return;   // panel not visible
+      if (!box.firstChild) return;                      // nothing rendered
+      if (document.visibilityState && document.visibilityState !== 'visible') return;
+      const ae = document.activeElement;
+      if (ae && box.contains(ae)) return;               // don't yank focus mid-click
+      doCustomerSearch('portal', { silent: true });
+    } catch (e) { /* best-effort; never break the page */ }
+  }, 30000);
 }
 
 // Refresh the Portal Customers panel — re-runs the active query
@@ -9113,6 +9145,18 @@ function renderCustomerSearchResults(source, rows) {
   if (!box) return;
   box.innerHTML = '';
   const esc = function(s) { return (s == null ? '' : String(s)).replace(/[<>&"]/g, function(c) { return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]; }); };
+  // Human "last seen" from an epoch-ms timestamp (presence heartbeat).
+  const ago = function(ms) {
+    const d = Date.now() - ms;
+    if (d < 0) return 'just now';
+    const m = Math.floor(d / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + 'm ago';
+    const h = Math.floor(m / 60);
+    if (h < 24) return h + 'h ago';
+    const days = Math.floor(h / 24);
+    return days + 'd ago';
+  };
   for (const row of rows) {
     const card = document.createElement('div');
     card.style.cssText = 'background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap';
@@ -9136,9 +9180,28 @@ function renderCustomerSearchResults(source, rows) {
     const statusPill = row.statusName
       ? '<span style="background:' + pillBg + ';color:' + pillFg + ';padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;margin-left:6px">' + esc(row.statusName) + '</span>'
       : '';
+    // Online/offline presence (portal rows only — they carry the heartbeat).
+    // Green dot + "Active now" while pinging; otherwise a muted dot and, if we
+    // have ever seen them, a "Seen Xm ago" chip. Never-seen → faint dot only.
+    let presenceDot = '';
+    let presenceChip = '';
+    if (row.source === 'portal') {
+      const isOnline = row.online === true;
+      const dotColor = isOnline ? '#16a34a' : (row.lastSeenMs ? '#94a3b8' : '#cbd5e1');
+      const glow = isOnline ? ';box-shadow:0 0 0 3px rgba(22,163,74,.18)' : '';
+      const dotTitle = isOnline ? 'Active now'
+        : (row.lastSeenMs ? 'Last seen ' + ago(row.lastSeenMs) : 'Offline');
+      presenceDot = '<span title="' + esc(dotTitle) + '" style="display:inline-block;width:9px;height:9px;'
+        + 'border-radius:50%;background:' + dotColor + glow + ';margin-right:8px;vertical-align:middle"></span>';
+      if (isOnline) {
+        presenceChip = '<span style="background:#e8f5ee;color:#1a6b3c;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;margin-left:6px">Active now</span>';
+      } else if (row.lastSeenMs) {
+        presenceChip = '<span style="background:#f1f5f9;color:#64748b;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;margin-left:6px">Seen ' + esc(ago(row.lastSeenMs)) + '</span>';
+      }
+    }
     card.innerHTML =
       '<div style="flex:1;min-width:260px">' +
-        '<div style="font-size:15px;font-weight:700;color:var(--text)">' + name + statusPill + '</div>' +
+        '<div style="font-size:15px;font-weight:700;color:var(--text)">' + presenceDot + name + statusPill + presenceChip + '</div>' +
         '<div style="font-size:12px;color:var(--muted);margin-top:4px">Customer #' + cid + ' · ' + email + ' · ' + phoneLast4 + metaTail + '</div>' +
       '</div>';
     // Action buttons (right side): View as customer · Open in Vergent ·
