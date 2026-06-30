@@ -2867,9 +2867,13 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       <div id="cust-filter-row" style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
         <button type="button" id="cust-chip-all" class="btn btn-primary" style="padding:7px 14px;font-size:12.5px;font-weight:700" onclick="setCustFilter('all')">All <span class="cust-chip-n" style="opacity:.75;margin-left:2px">0</span></button>
         <button type="button" id="cust-chip-online" class="btn btn-ghost" style="padding:7px 14px;font-size:12.5px;font-weight:700" onclick="setCustFilter('online')"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#16a34a;margin-right:6px;vertical-align:middle"></span>Active now <span class="cust-chip-n" style="opacity:.75;margin-left:2px">0</span></button>
+        <button type="button" id="cust-chip-pending" class="btn btn-ghost" style="padding:7px 14px;font-size:12.5px;font-weight:700" onclick="setCustFilter('pending')">Pending <span class="cust-chip-n" style="opacity:.75;margin-left:2px">0</span></button>
+        <button type="button" id="cust-chip-registered" class="btn btn-ghost" style="padding:7px 14px;font-size:12.5px;font-weight:700" onclick="setCustFilter('registered')">Registered <span class="cust-chip-n" style="opacity:.75;margin-left:2px">0</span></button>
+        <button type="button" id="cust-chip-new" class="btn btn-ghost" style="padding:7px 14px;font-size:12.5px;font-weight:700" onclick="setCustFilter('new')">New this week <span class="cust-chip-n" style="opacity:.75;margin-left:2px">0</span></button>
       </div>
       <div id="cust-portal-meta" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
       <div id="cust-portal-results" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div id="cust-loadmore" style="margin-top:12px;text-align:center"></div>
     </div>
 
   </div>
@@ -9091,7 +9095,8 @@ async function doCustomerSearch(source, opts) {
       // list alone — never blank out a working view from a transient blip.
       if (silent) return;
       _custRows = [];
-      _custSetChipCounts(0, 0);
+      _custSetChipCounts(_custCounts([]));
+      const lm0 = document.getElementById('cust-loadmore'); if (lm0) lm0.innerHTML = '';
       if (meta) {
         meta.textContent = q
           ? 'No matches for "' + q + '".'
@@ -9100,10 +9105,11 @@ async function doCustomerSearch(source, opts) {
       return;
     }
     // Store the rows + query, then render under the active filter (which
-    // also updates the chip counts + meta line).
+    // also updates the chip counts, meta line, and Load-more button).
     _custRows = rows;
     _custLastQ = q;
     _custErrSuffix = d.error ? ' · partial: ' + d.error : '';
+    if (!silent) _custShown = CUST_PAGE_SIZE;   // reset paging on an explicit search/refresh
     applyCustFilterAndRender();
     startCustomerPresenceRefresh();
   } catch (e) {
@@ -9111,63 +9117,107 @@ async function doCustomerSearch(source, opts) {
   }
 }
 
-// Customers-page view state: the last fetched rows + the active filter
-// chip ('all' | 'online'). Filtering is client-side over the rows we
-// already have, so toggling is instant and survives the 30s auto-refresh.
+// Customers-page view state: the last fetched rows, the active filter chip,
+// and how many rows are currently revealed (paging). Filtering + paging are
+// client-side over the rows we already have, so toggling is instant and
+// survives the 30s auto-refresh.
+var CUST_FILTERS = ['all', 'online', 'pending', 'registered', 'new'];
+const CUST_PAGE_SIZE = 25;
 let _custFilter = 'all';
 let _custRows = [];
 let _custLastQ = '';
 let _custErrSuffix = '';
+let _custShown = CUST_PAGE_SIZE;
 
-function _custSetChipCounts(total, online) {
-  const a = document.getElementById('cust-chip-all');
-  const o = document.getElementById('cust-chip-online');
-  const an = a && a.querySelector('.cust-chip-n');
-  const on = o && o.querySelector('.cust-chip-n');
-  if (an) an.textContent = total;
-  if (on) on.textContent = online;
+// Per-row predicate for each filter chip.
+function _custMatchesFilter(r, f) {
+  if (f === 'online') return r.online === true;
+  if (f === 'registered') return r.statusName === 'CONFIRMED';
+  if (f === 'pending') return !!r.statusName && r.statusName !== 'CONFIRMED';
+  if (f === 'new') { const ts = r.signupTs || 0; return ts > 0 && (Date.now() / 1000 - ts) <= 7 * 86400; }
+  return true; // 'all'
 }
 
-// Toggle the All / Active-now filter (called from the chip onclicks).
+// Count rows per filter in one pass (drives the chip badges).
+function _custCounts(rows) {
+  const c = { all: rows.length, online: 0, pending: 0, registered: 0, 'new': 0 };
+  const wk = Date.now() / 1000 - 7 * 86400;
+  rows.forEach(function (r) {
+    if (r.online === true) c.online++;
+    if (r.statusName === 'CONFIRMED') c.registered++;
+    else if (r.statusName) c.pending++;
+    if ((r.signupTs || 0) > wk) c['new']++;
+  });
+  return c;
+}
+
+function _custSetChipCounts(counts) {
+  CUST_FILTERS.forEach(function (k) {
+    const el = document.getElementById('cust-chip-' + k);
+    const n = el && el.querySelector('.cust-chip-n');
+    if (n) n.textContent = counts[k];
+  });
+}
+
+// Toggle a filter chip (called from the chip onclicks). Resets paging.
 function setCustFilter(f) {
-  _custFilter = (f === 'online') ? 'online' : 'all';
-  const a = document.getElementById('cust-chip-all');
-  const o = document.getElementById('cust-chip-online');
-  if (a) a.className = 'btn ' + (_custFilter === 'all' ? 'btn-primary' : 'btn-ghost');
-  if (o) o.className = 'btn ' + (_custFilter === 'online' ? 'btn-primary' : 'btn-ghost');
+  if (CUST_FILTERS.indexOf(f) < 0) f = 'all';
+  _custFilter = f;
+  _custShown = CUST_PAGE_SIZE;
+  CUST_FILTERS.forEach(function (k) {
+    const el = document.getElementById('cust-chip-' + k);
+    if (el) el.className = 'btn ' + (k === f ? 'btn-primary' : 'btn-ghost');
+  });
   applyCustFilterAndRender();
 }
 
-// Re-render the list from the stored rows under the current filter, and
-// refresh the chip counts + the meta line. Called after every fetch and
-// on every chip toggle.
+function loadMoreCust() {
+  _custShown += CUST_PAGE_SIZE;
+  applyCustFilterAndRender();
+}
+
+// Filter-aware meta line.
+function _custMetaText(counts) {
+  const q = _custLastQ, suffix = _custErrSuffix || '', qp = q ? (' matching "' + q + '"') : '';
+  const plural = function (n, one, many) { return n + ' ' + (n === 1 ? one : many); };
+  if (_custFilter === 'online') return (counts.online ? ('Showing ' + plural(counts.online, 'customer', 'customers') + ' active now' + qp) : ('No customers are active right now' + qp)) + '.' + suffix;
+  if (_custFilter === 'pending') return (counts.pending ? (plural(counts.pending, 'pending registration', 'pending registrations') + qp) : ('No pending registrations' + qp)) + '.' + suffix;
+  if (_custFilter === 'registered') return plural(counts.registered, 'registered customer', 'registered customers') + qp + '.' + suffix;
+  if (_custFilter === 'new') return (counts['new'] ? (counts['new'] + ' new this week' + qp) : ('No new signups this week' + qp)) + '.' + suffix;
+  if (q) return plural(counts.all, 'match', 'matches') + ' for "' + q + '"' + (counts.online ? (' · ' + counts.online + ' active now') : '') + '.' + suffix;
+  return plural(counts.all, 'portal customer', 'portal customers') + (counts.online ? (' · ' + counts.online + ' active now') : '') + ' · newest first.' + suffix;
+}
+
+function _custEmptyText() {
+  if (_custFilter === 'online') return 'No customers are active right now. They\'ll appear the moment someone opens the portal.';
+  if (_custFilter === 'pending') return 'No pending registrations. Everyone who signed up has finished setting up their account.';
+  if (_custFilter === 'new') return 'No new signups in the last 7 days.';
+  if (_custFilter === 'registered') return 'No registered customers yet.';
+  return 'No customers match this filter.';
+}
+
+// Re-render the list from the stored rows under the current filter + page
+// size, and refresh the chip counts, meta line, and Load-more button.
 function applyCustFilterAndRender() {
   const rows = _custRows || [];
-  const total = rows.length;
-  const onlineCount = rows.filter(function (r) { return r.online === true; }).length;
-  _custSetChipCounts(total, onlineCount);
-  const visible = _custFilter === 'online'
-    ? rows.filter(function (r) { return r.online === true; })
-    : rows;
+  const counts = _custCounts(rows);
+  _custSetChipCounts(counts);
+  const visible = rows.filter(function (r) { return _custMatchesFilter(r, _custFilter); });
+  const pageRows = visible.slice(0, _custShown);
   const meta = document.getElementById('cust-portal-meta');
-  if (meta) {
-    if (_custFilter === 'online') {
-      meta.textContent = onlineCount
-        ? ('Showing ' + onlineCount + ' customer' + (onlineCount === 1 ? '' : 's') + ' active now.')
-        : 'No customers are active right now.';
-    } else {
-      const base = _custLastQ
-        ? (total + ' match' + (total === 1 ? '' : 'es') + ' for "' + _custLastQ + '"')
-        : ('Showing ' + total + ' portal customer' + (total === 1 ? '' : 's') + ' (newest signup first)');
-      meta.textContent = base + (onlineCount ? (' · ' + onlineCount + ' active now') : '') + '.' + (_custErrSuffix || '');
-    }
-  }
-  renderCustomerSearchResults('portal', visible);
-  // Friendly empty-state when the Active-now filter has nobody to show.
-  if (_custFilter === 'online' && visible.length === 0) {
+  if (meta) meta.textContent = _custMetaText(counts);
+  renderCustomerSearchResults('portal', pageRows);
+  // Friendly empty-state when a filter has nothing to show.
+  if (visible.length === 0 && _custFilter !== 'all') {
     const box = document.getElementById('cust-portal-results');
-    if (box) box.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;background:#fff;border:1px solid var(--border);border-radius:12px">No customers are active right now. They\'ll appear here the moment someone opens the portal.</div>';
+    if (box) box.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;background:#fff;border:1px solid var(--border);border-radius:12px">' + _custEmptyText() + '</div>';
   }
+  // Load-more button (only when more filtered rows remain than are shown).
+  const remaining = visible.length - pageRows.length;
+  const lm = document.getElementById('cust-loadmore');
+  if (lm) lm.innerHTML = remaining > 0
+    ? '<button type="button" class="btn btn-ghost" style="padding:9px 18px;font-weight:700" onclick="loadMoreCust()">Load more (' + remaining + ' more)</button>'
+    : '';
 }
 
 // Keep the online/offline dots live without the operator re-searching:
