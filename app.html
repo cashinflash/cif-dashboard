@@ -6881,7 +6881,15 @@ function _denialPrecheck(a) {
     failed.forEach(g => {
       const v = g.value || {};
       switch (g.id) {
-        case 'G1': auto.add(1); break;                       // no/stale verified income
+        case 'G1': {                                         // income gate
+          // Distinguish "has income but below the $2,500 minimum"
+          // (Insufficient income, reason 0) from "no verifiable income
+          // at all" (reason 1). The floor decline carries the detected
+          // monthly amount in the gate value; no-income/stale do not.
+          const monthly = (v && typeof v === 'object') ? (v.qualifying_income_monthly || 0) : 0;
+          auto.add(monthly > 0 ? 0 : 1);
+          break;
+        }
         case 'G2': auto.add(4); break;                       // negative now / last 7d
         case 'G3': {                                         // NSF and/or chronic negative
           const nsf = (v.nsf_count || 0) >= 3;
