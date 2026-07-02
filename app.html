@@ -9703,8 +9703,18 @@ function renderIFSubmissions(rows) {
     const rowKey = escapeHtml(s.firebaseId || '');
     const nameAttr = escapeHtml(borrower.replace(/'/g, '').slice(0, 40));
     const sameName = borrower === cardholder;
+    // Hard-link chip: this submission carries its own vergent_customer_id
+    // or firebase_id (from the ?fb/?cid email links or a verified save),
+    // so Save Card resolves the customer with zero guessing.
+    const hardCid = String(s.vergentCustomerId || s.vergent_customer_id || '').trim();
+    const hardFb  = String(s.firebase_id || '').trim();
+    const linkChip = (hardCid && /^\d+$/.test(hardCid))
+      ? ` <span title="Hard-linked to Vergent #${escapeHtml(hardCid)}" style="display:inline-block;background:#e8f5ee;color:#1a6b3c;border:1px solid #bfe3cd;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px">🔗 #${escapeHtml(hardCid)}</span>`
+      : (hardFb
+        ? ` <span title="Linked to an application — Vergent customer resolves from its confirmed match" style="display:inline-block;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px">🔗 app</span>`
+        : ` <span title="No hard link — you'll pick the customer at save (name-verified either way)" style="display:inline-block;background:#fff5e6;color:#5a3300;border:1px solid #f2d46c;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px">needs match</span>`);
     return `<tr onclick="openIFCardModal('${rowKey}')">
-      <td><div class="applicant-name">${escapeHtml(borrower)}</div><div class="applicant-id">${sameName ? 'Same cardholder' : 'Cardholder: ' + escapeHtml(cardholder)}</div></td>
+      <td><div class="applicant-name">${escapeHtml(borrower)}${linkChip}</div><div class="applicant-id">${sameName ? 'Same cardholder' : 'Cardholder: ' + escapeHtml(cardholder)}</div></td>
       <td>${brandChip(s.brand)} <span style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;color:var(--text2);margin-left:6px">···· ${escapeHtml(s.last4 || '----')}</span></td>
       <td><span class="tbl-time" style="font-family:ui-monospace,Menlo,Consolas,monospace">${escapeHtml(exp)}</span></td>
       <td><span class="tbl-time" style="font-family:ui-monospace,Menlo,Consolas,monospace">${escapeHtml(s.billingZip || '—')}</span></td>
@@ -9795,7 +9805,38 @@ function openIFCardModal(rowKey) {
       ${copy ? `<button class="btn btn-ghost" style="margin-left:8px;padding:3px 9px;font-size:11px" onclick="_ifCopy('if-field-${escapeHtml(copy)}',this)">Copy</button>` : ''}
     </span>
   </div>`;
+  // Resolve the hard links UP FRONT so the modal shows exactly where a
+  // save will land before the operator clicks anything, and so the Open
+  // in Vergent / Open in Admin buttons point at the right records. Uses
+  // the same hard-link-only resolution as the save path (never names).
+  const cid = _ifResolveVergentCid(data);
+  const directFb = String(data.firebase_id || data.firebaseId_app || '').trim();
+  let linkedApp = null;
+  if (typeof apps !== 'undefined' && Array.isArray(apps)) {
+    if (directFb) linkedApp = apps.find(a => a.firebaseId === directFb) || null;
+    const subId = String(data.submissionId || '').trim();
+    if (!linkedApp && subId) {
+      linkedApp = apps.find(a => ((a.applicationData || {}).ifSubmissionId) === subId) || null;
+    }
+    if (!linkedApp && cid) {
+      linkedApp = apps.find(a => {
+        const vm = a.vergentMatch || {};
+        return (vm.status || '').toLowerCase() === 'found' && String(vm.customerId) === String(cid);
+      }) || null;
+    }
+  }
+  const linkedFbId = directFb || (linkedApp && linkedApp.firebaseId) || '';
+  const linkBanner = cid
+    ? `<div style="background:#e8f5ee;border:1px solid #bfe3cd;color:#1a6b3c;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12.5px;line-height:1.5">
+        <b>✓ Hard-linked — Save Card goes to Vergent #${escapeHtml(cid)}</b>${linkedApp ? ' · application: <b>' + escapeHtml(linkedApp.name || '—') + '</b>' : ''}
+        <div style="font-size:11.5px;opacity:.85;margin-top:2px">The name is re-verified against this exact Vergent record at save — a mismatch blocks the save.</div>
+      </div>`
+    : `<div style="background:#fff5e6;border:1px solid #f2d46c;color:#5a3300;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12.5px;line-height:1.5">
+        <b>No hard link to a Vergent customer yet.</b>${linkedApp ? ' Application matched: <b>' + escapeHtml(linkedApp.name || '—') + '</b> (no confirmed Vergent customer on it).' : ''}
+        <div style="font-size:11.5px;opacity:.9;margin-top:2px">You'll pick the customer when you save — every save is still name-verified against the Vergent record before anything is written.</div>
+      </div>`;
   mb.innerHTML = `
+    ${linkBanner}
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:14px">
       <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Borrower &amp; cardholder</div>
       ${row('Borrower', borrower)}
@@ -9829,7 +9870,12 @@ function openIFCardModal(rowKey) {
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;justify-content:flex-end">
-      <a href="https://cashinflash.my.vergentlms.com/login" target="_blank" rel="noopener" class="btn btn-ghost" style="text-decoration:none">Open Vergent ↗</a>
+      ${cid
+        ? `<a href="https://shared.lms.vergentlms.com/customer/general?action=view&id=${encodeURIComponent(cid)}" target="_blank" rel="noopener" class="btn btn-ghost" style="text-decoration:none" title="Open Vergent customer #${escapeHtml(cid)}">Open in Vergent ↗</a>`
+        : `<a href="https://cashinflash.my.vergentlms.com/login" target="_blank" rel="noopener" class="btn btn-ghost" style="text-decoration:none" title="No hard-linked customer — opens Vergent home">Open Vergent ↗</a>`}
+      ${linkedFbId
+        ? `<button class="btn btn-ghost" onclick="window.open(location.pathname+location.search+'#fb=${escapeHtml(linkedFbId)}','_blank')" title="Open this customer's application in the admin">Open in Admin</button>`
+        : ''}
       <button class="btn btn-ghost" onclick="_ifCopyAll()">Copy all fields</button>
       <button id="if-save-card-btn" type="button"
               onclick="saveIFCardToVergent('${escapeHtml(rowKey)}', this)"
@@ -9988,6 +10034,10 @@ async function _ifDoSaveCard(rowKey, cid, autoResolved, btn, force) {
       const who = d.vergentCustomerName ? ' — ' + d.vergentCustomerName : '';
       setMsg('#1a6b3c', 'Saved to customer #' + (d.vergentCustomerId || cid) + who + last4);
       toast('Card saved to Vergent', 'ok');
+      // Stamp the verified cid onto the local row so the modal + row chip
+      // show it as hard-linked immediately (the backend persists it too).
+      const _ifRow = (window._ifRows || []).find(r2 => r2.firebaseId === rowKey);
+      if (_ifRow) _ifRow.vergentCustomerId = String(d.vergentCustomerId || cid);
       loadIFSubmissions();
     } else if (r.status === 409 && d && d.error === 'name_mismatch') {
       // The identity gate blocked this — the names don't match. Make the
