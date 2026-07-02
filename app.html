@@ -2845,7 +2845,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     <div class="greet">
       <div>
         <div class="greet-title">Customers</div>
-        <div class="greet-sub" id="cust-greet-sub">Search the portal customer base by <b>customer ID</b>, <b>email</b>, or <b>last name</b>.</div>
+        <div class="greet-sub" id="cust-greet-sub">Search online accounts by <b>customer ID</b>, <b>email</b>, or <b>last name</b>.</div>
       </div>
     </div>
 
@@ -2862,7 +2862,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
              (list-all when input is empty, or the active search).
              Lets operators pull in just-signed-up customers without
              a full page reload. -->
-        <button type="button" id="cust-portal-refresh" class="btn btn-ghost" title="Refresh — pulls the latest portal signups" style="padding:10px 14px" onclick="refreshPortalCustomers()"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-refresh"/></svg>Refresh</button>
+        <button type="button" id="cust-portal-refresh" class="btn btn-ghost" title="Refresh — pulls the latest online account signups" style="padding:10px 14px" onclick="refreshPortalCustomers()"><svg class="icn" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><use href="#i-refresh"/></svg>Refresh</button>
       </div>
       <div id="cust-filter-row" style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
         <button type="button" id="cust-chip-all" class="btn btn-primary" style="padding:7px 14px;font-size:12.5px;font-weight:700" onclick="setCustFilter('all')">All <span class="cust-chip-n" style="opacity:.75;margin-left:2px">0</span></button>
@@ -9069,7 +9069,7 @@ async function doCustomerSearch(source, opts) {
   const results = document.getElementById('cust-portal-results');
   const q = (qEl && qEl.value || '').trim();
   if (!silent) {
-    if (meta) meta.textContent = q ? 'Searching…' : 'Loading all portal customers…';
+    if (meta) meta.textContent = q ? 'Searching…' : 'Loading all online accounts…';
     if (results) results.innerHTML = '';
   }
   try {
@@ -9100,7 +9100,7 @@ async function doCustomerSearch(source, opts) {
       if (meta) {
         meta.textContent = q
           ? 'No matches for "' + q + '".'
-          : 'No portal customers yet.';
+          : 'No online accounts yet.';
       }
       return;
     }
@@ -9185,7 +9185,7 @@ function _custMetaText(counts) {
   if (_custFilter === 'registered') return plural(counts.registered, 'registered customer', 'registered customers') + qp + '.' + suffix;
   if (_custFilter === 'new') return (counts['new'] ? (counts['new'] + ' new this week' + qp) : ('No new signups this week' + qp)) + '.' + suffix;
   if (q) return plural(counts.all, 'match', 'matches') + ' for "' + q + '"' + (counts.online ? (' · ' + counts.online + ' active now') : '') + '.' + suffix;
-  return plural(counts.all, 'portal customer', 'portal customers') + (counts.online ? (' · ' + counts.online + ' active now') : '') + ' · newest first.' + suffix;
+  return plural(counts.all, 'online account', 'online accounts') + (counts.online ? (' · ' + counts.online + ' active now') : '') + ' · newest first.' + suffix;
 }
 
 function _custEmptyText() {
