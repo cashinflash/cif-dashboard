@@ -1966,7 +1966,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     </div>
     <div class="stats" id="if-stats" style="grid-template-columns:repeat(3,1fr)"></div>
     <div style="margin-bottom:14px">
-      <input type="text" id="if-search" placeholder="Search by borrower, cardholder, last-4, or brand…" oninput="filterIFSubmissions(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+      <input type="text" id="if-search" placeholder="Search by borrower, cardholder, last-4, or brand…" oninput="_ifSearchDeb(this.value)" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
     </div>
     <div id="if-status" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
     <div id="if-table">
@@ -2023,7 +2023,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       <button class="chip"        data-pay-status="approved" onclick="setPayStatusFilter('approved')">Approved</button>
       <button class="chip"        data-pay-status="declined" onclick="setPayStatusFilter('declined')">Declined</button>
       <button class="chip"        data-pay-status="funding"  onclick="setPayStatusFilter('funding')">Funding</button>
-      <input type="text" id="pay-search" placeholder="Search customer, loan id, employee…" oninput="renderPayments()" style="margin-left:8px;flex:1;min-width:240px;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;font-family:inherit;outline:none">
+      <input type="text" id="pay-search" placeholder="Search customer, loan id, employee…" oninput="_paySearchDeb()" style="margin-left:8px;flex:1;min-width:240px;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;font-family:inherit;outline:none">
     </div>
 
     <div id="pay-status" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
@@ -2215,7 +2215,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       <button class="chip"        data-comm-kind="denial"              onclick="setCommFilter('denial')">Denial</button>
       <button class="chip"        data-comm-kind="card_failed"         onclick="setCommFilter('card_failed')">Invalid Card</button>
       <button class="chip"        data-comm-kind="registration"        onclick="setCommFilter('registration')">Registration</button>
-      <input type="text" id="comm-search" placeholder="Search recipient, loan id, subject…" oninput="renderCommunications()" style="margin-left:8px;flex:1;min-width:240px;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;font-family:inherit;outline:none">
+      <input type="text" id="comm-search" placeholder="Search recipient, loan id, subject…" oninput="_commSearchDeb()" style="margin-left:8px;flex:1;min-width:240px;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;font-family:inherit;outline:none">
     </div>
 
     <div id="comm-status" style="margin-bottom:10px;color:var(--muted);font-size:12.5px"></div>
@@ -2418,9 +2418,12 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     </div>
     <!-- Toolbar — search, bulk actions, CSV export, auto-refresh, last-loaded. -->
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-      <input type="text" id="rpt-search" placeholder="Search by name, phone, loan id, store…" oninput="filterReport(this.value)" style="flex:1;min-width:240px;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
+      <input type="text" id="rpt-search" placeholder="Search by name, phone, loan id, store…" oninput="_rptSearchDeb(this.value)" style="flex:1;min-width:240px;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:14px;font-family:inherit;outline:none">
       <span id="rpt-active-filter" style="display:none;align-items:center;gap:6px;background:#ecfdf5;color:var(--green-dark);border:1px solid #a7e8c2;border-radius:999px;padding:6px 6px 6px 12px;font-size:12px;font-weight:700"><span>Showing: <span id="rpt-active-filter-label" style="font-weight:700"></span></span><button onclick="_clearActiveFilter()" title="Clear filter" style="background:white;border:1px solid #a7e8c2;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--green-dark);padding:0;font-size:14px;line-height:1;font-family:inherit">&times;</button></span>
       <span id="rpt-loaded-at" style="font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums"></span>
+      <!-- Batch live-balance check — MANUAL ONLY (bills ~$0.10/customer). -->
+      <button id="rpt-checkbal-btn" onclick="checkDueTodayBalances(this)" title="Run a live Plaid balance check for every customer due today (~$0.10 each). Only runs when you press it." style="display:inline-flex;align-items:center;gap:6px;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🏦 Check due-today balances</button>
+      <span id="rpt-checkbal-progress" style="font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums"></span>
       <!-- Density toggle — operator preference, persisted to localStorage.
            Compact tightens row padding for power-users scanning lots of
            loans on big screens. Hidden when the Appointments tab is
@@ -3799,6 +3802,16 @@ function avgScore() {
 }
 
 // ───────── Queue ─────────
+// Per-row search text, built ONCE per data refresh (the 60s poll replaces
+// the app objects, so the cache naturally invalidates). Building this
+// string for every row on every keystroke was part of the search lag.
+function _appHay(a) {
+  if (a.__hay == null) {
+    const ad = a.applicationData || {};
+    a.__hay = `${a.name||''} ${ad.email||a.email||''} ${ad.phone||a.phone||''} ${a.firebaseId||''} ${a.submissionId||''}`.toLowerCase();
+  }
+  return a.__hay;
+}
 function filteredApps() {
   const q = currentSearch.trim().toLowerCase();
   const out = dedupedApps().filter(a => {
@@ -3807,10 +3820,7 @@ function filteredApps() {
     } else if (currentFilter !== 'all' && bucketStatus(a) !== currentFilter.toLowerCase()) {
       return false;
     }
-    if (q) {
-      const hay = `${a.name||''} ${a.email||''} ${a.phone||''} ${a.firebaseId||''}`.toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
+    if (q && !_appHay(a).includes(q)) return false;
     return true;
   });
   // Fund-first ordering on the Needs Review view: engine APPROVE (your
@@ -5604,38 +5614,72 @@ function renderBalanceResult(d, elId){
     const nm=escapeHtml((ac.name||'Account')+(ac.mask?(' ('+ac.mask+')'):''));
     const badge=ac.on_file?' <span style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#1a4d6b;background:#e8f3f8;border:1px solid #6cb1e2;border-radius:6px;padding:1px 5px;vertical-align:middle">On file</span>':'';
     const wrap=ac.on_file?'background:#daf0e2;border-radius:6px;padding:5px 6px;margin-top:2px':'padding:4px 0;border-top:1px solid rgba(26,107,60,.12)';
+    // Available is what a debit will actually clear against; when pending
+    // transactions make current differ, show both so the operator isn't
+    // fooled by a fat current balance that's already spoken for.
+    const curDiffers=(ac.available!=null && ac.current!=null
+      && Math.round(ac.available*100)!==Math.round(ac.current*100));
+    const curNote=curDiffers?' <span style="font-size:10.5px;opacity:.65;white-space:nowrap">('+_fmtMoney(ac.current)+' current)</span>':'';
     return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;'+wrap+'">'
       +'<span'+(ac.on_file?' style="font-weight:700"':'')+'>'+nm+badge+'</span>'
-      +'<span style="white-space:nowrap"><b style="font-size:14px">'+_fmtMoney(avail)+'</b> <span style="font-size:11px;opacity:.7">available</span></span></div>';
+      +'<span style="white-space:nowrap"><b style="font-size:14px">'+_fmtMoney(avail)+'</b> <span style="font-size:11px;opacity:.7">available</span>'+curNote+'</span></div>';
   }).join('');
   // Know the on-file last-4 but Plaid didn't return a matching account: tell
   // the operator which last-4 to look for instead of silently showing no badge.
   const note=(d.accountOnFileLast4 && !d.accountOnFileMatched)
     ? '<div style="font-size:11px;color:#5a3300;background:#fff5e6;border:1px solid #f2d46c;border-radius:6px;padding:4px 6px;margin-top:6px">Account on file ends ••'+escapeHtml(d.accountOnFileLast4)+' — not among the accounts Plaid returned.</div>'
     : '';
+  // Age hint: the card persists until re-checked (by design), so make a
+  // stale reading visually obvious before someone runs a payment on it.
+  let ageTxt='', ageStyle='opacity:.7';
+  if(d.checkedAt){
+    const mins=Math.floor((Date.now()-d.checkedAt)/60000);
+    if(mins>=1){ ageTxt=mins<60?(' · '+mins+'m ago'):(' · '+Math.floor(mins/60)+'h '+(mins%60)+'m ago'); }
+    if(mins>=60){ ageStyle='color:#b45309;font-weight:700'; ageTxt+=' — consider re-checking'; }
+  }
   el.innerHTML='<div style="font-weight:800;margin-bottom:2px">Live balance'
     +(d.institution?(' <span style="font-weight:600;opacity:.8">· '+escapeHtml(d.institution)+'</span>'):'')+'</div>'
     +(rows||'<div style="padding-top:4px">No deposit accounts returned</div>')
     +note
-    +'<div style="font-size:11px;opacity:.7;margin-top:6px">Checked '+escapeHtml(when)+'</div>';
+    +'<div style="font-size:11px;'+ageStyle+';margin-top:6px">Checked '+escapeHtml(when)+escapeHtml(ageTxt)+'</div>';
+}
+// Session-scoped balance cache keyed by fbId. This is what makes the card
+// PERMANENT until re-checked: the 60s reports poll REPLACES `apps` with
+// fresh objects (wiping any a.plaidBalance annotation) — this cache
+// survives that, and warning results (bank login expired etc.) live here
+// too so they don't vanish on the next re-render.
+var _profileBalanceCache = {};
+var _profileBalHydrateTried = {};
+function _stashBalance(fbId, d){
+  if(!fbId || !d) return;
+  if(!d.checkedAt) d.checkedAt = Date.now();
+  _profileBalanceCache[fbId]=d;
+  if(d.ok){
+    const app=(typeof apps!=='undefined'&&Array.isArray(apps))?apps.find(function(x){return x.firebaseId===fbId;}):null;
+    if(app) app.plaidBalance=d;
+    // Also stash on the hydrated full-record cache: the 60s poll rebuilds
+    // `apps` by overlaying _fullRecordCache, so this keeps plaidBalance
+    // riding along through every refresh.
+    if(typeof _fullRecordCache!=='undefined' && _fullRecordCache[fbId]) _fullRecordCache[fbId].plaidBalance=d;
+  }
 }
 function checkPlaidBalance(fbId){
   if(!fbId) return;
   const btn=document.getElementById('profile-balance-btn');
   const el=document.getElementById('profile-balance-result');
   if(btn){btn.disabled=true;btn.style.opacity='.6';}
-  if(el){el.style.display='block';el.style.background='#f4f7f9';el.style.borderColor='var(--border)';el.style.color='var(--muted)';el.textContent='Checking live balance…';}
+  if(el){el.style.display='block';el.style.background='#f4f7f9';el.style.borderColor='var(--border)';el.style.color='var(--muted)';el.textContent='Checking live balance… (some banks take up to a minute)';}
   fetch('/api/plaid-balance',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({firebase_id:fbId})})
     .then(function(r){return r.json();})
     .then(function(d){
-      // Persist on the in-memory app so the panel's poll/async re-renders
-      // keep showing it (renderProfilePanel re-shows a.plaidBalance) — the
-      // card now stays until the next Check balance replaces it.
-      const app=apps.find(function(x){return x.firebaseId===fbId;});
-      if(app && d && d.ok) app.plaidBalance=d;
+      _stashBalance(fbId, d);
       renderBalanceResult(d);
     })
-    .catch(function(e){renderBalanceResult({ok:false,message:'Request failed: '+e});})
+    .catch(function(e){
+      const err={ok:false,message:'Request failed: '+e,checkedAt:Date.now()};
+      _profileBalanceCache[fbId]=err;
+      renderBalanceResult(err);
+    })
     .finally(function(){if(btn){btn.disabled=false;btn.style.opacity='';}});
 }
 // Same balance check, from the Loans Due servicing modal (#lns-ov). That
@@ -5656,22 +5700,31 @@ function findAppByIdentity(row){
   function appPhone(a){ return _normPhone(a.phone || (a.applicationData||{}).phone); }
   function appFirst(a){ return _normName(a.firstName || (a.applicationData||{}).firstName); }
   function appLast(a){ return _normName(a.lastName || (a.applicationData||{}).lastName); }
-  const ph=_normPhone(row.Phone || row.CellPhone || row.phone || row.HomePhone);
+  // Loans Due / PastDueContactList rows carry the phone as
+  // PrimaryPhoneNumber (and Vergent's misspelled PrimaryPhoenNumber) —
+  // without these two, phone matching NEVER fired on servicing rows and
+  // everything fell through to name matching (the wrong-same-name bug).
+  const ph=_normPhone(row.PrimaryPhoneNumber || row.PrimaryPhoenNumber
+    || row.Phone || row.CellPhone || row.phone || row.HomePhone);
   if(ph && ph.length===10){
-    const byPhone=apps.find(function(a){ return appPhone(a)===ph; });
-    if(byPhone) return byPhone.firebaseId;
+    const byPhone=apps.filter(function(a){ return appPhone(a)===ph; });
+    if(byPhone.length) return byPhone[0].firebaseId;  // newest-first; phone is unique enough
   }
+  // Name matches must be UNIQUE. Two customers can share a name — guessing
+  // "the newest one" opened the wrong customer's report. When ambiguous we
+  // return null so the caller falls to the authoritative Vergent-id lookup.
   const fn=_normName(row.FirstName||row.firstName), ln=_normName(row.LastName||row.lastName);
   if(fn && ln){
-    const byName=apps.find(function(a){ return appFirst(a)===fn && appLast(a)===ln; });
-    if(byName) return byName.firebaseId;  // apps is sorted newest-first
+    const byName=apps.filter(function(a){ return appFirst(a)===fn && appLast(a)===ln; });
+    if(byName.length===1) return byName[0].firebaseId;
+    if(byName.length>1) return null;   // ambiguous — don't guess
   }
   // Full-name fallback — Payments rows carry a combined `customer` name
   // rather than first/last. Match against the app's top-level `name`.
   const full=_normName(row.customer || ((row.FirstName||row.firstName||'')+' '+(row.LastName||row.lastName||'')));
   if(full && full.length>=4){
-    const byFull=apps.find(function(a){ return _normName(a.name)===full; });
-    if(byFull) return byFull.firebaseId;
+    const byFull=apps.filter(function(a){ return _normName(a.name)===full; });
+    if(byFull.length===1) return byFull[0].firebaseId;
   }
   return null;
 }
@@ -5686,7 +5739,9 @@ function findAppByIdentity(row){
 // reload / first open, exactly like the profile panel's a.plaidBalance.
 var _modalBalHydrateSeq = 0;
 function _hydrateModalBalanceCard(row, cache, cid, resultElId, stillCurrent){
-  if(cache[cid] && cache[cid].ok){ renderBalanceResult(cache[cid], resultElId); return; }
+  // Any cached reading — including warnings like "bank login expired" —
+  // stays visible until a new check replaces it.
+  if(cache[cid]){ renderBalanceResult(cache[cid], resultElId); return; }
   const el=document.getElementById(resultElId);
   if(el){ el.style.display='none'; el.innerHTML=''; }   // clear any prior customer's card
   const fbId=findAppByIdentity(row);
@@ -5694,6 +5749,9 @@ function _hydrateModalBalanceCard(row, cache, cid, resultElId, stillCurrent){
   const app=(typeof apps!=='undefined'&&Array.isArray(apps))?apps.find(function(x){return x.firebaseId===fbId;}):null;
   if(app && app.plaidBalance && app.plaidBalance.ok){
     cache[cid]=app.plaidBalance; renderBalanceResult(app.plaidBalance, resultElId); return;
+  }
+  if(_profileBalanceCache[fbId] && _profileBalanceCache[fbId].ok){
+    cache[cid]=_profileBalanceCache[fbId]; renderBalanceResult(cache[cid], resultElId); return;
   }
   const seq=(++_modalBalHydrateSeq);
   fetch('/fb/reports/'+encodeURIComponent(fbId)+'/plaidBalance.json',{credentials:'same-origin'})
@@ -5713,18 +5771,78 @@ async function checkLoansDueBalance(btn){
   if(btn){btn.disabled=true;btn.style.opacity='.6';}
   if(el){el.style.display='block';el.style.background='#f4f7f9';el.style.borderColor='var(--border)';el.style.color='var(--muted)';el.textContent='Resolving customer…';}
   try{
-    // Identity match first (instant, no Vergent); Vergent-id lookup only as
-    // a fallback if name/phone didn't match a loaded application.
-    const fbId=findAppByIdentity(row) || await _lnsOvAwaitFbId(cid, 8000, String(row.HdrId||row.LoanId||''));
-    if(!fbId){ renderBalanceResult({ok:false,message:'No matching application found in the dashboard for this customer — live balance unavailable.'}, 'lns-ov-balance-result'); return; }
-    if(el) el.textContent='Checking live balance…';
+    // AUTHORITATIVE resolution first: the Vergent-cid lookup (O(1) via
+    // vergentCidIndex) can't pick a same-name stranger. Identity match is
+    // only the fallback for older loans the index doesn't know.
+    const fbId=(cid ? await _lnsOvAwaitFbId(cid, 25000, String(row.HdrId||row.LoanId||'')) : null)
+      || findAppByIdentity(row);
+    if(!fbId){
+      // Distinguish "lookup still running" (retryable) from a definitive miss.
+      const stillLooking = cid && _lnsOvFbIdByCid[cid]==='__loading__';
+      renderBalanceResult({ok:false,message: stillLooking
+        ? 'Still locating this customer’s application — give it a few seconds and click again.'
+        : 'No matching application found in the dashboard for this customer — live balance unavailable.'}, 'lns-ov-balance-result');
+      return;
+    }
+    if(el) el.textContent='Checking live balance… (some banks take up to a minute)';
     const d=await (await fetch('/api/plaid-balance',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({firebase_id:fbId})})).json();
-    if(d && d.ok){ _lnsOvBalanceCache[cid]=d;  // keep the card until a new check replaces it
-      const _ap=(typeof apps!=='undefined'&&Array.isArray(apps))?apps.find(function(x){return x.firebaseId===fbId;}):null;
-      if(_ap) _ap.plaidBalance=d; }            // mirror onto the app so other views show it too
+    if(d && !d.checkedAt) d.checkedAt=Date.now();
+    _lnsOvBalanceCache[cid]=d;      // keep the card (incl. warnings) until a new check replaces it
+    _stashBalance(fbId, d);         // mirror onto the app + profile cache so every view shows it
     renderBalanceResult(d, 'lns-ov-balance-result');
-  }catch(e){ renderBalanceResult({ok:false,message:'Request failed: '+e}, 'lns-ov-balance-result'); }
+    if(typeof renderLoansDueUnified==='function') renderLoansDueUnified();  // refresh the row's balance chip
+  }catch(e){
+    const err={ok:false,message:'Request failed: '+e,checkedAt:Date.now()};
+    _lnsOvBalanceCache[cid]=err;
+    renderBalanceResult(err, 'lns-ov-balance-result');
+  }
   finally{ if(btn){btn.disabled=false;btn.style.opacity='';} }
+}
+// Batch live-balance check for everyone DUE TODAY — morning collections
+// triage. MANUAL ONLY: runs solely on the toolbar button click (each check
+// bills ~$0.10, so this must never fire automatically). Sequential with a
+// small gap between customers; results land in the same caches the modal +
+// profile read, and every checked row gets a balance chip next to the name.
+var _dueBalBatchRunning=false;
+async function checkDueTodayBalances(btn){
+  if(_dueBalBatchRunning) return;
+  // Same dedupe + active filter as renderLoansDueUnified, narrowed to due-today.
+  const byId=new Map();
+  (_upcomingRows||[]).forEach(function(r){ const id=String(r.LoanId||''); if(id) byId.set(id,r); });
+  (_pastDueRows||[]).forEach(function(r){ const id=String(r.LoanId||''); if(id) byId.set(id,r); });
+  const rows=Array.from(byId.values()).filter(function(r){
+    return String(r.LoanStatus||'').trim().toLowerCase()==='held'
+      && (Number(r.AmountDue)||0)>0
+      && _pastDueComputedDaysLate(r)===0;
+  });
+  const prog=document.getElementById('rpt-checkbal-progress');
+  if(!rows.length){ if(prog) prog.textContent='No loans due today.'; return; }
+  if(!confirm('Check live balances for '+rows.length+' customer'+(rows.length===1?'':'s')+' due today?\n\nPlaid bills ~$0.10 per check (≈$'+(rows.length*0.10).toFixed(2)+' total). Some banks take up to a minute each — you can keep working while it runs.')) return;
+  _dueBalBatchRunning=true;
+  if(btn){btn.disabled=true;btn.style.opacity='.6';}
+  let done=0, okC=0, failC=0;
+  for(const r of rows){
+    const cid=String(r.CustomerId||'');
+    if(prog) prog.textContent='Checking balances… '+(done+1)+'/'+rows.length;
+    try{
+      const fbId=(cid?await _lnsOvAwaitFbId(cid,20000,String(r.HdrId||r.LoanId||'')):null)
+        || findAppByIdentity(r);
+      if(!fbId){ failC++; }
+      else{
+        const d=await(await fetch('/api/plaid-balance',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({firebase_id:fbId})})).json();
+        if(d&&!d.checkedAt) d.checkedAt=Date.now();
+        if(cid) _lnsOvBalanceCache[cid]=d;
+        _stashBalance(fbId,d);
+        if(d&&d.ok) okC++; else failC++;
+      }
+    }catch(e){ failC++; }
+    done++;
+    await new Promise(function(res){setTimeout(res,250);});
+  }
+  if(typeof renderLoansDueUnified==='function') renderLoansDueUnified();
+  if(prog) prog.textContent='Balances: '+okC+' ✓'+(failC?(' · '+failC+' unavailable'):'')+' — chips on each row; details in the customer modal.';
+  _dueBalBatchRunning=false;
+  if(btn){btn.disabled=false;btn.style.opacity='';}
 }
 // On-demand Plaid asset-report PDF ($0.99) — submit-time PDF is deferred;
 // this pulls it when an operator wants it. Idempotent backend (no re-bill).
@@ -5840,9 +5958,34 @@ function renderProfilePanel(fbId) {
   const balRes = document.getElementById('profile-balance-result');
   if (balRow) balRow.style.display = hasActivePlaid ? 'block' : 'none';
   if (balRes) {
-    if (hasActivePlaid && a.plaidBalance && a.plaidBalance.ok) {
-      renderBalanceResult(a.plaidBalance);
-    } else { balRes.style.display = 'none'; balRes.innerHTML = ''; }
+    // The last reading STAYS until a new check replaces it. Priority:
+    // (1) session cache (includes warning results), (2) the reading on
+    // the in-memory app, (3) the reading the backend persisted to
+    // Firebase (survives page reloads — hydrated once per applicant,
+    // read-only, never re-bills). Hiding the card when a.plaidBalance
+    // was missing is what made the balance vanish ~10-60s after a check:
+    // the 60s reports poll replaces `apps` with fresh objects that don't
+    // carry the annotation.
+    const cachedBal = _profileBalanceCache[fbId]
+      || (a.plaidBalance && a.plaidBalance.ok ? a.plaidBalance : null);
+    if (cachedBal) {
+      _profileBalanceCache[fbId] = cachedBal;
+      renderBalanceResult(cachedBal);
+    } else {
+      balRes.style.display = 'none'; balRes.innerHTML = '';
+      if (hasActivePlaid && !_profileBalHydrateTried[fbId]) {
+        _profileBalHydrateTried[fbId] = true;
+        fetch('/fb/reports/' + encodeURIComponent(fbId) + '/plaidBalance.json', { credentials: 'same-origin' })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (d && d.ok && window._profileFbId === fbId) {
+              _profileBalanceCache[fbId] = d;
+              renderBalanceResult(d);
+            }
+          })
+          .catch(function () {});
+      }
+    }
   }
   // Re-check button: visible only when there's NOT a matched Vergent
   // customer yet (status: not_found / new / ambiguous / error / pending).
@@ -6785,11 +6928,7 @@ function renderSearchDropdown(query) {
   const dd = document.getElementById('search-dropdown');
   const q = (query || '').trim().toLowerCase();
   if (!q) { dd.classList.remove('open'); dd.innerHTML = ''; return; }
-  const list = dedupedApps().filter(a => {
-    const ad = a.applicationData || {};
-    const hay = `${a.name||''} ${ad.email||a.email||''} ${ad.phone||a.phone||''} ${a.firebaseId||''} ${a.submissionId||''}`.toLowerCase();
-    return hay.includes(q);
-  }).slice(0, 8);
+  const list = dedupedApps().filter(a => _appHay(a).includes(q)).slice(0, 8);
   if (list.length === 0) {
     dd.innerHTML = `<div class="search-dd-empty">No applicants match "${escapeHtml(query)}"</div>`;
     dd.classList.add('open');
@@ -8338,11 +8477,30 @@ document.getElementById('queue-chips').addEventListener('click', (e) => {
   renderQueue();
 });
 
-document.getElementById('search-input').addEventListener('input', (e) => {
-  currentSearch = e.target.value || '';
+// Debounce — search re-renders fire once when typing PAUSES, not on every
+// keystroke. Rebuilding the whole queue table + dropdown per keypress was
+// the search lag.
+function _debounce(fn, ms){
+  let t=null;
+  return function(){
+    const args=arguments, self=this;
+    clearTimeout(t);
+    t=setTimeout(function(){ fn.apply(self, args); }, ms);
+  };
+}
+const _searchRerender = _debounce(function(){
   renderQueue();
   renderSearchDropdown(currentSearch);
+}, 140);
+document.getElementById('search-input').addEventListener('input', (e) => {
+  currentSearch = e.target.value || '';
+  _searchRerender();
 });
+// Debounced wrappers for the per-page search boxes (wired via oninput=).
+var _rptSearchDeb  = _debounce(function(v){ filterReport(v); }, 140);
+var _paySearchDeb  = _debounce(function(){ renderPayments(); }, 140);
+var _commSearchDeb = _debounce(function(){ renderCommunications(); }, 140);
+var _ifSearchDeb   = _debounce(function(v){ filterIFSubmissions(v); }, 140);
 document.getElementById('search-input').addEventListener('focus', () => {
   if (currentSearch) renderSearchDropdown(currentSearch);
 });
@@ -11895,8 +12053,10 @@ async function _payOvAwaitFbId(cid, timeoutMs, loanId) {
   }
 }
 var _payOvBalanceCache = {};  // customer_id -> last live balance (persists the card)
-// Check balance from the Payments declined-transaction modal — same as the
-// Loans Due one: resolve the application by identity, then hit the endpoint.
+// Check balance from the Payments declined-transaction modal — same
+// behavior as the Loans Due one: AUTHORITATIVE cid lookup first (can't
+// pick a same-name stranger), hardened identity match as fallback; the
+// card (including warnings) persists until a new check replaces it.
 async function checkPaymentBalance(btn){
   const row=_payOvRow; if(!row) return;
   const cid=String(row.customer_id||'');
@@ -11904,31 +12064,45 @@ async function checkPaymentBalance(btn){
   if(btn){btn.disabled=true;btn.style.opacity='.6';}
   if(el){el.style.display='block';el.style.background='#f4f7f9';el.style.borderColor='var(--border)';el.style.color='var(--muted)';el.textContent='Resolving customer…';}
   try{
-    const fbId=findAppByIdentity(row) || await _payOvAwaitFbId(cid, 8000, String(row.loan_id||''));
-    if(!fbId){ renderBalanceResult({ok:false,message:'No matching application found in the dashboard for this customer — live balance unavailable.'}, 'pay-ov-balance-result'); return; }
-    if(el) el.textContent='Checking live balance…';
+    const fbId=(cid ? await _payOvAwaitFbId(cid, 25000, String(row.loan_id||'')) : null)
+      || findAppByIdentity(row);
+    if(!fbId){
+      const stillLooking = cid && _payOvFbIdByCid[cid]==='__loading__';
+      renderBalanceResult({ok:false,message: stillLooking
+        ? 'Still locating this customer’s application — give it a few seconds and click again.'
+        : 'No matching application found in the dashboard for this customer — live balance unavailable.'}, 'pay-ov-balance-result');
+      return;
+    }
+    if(el) el.textContent='Checking live balance… (some banks take up to a minute)';
     const d=await (await fetch('/api/plaid-balance',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({firebase_id:fbId})})).json();
-    if(d && d.ok){ _payOvBalanceCache[cid]=d;  // keep the card until a new check replaces it
-      const _ap=(typeof apps!=='undefined'&&Array.isArray(apps))?apps.find(function(x){return x.firebaseId===fbId;}):null;
-      if(_ap) _ap.plaidBalance=d; }            // mirror onto the app so other views show it too
+    if(d && !d.checkedAt) d.checkedAt=Date.now();
+    _payOvBalanceCache[cid]=d;      // keep the card (incl. warnings) until a new check replaces it
+    _stashBalance(fbId, d);         // mirror onto the app + profile cache so every view shows it
     renderBalanceResult(d, 'pay-ov-balance-result');
-  }catch(e){ renderBalanceResult({ok:false,message:'Request failed: '+e}, 'pay-ov-balance-result'); }
+  }catch(e){
+    const err={ok:false,message:'Request failed: '+e,checkedAt:Date.now()};
+    _payOvBalanceCache[cid]=err;
+    renderBalanceResult(err, 'pay-ov-balance-result');
+  }
   finally{ if(btn){btn.disabled=false;btn.style.opacity='';} }
 }
 async function payOvOpenAdmin() {
   if (!_payOvRow) return;
   const cid = String(_payOvRow.customer_id || '');
   const loanId = String(_payOvRow.loan_id || '');
-  // Identity match first (instant, no Vergent id needed); Vergent-id lookup
-  // only as a fallback. Opens the application in a NEW tab, modal stays open.
+  // AUTHORITATIVE Vergent-id lookup first (can't open a same-name
+  // stranger); hardened identity match only as fallback for older loans
+  // the cid index doesn't know. Opens in a NEW tab, modal stays open.
   const btn = document.getElementById('pay-ov-open-admin');
   const orig = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.style.opacity = '.7'; btn.innerHTML = 'Opening…'; }
   try {
-    let fbId = findAppByIdentity(_payOvRow);
-    if (!fbId && cid) fbId = await _payOvAwaitFbId(cid, 25000, loanId);
+    let fbId = cid ? await _payOvAwaitFbId(cid, 25000, loanId) : null;
+    if (!fbId) fbId = findAppByIdentity(_payOvRow);
     if (fbId) {
       window.open(location.pathname + location.search + '#fb=' + encodeURIComponent(fbId), '_blank');
+    } else if (cid && _payOvFbIdByCid[cid] === '__loading__') {
+      toast('Still locating this customer — give it a few seconds and click again.', 'err');
     } else {
       toast('No application found in our system for this customer.', 'err');
     }
@@ -13609,13 +13783,16 @@ function renderLoansDueUnified() {
   _renderBucketCards(allRows);
   _pastDueRenderAging(allRows);
 
-  // Search filter — same JSON-stringify check used by contact queue.
+  // Search filter — the row's JSON is stringified ONCE per fetch (cached
+  // on the row object; rows are replaced wholesale by each report fetch)
+  // instead of per row per keystroke, which made typing here laggy.
   const q = (document.getElementById('rpt-search')?.value || '').toLowerCase().trim();
+  const _rowHay = r => (r.__q != null ? r.__q : (r.__q = JSON.stringify(r).toLowerCase()));
   // Card click + custom-range filter narrow what flows into sections.
   const buckets = {};
   _LOANS_DUE_SECTIONS.forEach(s => { buckets[s.key] = []; });
   allRows.forEach(r => {
-    if (q && !JSON.stringify(r).toLowerCase().includes(q)) return;
+    if (q && !_rowHay(r).includes(q)) return;
     if (_bucketFilter && !_rowMatchesBucket(r, _bucketFilter)) return;
     if (_customRange && !_rowInCustomRange(r)) return;
     const d = _pastDueComputedDaysLate(r);
@@ -13737,6 +13914,18 @@ function _loansDueRowHtml(r) {
       : '';
     apptBadge = ` <span title="${escapeHtml(dates || 'Has appointment')}" onclick="${badgeOnClick}" style="display:inline-block;background:#fff5e6;color:#5a3300;border:1px solid #f59e0b;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;cursor:pointer">📅 Appt</span>`;
   }
+  // Live-balance chip — populated by the batch "Check due-today balances"
+  // run or an individual modal check; persists until a new check replaces it.
+  let balChip = '';
+  const _balR = (typeof _lnsOvBalanceCache !== 'undefined') ? _lnsOvBalanceCache[cid] : null;
+  if (_balR && _balR.ok) {
+    const _accs = _balR.accounts || [];
+    const _onf = _accs.find(a => a.on_file) || _accs[0];
+    const _av = _onf ? (_onf.available != null ? _onf.available : _onf.current) : null;
+    if (_av != null) balChip = ` <span title="Live balance (available)${_balR.checkedAt ? ' — checked ' + new Date(_balR.checkedAt).toLocaleTimeString() : ''}" style="display:inline-block;background:#e8f5ee;color:#1a6b3c;border:1px solid #bfe3cd;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;white-space:nowrap">🏦 ${_fmtMoney(_av)}</span>`;
+  } else if (_balR && _balR.ok === false) {
+    balChip = ` <span title="${escapeHtml(_balR.message || 'Live balance unavailable')}" style="display:inline-block;background:#fff5e6;color:#5a3300;border:1px solid #f2d46c;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px">🏦 n/a</span>`;
+  }
   const daysLate = _pastDueComputedDaysLate(r);
   const daysCellHtml = daysLate >= 1
     ? _rptDaysLatePill(daysLate)
@@ -13762,7 +13951,7 @@ function _loansDueRowHtml(r) {
   window._lnsRowCache[_rowKey] = r;
   return `<tr class="lns-row${rowSev ? ' ' + rowSev : ''}" style="cursor:pointer" onclick="openLoansDueDetailModal(window._lnsRowCache['${_rowKey}'])" title="Tap to view customer details">
     <td class="tbl-checkbox"><button class="appt-add-btn" title="Create appointment" data-cid="${escapeHtml(cid)}" data-hdr="${escapeHtml(hdrId)}" data-name="${escapeHtml(name)}" onclick="event.stopPropagation();openApptModalFromBtn(this)">+ Appt</button></td>
-    <td><div class="applicant-name"><span style="color:var(--text);font-weight:700">${escapeHtml(name)}</span><span class="lns-card-icn" data-hdr="${escapeHtml(hdrId)}" style="display:none"></span>${apptBadge}</div></td>
+    <td><div class="applicant-name"><span style="color:var(--text);font-weight:700">${escapeHtml(name)}</span><span class="lns-card-icn" data-hdr="${escapeHtml(hdrId)}" style="display:none"></span>${apptBadge}${balChip}</div></td>
     <td><div class="app-info"><span class="app-type">${escapeHtml(r.LoanId || '—')}</span><span class="app-meta">${escapeHtml(r.LoanStatus || '')}${r.LoanSubStatus ? ' · ' + escapeHtml(r.LoanSubStatus) : ''}</span></div></td>
     <td>${daysCellHtml}</td>
     <td><span class="tbl-time" style="font-variant-numeric:tabular-nums">${_rptFmtMoney(r.Balance)}</span></td>
@@ -13940,18 +14129,22 @@ async function lnsOvOpenAdmin() {
   if (!_lnsOvRow) return;
   const cid = String(_lnsOvRow.CustomerId || '');
   const loanId = String(_lnsOvRow.HdrId || _lnsOvRow.LoanId || '');
-  // Identity match first: open the EXISTING application by name/phone from
-  // the loaded reports index — no Vergent id needed. Fall back to the
-  // Vergent-id lookup only if identity doesn't match a loaded application.
+  // AUTHORITATIVE lookup first: resolve by Vergent customer id (O(1) via
+  // vergentCidIndex, verified against the record) — it cannot open a
+  // same-name stranger. The name/phone identity match is only a fallback
+  // for older loans the index doesn't know, and it now refuses ambiguous
+  // name matches instead of guessing.
   const btn = document.getElementById('lns-ov-open-admin');
   const orig = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.style.opacity = '.7'; btn.innerHTML = 'Opening…'; }
   try {
-    let fbId = findAppByIdentity(_lnsOvRow);
-    if (!fbId && cid) fbId = await _lnsOvAwaitFbId(cid, 25000, loanId);
+    let fbId = cid ? await _lnsOvAwaitFbId(cid, 25000, loanId) : null;
+    if (!fbId) fbId = findAppByIdentity(_lnsOvRow);
     if (fbId) {
       // Open the application in a NEW tab; leave the Loans Due modal open.
       window.open(location.pathname + location.search + '#fb=' + encodeURIComponent(fbId), '_blank');
+    } else if (cid && _lnsOvFbIdByCid[cid] === '__loading__') {
+      toast('Still locating this customer — give it a few seconds and click again.', 'err');
     } else {
       toast('No application found in our system for this customer.', 'err');
     }
