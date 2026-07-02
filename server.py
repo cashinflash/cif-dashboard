@@ -80,9 +80,26 @@ def _mirror_report_write_to_index(fb_path, method, raw):
                     if k in ad:
                         proj[k] = ad[k]
                 proj['hasApp'] = True
+            # Derived: Vergent customer id -> the index, so the servicing
+            # pages resolve customer -> application client-side. Lock-step
+            # with cif-apply run_server.py's _derive_vergent_idx_fields.
+            vm = sent.get('vergentMatch')
+            cid = str((vm or {}).get('customerId') or '').strip() \
+                if isinstance(vm, dict) else ''
+            if not cid:
+                cid = str(sent.get('vergentCustomerId') or '').strip()
+            if cid:
+                proj['vergentCid'] = cid
         elif rest.endswith('/applicationData'):               # reports/{id}/applicationData
             rid = rest[:-len('/applicationData')]
             proj = {k: sent[k] for k in _INDEX_APPDATA_FIELDS if k in sent}
+        elif rest.endswith('/vergentMatch'):                  # reports/{id}/vergentMatch
+            # The Phase-2 badge ("Use this ID" etc.) writes the match via
+            # the /fb/ proxy — mirror the cid so client-side resolution
+            # sees it immediately.
+            rid = rest[:-len('/vergentMatch')]
+            _vm_cid = str(sent.get('customerId') or '').strip()
+            proj = {'vergentCid': _vm_cid} if _vm_cid else None
         if rid and proj:
             ireq = urllib.request.Request(
                 _fb_url(f'reportsIndex/{rid}.json'),
@@ -1136,6 +1153,14 @@ _FB_ALLOWED_PREFIXES = (
     'ifSubmissions.json',
     'dashboardState/',
     'dashboardState.json',
+    # Vergent customer/loan -> firebase_id indexes — the servicing pages
+    # download these small flat maps once and resolve customers locally
+    # (zero backend lookups). Read-mostly; writes are harmless (the
+    # backfill on cif-apply rebuilds them from /reports).
+    'vergentCidIndex/',
+    'vergentCidIndex.json',
+    'vergentLoanIndex/',
+    'vergentLoanIndex.json',
 )
 
 

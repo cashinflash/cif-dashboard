@@ -14187,9 +14187,34 @@ async function _loadVergentIndexes(force){
 }
 function _localFbIdFor(cid, loanId){
   const c = String(cid||'').trim();
-  if (c && _vgIdxMaps.cid && typeof _vgIdxMaps.cid[c] === 'string' && _vgIdxMaps.cid[c]) return _vgIdxMaps.cid[c];
   const m = String(loanId||'').match(/(\d+)\s*$/);
   const t = m ? m[1] : '';
+  // 1) The reports index the dashboard ALREADY has in memory — every
+  //    row carries vergentCid/vergentLoanTail (stamped by cif-apply's
+  //    index projection + startup backfill; hydrated records also
+  //    expose vergentMatch). Zero network — if the dashboard renders
+  //    at all, this layer works.
+  if (typeof apps !== 'undefined' && Array.isArray(apps)) {
+    if (c) {
+      const hit = apps.find(function(a){
+        return String(a.vergentCid||'')===c
+          || String((a.vergentMatch||{}).customerId||'')===c
+          || String(a.vergentCustomerId||'')===c;
+      });
+      if (hit) return hit.firebaseId;
+    }
+    if (t) {
+      const hit2 = apps.find(function(a){
+        if (String(a.vergentLoanTail||'')===t) return true;
+        if (t.length < 5) return false;   // short tails are too collision-prone
+        const hdr = String(((a.vergentLoan||{}).hdrId)||'').replace(/\D/g,'');
+        return !!hdr && hdr.endsWith(t);
+      });
+      if (hit2) return hit2.firebaseId;
+    }
+  }
+  // 2) The fetched copy of the Firebase cid/loan indexes.
+  if (c && _vgIdxMaps.cid && typeof _vgIdxMaps.cid[c] === 'string' && _vgIdxMaps.cid[c]) return _vgIdxMaps.cid[c];
   if (t && _vgIdxMaps.loan && typeof _vgIdxMaps.loan[t] === 'string' && _vgIdxMaps.loan[t]) return _vgIdxMaps.loan[t];
   return '';
 }
