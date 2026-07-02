@@ -2288,13 +2288,16 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   </div>
 </div>
 
-<!-- MARKETING CAMPAIGNS modal — compose + blast a marketing email to the
-     ACTIVE-LOAN customers (the same servicing book as the Loans Due page).
-     Audience comes from cif-apply's /marketingAudienceData, built from
-     Vergent's active-loan report with each customer's email resolved by
-     CustomerId. The compliant footer + a working unsubscribe link are
-     added SERVER-SIDE; the operator writes only the subject + body.
-     Opt-outs are skipped automatically at send. -->
+<!-- MARKETING CAMPAIGNS modal — two send paths share one audience.
+     The audience is the ACTIVE-LOAN customers (same servicing book as the
+     Loans Due page), built by cif-apply from Vergent's active-loan report
+     with each customer's email resolved by CustomerId, then ADD-ONLY
+     synced into the Resend audience "Active Loan Customers" (daily auto-
+     sync + the Sync button here).
+     Path 1 — RESEND BROADCASTS: holiday/general blasts are composed and
+     sent in Resend (native unsubscribes, analytics). Path 2 — the
+     IN-HOUSE composer below: kept for sends that need per-customer
+     content Resend can't mint, e.g. the Portal Invite magic link. -->
 <div id="mkt-modal" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:20px"
      onclick="if(event.target.id==='mkt-modal')closeCampaignsModal()">
   <div style="background:white;border-radius:14px;width:100%;max-width:760px;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25)">
@@ -2307,8 +2310,16 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       <div style="display:flex;align-items:center;gap:10px;background:#f9fafb;border:1px solid var(--border);border-radius:10px;padding:10px 14px;flex-wrap:wrap">
         <div style="font-size:13.5px"><b id="mkt-aud-count" style="font-size:16px;color:var(--text)">—</b> active-loan customers in the audience</div>
         <div id="mkt-aud-synced" style="font-size:11.5px;color:var(--muted)"></div>
-        <button id="mkt-refresh-btn" class="btn btn-ghost" style="margin-left:auto;padding:6px 12px" onclick="mktRefreshAudience()"><svg class="icn" style="width:13px;height:13px;vertical-align:-2px;margin-right:4px"><use href="#i-refresh"/></svg>Refresh list from Vergent</button>
+        <button id="mkt-refresh-btn" class="btn btn-ghost" style="margin-left:auto;padding:6px 12px" onclick="mktRefreshAudience()" title="Pull the active-loan list from Vergent and push new contacts to Resend"><svg class="icn" style="width:13px;height:13px;vertical-align:-2px;margin-right:4px"><use href="#i-refresh"/></svg>Sync now</button>
         <div id="mkt-aud-breakdown" style="flex-basis:100%;font-size:11.5px;color:var(--muted);line-height:1.5"></div>
+      </div>
+      <!-- Resend hand-off: general blasts (holiday etc.) are composed +
+           sent in Resend Broadcasts; this list auto-syncs there. -->
+      <div style="background:#f0faf4;border:1px solid #b2e8c8;border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.6;color:#1f3c2e">
+        <div style="font-weight:700;margin-bottom:4px">📨 Holiday &amp; general blasts: send from Resend Broadcasts</div>
+        This list auto-syncs to your Resend audience <b>"Active Loan Customers"</b> daily (new customers are added; unsubscribes in Resend are never overwritten). Compose in Resend → Broadcasts, pick that audience, send yourself a test, then send or schedule. Use the composer <b>below</b> only for sends that need a per-customer link (e.g. the Portal Invite) — Resend can't mint those.
+        <div id="mkt-resend-line" style="margin-top:8px;font-size:12.5px;color:var(--muted)">—</div>
+        <a href="https://resend.com/broadcasts" target="_blank" rel="noopener" class="btn btn-ghost" style="display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:7px 12px;text-decoration:none">Open Resend Broadcasts ↗</a>
       </div>
       <!-- Saved templates -->
       <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
@@ -2358,7 +2369,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       </div>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 22px;border-top:1px solid var(--border);flex-wrap:wrap">
-      <div style="font-size:11.5px;color:var(--muted)">Sends to <b id="mkt-foot-count">—</b> active-loan customers · opt-outs skipped automatically</div>
+      <div style="font-size:11.5px;color:var(--muted)">Sends to <b id="mkt-foot-count">—</b> active-loan customers · opt-outs skipped automatically · list auto-syncs to Resend daily</div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-ghost" onclick="closeCampaignsModal()">Close</button>
         <button class="btn btn-primary" id="mkt-send-btn" onclick="mktSendCampaign()">Send to active-loan customers</button>
@@ -12276,6 +12287,7 @@ async function mktLoadAudienceStats() {
   const footEl = document.getElementById('mkt-foot-count');
   const syncEl = document.getElementById('mkt-aud-synced');
   const bdEl = document.getElementById('mkt-aud-breakdown');
+  const rEl = document.getElementById('mkt-resend-line');
   try {
     const { data } = await _mktPost('/api/marketing/audience-stats', {});
     const n = data.count || 0;
@@ -12288,10 +12300,19 @@ async function mktLoadAudienceStats() {
         try { when = new Date(data.lastSyncedAt).toLocaleString(); } catch (e) {}
         syncEl.textContent = 'list synced ' + when;
       } else {
-        syncEl.textContent = 'never synced — click “Refresh list from Vergent”';
+        syncEl.textContent = 'never synced — click “Sync now”';
       }
     }
     if (bdEl) bdEl.innerHTML = _mktBreakdownHtml(data.syncStats || {});
+    if (rEl) {
+      if (data.resendError) {
+        rEl.innerHTML = '<span style="color:var(--red);font-weight:700">Resend sync error:</span> ' + escapeHtml(String(data.resendError));
+      } else if (data.resendContacts != null) {
+        rEl.innerHTML = '<b>' + Number(data.resendContacts).toLocaleString() + '</b> contacts in the Resend audience';
+      } else {
+        rEl.textContent = 'Not synced to Resend yet — click “Sync now” above.';
+      }
+    }
   } catch (e) {
     if (countEl) countEl.textContent = '—';
   }
@@ -12327,28 +12348,38 @@ async function mktRefreshAudience() {
   }
   _mktRefreshing = true;
   if (btn) { btn.disabled = true; btn.style.opacity = '.6'; btn.style.cursor = 'default'; }
-  if (res) { res.style.color = 'var(--muted)'; res.textContent = 'Building the active-loan list from Vergent… (this can take a couple minutes)'; }
+  if (res) { res.style.color = 'var(--muted)'; res.textContent = 'Building the active-loan list from Vergent… (the first sync can take several minutes)'; }
   try {
     try { await _mktPost('/api/marketing/refresh-audience', {}); } catch (e) {}
-    // Budget ~4 min: the sync resolves each active-loan customer's email,
-    // which can mean hundreds of per-customer Vergent lookups.
-    for (let i = 0; i < 80; i++) {
+    // Budget ~10 min: email lookups can mean hundreds of per-customer
+    // Vergent calls, and the first push of ~800 contacts into Resend is
+    // rate-limit-throttled (~2/sec). Later syncs only add newcomers.
+    for (let i = 0; i < 200; i++) {
       await new Promise(r => setTimeout(r, 3000));
       let data;
       try { data = (await _mktPost('/api/marketing/audience-stats', {})).data; } catch (e) { continue; }
       if (data.syncStatus === 'done') {
         await mktLoadAudienceStats();
-        if (res) { res.style.color = 'var(--green-dark)'; res.textContent = 'Audience updated: ' + (data.count || 0).toLocaleString() + ' active-loan customers emailable.'; }
+        if (res) {
+          res.style.color = 'var(--green-dark)';
+          let done = 'Audience updated: ' + (data.count || 0).toLocaleString() + ' active-loan customers emailable.';
+          if (data.resendError) done += ' Resend push failed — see the red note above.';
+          else if (data.resendContacts != null) done += ' ' + Number(data.resendContacts).toLocaleString() + ' contacts now in Resend.';
+          res.textContent = done;
+        }
         return;
       }
       if (data.syncStatus === 'error') {
         if (res) { res.style.color = 'var(--red)'; res.textContent = 'Refresh failed: ' + (data.syncError || 'unknown error'); }
         return;
       }
-      // Live progress while it runs: stage + per-customer email lookup count.
+      // Live progress while it runs: stage + per-customer counts.
       if (res) {
         let msg = 'Building the active-loan list from Vergent…';
-        if (data.syncStage === 'emails') {
+        if (data.syncStage === 'resend') {
+          msg = 'Pushing contacts to Resend…';
+          if (data.resendTotal) msg += ' ' + (data.resendDone || 0).toLocaleString() + '/' + Number(data.resendTotal).toLocaleString() + ' new';
+        } else if (data.syncStage === 'emails') {
           msg = 'Looking up customer emails…';
           if (data.lookupTotal) msg += ' ' + (data.lookupDone || 0).toLocaleString() + '/' + Number(data.lookupTotal).toLocaleString();
         } else if (data.syncStage === 'loans') {
@@ -12357,7 +12388,7 @@ async function mktRefreshAudience() {
         res.textContent = msg;
       }
     }
-    if (res) res.textContent = 'Still syncing — check back in a minute, then reopen this window.';
+    if (res) res.textContent = 'Still syncing — it keeps running server-side; reopen this window in a few minutes.';
   } finally {
     _mktRefreshing = false;
     if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; }
