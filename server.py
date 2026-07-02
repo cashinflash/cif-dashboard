@@ -2139,6 +2139,11 @@ class Handler(BaseHTTPRequestHandler):
         # forwards {firebase_id} to cif-apply's /api/plaid-balance. Only
         # called when the operator clicks "Check balance"; cif-apply caches
         # the reading so a re-open doesn't re-bill.
+        # TIMEOUT: 90s — must OUTLAST cif-apply's 60s Plaid budget. A live
+        # balance check queries the customer's actual bank; slow banks take
+        # 30-45s. With a 30s proxy timeout the proxy aborted FIRST: the
+        # operator saw a failure and re-clicked (double-billing $0.10) while
+        # cif-apply's original call completed behind the scenes.
         if path == '/api/plaid-balance':
             try:
                 body = json.loads(raw)
@@ -2147,7 +2152,7 @@ class Handler(BaseHTTPRequestHandler):
                 import urllib.request as ur
                 req = ur.Request('https://cif-apply.onrender.com/api/plaid-balance',
                     data=payload, headers={'Content-Type': 'application/json'}, method='POST')
-                with ur.urlopen(req, timeout=30) as r:
+                with ur.urlopen(req, timeout=90) as r:
                     result = json.loads(r.read().decode())
                 self.send_json(200, result)
             except urllib.error.HTTPError as e:
