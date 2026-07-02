@@ -2278,7 +2278,9 @@ class Handler(BaseHTTPRequestHandler):
                 import urllib.request as ur
                 req = ur.Request('https://cif-apply.onrender.com/api/lookup-fbid-by-vergent-cid',
                     data=payload, headers={'Content-Type': 'application/json'}, method='POST')
-                with ur.urlopen(req, timeout=30) as r:
+                # 60s: unindexed customers fall back to a walk of the
+                # multi-MB /reports tree, which regularly outlives 30s.
+                with ur.urlopen(req, timeout=60) as r:
                     result = json.loads(r.read().decode())
                 self.send_json(200, result)
             except urllib.error.HTTPError as e:
@@ -2288,6 +2290,30 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(e.code, err_body)
             except Exception as e:
                 print(f'[FBID-LOOKUP ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
+        # Batch firebase-id resolver for the "Check due-today balances"
+        # button — ONE call resolves every customer (at most one /reports
+        # walk on cif-apply) instead of N sequential walks that each blew
+        # the timeout. Long deadline: the single walk can take a while.
+        if path == '/api/lookup-fbids-by-vergent-cids':
+            try:
+                body = json.loads(raw) if raw else {}
+                payload = json.dumps(body).encode()
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/lookup-fbids-by-vergent-cids',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=120) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[FBIDS-LOOKUP UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[FBIDS-LOOKUP ERROR] {e}', flush=True)
                 self.send_json(500, {'error': str(e)})
             return
 
