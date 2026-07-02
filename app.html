@@ -2422,7 +2422,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       <span id="rpt-active-filter" style="display:none;align-items:center;gap:6px;background:#ecfdf5;color:var(--green-dark);border:1px solid #a7e8c2;border-radius:999px;padding:6px 6px 6px 12px;font-size:12px;font-weight:700"><span>Showing: <span id="rpt-active-filter-label" style="font-weight:700"></span></span><button onclick="_clearActiveFilter()" title="Clear filter" style="background:white;border:1px solid #a7e8c2;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--green-dark);padding:0;font-size:14px;line-height:1;font-family:inherit">&times;</button></span>
       <span id="rpt-loaded-at" style="font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums"></span>
       <!-- Batch live-balance check — MANUAL ONLY (bills ~$0.10/customer). -->
-      <button id="rpt-checkbal-btn" onclick="checkDueTodayBalances(this)" title="Run a live Plaid balance check for every customer due today (~$0.10 each). Only runs when you press it." style="display:inline-flex;align-items:center;gap:6px;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🏦 Check due-today balances</button>
+      <button id="rpt-checkbal-btn" onclick="checkAllVisibleBalances(this)" title="Run a live Plaid balance check for every customer currently shown — pick a bucket (Due today, 2-7 days late, …), scope, or search first and the sweep covers exactly that set (~$0.10 each). Only runs when you press it." style="display:inline-flex;align-items:center;gap:6px;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🏦 Check All Balances</button>
       <span id="rpt-checkbal-progress" style="font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums"></span>
       <!-- Density toggle — operator preference, persisted to localStorage.
            Compact tightens row padding for power-users scanning lots of
@@ -5798,26 +5798,55 @@ async function checkLoansDueBalance(btn){
   }
   finally{ if(btn){btn.disabled=false;btn.style.opacity='';} }
 }
-// Batch live-balance check for everyone DUE TODAY — morning collections
-// triage. MANUAL ONLY: runs solely on the toolbar button click (each check
-// bills ~$0.10, so this must never fire automatically). Sequential with a
-// small gap between customers; results land in the same caches the modal +
-// profile read, and every checked row gets a balance chip next to the name.
-var _dueBalBatchRunning=false;
-async function checkDueTodayBalances(btn){
-  if(_dueBalBatchRunning) return;
-  // Same dedupe + active filter as renderLoansDueUnified, narrowed to due-today.
+// Rows currently VISIBLE on the Loans Due table — mirrors
+// renderLoansDueUnified's whole filter pipeline (active-loan filter,
+// search box, bucket card like "2-7 days late", custom date range, and
+// the Past-due/Upcoming scope) so the batch balance button checks
+// exactly what the operator is looking at.
+function _visibleLoansDueRows(){
   const byId=new Map();
   (_upcomingRows||[]).forEach(function(r){ const id=String(r.LoanId||''); if(id) byId.set(id,r); });
   (_pastDueRows||[]).forEach(function(r){ const id=String(r.LoanId||''); if(id) byId.set(id,r); });
-  const rows=Array.from(byId.values()).filter(function(r){
-    return String(r.LoanStatus||'').trim().toLowerCase()==='held'
-      && (Number(r.AmountDue)||0)>0
-      && _pastDueComputedDaysLate(r)===0;
+  const q=(document.getElementById('rpt-search')?.value||'').toLowerCase().trim();
+  const hay=function(r){ return (r.__q!=null?r.__q:(r.__q=JSON.stringify(r).toLowerCase())); };
+  const out=[];
+  Array.from(byId.values()).forEach(function(r){
+    if(String(r.LoanStatus||'').trim().toLowerCase()!=='held') return;
+    if(!((Number(r.AmountDue)||0)>0)) return;
+    if(q && !hay(r).includes(q)) return;
+    if(_bucketFilter && !_rowMatchesBucket(r,_bucketFilter)) return;
+    if(_customRange && !_rowInCustomRange(r)) return;
+    const d=_pastDueComputedDaysLate(r);
+    let secKey=null;
+    for(const s of _LOANS_DUE_SECTIONS){ if(d>=s.min && d<=s.max){ secKey=s.key; break; } }
+    if(!secKey) return;
+    if(_servicingScope==='pastdue' && secKey!=='pastdue') return;
+    if(_servicingScope==='upcoming' && secKey==='pastdue') return;
+    out.push(r);
+  });
+  return out;
+}
+// Batch live-balance check for every loan CURRENTLY SHOWN — pick a
+// bucket card ("Due today", "2-7 days late", …), a scope, a custom
+// range, or a search first and the sweep covers exactly that set.
+// MANUAL ONLY: runs solely on the toolbar button click (each check
+// bills ~$0.10, so this must never fire automatically). Deduped by
+// customer (two loans, one customer = one check). Sequential with a
+// small gap; results land in the same caches the modal + profile read,
+// and every checked row gets a balance chip next to the name.
+var _dueBalBatchRunning=false;
+async function checkAllVisibleBalances(btn){
+  if(_dueBalBatchRunning) return;
+  const seenCid=new Set();
+  const rows=_visibleLoansDueRows().filter(function(r){
+    const c=String(r.CustomerId||'');
+    if(!c || seenCid.has(c)) return false;
+    seenCid.add(c);
+    return true;
   });
   const prog=document.getElementById('rpt-checkbal-progress');
-  if(!rows.length){ if(prog) prog.textContent='No loans due today.'; return; }
-  if(!confirm('Check live balances for '+rows.length+' customer'+(rows.length===1?'':'s')+' due today?\n\nPlaid bills ~$0.10 per check (≈$'+(rows.length*0.10).toFixed(2)+' total). Some banks take up to a minute each — you can keep working while it runs.')) return;
+  if(!rows.length){ if(prog) prog.textContent='No loans in the current view.'; return; }
+  if(!confirm('Check live balances for the '+rows.length+' customer'+(rows.length===1?'':'s')+' currently shown in this view?\n\nYour filters (bucket, search, scope, date range) are respected. Plaid bills ~$0.10 per check (≈$'+(rows.length*0.10).toFixed(2)+' total). Some banks take up to a minute each — you can keep working while it runs.')) return;
   _dueBalBatchRunning=true;
   if(btn){btn.disabled=true;btn.style.opacity='.6';}
   // PRE-RESOLVE every customer in ONE backend call (at most one /reports
