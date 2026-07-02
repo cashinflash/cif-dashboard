@@ -5744,7 +5744,15 @@ function _hydrateModalBalanceCard(row, cache, cid, resultElId, stillCurrent){
   if(cache[cid]){ renderBalanceResult(cache[cid], resultElId); return; }
   const el=document.getElementById(resultElId);
   if(el){ el.style.display='none'; el.innerHTML=''; }   // clear any prior customer's card
-  const fbId=findAppByIdentity(row);
+  _loadVergentIndexes();   // warm the local cid map (async — helps next opens)
+  // MIRRORING: resolve the application any way we can — identity match,
+  // the local cid/loan index copy, or a completed lookup — so a balance
+  // checked on the PROFILE page shows here too (and vice versa via
+  // _stashBalance). All surfaces read the same fbId-keyed reading.
+  const _cachedLk=_lnsOvFbIdByCid[cid];
+  const fbId=findAppByIdentity(row)
+    || _localFbIdFor(cid, String(row.HdrId||row.LoanId||row.loan_id||''))
+    || ((_cachedLk && _cachedLk!=='__loading__') ? _cachedLk : '');
   if(!fbId) return;
   const app=(typeof apps!=='undefined'&&Array.isArray(apps))?apps.find(function(x){return x.firebaseId===fbId;}):null;
   if(app && app.plaidBalance && app.plaidBalance.ok){
@@ -5849,51 +5857,69 @@ async function checkAllVisibleBalances(btn){
   if(!confirm('Check live balances for the '+rows.length+' customer'+(rows.length===1?'':'s')+' currently shown in this view?\n\nYour filters (bucket, search, scope, date range) are respected. Plaid bills ~$0.10 per check (≈$'+(rows.length*0.10).toFixed(2)+' total). Some banks take up to a minute each — you can keep working while it runs.')) return;
   _dueBalBatchRunning=true;
   if(btn){btn.disabled=true;btn.style.opacity='.6';}
-  // PRE-RESOLVE every customer in ONE backend call (at most one /reports
-  // walk server-side). The first version did N sequential single lookups,
-  // each of which could trigger its own multi-MB walk and time out — the
-  // answers landed in the cache AFTER the batch had moved on, which is
-  // why manual clicks minutes later worked while the batch showed 2/11.
+  // PRE-RESOLVE, local-first: the client-side copy of the Firebase
+  // cid/loan indexes matches most customers instantly with ZERO backend
+  // calls — immune to cif-apply deploys/restarts (running the sweep
+  // mid-deploy is what produced a 1-of-48 run). Only customers the local
+  // map doesn't know go to the backend batch resolver, which is retried
+  // once if it hiccups.
   // resolvedMap: cid -> firebase_id (found) | null (definitively no link)
-  // | undefined (batch call unavailable -> per-customer fallback below).
+  // | undefined (resolver unavailable -> per-customer fallback below).
   const resolvedMap={};
-  if(prog) prog.textContent='Matching customers… (one-time indexing can take a minute)';
-  try{
-    const items=rows.map(function(r){ return {cid:String(r.CustomerId||''), loan_id:String(r.HdrId||r.LoanId||'')}; });
-    const lr=await fetch('/api/lookup-fbids-by-vergent-cids',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({items:items})});
-    const ld=await lr.json().catch(function(){return {};});
-    if(lr.ok && ld && ld.map){
-      Object.keys(ld.map).forEach(function(c){
-        const v=ld.map[c];
-        resolvedMap[c]=(v && v.firebase_id) ? v.firebase_id : null;
-        if(v && v.firebase_id) _lnsOvFbIdByCid[c]=v.firebase_id;  // modals benefit too
-      });
+  if(prog) prog.textContent='Matching customers…';
+  try{ await _loadVergentIndexes(true); }catch(e){}
+  const needBackend=[];
+  rows.forEach(function(r){
+    const c=String(r.CustomerId||'');
+    const loc=_localFbIdFor(c, String(r.HdrId||r.LoanId||''));
+    if(loc){ resolvedMap[c]=loc; _lnsOvFbIdByCid[c]=loc; }
+    else needBackend.push(r);
+  });
+  if(needBackend.length){
+    if(prog) prog.textContent='Matching customers… '+(rows.length-needBackend.length)+'/'+rows.length+' matched — indexing the rest (can take a minute)';
+    const items=needBackend.map(function(r){ return {cid:String(r.CustomerId||''), loan_id:String(r.HdrId||r.LoanId||'')}; });
+    for(let attempt=0; attempt<2; attempt++){
+      try{
+        const lr=await fetch('/api/lookup-fbids-by-vergent-cids',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({items:items})});
+        const ld=await lr.json().catch(function(){return {};});
+        if(lr.ok && ld && ld.map){
+          Object.keys(ld.map).forEach(function(c){
+            const v=ld.map[c];
+            resolvedMap[c]=(v && v.firebase_id) ? v.firebase_id : null;
+            if(v && v.firebase_id) _lnsOvFbIdByCid[c]=v.firebase_id;  // modals benefit too
+          });
+          break;
+        }
+      }catch(e){ /* transient — retried once below */ }
+      if(attempt===0) await new Promise(function(res){setTimeout(res,3000);});
     }
-  }catch(e){ /* endpoint unavailable — per-customer fallback below */ }
-  let done=0, okC=0, failC=0;
+  }
+  let done=0, okC=0, noLink=0, balFail=0;
   for(const r of rows){
     const cid=String(r.CustomerId||'');
     if(prog) prog.textContent='Checking balances… '+(done+1)+'/'+rows.length;
     try{
       let fbId=resolvedMap[cid];
-      if(fbId===undefined){   // batch resolver unavailable — old path
+      if(fbId===undefined){   // batch resolver unavailable — per-customer path
         fbId=(cid?await _lnsOvAwaitFbId(cid,20000,String(r.HdrId||r.LoanId||'')):null);
       }
       if(!fbId) fbId=findAppByIdentity(r);
-      if(!fbId){ failC++; }
+      if(!fbId){ noLink++; }
       else{
         const d=await(await fetch('/api/plaid-balance',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({firebase_id:fbId})})).json();
         if(d&&!d.checkedAt) d.checkedAt=Date.now();
         if(cid) _lnsOvBalanceCache[cid]=d;
         _stashBalance(fbId,d);
-        if(d&&d.ok) okC++; else failC++;
+        if(d&&d.ok) okC++; else balFail++;
       }
-    }catch(e){ failC++; }
+    }catch(e){ balFail++; }
     done++;
     await new Promise(function(res){setTimeout(res,250);});
   }
   if(typeof renderLoansDueUnified==='function') renderLoansDueUnified();
-  if(prog) prog.textContent='Balances: '+okC+' ✓'+(failC?(' · '+failC+' unavailable'):'')+' — chips on each row; details in the customer modal.';
+  if(prog) prog.textContent='Balances: '+okC+' ✓'
+    +(balFail?(' · '+balFail+' unavailable (no Plaid / expired login — hover the row chip)'):'')
+    +(noLink?(' · '+noLink+' no application match'):'');
   _dueBalBatchRunning=false;
   if(btn){btn.disabled=false;btn.style.opacity='';}
 }
@@ -12139,16 +12165,26 @@ function _payOvRefreshAdminButton(cid) {
 }
 async function _payOvAwaitFbId(cid, timeoutMs, loanId) {
   if (!cid) return null;
+  // Local-first + one transparent retry on transient failure — same
+  // semantics as _lnsOvAwaitFbId (see comments there).
+  try { await _loadVergentIndexes(); } catch (e) {}
+  const loc = _localFbIdFor(cid, loanId);
+  if (loc) { _payOvFbIdByCid[cid] = loc; return loc; }
   const cached = _payOvFbIdByCid[cid];
   if (cached && cached !== '__loading__') return cached;
   if (cached !== '__loading__') _payOvKickoffFbIdLookup(cid, loanId);
   const start = (typeof performance !== 'undefined' && performance.now)
     ? performance.now() : new Date().getTime();
   const limit = Number(timeoutMs) || 25000;
+  let retried = false;
   while (true) {
     const v = _payOvFbIdByCid[cid];
     if (v && v !== '__loading__') return v;
-    if (v === null) return null;
+    if (v === null) {
+      if (retried) return null;
+      retried = true;
+      _payOvKickoffFbIdLookup(cid, loanId);
+    }
     const now = (typeof performance !== 'undefined' && performance.now)
       ? performance.now() : new Date().getTime();
     if ((now - start) > limit) return null;
@@ -14124,6 +14160,39 @@ async function _ensureModal14dActivity() {
 // are instant — by the time the operator scans the modal and clicks,
 // the lookup is usually done. Values: undefined = not started,
 // '__loading__' = in flight, string = found, null = not found.
+// Client-side copy of the Firebase cid/loan -> firebase_id indexes.
+// One small fetch (a flat map, ~30 bytes per matched customer) replaces
+// a backend lookup PER CUSTOMER — resolution becomes instant and stays
+// working even while cif-apply is deploying/restarting (running the
+// balance sweep mid-deploy is what produced a 1-of-48 run). Refreshed
+// at most every 5 min; force=true refetches (used by the sweep).
+var _vgIdxMaps = { cid: null, loan: null, at: 0, loading: null };
+async function _loadVergentIndexes(force){
+  const now = Date.now();
+  if (!force && _vgIdxMaps.cid && (now - _vgIdxMaps.at) < 5*60*1000) return _vgIdxMaps;
+  if (_vgIdxMaps.loading) { try { await _vgIdxMaps.loading; } catch(e){} return _vgIdxMaps; }
+  _vgIdxMaps.loading = (async function(){
+    try {
+      const rs = await Promise.all([
+        fetch('/fb/vergentCidIndex.json', {credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return null;}),
+        fetch('/fb/vergentLoanIndex.json', {credentials:'same-origin'}).then(function(r){return r.json();}).catch(function(){return null;}),
+      ]);
+      if (rs[0] && typeof rs[0] === 'object' && !rs[0].error) _vgIdxMaps.cid = rs[0];
+      if (rs[1] && typeof rs[1] === 'object' && !rs[1].error) _vgIdxMaps.loan = rs[1];
+      _vgIdxMaps.at = Date.now();
+    } finally { _vgIdxMaps.loading = null; }
+  })();
+  try { await _vgIdxMaps.loading; } catch(e){}
+  return _vgIdxMaps;
+}
+function _localFbIdFor(cid, loanId){
+  const c = String(cid||'').trim();
+  if (c && _vgIdxMaps.cid && typeof _vgIdxMaps.cid[c] === 'string' && _vgIdxMaps.cid[c]) return _vgIdxMaps.cid[c];
+  const m = String(loanId||'').match(/(\d+)\s*$/);
+  const t = m ? m[1] : '';
+  if (t && _vgIdxMaps.loan && typeof _vgIdxMaps.loan[t] === 'string' && _vgIdxMaps.loan[t]) return _vgIdxMaps.loan[t];
+  return '';
+}
 const _lnsOvFbIdByCid = {};
 let _lnsOvFbIdLookupSeq = 0;
 async function _lnsOvKickoffFbIdLookup(cid, loanId) {
@@ -14172,16 +14241,29 @@ async function _lnsOvAwaitFbId(cid, timeoutMs, loanId) {
   // Used by the click handlers to await the in-flight lookup with a
   // visible button state. Returns string fbId or null.
   if (!cid) return null;
+  // Local-first: the client-side copy of the cid/loan indexes resolves
+  // instantly with zero backend calls (immune to cif-apply deploys).
+  try { await _loadVergentIndexes(); } catch (e) {}
+  const loc = _localFbIdFor(cid, loanId);
+  if (loc) { _lnsOvFbIdByCid[cid] = loc; return loc; }
   const cached = _lnsOvFbIdByCid[cid];
   if (cached && cached !== '__loading__') return cached;
   if (cached !== '__loading__') _lnsOvKickoffFbIdLookup(cid, loanId);
   const start = (typeof performance !== 'undefined' && performance.now)
     ? performance.now() : new Date().getTime();
   const limit = Number(timeoutMs) || 30000;
+  let retried = false;
   while (true) {
     const v = _lnsOvFbIdByCid[cid];
     if (v && v !== '__loading__') return v;
-    if (v === null) return null;
+    if (v === null) {
+      // One transparent retry: a transient blip (backend deploy restart,
+      // 502, dropped connection) must NOT read as a definitive "no
+      // application for this customer".
+      if (retried) return null;
+      retried = true;
+      _lnsOvKickoffFbIdLookup(cid, loanId);
+    }
     const now = (typeof performance !== 'undefined' && performance.now)
       ? performance.now() : new Date().getTime();
     if ((now - start) > limit) return null;
