@@ -1861,7 +1861,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
-        if path in ('/api/send-returned-payment', '/api/send-thank-you-payment', '/api/send-approval', '/api/send-card-failed', '/api/send-card-request'):
+        if path in ('/api/send-returned-payment', '/api/send-thank-you-payment', '/api/send-approval', '/api/send-card-failed', '/api/send-card-request', '/api/send-google-review'):
             try:
                 import urllib.request as ur
                 req = ur.Request('https://cif-apply.onrender.com' + path,

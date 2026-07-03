@@ -1892,6 +1892,14 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
                 <div id="dv-portal-status-chip" style="font-size:11px;font-weight:600;color:var(--muted);margin-top:5px;min-height:14px"></div>
                 <div id="dv-portal-invite-result" style="font-size:11.5px;color:var(--muted);margin-top:3px;min-height:14px"></div>
               </div>
+              <!-- Google Review (operator request): emails the customer a
+                   branded ask to review us on Google (g.page review link).
+                   Double-send guarded server-side — a repeat click warns
+                   with the original send date and requires confirmation. -->
+              <div>
+                <button class="qa-btn" id="dv-google-review-btn" type="button" onclick="sendGoogleReviewEmail(this)" title="Email this customer a request to leave us a Google review"><span style="font-size:13px;line-height:1">⭐</span>Google Review</button>
+                <div id="dv-google-review-result" style="font-size:11.5px;color:var(--muted);margin-top:3px;min-height:14px"></div>
+              </div>
               <!-- Shown by renderProfilePanel when the customer already
                    has a Held / Pending / Active / Outstanding loan in
                    Vergent. Hides the Create Loan + combo buttons so the
@@ -5951,6 +5959,43 @@ function generatePlaidPdf(fbId, btn){
       }
     })
     .catch(function(e){ if(btn){btn.disabled=false;btn.textContent='Generate & view PDF';} alert('Request failed: '+e); });
+}
+// Google Review (Quick Actions): email the customer a branded ask to
+// review us on Google. Server-side double-send guard — a repeat click
+// warns with the original send date and requires an explicit confirm.
+async function sendGoogleReviewEmail(btn){
+  const fbId = window._profileFbId || document.body.dataset.firebaseId || '';
+  if(!fbId){ toast('Open an applicant first','err'); return; }
+  const a = (typeof apps!=='undefined'&&Array.isArray(apps))?apps.find(x=>x.firebaseId===fbId):null;
+  const email = (a && (a.email || (a.applicationData||{}).email)) || '';
+  const resEl = document.getElementById('dv-google-review-result');
+  if(!confirm('Send a Google review request to '+(email||'this customer')+'?')) return;
+  if(btn){btn.disabled=true;btn.style.opacity='.6';}
+  if(resEl){resEl.style.color='var(--muted)';resEl.textContent='Sending…';}
+  try{
+    let r=await fetch('/api/send-google-review',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({firebase_id:fbId})});
+    let d=await r.json().catch(()=>({}));
+    if(r.ok && d && d.already_sent){
+      const when=d.sentAt?new Date(d.sentAt).toLocaleString():'earlier';
+      if(!confirm('A review request was already sent '+when+(d.sentTo?(' to '+d.sentTo):'')+'.\n\nSend it again?')){
+        if(resEl){resEl.style.color='var(--muted)';resEl.textContent='Already sent '+when+'.';}
+        return;
+      }
+      r=await fetch('/api/send-google-review',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({firebase_id:fbId,force:true})});
+      d=await r.json().catch(()=>({}));
+    }
+    if(r.ok && d && d.ok){
+      if(resEl){resEl.style.color='var(--green-dark)';resEl.textContent='Review request sent to '+(d.to||email)+' ✓';}
+      toast('Google review request sent','ok');
+    } else {
+      if(resEl){resEl.style.color='var(--red)';resEl.textContent='Failed: '+((d&&(d.detail||d.error))||('HTTP '+r.status));}
+      toast('Review request failed','err');
+    }
+  }catch(e){
+    if(resEl){resEl.style.color='var(--red)';resEl.textContent='Network error: '+((e&&e.message)||e);}
+  }finally{
+    if(btn){btn.disabled=false;btn.style.opacity='';}
+  }
 }
 // Portal Invite helpers (Quick Actions). Both calls go through cif-apply; the
 // send is keyed by Vergent customer id so the magic link reaches the customer's
