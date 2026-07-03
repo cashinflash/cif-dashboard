@@ -1894,9 +1894,12 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
               </div>
               <!-- Google Review (operator request): emails the customer a
                    branded ask to review us on Google (g.page review link).
-                   Double-send guarded server-side — a repeat click warns
-                   with the original send date and requires confirmation. -->
-              <div>
+                   Shown ONLY when the customer EXISTS in Vergent (match
+                   status 'found') — renderProfilePanel toggles visibility,
+                   same gating as Portal Invite. Double-send guarded
+                   server-side: a repeat click warns with the original send
+                   date and requires confirmation. -->
+              <div id="dv-google-review-wrap" style="display:none">
                 <button class="qa-btn" id="dv-google-review-btn" type="button" onclick="sendGoogleReviewEmail(this)" title="Email this customer a request to leave us a Google review"><span style="font-size:13px;line-height:1">⭐</span>Google Review</button>
                 <div id="dv-google-review-result" style="font-size:11.5px;color:var(--muted);margin-top:3px;min-height:14px"></div>
               </div>
@@ -6117,6 +6120,10 @@ function renderProfilePanel(fbId) {
   const recheckBtn = document.getElementById('profile-vergent-recheck');
   const matchedHere = m && (m.status || '').toLowerCase() === 'found';
   if (recheckBtn) recheckBtn.style.display = matchedHere ? 'none' : 'inline-flex';
+  // Google Review button: only for customers who EXIST in Vergent —
+  // same 'found' gating as Portal Invite (operator request).
+  const grWrap = document.getElementById('dv-google-review-wrap');
+  if (grWrap) grWrap.style.display = matchedHere ? 'block' : 'none';
   // Create Customer button (rail Quick Actions): shown ONLY for the
   // not_found / new state, where the operator's next action is to
   // create the Vergent record. Hidden on found (already exists),
