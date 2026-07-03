@@ -6003,39 +6003,70 @@ async function sendGoogleReviewEmail(btn){
 // Portal Invite helpers (Quick Actions). Both calls go through cif-apply; the
 // send is keyed by Vergent customer id so the magic link reaches the customer's
 // on-file email, and the status check tells the operator if they're registered.
-function refreshPortalStatus(fbId, cid) {
+// Portal status cache — cid -> {d, at}. The chip renders INSTANTLY from
+// this and never flashes back to "Checking…" once a status is known:
+// renderProfilePanel re-runs constantly (match polls, loan loads, the
+// 60s index refresh) and the old implementation reset the chip + button
+// on every pass then re-fetched, which read as twitching. Refreshes now
+// go out silently in the background (single-flight per cid, 60s TTL)
+// and only touch the DOM when the answer actually changed.
+var _portalStatusCache = {};      // cid -> {d, at}
+var _portalStatusInflight = {};   // cid -> true while a check is running
+function _renderPortalStatus(cid, d) {
+  const wrap = document.getElementById('dv-portal-invite-wrap');
+  if (!wrap || wrap.getAttribute('data-cid') !== String(cid)) return;  // operator switched applicants
   const chip = document.getElementById('dv-portal-status-chip');
   if (!chip) return;
-  chip.textContent = 'Checking account status…'; chip.style.color = 'var(--muted)';
+  d = d || {};
+  let html;
+  if (d.registered) {
+    html = '<span style="color:var(--green-dark)">✓ Portal user</span>'
+      + (d.masked ? ' · ' + escapeHtml(d.masked) : '');
+  } else if (d.noEmail) {
+    html = '<span style="color:var(--amber-700)">No email on file in Vergent</span>';
+  } else if (d.error) {
+    html = '';
+  } else {
+    html = '<span style="color:var(--muted)">Not registered yet</span>'
+      + (d.masked ? ' · ' + escapeHtml(d.masked) : '');
+  }
+  if (chip.innerHTML !== html) chip.innerHTML = html;   // write only on change
+  // Already a portal user → no invite to send: hide the button (+ its
+  // result line), the chip alone says they're set up. Otherwise show it.
+  const inviteBtn = document.getElementById('dv-portal-invite-btn');
+  const inviteRes = document.getElementById('dv-portal-invite-result');
+  const wantDisplay = d.registered ? 'none' : '';
+  if (inviteBtn && inviteBtn.style.display !== wantDisplay) inviteBtn.style.display = wantDisplay;
+  if (inviteRes && d.registered && inviteRes.textContent) inviteRes.textContent = '';
+}
+function refreshPortalStatus(fbId, cid, force) {
+  const chip = document.getElementById('dv-portal-status-chip');
+  if (!chip) return;
+  const key = String(cid);
+  const cached = _portalStatusCache[key];
+  if (cached) {
+    _renderPortalStatus(key, cached.d);   // instant — no "Checking…" flash
+  } else {
+    chip.textContent = 'Checking account status…'; chip.style.color = 'var(--muted)';
+  }
+  if (cached && !force && (Date.now() - cached.at) < 60000) return;  // fresh enough
+  if (_portalStatusInflight[key]) return;                            // single-flight
+  _portalStatusInflight[key] = true;
   fetch('/api/portal-status', {
     method: 'POST', credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ customer_id: cid }),
   }).then(function (r) { return r.json().catch(function () { return {}; }); })
     .then(function (d) {
-      const wrap = document.getElementById('dv-portal-invite-wrap');
-      if (wrap && wrap.getAttribute('data-cid') !== String(cid)) return;  // operator switched applicants
       d = d || {};
-      // Already a portal user → no invite to send: hide the button (+ its
-      // result line), the chip alone says they're set up. Otherwise show it.
-      const inviteBtn = document.getElementById('dv-portal-invite-btn');
-      const inviteRes = document.getElementById('dv-portal-invite-result');
-      if (inviteBtn) inviteBtn.style.display = d.registered ? 'none' : '';
-      if (inviteRes && d.registered) inviteRes.textContent = '';
-      if (d.registered) {
-        chip.innerHTML = '<span style="color:var(--green-dark)">✓ Portal user</span>'
-          + (d.masked ? ' · ' + escapeHtml(d.masked) : '');
-      } else if (d.noEmail) {
-        chip.innerHTML = '<span style="color:var(--amber-700)">No email on file in Vergent</span>';
-      } else if (d.error) {
-        chip.textContent = '';
-      } else {
-        chip.innerHTML = '<span style="color:var(--muted)">Not registered yet</span>'
-          + (d.masked ? ' · ' + escapeHtml(d.masked) : '');
-      }
-    }).catch(function () { chip.textContent = ''; });
+      // Don't cache transport errors — keep showing the last good status.
+      if (!d.error) _portalStatusCache[key] = { d: d, at: Date.now() };
+      _renderPortalStatus(key, (_portalStatusCache[key] || { d: d }).d);
+    })
+    .catch(function () { /* keep the last rendered state */ })
+    .finally(function () { delete _portalStatusInflight[key]; });
 }
-function sendPortalInvite(fbId, cid) {
+function sendPortalInvite(fbId, cid, force) {
   const btn = document.getElementById('dv-portal-invite-btn');
   const res = document.getElementById('dv-portal-invite-result');
   if (!cid) { if (res) { res.textContent = 'No Vergent customer id.'; res.style.color = 'var(--red)'; } return; }
@@ -6044,18 +6075,34 @@ function sendPortalInvite(fbId, cid) {
   fetch('/api/send-registration', {
     method: 'POST', credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    // Operator-initiated invite: allow a re-send (the dedup gate is there to
-    // stop accidental auto/double sends, not a deliberate operator click).
-    body: JSON.stringify({ customer_id: cid, force_resend: true }),
+    // First click sends WITHOUT force so the server-side daily cap can
+    // answer: 1st of the day goes out, a 2nd asks the operator to
+    // confirm (we retry with force_resend), a 3rd+ is hard-blocked
+    // server-side (max 2/day per customer — force can't bypass).
+    body: JSON.stringify({ customer_id: cid, force_resend: !!force }),
   }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }).catch(function () { return { ok: r.ok, d: null }; }); })
     .then(function (x) {
       const d = x.d || {};
       if (btn) btn.disabled = false;
+      if (x.ok && d.limit_reached) {
+        const when = d.lastAt ? new Date(d.lastAt).toLocaleTimeString() : '';
+        if (res) { res.innerHTML = '<span style="color:var(--red);font-weight:700">Daily limit reached</span> — 2 invites already sent today' + (when ? ' (last at ' + escapeHtml(when) + ')' : '') + '. Try again tomorrow.'; }
+        return;
+      }
+      if (x.ok && d.confirm_resend) {
+        const when = d.lastAt ? new Date(d.lastAt).toLocaleTimeString() : '';
+        if (confirm('An invite was already sent to this customer today' + (when ? ' at ' + when : '') + '.\n\nSend one more? (Daily limit: 2 per customer)')) {
+          sendPortalInvite(fbId, cid, true);
+        } else if (res) {
+          res.innerHTML = '<span style="color:var(--amber-700)">Not re-sent — an invite already went out today.</span>';
+        }
+        return;
+      }
       if (x.ok && d.ok && d.duplicate) {
         if (res) { res.innerHTML = '<span style="color:var(--amber-700)">Already sent today (no duplicate sent).</span>'; }
       } else if (x.ok && d.ok) {
         if (res) { res.innerHTML = '<span style="color:var(--green-dark);font-weight:700">✓ Invite sent</span>'; }
-        setTimeout(function () { refreshPortalStatus(fbId, cid); }, 900);
+        setTimeout(function () { refreshPortalStatus(fbId, cid, true); }, 900);
       } else {
         if (res) { res.textContent = 'Failed: ' + (d.error || 'request error'); res.style.color = 'var(--red)'; }
       }
@@ -6153,13 +6200,23 @@ function renderProfilePanel(fbId) {
     const pms = m ? (m.status || '').toLowerCase() : '';
     const foundCid = (pms === 'found' && m && m.customerId) ? String(m.customerId) : '';
     if (foundCid) {
-      portalWrap.style.display = '';
+      // Only RESET the button/result when the applicant actually changed —
+      // renderProfilePanel re-runs constantly, and resetting on every pass
+      // (button popping back in, result line wiped, chip flashing
+      // "Checking…") is what made the section twitch.
+      const sameCid = portalWrap.getAttribute('data-cid') === foundCid;
+      if (portalWrap.style.display === 'none') portalWrap.style.display = '';
       portalWrap.setAttribute('data-cid', foundCid);
       const ib = document.getElementById('dv-portal-invite-btn');
-      // Default visible; refreshPortalStatus() hides it if already registered.
-      if (ib) { ib.disabled = false; ib.style.display = ''; ib.onclick = function () { sendPortalInvite(fbId, foundCid); }; }
+      if (ib) {
+        ib.disabled = false;
+        ib.onclick = function () { sendPortalInvite(fbId, foundCid); };
+        // Default visible on a NEW customer; refreshPortalStatus hides it
+        // (from cache, no flash) if they're already registered.
+        if (!sameCid) ib.style.display = '';
+      }
       const rr = document.getElementById('dv-portal-invite-result');
-      if (rr) { rr.textContent = ''; rr.style.color = 'var(--muted)'; }
+      if (rr && !sameCid) { rr.textContent = ''; rr.style.color = 'var(--muted)'; }
       refreshPortalStatus(fbId, foundCid);
     } else {
       portalWrap.style.display = 'none';
