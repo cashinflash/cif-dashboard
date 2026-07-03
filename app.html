@@ -3415,11 +3415,16 @@ function reviewQueue() {
 function reviewGroups() {
   const q = reviewQueue();
   const dec = a => (a.claudeDecision || '').trim().toLowerCase();
+  // Portal re-loans pinned as their own top group (operator rule
+  // 2026-07-03: every portal application is reviewed by hand, first).
+  const isPortal = a => _sourceOf(a) === 'portal_reloan';
+  const rest = q.filter(a => !isPortal(a));
   return {
     all: q,
-    fund: q.filter(a => dec(a).startsWith('appr')),                 // engine APPROVE → fund
-    review: q.filter(a => { const d = dec(a); return !d || d.startsWith('review'); }),
-    confirm: q.filter(a => dec(a).startsWith('decl')),              // engine DECLINE held for you
+    portal: q.filter(isPortal),                                     // pinned first — always manual
+    fund: rest.filter(a => dec(a).startsWith('appr')),              // engine APPROVE → fund
+    review: rest.filter(a => { const d = dec(a); return !d || d.startsWith('review'); }),
+    confirm: rest.filter(a => dec(a).startsWith('decl')),           // engine DECLINE held for you
   };
 }
 
@@ -3682,6 +3687,7 @@ function renderActionCenter() {
   };
 
   const _AUTO_BUCKET = { out_of_state: 'out-of-state', no_income: 'no income',
+                         below_income_floor: 'below income floor',
                          dead_balance: 'low balance / no survival' };
 
   const left =
@@ -3689,7 +3695,9 @@ function renderActionCenter() {
        Needs your review · ${g.all.length}</div>` +
     (g.all.length === 0
       ? '<div class="tbl-empty" style="padding:18px 22px">All caught up — nothing awaiting you 🎉</div>'
-      : (section('Ready to fund', 'var(--green)', g.fund, '💰', 'ok',
+      : (section('Portal re-loans — always yours', '#1a4d6b', g.portal, '🔁', 'ok',
+           a => a.v4ReasonLine || a.reason || 'Returning customer — manual review') +
+         section('Ready to fund', 'var(--green)', g.fund, '💰', 'ok',
            a => 'Engine: APPROVE' + (parseAmount(a.amount) ? ' $' + parseAmount(a.amount) : '')) +
          section('Needs a decision', 'var(--amber-700)', g.review, '🔎', 'warn',
            a => a.v4ReasonLine || a.reason || 'Review') +
@@ -4061,6 +4069,7 @@ function renderDetail(fbId) {
   const _by = a.humanActionBy || '';
   const _isAuto = _by === 'auto-system';
   const _AUTO_BUCKET = { out_of_state: 'out-of-state', no_income: 'no income',
+                         below_income_floor: 'below income floor',
                          dead_balance: 'low balance / no survival' };
   const _byLabel = _isAuto
     ? (' automatically by system' + (a.autoDeclineBucket
