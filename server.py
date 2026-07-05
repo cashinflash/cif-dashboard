@@ -1316,6 +1316,12 @@ class Handler(BaseHTTPRequestHandler):
             '/logo.png': ('static/logo.png', 'image/png', 86400),
             '/apple-touch-icon.png':
                 ('static/icons/apple-touch-icon.png', 'image/png', 86400),
+            '/apple-touch-icon-precomposed.png':
+                ('static/icons/apple-touch-icon.png', 'image/png', 86400),
+            '/apple-touch-icon-180x180.png':
+                ('static/icons/apple-touch-icon.png', 'image/png', 86400),
+            '/apple-touch-icon-180x180-precomposed.png':
+                ('static/icons/apple-touch-icon.png', 'image/png', 86400),
             '/static/icons/icon-192.png':
                 ('static/icons/icon-192.png', 'image/png', 86400),
             '/static/icons/icon-512.png':
