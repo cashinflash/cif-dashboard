@@ -104,7 +104,9 @@ self.addEventListener('fetch', (e) => {
       const cache = await caches.open(STATIC_CACHE);
       const hit = await cache.match(req);
       const refresh = fetch(req).then((resp) => {
-        if (resp.ok) cache.put(req, resp.clone());
+        // Google Fonts arrive as opaque (no-cors) responses — resp.ok
+        // is false for those but they are perfectly storable.
+        if (resp.ok || resp.type === 'opaque') cache.put(req, resp.clone());
         return resp;
       }).catch(() => hit);
       return hit || refresh;
