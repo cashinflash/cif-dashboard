@@ -3001,6 +3001,115 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(500, {'error': 'Login failed'})
 
 
+# ───────────────── gzip middleware (Render bandwidth fix, 2026-07) ─────────
+# Render bills OUTBOUND bandwidth and nothing here compressed anything —
+# the 60s reportsIndex polls alone shipped multiple GB/day of raw JSON.
+# This buffers each handler call's full response and gzips the body when
+# the client asked for gzip, the status is 200, the type is textual, and
+# it's >= 500 bytes. Everything else (and every client that didn't ask)
+# gets byte-identical output. DISABLE_GZIP=true is the kill switch.
+# NOTE: identical copy lives in cif-apply/gzip_mw.py (tested there in
+# tests/test_gzip_mw.py) — keep the two in sync.
+
+import gzip as _gzip_lib
+import io as _io_lib
+
+_GZ_MIN_BODY = 500
+_GZ_TEXTUAL = (b"text/", b"application/json", b"application/javascript",
+               b"application/xml", b"image/svg", b"application/x-ndjson")
+
+
+def compress_http_response(raw, accept_encoding):
+    """Rewrite one buffered HTTP/1.x response with a gzipped body, or
+    return it untouched when compression doesn't apply. Never raises."""
+    try:
+        if "gzip" not in (accept_encoding or "").lower():
+            return raw
+        if b"\r\n\r\n" not in raw:
+            return raw
+        head, body = raw.split(b"\r\n\r\n", 1)
+        if len(body) < _GZ_MIN_BODY:
+            return raw
+        lines = head.split(b"\r\n")
+        status_parts = lines[0].split()
+        if len(status_parts) < 2 or status_parts[1] != b"200":
+            return raw
+        ctype = b""
+        for ln in lines[1:]:
+            low = ln.lower()
+            if (low.startswith(b"content-encoding:")
+                    or low.startswith(b"transfer-encoding:")):
+                return raw
+            if low.startswith(b"content-type:"):
+                ctype = low
+        if not any(t in ctype for t in _GZ_TEXTUAL):
+            return raw
+        gz = _gzip_lib.compress(body, 6)
+        if len(gz) >= len(body):
+            return raw
+        out = [ln for ln in lines
+               if not ln.lower().startswith(b"content-length:")]
+        out.append(b"Content-Length: " + str(len(gz)).encode("ascii"))
+        out.append(b"Content-Encoding: gzip")
+        out.append(b"Vary: Accept-Encoding")
+        return b"\r\n".join(out) + b"\r\n\r\n" + gz
+    except Exception:
+        return raw
+
+
+def wrap_handler_method(method_fn, exclude_prefixes=()):
+    """Wrap a BaseHTTPRequestHandler do_* method: buffer everything it
+    writes, then send the (possibly gzipped) response in one shot. A
+    handler crash mid-response still flushes what was written first."""
+    def wrapped(self):
+        if (os.environ.get("DISABLE_GZIP") or "").strip().lower() in \
+                ("1", "true", "yes", "on"):
+            return method_fn(self)
+        path = getattr(self, "path", "") or ""
+        for p in exclude_prefixes:
+            if path.startswith(p):
+                return method_fn(self)
+        real = self.wfile
+        buf = _io_lib.BytesIO()
+        self.wfile = buf
+        try:
+            method_fn(self)
+        except Exception:
+            self.wfile = real
+            pending = buf.getvalue()
+            if pending:
+                try:
+                    real.write(pending)
+                    real.flush()
+                except Exception:
+                    pass
+            raise
+        self.wfile = real
+        raw = buf.getvalue()
+        if not raw:
+            return None
+        try:
+            ae = (self.headers.get("Accept-Encoding", "")
+                  if getattr(self, "headers", None) is not None else "")
+        except Exception:
+            ae = ""
+        out = compress_http_response(raw, ae)
+        try:
+            real.write(out)
+            real.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            # Client hung up mid-response — same outcome as before.
+            pass
+        return None
+    return wrapped
+
+
+Handler.do_GET = wrap_handler_method(Handler.do_GET)
+Handler.do_POST = wrap_handler_method(Handler.do_POST)
+print('[GZIP] response compression enabled (DISABLE_GZIP=true to turn off)',
+      flush=True)
+
+
 if __name__ == '__main__':
     print(f'CIF Dashboard on port {PORT}')
     print(f'Users configured: {sorted(USERS.keys())}')
