@@ -340,6 +340,33 @@ The full multi-phase plan lives at
 for the in-flight badge UX work. The open bugs above are the loose
 ends from Part J.
 
+## Mobile layer (2026-07 overhaul)
+
+app.html is now ~850 KB / ~15k lines (the "315 KB" notes above are
+stale — same Edit-small-diffs rule applies, doubly so).
+
+- **PWA app mode**: static/manifest.json + static/sw.js + static/icons/
+  (generated from the wordmark's F-bolt glyph). server.py serves them
+  pre-auth via the `_pub_static` exact-path map. sw.js is network-first
+  for navigations (deploys visible immediately), never touches /api|/fb,
+  only caches /app from a clean 200. Kill switch: unregister via
+  DevTools or bump VERSION in sw.js.
+- **Bottom tab bar** (<=600px): `.bottom-tabs` HTML after the mobile
+  subnav; active state synced in setRoute; More sheet = #more-sheet.
+  Top tab strips hidden on phones.
+- **Back-gesture/Escape modal closing**: the single hashchange listener
+  intercepts back-nav when an overlay is open; `_MOB_OVERLAYS` (end of
+  main script) maps overlay id -> bespoke close fn. ADD NEW MODALS TO
+  THIS LIST (inner-most first).
+- **Mobile table cards**: Payments/Funding/IF/Comms + contact queue in
+  the "MOBILE CARD PASS" CSS block; contact-queue tables carry
+  `cq-tbl`/`cq-plain` classes so the Loans Due card map can't scramble
+  them. New tables rendered into #rpt-table MUST get one of these
+  classes.
+- **Sheets**: `.appr-ov` family renders as bottom sheets <=600px.
+- The topnav height var is `calc(60px + env(safe-area-inset-top))` —
+  never hardcode 60px for offsets; use var(--topnav-h).
+
 ## Coordinating with cif-apply
 
 Many bugs span both repos (Bug 1 in particular). Read

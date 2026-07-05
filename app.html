@@ -8,6 +8,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#15803d">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CIF Admin">
 <style>
 :root{
   --green:#16a34a;--green-mid:#22c55e;--green-dark:#15803d;--green-deep:#14532d;
@@ -23,15 +30,15 @@
   --shadow-xs:0 1px 2px rgba(15,40,25,.04);
   --shadow-sm:0 1px 3px rgba(15,40,25,.06),0 1px 2px rgba(15,40,25,.04);
   --shadow-md:0 4px 12px rgba(15,40,25,.06),0 2px 4px rgba(15,40,25,.04);
-  --radius:12px;--topnav-h:60px;--rail-w:212px;
+  --radius:12px;--topnav-h:calc(60px + env(safe-area-inset-top,0px));--rail-w:212px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow-x:hidden;max-width:100vw;-webkit-text-size-adjust:100%;touch-action:pan-y}
+html,body{height:100%;overflow-x:hidden;max-width:100vw;-webkit-text-size-adjust:100%;touch-action:pan-y;-webkit-tap-highlight-color:transparent}
 body{background:var(--bg);font-family:var(--sans);color:var(--text);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
 button,input,select{font-family:inherit}
 
 /* TOP NAV — green gradient header */
-.topnav{position:fixed;top:0;left:0;right:0;z-index:200;height:var(--topnav-h);background:linear-gradient(180deg,var(--green-dark) 0%,var(--green) 100%);border-bottom:1px solid rgba(0,0,0,.08);box-shadow:0 1px 0 rgba(0,0,0,.05);display:flex;align-items:center;padding:0 22px;gap:18px}
+.topnav{position:fixed;top:0;left:0;right:0;z-index:200;height:var(--topnav-h);background:linear-gradient(180deg,var(--green-dark) 0%,var(--green) 100%);border-bottom:1px solid rgba(0,0,0,.08);box-shadow:0 1px 0 rgba(0,0,0,.05);display:flex;align-items:center;padding:env(safe-area-inset-top,0px) 22px 0;gap:18px}
 .brand{display:flex;align-items:center;gap:11px;flex-shrink:0;cursor:pointer;text-decoration:none}
 .brand-icon{width:36px;height:36px;border-radius:9px;object-fit:cover;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.4);background:white}
 .brand-img{display:block;height:24px;width:auto;max-width:160px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 1px 2px rgba(0,0,0,.18))}
@@ -1139,7 +1146,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   /* In-dashboard rail is hidden on mobile — the sticky global strip
      above takes its place across all views. */
   .subnav{display:none}
-  .topnav{padding:0 14px;gap:10px}
+  .topnav{padding:env(safe-area-inset-top,0px) 14px 0;gap:10px}
   /* Top nav is just three tabs now (Dashboard · Applications · Reports)
      so they fit on phone width; keep them visible. The icons drop on
      phones so labels still read; user-menu dropdown remains for
@@ -1194,9 +1201,9 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
      stays one tap away without crowding the tab row. --topnav-h is
      bumped to 116px on mobile so .shell / .main.full / .mobile-subnav
      all offset below the combined topnav + search-bar height. */
-  :root{--topnav-h:116px}
-  .topnav{padding:0 10px;gap:8px;height:60px}
-  .search-wrap{display:block;position:fixed;top:60px;left:0;right:0;z-index:91;background:var(--surface);padding:7px 10px;border-bottom:1px solid var(--border);box-shadow:0 1px 0 rgba(0,0,0,.04)}
+  :root{--topnav-h:calc(116px + env(safe-area-inset-top,0px))}
+  .topnav{padding:env(safe-area-inset-top,0px) 10px 0;gap:8px;height:calc(60px + env(safe-area-inset-top,0px))}
+  .search-wrap{display:block;position:fixed;top:calc(60px + env(safe-area-inset-top,0px));left:0;right:0;z-index:91;background:var(--surface);padding:7px 10px;border-bottom:1px solid var(--border);box-shadow:0 1px 0 rgba(0,0,0,.04)}
   .topnav-search{display:flex;width:100%;max-width:none;background:#f7faf8;border:1px solid var(--border);box-shadow:none;padding:9px 12px;border-radius:10px}
   .topnav-search input{font-size:14px;color:var(--text)}
   .topnav-search .icn{width:16px;height:16px;color:var(--muted)}
@@ -1356,6 +1363,150 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   /* Hide the verbose tail of the labels — see HTML markup */
   .dnl-long-label{display:none}
 }
+
+/* ═══ MOBILE CARD PASS (2026-07) — Payments / Funding / IF / Comms /
+   contact queues. Same card language as the Loans Due pattern above.
+   All rules are <=600px-scoped; desktop is untouched. The .cq-tbl /
+   .cq-plain classes also FIX an existing bug: the contact-queue and
+   legacy tables render into #rpt-table, where the 8-column Loans Due
+   card map used to scramble their 5-column layout on phones. ═══ */
+@media(max-width:600px){
+  /* Contact queue (upcoming tabs) — proper 5-col card. Specificity
+     .tbl.cq-tbl intentionally outguns the Loans Due #rpt-table .tbl
+     rules for every property they both touch. */
+  #rpt-table .tbl.cq-tbl tbody tr:not(.lns-sec){display:grid;grid-template-columns:1fr auto;column-gap:12px;row-gap:4px;padding:11px 14px;border-bottom:1px solid #f0f0f0;background:white;align-items:center}
+  #rpt-table .tbl.cq-tbl tbody tr:not(.lns-sec)>td{display:block;padding:0;border:none;line-height:1.35}
+  #rpt-table .tbl.cq-tbl tbody tr:not(.lns-sec)>td::before{content:none}
+  #rpt-table .tbl.cq-tbl tbody tr:not(.lns-sec)>td:nth-child(1){grid-column:1;grid-row:1;font-size:14.5px;font-weight:700;justify-self:start;min-width:0}
+  #rpt-table .tbl.cq-tbl tbody tr:not(.lns-sec)>td:nth-child(4){grid-column:2;grid-row:1;font-size:14.5px;font-weight:800;font-variant-numeric:tabular-nums;justify-self:end;text-align:right}
+  #rpt-table .tbl.cq-tbl tbody tr:not(.lns-sec)>td:nth-child(2){grid-column:1;grid-row:2;font-size:12px;color:var(--muted);justify-self:start;font-weight:400}
+  #rpt-table .tbl.cq-tbl tbody tr:not(.lns-sec)>td:nth-child(3){grid-column:1;grid-row:3;font-size:11px;color:var(--muted);justify-self:start}
+  #rpt-table .tbl.cq-tbl tbody tr:not(.lns-sec)>td:nth-child(5){grid-column:2;grid-row:2 / span 2;font-size:11.5px;color:var(--text2);justify-self:end;align-self:start;text-align:right}
+  /* Legacy renderers into #rpt-table: revert to a plain scrollable
+     table — display:table makes the inherited grid props inert. */
+  #rpt-table .tbl-card-scroll:has(.cq-plain){overflow-x:auto;max-height:none;-webkit-overflow-scrolling:touch}
+  #rpt-table .tbl.cq-plain{display:table;width:100%;min-width:640px}
+  #rpt-table .tbl.cq-plain thead{display:table-header-group}
+  #rpt-table .tbl.cq-plain tbody{display:table-row-group}
+  #rpt-table .tbl.cq-plain tbody tr:not(.lns-sec){display:table-row;padding:0}
+  #rpt-table .tbl.cq-plain tbody tr:not(.lns-sec)>td{display:table-cell;padding:8px 10px;border-bottom:1px solid var(--border-soft);font-size:12px;font-weight:400}
+  #rpt-table .tbl.cq-plain tbody tr:not(.lns-sec)>td:nth-child(6)::before{content:none}
+  #rpt-table .tbl.cq-plain tbody tr:not(.lns-sec)>td:nth-child(7){display:table-cell}
+
+  /* Payments -> cards: customer + amount up top, time/status next,
+     employee last; store hidden. Tap still opens the detail modal. */
+  #pay-table .tbl-card-scroll{max-height:none;overflow:visible;border-radius:10px}
+  #pay-table .tbl{display:block;width:100%}
+  #pay-table .tbl thead{display:none}
+  #pay-table .tbl tbody{display:block}
+  #pay-table .tbl tbody tr{display:grid;grid-template-columns:1fr auto;column-gap:12px;row-gap:4px;padding:11px 14px;border-bottom:1px solid #f0f0f0;background:white;align-items:center}
+  #pay-table .tbl tbody tr>td{display:block;padding:0;border:none;line-height:1.35}
+  #pay-table .tbl td:nth-child(2){grid-column:1;grid-row:1;font-size:14.5px;font-weight:700;min-width:0}
+  #pay-table .tbl td:nth-child(3){grid-column:2;grid-row:1;font-size:14.5px;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+  #pay-table .tbl td:nth-child(1){grid-column:1;grid-row:2;font-size:11px;color:var(--muted)}
+  #pay-table .tbl td:nth-child(4){grid-column:2;grid-row:2;justify-self:end}
+  #pay-table .tbl td:nth-child(5){grid-column:1;grid-row:3;font-size:11px;color:var(--muted)}
+  #pay-table .tbl td:nth-child(6){display:none}
+
+  /* Funding queue -> cards (id-scoped rules also outweigh the global
+     .tbl-card column hides, restoring Amount + actions on phones). */
+  #fund-table .tbl{display:block;width:100%}
+  #fund-table .tbl thead{display:none}
+  #fund-table .tbl tbody{display:block}
+  #fund-table .tbl tbody tr{display:grid;grid-template-columns:1fr auto;column-gap:12px;row-gap:4px;padding:11px 14px;border-bottom:1px solid #f0f0f0;background:white;align-items:center}
+  #fund-table .tbl tbody tr>td{display:block;padding:0;border:none;line-height:1.35}
+  #fund-table .tbl td:nth-child(2){grid-column:1;grid-row:1;font-size:14.5px;font-weight:700;min-width:0}
+  #fund-table .tbl td:nth-child(8){display:block;grid-column:2;grid-row:1;font-size:14.5px;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+  #fund-table .tbl td:nth-child(1){grid-column:1;grid-row:2;font-size:11px;color:var(--muted)}
+  #fund-table .tbl td:nth-child(4){grid-column:2;grid-row:2;justify-self:end}
+  #fund-table .tbl td:nth-child(5){display:block;grid-column:1;grid-row:3;font-size:11px;color:var(--muted)}
+  #fund-table .tbl td:nth-child(6){grid-column:1;grid-row:4;font-size:11px;color:var(--muted)}
+  #fund-table .tbl td:nth-child(9){grid-column:2;grid-row:3 / span 2;justify-self:end;align-self:center}
+  #fund-table .tbl td:nth-child(3),#fund-table .tbl td:nth-child(7){display:none}
+
+  /* Instant Funding -> cards; also restores Status + the View-card /
+     delete actions that the global hides removed on phones. */
+  #if-table .tbl{display:block;width:100%}
+  #if-table .tbl thead{display:none}
+  #if-table .tbl tbody{display:block}
+  #if-table .tbl tbody tr{display:grid;grid-template-columns:1fr auto;column-gap:12px;row-gap:4px;padding:11px 14px;border-bottom:1px solid #f0f0f0;background:white;align-items:center}
+  #if-table .tbl tbody tr>td{display:block;padding:0;border:none;line-height:1.35}
+  #if-table .tbl td:nth-child(1){grid-column:1;grid-row:1;font-size:14.5px;font-weight:700;min-width:0}
+  #if-table .tbl td:nth-child(5){display:block;grid-column:2;grid-row:1;justify-self:end}
+  #if-table .tbl td:nth-child(2){grid-column:1;grid-row:2;font-size:12px;color:var(--muted)}
+  #if-table .tbl td:nth-child(3){display:block;grid-column:2;grid-row:2;font-size:12px;color:var(--muted);justify-self:end}
+  #if-table .tbl td:nth-child(6){grid-column:1;grid-row:3;font-size:11px;color:var(--muted)}
+  #if-table .tbl td:nth-child(7){display:block;grid-column:2;grid-row:3;justify-self:end}
+  #if-table .tbl td:nth-child(4){display:none}
+
+  /* Communications -> cards: recipient + when, kind chip, subject
+     clamped to two lines. */
+  #comm-list .tbl-card-scroll{max-height:none;overflow:visible;border-radius:10px}
+  #comm-list .tbl{display:block;width:100%}
+  #comm-list .tbl thead{display:none}
+  #comm-list .tbl tbody{display:block}
+  #comm-list .tbl tbody tr{display:grid;grid-template-columns:1fr auto;column-gap:12px;row-gap:4px;padding:11px 14px;border-bottom:1px solid #f0f0f0;background:white;align-items:center}
+  #comm-list .tbl tbody tr>td{display:block;padding:0;border:none;line-height:1.35}
+  #comm-list .tbl td:nth-child(2){grid-column:1;grid-row:1;font-size:13.5px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #comm-list .tbl td:nth-child(4){grid-column:2;grid-row:1;font-size:11px;color:var(--muted);justify-self:end}
+  #comm-list .tbl td:nth-child(1){grid-column:1;grid-row:2;font-size:11px}
+  #comm-list .tbl td:nth-child(3){grid-column:1 / span 2;grid-row:3;font-size:12px;color:var(--text2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+  /* Backend-generated engine report tables: contained side-scroll
+     instead of stretching the page. */
+  .dv-report-html{overflow-x:auto;-webkit-overflow-scrolling:touch}
+}
+
+/* ═══ MOBILE NAV + SHEETS + TOUCH (2026-07) ═══ */
+.bottom-tabs{display:none}
+.more-sheet-ov{display:none;position:fixed;inset:0;z-index:520;background:rgba(0,0,0,.45)}
+@keyframes cifSheetUp{from{transform:translateY(48px);opacity:.5}to{transform:none;opacity:1}}
+@media(max-width:600px){
+  /* Bottom tab bar — thumb zone, safe-area aware, frosted. */
+  .bottom-tabs{position:fixed;left:0;right:0;bottom:0;z-index:300;display:grid;grid-template-columns:repeat(5,1fr);background:rgba(255,255,255,.96);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-top:1px solid var(--border);padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));box-shadow:0 -2px 12px rgba(15,40,25,.06)}
+  .bt-tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 2px;min-height:44px;border:none;background:none;font-family:inherit;font-size:10px;font-weight:600;color:var(--muted);text-decoration:none;border-radius:10px;cursor:pointer}
+  .bt-tab .icn{width:21px;height:21px;stroke-width:2}
+  .bt-tab.active{color:var(--green-dark)}
+  .bt-tab:active{transform:scale(.94)}
+  /* Content, toasts and floating bits clear the bar. */
+  .main{padding-bottom:calc(84px + env(safe-area-inset-bottom,0px)) !important}
+  .toast-wrap{left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom,0px));align-items:stretch}
+  /* The bar replaces both top tab strips on phones. */
+  .topnav-tabs{display:none !important}
+  .mobile-subnav{display:none !important}
+  /* More sheet */
+  .more-sheet-ov.open{display:flex;align-items:flex-end}
+  .more-sheet{background:white;width:100%;border-radius:16px 16px 0 0;padding:8px 14px calc(14px + env(safe-area-inset-bottom,0px));animation:cifSheetUp .22s ease}
+  .more-grab{width:40px;height:4px;border-radius:2px;background:var(--border2);margin:6px auto 12px}
+  .more-item{display:flex;align-items:center;gap:12px;padding:14px 10px;font-size:14.5px;font-weight:600;color:var(--text);text-decoration:none;border-radius:10px}
+  .more-item .icn{width:20px;height:20px;color:var(--green-dark)}
+  .more-item:active{background:var(--surface2)}
+
+  /* Bottom-sheet modals: the whole .appr-ov family (payment/loan
+     detail, schedule, approval, denial, override, create-loan, edit)
+     slides up from the bottom with a grab handle. */
+  .appr-ov,.dnl-ov{align-items:flex-end;padding:0}
+  .appr-ov .appr-card,.dnl-ov .dnl-card{max-width:100% !important;width:100%;border-radius:18px 18px 0 0 !important;max-height:92vh;max-height:92dvh;animation:cifSheetUp .22s ease;padding-bottom:env(safe-area-inset-bottom,0px)}
+  .appr-ov .appr-card::before,.dnl-ov .dnl-card::before{content:"";flex:none;width:40px;height:4px;border-radius:2px;background:var(--border2);margin:8px auto 0}
+
+  /* Comfortable touch targets. */
+  .btn{min-height:40px;padding:9px 14px}
+  .appr-actions .btn{min-height:44px}
+  .app-data-copy{padding:7px 12px;font-size:12px}
+  .note-chip-x{width:22px;height:22px}
+  .note-chip-edit,.vcd-btn,.appt-add-btn{padding:7px 11px}
+  /* The Plaid-PDF download chip is pinned by INLINE style (bottom:18px,
+     z-index 9999) — lift it above the tab bar; !important required. */
+  #plaid-pdf-chip{bottom:calc(76px + env(safe-area-inset-bottom,0px)) !important}
+}
+@media(hover:none){
+  /* Touch-only: stop pull-to-refresh from wiping scroll position. */
+  html,body{overscroll-behavior-y:contain}
+  /* Pressed-state feedback — :hover doesn't exist on touch. */
+  .btn:active{transform:scale(.97)}
+  .tbl tbody tr:active{background:var(--surface2)}
+  .more-item:active,.subnav-link:active{background:var(--surface2)}
+}
 </style>
 </head>
 <body data-firebase-id="">
@@ -1457,6 +1608,25 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   <a class="subnav-link" data-route="funding" href="#funding"><svg class="icn"><use href="#i-clock"/></svg>Funding Status</a>
   <a class="subnav-link" data-route="customers" href="#customers"><svg class="icn"><use href="#i-list"/></svg>Customers</a>
 </nav>
+
+<!-- MOBILE BOTTOM TAB BAR (<=600px) — thumb-zone navigation; replaces
+     both top tab strips on phones. More opens the sheet below. -->
+<nav class="bottom-tabs" id="bottom-tabs" aria-label="Primary">
+  <a class="bt-tab" data-route="queue" href="#queue"><svg class="icn"><use href="#i-list"/></svg><span>Queue</span></a>
+  <a class="bt-tab" data-route="reports" href="#reports"><svg class="icn"><use href="#i-clock"/></svg><span>Servicing</span></a>
+  <a class="bt-tab" data-route="payments" href="#payments"><svg class="icn"><use href="#i-bank"/></svg><span>Payments</span></a>
+  <a class="bt-tab" data-route="funding" href="#funding"><svg class="icn"><use href="#i-pipeline"/></svg><span>Funding</span></a>
+  <button class="bt-tab" id="bt-more" type="button" onclick="mobMoreOpen()"><svg class="icn"><use href="#i-dashboard"/></svg><span>More</span></button>
+</nav>
+<div class="more-sheet-ov" id="more-sheet" onclick="if(event.target===this)mobMoreClose()">
+  <div class="more-sheet">
+    <div class="more-grab"></div>
+    <a class="more-item" data-route="dashboard" href="#dashboard" onclick="mobMoreClose()"><svg class="icn"><use href="#i-overview"/></svg>Overview</a>
+    <a class="more-item" data-route="if" href="#if" onclick="mobMoreClose()"><svg class="icn"><use href="#i-zap"/></svg>Instant Funding</a>
+    <a class="more-item" data-route="communications" href="#communications" onclick="mobMoreClose()"><svg class="icn"><use href="#i-message"/></svg>Communications</a>
+    <a class="more-item" data-route="customers" href="#customers" onclick="mobMoreClose()"><svg class="icn"><use href="#i-user"/></svg>Customers</a>
+  </div>
+</div>
 
 <!-- DASHBOARD -->
 <div class="view active" id="view-dashboard">
@@ -3147,6 +3317,7 @@ function setRoute(name, fbId) {
   // Mirror the active state onto the mobile sticky sub-nav so the
   // current destination is visibly highlighted there too.
   document.querySelectorAll('.mobile-subnav .subnav-link[data-route]').forEach(t => t.classList.toggle('active', t.getAttribute('data-route') === name));
+  document.querySelectorAll('.bottom-tabs .bt-tab[data-route]').forEach(t => t.classList.toggle('active', t.getAttribute('data-route') === name));
   // Same for the desktop left-rail sidebars (includes the cloned
   // ones on Connections / Customers / Instant Funding).
   document.querySelectorAll('.subnav .subnav-link[data-route]').forEach(t => t.classList.toggle('active', t.getAttribute('data-route') === name));
@@ -3173,7 +3344,7 @@ function setRoute(name, fbId) {
   if (name !== 'payments' && typeof _payAutoStop === 'function') _payAutoStop();
   if (name !== 'funding' && typeof _fundAutoStop === 'function') _fundAutoStop();
   if (name === 'detail' && fbId) {
-    location.hash = '#fb=' + encodeURIComponent(fbId);
+    _navHash('#fb=' + encodeURIComponent(fbId));
   } else if (name === 'customers') {
     // The canonical sub-tab hash (#customers / #applinks / #portallinks) is
     // owned by setCustTab(), which was already called above. Do NOT re-write
@@ -3182,7 +3353,7 @@ function setRoute(name, fbId) {
     // visibly flickered #customers <-> #portal (and polluted history) on
     // every navigation into Customers.
   } else if (name !== 'detail') {
-    location.hash = '#' + name;
+    _navHash('#' + name);
   }
   window.scrollTo({top: 0});
 }
@@ -8738,14 +8909,37 @@ document.getElementById('sign-out').addEventListener('click', async () => {
   window.location.replace('/');
 });
 
+let _swallowNextHash = false;
+let _lastRouteHash = location.hash || '#queue';
+function _navHash(h) {
+  // Intentional (programmatic) hash write: never treat the resulting
+  // hashchange as a back gesture, and skip the redundant setRoute echo.
+  if (location.hash === h) return;
+  _swallowNextHash = true;
+  location.hash = h;
+}
 window.addEventListener('hashchange', () => {
+  if (_swallowNextHash) { _swallowNextHash = false; _lastRouteHash = location.hash; return; }
+  // Phone back gesture (or browser back) while a modal/sheet/drawer is
+  // open: close the overlay and stay on the current view by restoring
+  // the previous hash. A second back then navigates for real.
+  if (mobCloseTopOverlay()) {
+    if (location.hash !== _lastRouteHash) {
+      _swallowNextHash = true;
+      location.hash = _lastRouteHash;
+    }
+    return;
+  }
   const [route, fbId] = readRouteFromHash();
   setRoute(route, fbId);
+  _lastRouteHash = location.hash;
 });
 
 // Keyboard shortcuts: Esc back to queue, J/K nav between applicants when in detail
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && mobCloseTopOverlay()) { e.preventDefault(); return; }
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return;
+  if (_mobAnyOverlayOpen()) return; // no J/K view-jumps under an open modal
   const detailActive = document.getElementById('view-detail').classList.contains('active');
   if (e.key === 'Escape' && detailActive) { setRoute('queue'); return; }
   if (detailActive && (e.key === 'j' || e.key === 'k' || e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
@@ -9416,7 +9610,7 @@ function setCustTab(name) {
     doCustomerSearch('portal');  // empty-q → list-all from backend
   }
   // Mirror the section in the hash so the URL stays shareable.
-  if (location.hash !== '#customers') location.hash = '#customers';
+  _navHash('#customers');
 }
 
 async function doCustomerSearch(source, opts) {
@@ -9776,7 +9970,7 @@ function openCustomerInAdmin(email, btn) {
   if (!fbId) return;
   // Open the application detail the same way the code itself does (the
   // hashchange router maps #fb=<id> to the detail view + renderDetail).
-  location.hash = '#fb=' + encodeURIComponent(fbId);
+  _navHash('#fb=' + encodeURIComponent(fbId));
 }
 
 async function impersonateCustomer(btn, target) {
@@ -11390,7 +11584,7 @@ function renderContactQueue(rows) {
     const keys = Object.keys(probe).slice(0, 8);
     const head = keys.map(k => '<th>' + escapeHtml(k) + '</th>').join('');
     const body = list.slice(0, 300).map(r => '<tr>' + keys.map(k => '<td>' + escapeHtml(String(r[k] != null ? r[k] : '')) + '</td>').join('') + '</tr>').join('');
-    table.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Raw view — column names not mapped yet. Send your dev the field names above to finalize.</div><div class="tbl-card-scroll"><table class="tbl"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+    table.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Raw view — column names not mapped yet. Send your dev the field names above to finalize.</div><div class="tbl-card-scroll"><table class="tbl cq-plain"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
     return;
   }
 
@@ -11443,7 +11637,7 @@ function renderContactQueue(rows) {
       '<td>' + escapeHtml(dueFmt || '—') + '</td>' +
     '</tr>';
   }).join('');
-  table.innerHTML = '<div class="tbl-card-scroll"><table class="tbl"><thead><tr><th>Customer</th><th>Phone</th><th>Loan</th><th style="text-align:right">Amount</th><th>Due / Appt</th></tr></thead><tbody>' + body + '</tbody></table></div>';
+  table.innerHTML = '<div class="tbl-card-scroll"><table class="tbl cq-tbl"><thead><tr><th>Customer</th><th>Phone</th><th>Loan</th><th style="text-align:right">Amount</th><th>Due / Appt</th></tr></thead><tbody>' + body + '</tbody></table></div>';
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -13306,7 +13500,7 @@ function renderPastDueReport(rows) {
     </tr>`;
   }).join('');
 
-  table.innerHTML = `<div class="tbl-card-scroll"><table class="tbl">
+  table.innerHTML = `<div class="tbl-card-scroll"><table class="tbl cq-plain">
     <thead><tr>
       <th class="tbl-checkbox"></th>
       ${headHtml}
@@ -15242,6 +15436,78 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', _pastDueLoadView);
 } else {
   _pastDueLoadView();
+}
+
+/* ── MOBILE NAV + BACK-GESTURE LAYER (2026-07) ─────────────────────
+   mobCloseTopOverlay() closes the top-most open modal / sheet /
+   drawer via each one's own bespoke close function so their cleanup
+   runs. Consumers: the hashchange back-gesture interceptor, the
+   Escape key, and the More sheet. Ordered inner-most first so
+   stacked modals unwind naturally (e.g. schedule-payment closes
+   before the payment detail under it). */
+const _MOB_OVERLAYS = [
+  ['more-sheet', 'mobMoreClose'],
+  ['schp-ov', 'closeSchedulePaymentModal'],
+  ['rng-modal', 'closeRangeModal'],
+  ['appt-one-modal', 'closeApptOneModal'],
+  ['appt-day-modal', 'closeApptDayModal'],
+  ['appt-modal', 'closeApptModal'],
+  ['if-modal-ov', 'closeIFModal'],
+  ['cl-ov', 'closeCreateLoanModal'],
+  ['ccl-ov', 'closeCreateCustomerLoanModal'],
+  ['edit-ov', 'closeEditAppModal'],
+  ['dnl-ov', 'closeDenialModal'],
+  ['appr-ov', 'closeApprovalModal'],
+  ['ovr-ov', 'closeOverrideModal'],
+  ['comm-preview-modal', 'closeCommPreview'],
+  ['comm-test-modal', 'closeCommTestModal'],
+  ['mkt-modal', 'closeCampaignsModal'],
+  ['pay-ov', 'closePaymentDetailModal'],
+  ['lns-ov', 'closeLoansDueDetailModal'],
+  ['portal-plaid-drawer', 'closePortalPlaidDrawer'],
+  ['app-links-drawer', 'closeAppLinksDrawer'],
+];
+function _mobOverlayOpen(el) {
+  return !!el && (el.classList.contains('open') ||
+    (el.style && el.style.display && el.style.display !== 'none'));
+}
+function _mobAnyOverlayOpen() {
+  for (const pair of _MOB_OVERLAYS) {
+    if (_mobOverlayOpen(document.getElementById(pair[0]))) return true;
+  }
+  return false;
+}
+function mobCloseTopOverlay() {
+  for (const pair of _MOB_OVERLAYS) {
+    const el = document.getElementById(pair[0]);
+    if (!_mobOverlayOpen(el)) continue;
+    try {
+      if (typeof window[pair[1]] === 'function') window[pair[1]]();
+      else { el.classList.remove('open'); el.style.display = 'none'; }
+    } catch (err) {
+      el.classList.remove('open'); el.style.display = 'none';
+    }
+    return true;
+  }
+  return false;
+}
+function mobMoreOpen() {
+  const s = document.getElementById('more-sheet');
+  if (s) s.classList.add('open');
+}
+function mobMoreClose() {
+  const s = document.getElementById('more-sheet');
+  if (s) s.classList.remove('open');
+}
+</script>
+
+<script>
+/* Service worker: instant app launches + a clean offline screen.
+   Conservative by design (see static/sw.js) — never touches /api|/fb. */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/sw.js').catch(function () {});
+  });
 }
 </script>
 
