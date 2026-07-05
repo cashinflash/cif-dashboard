@@ -1522,6 +1522,12 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 @media(hover:none){
   /* Touch-only: stop pull-to-refresh from wiping scroll position. */
   html,body{overscroll-behavior-y:contain}
+  /* The OS paints the zones OUTSIDE the layout viewport (home-indicator
+     strip below the tab bar, top overscroll) with the page's root
+     background. Split the canvas: brand green up top (merges with the
+     header), white below (merges with the tab bar) — the "band" under
+     the bar disappears on every iPhone, present and future. */
+  html{background:linear-gradient(to bottom,#15803d 0%,#15803d 50%,#ffffff 50%,#ffffff 100%) fixed}
   /* Pressed-state feedback — :hover doesn't exist on touch. */
   .btn:active{transform:scale(.97)}
   .tbl tbody tr:active{background:var(--surface2)}
