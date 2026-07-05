@@ -1305,13 +1305,37 @@ class Handler(BaseHTTPRequestHandler):
             self.send_html(200, data)
             return
 
-        if path in ('/favicon.png', '/favicon.ico', '/apple-touch-icon.png', '/logo.png'):
-            fname = 'logo.png' if path == '/logo.png' else 'favicon.png'
-            data = read_file(os.path.join(DIR, 'static', fname))
+        # Public PWA/static assets (no auth — icons, manifest, service
+        # worker; nothing sensitive). Exact-path map, no arbitrary file
+        # reads. sw.js is no-cache so worker updates roll on deploy;
+        # /apple-touch-icon.png now serves the real 180px icon instead
+        # of the blurry 32px favicon.
+        _pub_static = {
+            '/favicon.png': ('static/favicon.png', 'image/png', 86400),
+            '/favicon.ico': ('static/favicon.png', 'image/png', 86400),
+            '/logo.png': ('static/logo.png', 'image/png', 86400),
+            '/apple-touch-icon.png':
+                ('static/icons/apple-touch-icon.png', 'image/png', 86400),
+            '/static/icons/icon-192.png':
+                ('static/icons/icon-192.png', 'image/png', 86400),
+            '/static/icons/icon-512.png':
+                ('static/icons/icon-512.png', 'image/png', 86400),
+            '/static/icons/apple-touch-icon.png':
+                ('static/icons/apple-touch-icon.png', 'image/png', 86400),
+            '/manifest.json':
+                ('static/manifest.json', 'application/manifest+json', 3600),
+            '/sw.js':
+                ('static/sw.js', 'application/javascript; charset=utf-8', 0),
+        }
+        if path in _pub_static:
+            rel, ctype, maxage = _pub_static[path]
+            data = read_file(os.path.join(DIR, *rel.split('/')))
             if data:
                 self.send_response(200)
-                self.send_header('Content-Type', 'image/png')
-                self.send_header('Cache-Control', 'public, max-age=86400')
+                self.send_header('Content-Type', ctype)
+                self.send_header(
+                    'Cache-Control',
+                    f'public, max-age={maxage}' if maxage else 'no-cache')
                 self.send_header('Content-Length', str(len(data)))
                 self.end_headers()
                 self.wfile.write(data)
