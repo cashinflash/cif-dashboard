@@ -1384,7 +1384,8 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   #rpt-table .tbl.cq-tbl tbody tr:not(.lns-sec)>td:nth-child(5){grid-column:2;grid-row:2 / span 2;font-size:11.5px;color:var(--text2);justify-self:end;align-self:start;text-align:right}
   /* Legacy renderers into #rpt-table: revert to a plain scrollable
      table — display:table makes the inherited grid props inert. */
-  #rpt-table .tbl.cq-plain{display:table;width:100%}
+  #rpt-table .tbl-card-scroll:has(.cq-plain){overflow-x:auto;max-height:none;-webkit-overflow-scrolling:touch}
+  #rpt-table .tbl.cq-plain{display:table;width:100%;min-width:640px}
   #rpt-table .tbl.cq-plain thead{display:table-header-group}
   #rpt-table .tbl.cq-plain tbody{display:table-row-group}
   #rpt-table .tbl.cq-plain tbody tr:not(.lns-sec){display:table-row;padding:0}
@@ -1494,9 +1495,9 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   .app-data-copy{padding:7px 12px;font-size:12px}
   .note-chip-x{width:22px;height:22px}
   .note-chip-edit,.vcd-btn,.appt-add-btn{padding:7px 11px}
-  /* The detail view's sticky bottom action bar rides ABOVE the new
-     tab bar instead of hiding behind it. */
-  .action-bar{bottom:calc(68px + env(safe-area-inset-bottom,0px))}
+  /* The Plaid-PDF download chip is pinned by INLINE style (bottom:18px,
+     z-index 9999) — lift it above the tab bar; !important required. */
+  #plaid-pdf-chip{bottom:calc(76px + env(safe-area-inset-bottom,0px)) !important}
 }
 @media(hover:none){
   /* Touch-only: stop pull-to-refresh from wiping scroll position. */
