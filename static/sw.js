@@ -83,9 +83,14 @@ self.addEventListener('fetch', (e) => {
         }
         return resp;
       } catch (err) {
-        const cache = await caches.open(SHELL_CACHE);
-        const shell = await cache.match('/app');
-        if (shell) return shell;
+        // Cached shell ONLY for the app itself — an offline hit on '/'
+        // (login) or any other page gets the offline screen instead of
+        // silently impersonating /app.
+        if (url.pathname === '/app' || url.pathname === '/app.html') {
+          const cache = await caches.open(SHELL_CACHE);
+          const shell = await cache.match('/app');
+          if (shell) return shell;
+        }
         return new Response(OFFLINE_HTML,
           { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
       }

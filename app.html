@@ -33,7 +33,7 @@
   --radius:12px;--topnav-h:calc(60px + env(safe-area-inset-top,0px));--rail-w:212px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow-x:hidden;max-width:100vw;-webkit-text-size-adjust:100%;touch-action:pan-y;overscroll-behavior-y:contain;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow-x:hidden;max-width:100vw;-webkit-text-size-adjust:100%;touch-action:pan-y;-webkit-tap-highlight-color:transparent}
 body{background:var(--bg);font-family:var(--sans);color:var(--text);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
 button,input,select{font-family:inherit}
 
@@ -1146,7 +1146,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   /* In-dashboard rail is hidden on mobile — the sticky global strip
      above takes its place across all views. */
   .subnav{display:none}
-  .topnav{padding:0 14px;gap:10px}
+  .topnav{padding:env(safe-area-inset-top,0px) 14px 0;gap:10px}
   /* Top nav is just three tabs now (Dashboard · Applications · Reports)
      so they fit on phone width; keep them visible. The icons drop on
      phones so labels still read; user-menu dropdown remains for
@@ -1201,9 +1201,9 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
      stays one tap away without crowding the tab row. --topnav-h is
      bumped to 116px on mobile so .shell / .main.full / .mobile-subnav
      all offset below the combined topnav + search-bar height. */
-  :root{--topnav-h:116px}
-  .topnav{padding:0 10px;gap:8px;height:60px}
-  .search-wrap{display:block;position:fixed;top:60px;left:0;right:0;z-index:91;background:var(--surface);padding:7px 10px;border-bottom:1px solid var(--border);box-shadow:0 1px 0 rgba(0,0,0,.04)}
+  :root{--topnav-h:calc(116px + env(safe-area-inset-top,0px))}
+  .topnav{padding:env(safe-area-inset-top,0px) 10px 0;gap:8px;height:calc(60px + env(safe-area-inset-top,0px))}
+  .search-wrap{display:block;position:fixed;top:calc(60px + env(safe-area-inset-top,0px));left:0;right:0;z-index:91;background:var(--surface);padding:7px 10px;border-bottom:1px solid var(--border);box-shadow:0 1px 0 rgba(0,0,0,.04)}
   .topnav-search{display:flex;width:100%;max-width:none;background:#f7faf8;border:1px solid var(--border);box-shadow:none;padding:9px 12px;border-radius:10px}
   .topnav-search input{font-size:14px;color:var(--text)}
   .topnav-search .icn{width:16px;height:16px;color:var(--muted)}
@@ -1374,21 +1374,23 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   /* Contact queue (upcoming tabs) — proper 5-col card. Specificity
      .tbl.cq-tbl intentionally outguns the Loans Due #rpt-table .tbl
      rules for every property they both touch. */
-  #rpt-table .tbl.cq-tbl tbody tr{display:grid;grid-template-columns:1fr auto;column-gap:12px;row-gap:4px;padding:11px 14px;border-bottom:1px solid #f0f0f0;background:white;align-items:center}
-  #rpt-table .tbl.cq-tbl tbody tr>td{display:block;padding:0;border:none;line-height:1.35}
-  #rpt-table .tbl.cq-tbl tbody tr>td::before{content:none}
-  #rpt-table .tbl.cq-tbl td:nth-child(1){grid-column:1;grid-row:1;font-size:14.5px;font-weight:700;justify-self:start;min-width:0}
-  #rpt-table .tbl.cq-tbl td:nth-child(4){grid-column:2;grid-row:1;font-size:14.5px;font-weight:800;font-variant-numeric:tabular-nums;justify-self:end}
-  #rpt-table .tbl.cq-tbl td:nth-child(2){grid-column:1;grid-row:2;font-size:12px;color:var(--muted);justify-self:start}
-  #rpt-table .tbl.cq-tbl td:nth-child(3){grid-column:1;grid-row:3;font-size:11px;color:var(--muted);justify-self:start}
-  #rpt-table .tbl.cq-tbl td:nth-child(5){grid-column:2;grid-row:2 / span 2;font-size:11.5px;color:var(--text2);justify-self:end;align-self:start;text-align:right}
+  #rpt-table .tbl.cq-tbl tbody tr:not(.lns-sec){display:grid;grid-template-columns:1fr auto;column-gap:12px;row-gap:4px;padding:11px 14px;border-bottom:1px solid #f0f0f0;background:white;align-items:center}
+  #rpt-table .tbl.cq-tbl tbody tr:not(.lns-sec)>td{display:block;padding:0;border:none;line-height:1.35}
+  #rpt-table .tbl.cq-tbl tbody tr:not(.lns-sec)>td::before{content:none}
+  #rpt-table .tbl.cq-tbl tbody tr:not(.lns-sec)>td:nth-child(1){grid-column:1;grid-row:1;font-size:14.5px;font-weight:700;justify-self:start;min-width:0}
+  #rpt-table .tbl.cq-tbl tbody tr:not(.lns-sec)>td:nth-child(4){grid-column:2;grid-row:1;font-size:14.5px;font-weight:800;font-variant-numeric:tabular-nums;justify-self:end;text-align:right}
+  #rpt-table .tbl.cq-tbl tbody tr:not(.lns-sec)>td:nth-child(2){grid-column:1;grid-row:2;font-size:12px;color:var(--muted);justify-self:start;font-weight:400}
+  #rpt-table .tbl.cq-tbl tbody tr:not(.lns-sec)>td:nth-child(3){grid-column:1;grid-row:3;font-size:11px;color:var(--muted);justify-self:start}
+  #rpt-table .tbl.cq-tbl tbody tr:not(.lns-sec)>td:nth-child(5){grid-column:2;grid-row:2 / span 2;font-size:11.5px;color:var(--text2);justify-self:end;align-self:start;text-align:right}
   /* Legacy renderers into #rpt-table: revert to a plain scrollable
      table — display:table makes the inherited grid props inert. */
   #rpt-table .tbl.cq-plain{display:table;width:100%}
   #rpt-table .tbl.cq-plain thead{display:table-header-group}
   #rpt-table .tbl.cq-plain tbody{display:table-row-group}
-  #rpt-table .tbl.cq-plain tbody tr{display:table-row;padding:0}
-  #rpt-table .tbl.cq-plain tbody tr>td{display:table-cell;padding:8px 10px;border-bottom:1px solid var(--border-soft);font-size:12px}
+  #rpt-table .tbl.cq-plain tbody tr:not(.lns-sec){display:table-row;padding:0}
+  #rpt-table .tbl.cq-plain tbody tr:not(.lns-sec)>td{display:table-cell;padding:8px 10px;border-bottom:1px solid var(--border-soft);font-size:12px;font-weight:400}
+  #rpt-table .tbl.cq-plain tbody tr:not(.lns-sec)>td:nth-child(6)::before{content:none}
+  #rpt-table .tbl.cq-plain tbody tr:not(.lns-sec)>td:nth-child(7){display:table-cell}
 
   /* Payments -> cards: customer + amount up top, time/status next,
      employee last; store hidden. Tap still opens the detail modal. */
@@ -1482,9 +1484,9 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   /* Bottom-sheet modals: the whole .appr-ov family (payment/loan
      detail, schedule, approval, denial, override, create-loan, edit)
      slides up from the bottom with a grab handle. */
-  .appr-ov{align-items:flex-end;padding:0}
-  .appr-ov .appr-card{max-width:100%;width:100%;border-radius:18px 18px 0 0;max-height:92vh;max-height:92dvh;animation:cifSheetUp .22s ease;padding-bottom:env(safe-area-inset-bottom,0px)}
-  .appr-ov .appr-card::before{content:"";flex:none;width:40px;height:4px;border-radius:2px;background:var(--border2);margin:8px auto 0}
+  .appr-ov,.dnl-ov{align-items:flex-end;padding:0}
+  .appr-ov .appr-card,.dnl-ov .dnl-card{max-width:100% !important;width:100%;border-radius:18px 18px 0 0 !important;max-height:92vh;max-height:92dvh;animation:cifSheetUp .22s ease;padding-bottom:env(safe-area-inset-bottom,0px)}
+  .appr-ov .appr-card::before,.dnl-ov .dnl-card::before{content:"";flex:none;width:40px;height:4px;border-radius:2px;background:var(--border2);margin:8px auto 0}
 
   /* Comfortable touch targets. */
   .btn{min-height:40px;padding:9px 14px}
@@ -1497,6 +1499,8 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   .action-bar{bottom:calc(68px + env(safe-area-inset-bottom,0px))}
 }
 @media(hover:none){
+  /* Touch-only: stop pull-to-refresh from wiping scroll position. */
+  html,body{overscroll-behavior-y:contain}
   /* Pressed-state feedback — :hover doesn't exist on touch. */
   .btn:active{transform:scale(.97)}
   .tbl tbody tr:active{background:var(--surface2)}
@@ -3339,7 +3343,7 @@ function setRoute(name, fbId) {
   if (name !== 'payments' && typeof _payAutoStop === 'function') _payAutoStop();
   if (name !== 'funding' && typeof _fundAutoStop === 'function') _fundAutoStop();
   if (name === 'detail' && fbId) {
-    location.hash = '#fb=' + encodeURIComponent(fbId);
+    _navHash('#fb=' + encodeURIComponent(fbId));
   } else if (name === 'customers') {
     // The canonical sub-tab hash (#customers / #applinks / #portallinks) is
     // owned by setCustTab(), which was already called above. Do NOT re-write
@@ -3348,7 +3352,7 @@ function setRoute(name, fbId) {
     // visibly flickered #customers <-> #portal (and polluted history) on
     // every navigation into Customers.
   } else if (name !== 'detail') {
-    location.hash = '#' + name;
+    _navHash('#' + name);
   }
   window.scrollTo({top: 0});
 }
@@ -8906,6 +8910,13 @@ document.getElementById('sign-out').addEventListener('click', async () => {
 
 let _swallowNextHash = false;
 let _lastRouteHash = location.hash || '#queue';
+function _navHash(h) {
+  // Intentional (programmatic) hash write: never treat the resulting
+  // hashchange as a back gesture, and skip the redundant setRoute echo.
+  if (location.hash === h) return;
+  _swallowNextHash = true;
+  location.hash = h;
+}
 window.addEventListener('hashchange', () => {
   if (_swallowNextHash) { _swallowNextHash = false; _lastRouteHash = location.hash; return; }
   // Phone back gesture (or browser back) while a modal/sheet/drawer is
@@ -8925,8 +8936,9 @@ window.addEventListener('hashchange', () => {
 
 // Keyboard shortcuts: Esc back to queue, J/K nav between applicants when in detail
 document.addEventListener('keydown', (e) => {
-  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return;
   if (e.key === 'Escape' && mobCloseTopOverlay()) { e.preventDefault(); return; }
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return;
+  if (_mobAnyOverlayOpen()) return; // no J/K view-jumps under an open modal
   const detailActive = document.getElementById('view-detail').classList.contains('active');
   if (e.key === 'Escape' && detailActive) { setRoute('queue'); return; }
   if (detailActive && (e.key === 'j' || e.key === 'k' || e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
@@ -9597,7 +9609,7 @@ function setCustTab(name) {
     doCustomerSearch('portal');  // empty-q → list-all from backend
   }
   // Mirror the section in the hash so the URL stays shareable.
-  if (location.hash !== '#customers') location.hash = '#customers';
+  _navHash('#customers');
 }
 
 async function doCustomerSearch(source, opts) {
@@ -9957,7 +9969,7 @@ function openCustomerInAdmin(email, btn) {
   if (!fbId) return;
   // Open the application detail the same way the code itself does (the
   // hashchange router maps #fb=<id> to the detail view + renderDetail).
-  location.hash = '#fb=' + encodeURIComponent(fbId);
+  _navHash('#fb=' + encodeURIComponent(fbId));
 }
 
 async function impersonateCustomer(btn, target) {
@@ -15457,6 +15469,12 @@ const _MOB_OVERLAYS = [
 function _mobOverlayOpen(el) {
   return !!el && (el.classList.contains('open') ||
     (el.style && el.style.display && el.style.display !== 'none'));
+}
+function _mobAnyOverlayOpen() {
+  for (const pair of _MOB_OVERLAYS) {
+    if (_mobOverlayOpen(document.getElementById(pair[0]))) return true;
+  }
+  return false;
 }
 function mobCloseTopOverlay() {
   for (const pair of _MOB_OVERLAYS) {
