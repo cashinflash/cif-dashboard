@@ -1240,9 +1240,24 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   .dv-rail{border-left:none;border-top:1px solid var(--border);padding:14px}
   /* Wide content stays inside its container — internal scroll only */
   .dv-report-html{padding:16px 14px;font-size:13px;border-radius:10px}
-  .dv-report-html table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;white-space:nowrap}
+  .dv-report-html table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;white-space:nowrap;min-width:0}
   .dv-report-html h1{font-size:16px}
-  .dv-report-html h2{font-size:11px}
+  .dv-report-html h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px}
+  /* ── PHASE 2: detail screens, phone-native ── */
+  .dv-mreport{display:block}
+  .dv-tabs{position:sticky;top:var(--topnav-h);z-index:60;box-shadow:0 2px 8px rgba(15,40,25,.05)}
+  .dv-tab{border:1px solid var(--border);border-radius:999px;background:var(--surface2);font-weight:700;min-height:38px}
+  .dv-tab.active{background:var(--green);border-color:var(--green);color:#fff}
+  .dv-hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
+  .dv-hero-stat{padding:9px 10px;min-width:0}
+  .qa-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .qa-grid .qa-btn{min-height:48px}
+  .qa-grid > div{grid-column:1 / -1}
+  #dv-app-data .app-data-section{cursor:pointer;display:flex;align-items:center;justify-content:space-between;-webkit-user-select:none;user-select:none}
+  #dv-app-data .app-data-section::after{content:"";width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .15s;margin-right:4px}
+  #dv-app-data .app-data-section.mob-collapsed::after{transform:rotate(-45deg)}
+  #dv-app-data .mob-row-hidden{display:none !important}
+  .dv-report-html .tier-breakdown{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--surface2)}
   /* Performance + snapshot tighten on phones */
   .perf{grid-template-columns:repeat(2,1fr)}
   .snap-grid{grid-template-columns:repeat(2,1fr);gap:8px}
@@ -1459,6 +1474,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 
 /* ═══ MOBILE NAV + SHEETS + TOUCH (2026-07) ═══ */
 .bottom-tabs{display:none}
+.dv-mreport{display:none}
 .more-sheet-ov{display:none;position:fixed;inset:0;z-index:520;background:rgba(0,0,0,.45)}
 @keyframes cifSheetUp{from{transform:translateY(48px);opacity:.5}to{transform:none;opacity:1}}
 @media(max-width:600px){
@@ -1966,6 +1982,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
             </div>
             <!-- Slim facts strip (verified income + bank) — replaced the old
                  7-card snapshot whose other 5 cards were dead v2 fields. -->
+            <div id="dv-mreport" class="dv-mreport"></div>
             <div id="dv-snap" style="margin-bottom:14px"></div>
             <div class="dv-report-html" id="dv-report-html"></div>
           </div>
@@ -4336,6 +4353,31 @@ function renderDetail(fbId) {
          ${fact('Bank',
             `<span style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(bankDisplay + acctType)}${bankVerified ? ' <span style="color:var(--green-dark);font-weight:800">✓</span>' : ''}</span>`)}
        </div>`;
+  }
+
+  // Mobile-only verdict card (Phase 2): the engine's decision, tier and
+  // reason as a phone-native card ABOVE the raw report HTML. Desktop
+  // never shows it (.dv-mreport is display:none outside <=600px).
+  const mrep = document.getElementById('dv-mreport');
+  if (mrep) {
+    const dec = String(a.claudeDecision || '').toUpperCase();
+    const amt = a.amount ? '$' + Number(a.amount).toLocaleString() : '';
+    const tier = a.v4Tier ? 'Tier ' + escapeHtml(String(a.v4Tier)) : '';
+    const reason = a.v4ReasonLine || a.reason || '';
+    const tone = dec === 'APPROVE'
+      ? ['var(--green-50)', 'var(--green-200)', 'var(--green-dark)']
+      : dec === 'DECLINE'
+        ? ['var(--red-50)', 'var(--red-200)', 'var(--red-700)']
+        : ['var(--amber-50)', 'var(--amber-200)', 'var(--amber-700)'];
+    mrep.innerHTML = dec
+      ? `<div style="background:${tone[0]};border:1px solid ${tone[1]};border-radius:12px;padding:14px 16px;margin-bottom:12px">
+           <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap">
+             <span style="font-size:22px;font-weight:800;letter-spacing:-.01em;color:${tone[2]}">${escapeHtml(dec)}${amt ? ' ' + escapeHtml(amt) : ''}</span>
+             ${tier ? `<span style="font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:${tone[2]};background:rgba(255,255,255,.6);padding:3px 9px;border-radius:999px">${tier}</span>` : ''}
+           </div>
+           ${reason ? `<div style="font-size:13px;line-height:1.5;color:var(--text2);margin-top:7px">${escapeHtml(reason)}</div>` : ''}
+         </div>`
+      : '';
   }
 
   // Decision-checks list removed — its right-rail slot now hosts
@@ -7339,6 +7381,11 @@ function _searchOpenKbd() {
 function switchDetailTab(name) {
   document.querySelectorAll('.dv-tab').forEach(t => t.classList.toggle('active', t.getAttribute('data-tab') === name));
   document.querySelectorAll('.dv-panel').forEach(p => p.classList.toggle('active', p.id === 'dv-panel-' + name));
+  // Phone chip strip: keep the active chip visible.
+  if (window.matchMedia('(max-width:600px)').matches) {
+    const t = document.querySelector('.dv-tab.active');
+    if (t && t.scrollIntoView) t.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  }
 }
 
 async function fbPatchReport(fbId, data) {
@@ -15467,6 +15514,19 @@ const _MOB_OVERLAYS = [
   ['portal-plaid-drawer', 'closePortalPlaidDrawer'],
   ['app-links-drawer', 'closeAppLinksDrawer'],
 ];
+// Phase 2: Application-tab sections collapse on tap (phones only).
+document.addEventListener('click', (e) => {
+  if (!window.matchMedia('(max-width:600px)').matches) return;
+  const sec = e.target.closest('.app-data-section');
+  if (!sec || sec.closest('#dv-app-data') === null) return;
+  const collapsed = sec.classList.toggle('mob-collapsed');
+  let n = sec.nextElementSibling;
+  while (n && !n.classList.contains('app-data-section')) {
+    n.classList.toggle('mob-row-hidden', collapsed);
+    n = n.nextElementSibling;
+  }
+});
+
 function _mobCloseById(id) {
   for (const pair of _MOB_OVERLAYS) {
     if (pair[0] !== id) continue;
