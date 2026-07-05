@@ -1484,6 +1484,12 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   /* Bottom tab bar — thumb zone, safe-area aware, frosted. */
   .bottom-tabs{position:fixed;left:0;right:0;bottom:0;z-index:300;display:grid;grid-template-columns:repeat(5,1fr);background:rgba(242,242,247,.94);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid rgba(0,0,0,.08);padding:5px 4px calc(2px + env(safe-area-inset-bottom,0px));box-shadow:none}
   .bottom-tabs::after{content:"";position:absolute;left:0;right:0;top:100%;height:200px;background:#f2f2f7}
+  /* iOS 26 lifts the layout viewport ABOVE the system bottom zone but
+     still reports safe-area-inset-bottom — padding for an indicator
+     that isn't inside the page = double space. _tuneBarInset() flags
+     the lifted state; the bar then keeps only a slim native pad. */
+  html.vp-lifted .bottom-tabs{padding-bottom:7px}
+  html.vp-lifted .main{padding-bottom:92px !important}
   .bt-tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 2px;min-height:44px;border:none;background:none;font-family:inherit;font-size:10px;font-weight:600;color:var(--muted);text-decoration:none;border-radius:10px;cursor:pointer}
   .bt-tab .icn{width:21px;height:21px;stroke-width:2}
   .bt-tab.active{color:var(--green-dark)}
@@ -15551,6 +15557,24 @@ function _mobCloseById(id) {
   }
   return false;
 }
+
+// iOS 26 double-space fix: when the layout viewport ends well above
+// the physical screen bottom (the OS reserved that zone for itself),
+// the home indicator is NOT inside the page — flag it so the tab bar
+// drops its env() padding. Any browser with bottom chrome measures
+// the same way (their toolbars cover the indicator), so this is safe
+// everywhere; classic edge-to-edge standalone keeps the env() pad.
+function _tuneBarInset() {
+  try {
+    const lifted = (screen.height - window.innerHeight) > 40;
+    document.documentElement.classList.toggle('vp-lifted', lifted);
+  } catch (err) { /* leave default padding */ }
+}
+_tuneBarInset();
+window.addEventListener('resize', _tuneBarInset);
+window.addEventListener('orientationchange', _tuneBarInset);
+window.addEventListener('pageshow', _tuneBarInset);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', _tuneBarInset);
 
 // Drag-to-dismiss for bottom sheets (<=600px): pull down from the top
 // (grab-handle zone) of any sheet to close it. Reuses the same close
