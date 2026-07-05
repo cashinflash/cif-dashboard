@@ -30,6 +30,9 @@
   --shadow: 0 16px 48px rgba(15, 68, 37, .22);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
+/* iOS 26 reserves a strip below the viewport and paints it with the
+   ROOT background — match the gradient's dark end so it blends. */
+html { background: #0f4425; }
 html, body { height: 100%; }
 body {
   background: linear-gradient(135deg, #0f4425 0%, #1a6b3c 50%, #0f4425 100%);
