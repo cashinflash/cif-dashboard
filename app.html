@@ -1191,7 +1191,10 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
      border radius + side borders, and dv-main pulls its padding in
      from 22-24 down to 12-13. */
   #view-detail .main.full{padding:calc(var(--topnav-h) + 12px) 6px 50px}
-  .detail-card{box-shadow:none;border-radius:0;border-left:none;border-right:none}
+  /* overflow:hidden (corner clipping) kills position:sticky for
+     everything inside — corners are already square on phones, so
+     release it and the section chips actually stick. */
+  .detail-card{box-shadow:none;border-radius:0;border-left:none;border-right:none;overflow:visible}
   .dv-main{padding:14px 13px 18px}
   .dv-rail{padding:14px 13px}
   .dv-tabs{padding:8px 6px}
