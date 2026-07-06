@@ -1098,15 +1098,13 @@ _MICROBILT_PANEL_HTML = ("""
   window.__microbiltPanelInit = true;
 
   function findFbId() {
+    // The detail route stamps the current applicant on <body> (setRoute:
+    // document.body.dataset.firebaseId) — '' when not on a detail view.
+    var b = document.body && document.body.dataset
+      ? document.body.dataset.firebaseId : '';
+    if (b) return b;
     var m = window.location.hash.match(/-O[A-Za-z0-9_-]{15,}/);
-    if (m) return m[0];
-    m = window.location.search.match(/[?&]id=(-O[A-Za-z0-9_-]{15,})/);
-    if (m) return m[1];
-    var el = document.querySelector('[data-firebase-id]:not([hidden])');
-    if (el) return el.getAttribute('data-firebase-id');
-    if (window.currentFirebaseId) return window.currentFirebaseId;
-    if (window.currentApp && window.currentApp.firebaseId) return window.currentApp.firebaseId;
-    return null;
+    return m ? m[0] : null;
   }
 
   function esc(s) {
@@ -1115,23 +1113,33 @@ _MICROBILT_PANEL_HTML = ("""
   }
 
   function getOrInsertCard(fbId) {
+    // Renders as a native right-rail section (the fixed sidebar on the
+    // applicant detail), directly below the Vergent section. The old
+    // anchors (.msticky / vergentpush-*) were deleted in the 2026-07
+    // detail overhaul — the .dv-rail is the stable home now.
     var id = 'microbilt-card-' + fbId;
     var card = document.getElementById(id);
     if (card) return card;
+    // One applicant at a time — drop cards left from other applicants.
+    document.querySelectorAll('[id^="microbilt-card-"]').forEach(function(el) {
+      el.parentNode && el.parentNode.removeChild(el);
+    });
     card = document.createElement('div');
     card.id = id;
-    // Preferred anchor: right after the Vergent card (same Report tab).
-    var vb = document.getElementById('vergent-badge-' + fbId);
-    if (vb && vb.parentNode) {
-      vb.parentNode.insertBefore(card, vb.nextSibling);
+    card.className = 'dv-rail-section';
+    var vg = document.getElementById('dv-rail-vergent');
+    if (vg && vg.parentNode) {
+      vg.parentNode.insertBefore(card, vg.nextSibling);
       return card;
     }
-    var sticky = document.querySelector('#detailBody .msticky');
-    if (sticky && sticky.parentNode) {
-      sticky.parentNode.insertBefore(card, sticky.nextSibling);
+    var rail = document.querySelector('.dv-rail');
+    if (rail) {
+      var danger = rail.querySelector('.dv-rail-danger');
+      if (danger) rail.insertBefore(card, danger);
+      else rail.appendChild(card);
       return card;
     }
-    return null;  // modal not rendered yet; next poll retries
+    return null;  // detail not rendered yet; next poll retries
   }
 
   function pill(cls, text, title) {
@@ -1192,9 +1200,11 @@ _MICROBILT_PANEL_HTML = ("""
       : '';
 
     card.innerHTML =
-      '<div class="v2chip"><div class="v2chip-hdr">Compliance &mdash; MLA + SSN</div>' +
-      '<div class="v2chip-row">' + pills + btn + '</div>' +
-      '<div class="mb-detail">' + detail + '</div></div>';
+      '<div class="dv-rail-title">Compliance <span style="font-weight:600;' +
+      'color:#6b7280;text-transform:none;letter-spacing:0">MLA + SSN</span></div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">' +
+      pills + btn + '</div>' +
+      '<div class="mb-detail">' + detail + '</div>';
 
     // Click any pill -> toggle the detail line (delegated; no inline JS).
     card.querySelectorAll('.mbpill').forEach(function(p) {

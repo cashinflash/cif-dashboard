@@ -216,7 +216,13 @@ prefer that anchor over the legacy push button.
 Second injected blob `_MICROBILT_PANEL_HTML` in server.py (same pattern as
 the Vergent panel; `inject_phase2_panel` appends both). Polls
 `/fb/reports/{id}/microbilt.json` (written by cif-apply's intake checks) and
-renders a "Compliance — MLA + SSN" card under the Vergent card: green
+renders a "Compliance" section in the detail view's RIGHT RAIL
+(`.dv-rail-section` inserted after `#dv-rail-vergent`; fbId comes from
+`document.body.dataset.firebaseId`, stamped by setRoute). NOTE: the 2026-07
+detail overhaul deleted the old anchors (`.msticky`, `vergentpush-*`) — the
+ORIGINAL injected Vergent panel (`_PHASE2_PANEL_HTML`) is vestigial now (the
+native `#dv-rail-vergent` card in app.html replaced it); don't anchor
+anything new to it. Pills: green
 pills for not-covered/verified, red for MLA COVERED BORROWER, orange for
 review-class results (click any pill = toggle the verbatim detail line),
 gray for docs-form skips. "Re-run checks" button POSTs
