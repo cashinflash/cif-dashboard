@@ -1425,6 +1425,82 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': 'firebase_proxy_failed'})
             return
 
+        # ─── Communications: light email list ─────────────────────
+        # /api/comms-list?limit=200&before=<ms> — newest-first /emailLog
+        # entries WITHOUT rendered_html/replacements (~25 KB per record;
+        # the page used to download the ENTIRE log, bodies included).
+        # Bodies now load one-at-a-time via /fb/emailLog/{id}/
+        # rendered_html.json when a preview opens. Prefers an indexed
+        # Firebase query (add {"emailLog": {".indexOn": "sent_at"}} to
+        # the DB rules for constant-time); transparently falls back to
+        # a server-side full fetch + sort when the index is missing —
+        # the browser payload stays tiny either way.
+        if path == '/api/comms-list':
+            if not valid_session(token):
+                self.send_json(401, {'error': 'Unauthorized'}); return
+            from urllib.parse import parse_qs, urlparse
+            q = parse_qs(urlparse(self.path).query)
+            try:
+                limit = max(1, min(int(q.get('limit', ['200'])[0]), 500))
+            except (TypeError, ValueError):
+                limit = 200
+            try:
+                before = int(q.get('before', ['0'])[0])
+            except (TypeError, ValueError):
+                before = 0
+            light_fields = ('kind', 'to_email', 'to_name', 'subject',
+                            'sent_at', 'status', 'error', 'customer_id',
+                            'loan_id', 'amount', 'test', 'auto', 'sender',
+                            'due_date', 'days_late')
+            data, indexed = None, True
+            try:
+                fbq = f'emailLog.json?orderBy=%22sent_at%22&limitToLast={limit}'
+                if before:
+                    fbq += f'&endAt={before - 1}'
+                with urllib.request.urlopen(_fb_url(fbq), timeout=20) as r:
+                    data = json.loads(r.read() or b'null')
+            except Exception:
+                indexed = False
+            if not indexed:
+                try:
+                    with urllib.request.urlopen(_fb_url('emailLog.json'),
+                                                timeout=45) as r:
+                        data = json.loads(r.read() or b'null')
+                except Exception:
+                    self.send_json(500, {'error': 'firebase_fetch_failed'})
+                    return
+            data = data if isinstance(data, dict) else {}
+            entries = []
+            for _id, v in data.items():
+                if not isinstance(v, dict):
+                    continue
+                sent = v.get('sent_at') or 0
+                if before and not indexed and sent >= before:
+                    continue
+                e = {k: v.get(k) for k in light_fields if k in v}
+                e['_id'] = _id
+                e['has_html'] = bool(v.get('rendered_html'))
+                entries.append(e)
+            entries.sort(key=lambda e: e.get('sent_at') or 0, reverse=True)
+            entries = entries[:limit]
+            self.send_json(200, {'ok': True, 'entries': entries,
+                                 'indexed': indexed, 'count': len(entries)})
+            return
+
+        # ─── Payment reminders: status card (proxy to cif-apply) ──
+        if path == '/api/reminders-status':
+            if not valid_session(token):
+                self.send_json(401, {'error': 'Unauthorized'}); return
+            try:
+                with urllib.request.urlopen(
+                        'https://cif-apply.onrender.com/api/reminders-status',
+                        timeout=15) as r:
+                    body = r.read()
+                self.send_json(200, json.loads(body))
+            except Exception as e:
+                self.send_json(502, {'error': str(e)})
+            return
+
         # ─── Instant-Funding vault — staff views ─────────────────
         # The standalone /if and /if/view/<id> HTML pages were removed
         # in favor of a native tab inside the main dashboard (app.html
@@ -1891,7 +1967,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
-        if path in ('/api/send-returned-payment', '/api/send-thank-you-payment', '/api/send-approval', '/api/send-card-failed', '/api/send-card-request', '/api/send-google-review', '/api/send-trustpilot-review'):
+        if path in ('/api/send-returned-payment', '/api/send-thank-you-payment', '/api/send-approval', '/api/send-card-failed', '/api/send-card-request', '/api/send-google-review', '/api/send-trustpilot-review', '/api/run-reminders-sweep', '/api/reminders-samples'):
             try:
                 import urllib.request as ur
                 req = ur.Request('https://cif-apply.onrender.com' + path,

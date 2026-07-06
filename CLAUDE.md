@@ -367,6 +367,30 @@ stale — same Edit-small-diffs rule applies, doubly so).
 - The topnav height var is `calc(60px + env(safe-area-inset-top))` —
   never hardcode 60px for offsets; use var(--topnav-h).
 
+## Communications page (2026-07 perf fix)
+
+The list loads via `GET /api/comms-list?limit=200[&before=<ms>]`
+(server.py, right after the /fb/ GET proxy) — newest-first /emailLog
+entries WITHOUT `rendered_html`/`replacements`. Never go back to
+fetching the whole /emailLog node client-side: every record carries
+~25 KB of rendered email HTML and the node grows forever. The endpoint
+tries an indexed Firebase query first (needs `{"emailLog": {".indexOn":
+"sent_at"}}` in the DB rules; constant-time) and falls back to a
+server-side full fetch + strip when the index is missing — browser
+payload is tiny either way. Preview bodies lazy-load per email via
+`/fb/emailLog/{id}/rendered_html.json` in `openCommPreview` and are
+cached on the entry. "Load older emails" pages back with `before=`.
+
+The Payment Reminders card on this page (`#rem-card`) shows mode/last
+sweep from `GET /api/reminders-status` and has two always-safe buttons:
+"Email me the samples" (`POST /api/reminders-samples`) and "Run dry-run
+sweep" (`POST /api/run-reminders-sweep` — backend forces dry_run unless
+the cif-apply env is already live). All three proxy to cif-apply — see
+cif-apply/CLAUDE.md "Payment reminders" for the backend. Reminder kinds
+(`reminder_*`) have entries in `_COMM_KIND_LABELS`/`_COMM_KIND_COLORS`
+and a grouped "Reminders" filter chip (startsWith match in
+renderCommunications).
+
 ## Coordinating with cif-apply
 
 Many bugs span both repos (Bug 1 in particular). Read
