@@ -211,6 +211,24 @@ function (search for `applicationModal` or similar) to find a stable
 anchor. Then update `getOrInsertBadge()` in `_PHASE2_PANEL_HTML` to
 prefer that anchor over the legacy push button.
 
+## MicroBilt compliance pills (MLA + SSN, 2026-07-06)
+
+Second injected blob `_MICROBILT_PANEL_HTML` in server.py (same pattern as
+the Vergent panel; `inject_phase2_panel` appends both). Polls
+`/fb/reports/{id}/microbilt.json` (written by cif-apply's intake checks) and
+renders a "Compliance — MLA + SSN" card under the Vergent card: green
+pills for not-covered/verified, red for MLA COVERED BORROWER, orange for
+review-class results (click any pill = toggle the verbatim detail line),
+gray for docs-form skips. "Re-run checks" button POSTs
+`/api/microbilt-recheck` (proxy in server.py → cif-apply, 60s timeout).
+`microbiltSummary` is in `_INDEX_TOP_FIELDS` (lock-step with cif-apply) and
+appends to the queue-row subtitle — '' when clean, so silence = clean.
+DENIAL_REASONS gained "Unable to offer this loan product to MLA covered
+borrowers" at index 13 — **_denialPrecheck references reasons BY INDEX;
+only ever APPEND to that list, never insert.** The precheck pre-ticks 13
+when `record.microbilt.mla.covered === true`. Backend details:
+cif-apply/CLAUDE.md "MicroBilt intake checks".
+
 ## v4 dashboard changes (spec §8 — docs/v4_spec.md in cif-apply)
 
 Landed on `claude/epic-davinci-cdufn9` alongside the cif-apply engine_v4

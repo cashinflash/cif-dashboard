@@ -3915,6 +3915,7 @@ function renderActionCenter() {
 
   const _AUTO_BUCKET = { out_of_state: 'out-of-state', no_income: 'no income',
                          below_income_floor: 'below income floor',
+                         mla_covered: 'MLA covered borrower',
                          dead_balance: 'low balance / no survival' };
 
   const left =
@@ -4137,7 +4138,11 @@ function renderQueue() {
     // §8.5: one-sentence engine reason as the row subtitle so the queue
     // is scannable without opening modals. v4ReasonLine when the v4
     // shadow has run; falls back to the canonical engine reason.
-    const subReason = a.v4ReasonLine || a.reason || '';
+    // microbiltSummary ('' when clean) appends MLA/SSN flags so identity
+    // issues are visible before opening the modal — silence = clean.
+    const mbFlag = a.microbiltSummary || '';
+    const subReason = (a.v4ReasonLine || a.reason || '') +
+      (mbFlag ? ' · ' + mbFlag : '');
     rows.push(`<tr data-fb="${escapeHtml(a.firebaseId)}">
       <td><div class="applicant"><input type="checkbox" class="queue-sel-cb" data-fb="${escapeHtml(a.firebaseId)}" title="Select for bulk action"><div class="av">${escapeHtml(initials(a.name))}</div><div class="applicant-text"><div class="applicant-name">${escapeHtml(a.name || 'Unnamed')} ${sourceBadge(a)}</div><div class="applicant-id">#${escapeHtml(idShort)}</div></div></div></td>
       <td><div class="app-info"><div class="app-type">${escapeHtml(appType)}</div><div class="app-meta">${escapeHtml(appMeta)}</div>${subReason ? `<div class="app-meta" style="max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(subReason)}">${escapeHtml(subReason)}</div>` : ''}</div></td>
@@ -4297,6 +4302,7 @@ function renderDetail(fbId) {
   const _isAuto = _by === 'auto-system';
   const _AUTO_BUCKET = { out_of_state: 'out-of-state', no_income: 'no income',
                          below_income_floor: 'below income floor',
+                         mla_covered: 'MLA covered borrower',
                          dead_balance: 'low balance / no survival' };
   const _byLabel = _isAuto
     ? (' automatically by system' + (a.autoDeclineBucket
@@ -7489,7 +7495,10 @@ const DENIAL_REASONS = [
   "Bank statement outside acceptable window",
   "Excessive speculative activity",
   "Inability to demonstrate repayment without hardship",
-  "Incomplete or unreadable bank statement"
+  "Incomplete or unreadable bank statement",
+  // APPENDED (2026-07-06): _denialPrecheck references reasons BY INDEX
+  // (0-12 above) — new reasons must only ever be appended, never inserted.
+  "Unable to offer this loan product to MLA covered borrowers"  // index 13
 ];
 // Legacy/canonical fallback only — v4 declines pre-check from the
 // STRUCTURED gate data instead (see _denialPrecheck). Generic tokens
@@ -7520,6 +7529,11 @@ const DENIAL_KEYWORD_MAP = [
 // "Insufficient income" on declines that had verified income).
 function _denialPrecheck(a) {
   const auto = new Set();
+  // MLA covered borrower (MicroBilt check, not an engine gate): pre-tick
+  // reason 13 so a manual decline of a covered borrower emails the right
+  // reason even when the auto-decline bucket isn't armed.
+  const _mla = (a.microbilt && a.microbilt.mla) || null;
+  if (_mla && _mla.covered === true) auto.add(13);
   let gates = null;
   try { gates = a.v4GatesJson ? JSON.parse(a.v4GatesJson) : null; } catch (e) {}
   if ((a.v4Decision || '').toUpperCase() === 'DECLINE' && Array.isArray(gates)) {

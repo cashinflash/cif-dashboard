@@ -38,6 +38,9 @@ _INDEX_TOP_FIELDS = (
     # humanActionBy/autoDeclineBucket: so the queue can badge auto-declines.
     'v4ReasonLine', 'v4Decision', 'v4Tier', 'humanAction',
     'humanActionBy', 'autoDeclineBucket',
+    # MicroBilt MLA/SSN checks (2026-07-06): queue-row subtitle flag.
+    # '' = clean/unchecked; keep lock-step with cif-apply run_server.py.
+    'microbiltSummary',
 )
 _INDEX_APPDATA_FIELDS = ('email', 'phone', 'firstName', 'lastName')
 
@@ -1063,6 +1066,181 @@ _PHASE2_PANEL_HTML = ("""
 """).encode("utf-8")
 
 
+# ── MicroBilt compliance pills (MLA + SSN-name, 2026-07-06) ──────────────
+# Second injected blob, same pattern as the Vergent panel above. Reads
+# /fb/reports/{id}/microbilt.json (written by cif-apply's intake checks)
+# and renders two status pills in a card right below the Vergent card.
+# Clean results are quiet (green); review-class results carry the verbatim
+# MicroBilt description + a "Re-run checks" button that POSTs
+# /api/microbilt-recheck (proxied to cif-apply). Reuses the .v2chip card
+# chrome classes from the Vergent panel's <style> block.
+_MICROBILT_PANEL_HTML = ("""
+<style>
+  .mbpill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 6px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 700; letter-spacing: .02em;
+    border: 1px solid; white-space: nowrap; cursor: pointer;
+    font-family: inherit;
+  }
+  .mbpill-ok     { background:#e8f5ee; color:#1a6b3c; border-color:#9fd8b5; }
+  .mbpill-bad    { background:#fde7e7; color:#5a0d0d; border-color:#f0a8a8; }
+  .mbpill-warn   { background:#fff5e6; color:#5a3300; border-color:#ffd9a3; }
+  .mbpill-off    { background:#f3f4f6; color:#6b7280; border-color:#d1d5db; }
+  .mb-detail {
+    font-size: 11px; color: #6b7280; margin-top: 6px; line-height: 1.5;
+    display: none;
+  }
+</style>
+<script>
+(function() {
+  if (window.__microbiltPanelInit) return;
+  window.__microbiltPanelInit = true;
+
+  function findFbId() {
+    var m = window.location.hash.match(/-O[A-Za-z0-9_-]{15,}/);
+    if (m) return m[0];
+    m = window.location.search.match(/[?&]id=(-O[A-Za-z0-9_-]{15,})/);
+    if (m) return m[1];
+    var el = document.querySelector('[data-firebase-id]:not([hidden])');
+    if (el) return el.getAttribute('data-firebase-id');
+    if (window.currentFirebaseId) return window.currentFirebaseId;
+    if (window.currentApp && window.currentApp.firebaseId) return window.currentApp.firebaseId;
+    return null;
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function getOrInsertCard(fbId) {
+    var id = 'microbilt-card-' + fbId;
+    var card = document.getElementById(id);
+    if (card) return card;
+    card = document.createElement('div');
+    card.id = id;
+    // Preferred anchor: right after the Vergent card (same Report tab).
+    var vb = document.getElementById('vergent-badge-' + fbId);
+    if (vb && vb.parentNode) {
+      vb.parentNode.insertBefore(card, vb.nextSibling);
+      return card;
+    }
+    var sticky = document.querySelector('#detailBody .msticky');
+    if (sticky && sticky.parentNode) {
+      sticky.parentNode.insertBefore(card, sticky.nextSibling);
+      return card;
+    }
+    return null;  // modal not rendered yet; next poll retries
+  }
+
+  function pill(cls, text, title) {
+    return '<span class="mbpill ' + cls + '" title="' + esc(title || '') + '">' +
+           text + '</span>';
+  }
+
+  function fmtDate(ms) {
+    try { return new Date(ms).toLocaleDateString(); } catch (e) { return ''; }
+  }
+
+  function render(node, fbId) {
+    var card = getOrInsertCard(fbId);
+    if (!card) return;
+    var mla = (node && node.mla) || null;
+    var ssn = (node && node.ssn) || null;
+    var pills = '', detail = '', needsRerun = false;
+
+    if (!mla && !ssn) {
+      pills += pill('mbpill-off', 'MLA + SSN: no check on record', '');
+      needsRerun = true;
+    } else {
+      if (mla) {
+        if (mla.decision === 'proceed') {
+          pills += pill('mbpill-ok', 'MLA: Not covered &#10003;', mla.text);
+        } else if (mla.decision === 'decline') {
+          pills += pill('mbpill-bad', 'MLA: COVERED BORROWER', mla.text);
+        } else if (mla.decision === 'skipped') {
+          pills += pill('mbpill-off', 'MLA: not checked', mla.skipReason || '');
+        } else {
+          pills += pill('mbpill-warn', 'MLA: check failed', mla.text);
+          needsRerun = true;
+        }
+        detail += 'MLA: ' + esc(mla.text || mla.skipReason || mla.decision) +
+                  (mla.checkedAt ? ' &middot; checked ' + fmtDate(mla.checkedAt) : '') + '<br>';
+      }
+      if (ssn) {
+        if (ssn.decision === 'pass') {
+          pills += pill('mbpill-ok', 'SSN: Verified &#10003;' +
+            (ssn.cached ? ' (' + fmtDate(ssn.checkedAt) + ')' : ''), ssn.description);
+        } else if (ssn.decision === 'skipped') {
+          pills += pill('mbpill-off', 'SSN: not checked', ssn.skipReason || '');
+        } else {
+          var short = /match/i.test(ssn.description || '') ? 'Partial match' : 'Needs review';
+          pills += pill('mbpill-warn', 'SSN: ' + short, ssn.description);
+          needsRerun = true;
+        }
+        detail += 'SSN: ' + esc(ssn.description || ssn.skipReason || ssn.decision) +
+                  (ssn.checkedAt ? ' &middot; checked ' + fmtDate(ssn.checkedAt) : '');
+      }
+    }
+
+    var btn = needsRerun
+      ? '<button data-mb-act="rerun" style="background:#e8f3f8;color:#1a4d6b;' +
+        'border:1px solid #6cb1e2;padding:6px 10px;border-radius:8px;' +
+        'font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">' +
+        'Re-run checks</button>'
+      : '';
+
+    card.innerHTML =
+      '<div class="v2chip"><div class="v2chip-hdr">Compliance &mdash; MLA + SSN</div>' +
+      '<div class="v2chip-row">' + pills + btn + '</div>' +
+      '<div class="mb-detail">' + detail + '</div></div>';
+
+    // Click any pill -> toggle the detail line (delegated; no inline JS).
+    card.querySelectorAll('.mbpill').forEach(function(p) {
+      p.onclick = function() {
+        var d = card.querySelector('.mb-detail');
+        if (d) d.style.display = d.style.display === 'block' ? 'none' : 'block';
+      };
+    });
+
+    var rerun = card.querySelector('[data-mb-act="rerun"]');
+    if (rerun) rerun.onclick = function() {
+      rerun.disabled = true; rerun.textContent = 'Running…';
+      fetch('/api/microbilt-recheck', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ firebase_id: fbId }),
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(d) { render((d && d.microbilt) || null, fbId); })
+        .catch(function() { rerun.disabled = false; rerun.textContent = 'Re-run checks'; });
+    };
+  }
+
+  function poll() {
+    if (document.visibilityState && document.visibilityState !== 'visible') return;
+    var fbId = findFbId();
+    if (!fbId) return;
+    var now = Date.now();
+    if (window.__microbiltLastFbId === fbId
+        && (now - (window.__microbiltLastFetch || 0)) < 30000) return;
+    window.__microbiltLastFbId = fbId;
+    window.__microbiltLastFetch = now;
+    fetch('/fb/reports/' + fbId + '/microbilt.json', { credentials: 'same-origin' })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(node) { render(node, fbId); })
+      .catch(function() {});
+  }
+
+  setInterval(poll, 2000);
+  setTimeout(poll, 1200);
+})();
+</script>
+""").encode("utf-8")
+
+
 # Messages panel removed 2026-05-30. Vergent has no working partner API
 # for outbound SMS, no working read endpoint, and X-Frame-Options blocks
 # embedding their UI. Per-applicant SMS work pauses until Vergent fixes
@@ -1077,11 +1255,12 @@ def inject_phase2_panel(html_bytes: bytes) -> bytes:
     sentinel is found (defensive — modern HTML always has one)."""
     if not html_bytes:
         return html_bytes
+    blob = _PHASE2_PANEL_HTML + _MICROBILT_PANEL_HTML
     closing = b'</body>'
     idx = html_bytes.rfind(closing)
     if idx < 0:
-        return html_bytes + _PHASE2_PANEL_HTML
-    return html_bytes[:idx] + _PHASE2_PANEL_HTML + html_bytes[idx:]
+        return html_bytes + blob
+    return html_bytes[:idx] + blob + html_bytes[idx:]
 
 
 # CORS: restrict to same-origin. The dashboard is a single app; there's no
@@ -2743,6 +2922,30 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(e.code, err_body)
             except Exception as e:
                 print(f'[VERGENT-PUSH-V2 ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
+        # MicroBilt re-check (2026-07-06): re-run the MLA + SSN-name checks
+        # for one applicant. Proxies to cif-apply; the injected compliance
+        # pills call this from their "Re-run checks" button.
+        if path == '/api/microbilt-recheck':
+            try:
+                body = json.loads(raw)
+                payload = json.dumps(body).encode()
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/microbilt-recheck',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                # Two upstream MicroBilt calls (~1-2s each) + Firebase writes.
+                with ur.urlopen(req, timeout=60) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[MICROBILT-RECHECK UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[MICROBILT-RECHECK ERROR] {e}', flush=True)
                 self.send_json(500, {'error': str(e)})
             return
 
