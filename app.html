@@ -2423,6 +2423,22 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     <!-- KPIs -->
     <div id="comm-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px"></div>
 
+    <!-- Payment Reminders — mode/status + preview controls. Safe by
+         design: samples go to the operator's own inbox and the sweep
+         button is ALWAYS dry-run (backend refuses live unless the
+         PAYMENT_REMINDERS env var is already "live"). -->
+    <div id="rem-card" style="background:white;border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-xs);margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:220px">
+          <div style="font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Payment Reminders</div>
+          <div id="rem-status" style="font-size:12.5px;color:var(--muted)">Checking status…</div>
+        </div>
+        <button class="chip" style="background:white" onclick="sendReminderSamples(this)" title="Email one sample of every reminder template to your inbox for review">Email me the samples</button>
+        <button class="chip" style="background:white" onclick="runReminderDryRun(this)" title="Check today's real Vergent due dates and log what WOULD send — no emails go out">Run dry-run sweep</button>
+      </div>
+      <div id="rem-result" style="font-size:11.5px;color:var(--muted);margin-top:6px"></div>
+    </div>
+
     <!-- Filter chips -->
     <div class="chips" style="margin-bottom:12px">
       <button class="chip active" data-comm-kind="all"                 onclick="setCommFilter('all')">All</button>
@@ -2433,6 +2449,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
       <button class="chip"        data-comm-kind="denial"              onclick="setCommFilter('denial')">Denial</button>
       <button class="chip"        data-comm-kind="card_failed"         onclick="setCommFilter('card_failed')">Invalid Card</button>
       <button class="chip"        data-comm-kind="registration"        onclick="setCommFilter('registration')">Registration</button>
+      <button class="chip"        data-comm-kind="reminders"           onclick="setCommFilter('reminders')" title="All payment reminders — due-soon nudges and the past-due ladder">Reminders</button>
       <input type="text" id="comm-search" placeholder="Search recipient, loan id, subject…" oninput="_commSearchDeb()" style="margin-left:8px;flex:1;min-width:240px;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;font-family:inherit;outline:none">
     </div>
 
@@ -12071,6 +12088,16 @@ const _COMM_KIND_LABELS = {
   denial:            'Denial',
   card_failed:       'Invalid Card',
   registration:      'Registration',
+  google_review:     'Google Review',
+  trustpilot_review: 'Trustpilot Review',
+  reminder_due_3d:    'Due in 3 Days',
+  reminder_due_1d:    'Due Tomorrow',
+  reminder_due_today: 'Due Today',
+  reminder_late_1d:   '1 Day Late',
+  reminder_late_3d:   '3 Days Late',
+  reminder_late_7d:   '7 Days Late',
+  reminder_late_14d:  '14 Days Late',
+  reminder_late_30d:  '30 Days Late',
 };
 const _COMM_KIND_COLORS = {
   approval:          { bg: '#bbf7d0', fg: '#14532d' },
@@ -12085,6 +12112,18 @@ const _COMM_KIND_COLORS = {
   // Indigo — portal-registration / magic-link sends, visually distinct
   // from the transactional (green/red/amber) emails.
   registration:      { bg: '#e0e7ff', fg: '#4338ca' },
+  google_review:     { bg: '#fef9c3', fg: '#854d0e' },
+  trustpilot_review: { bg: '#d1fae5', fg: '#065f46' },
+  // Payment reminders: teal for pre-due nudges, rose (darkening with
+  // lateness) for the past-due collections ladder.
+  reminder_due_3d:    { bg: '#ccfbf1', fg: '#115e59' },
+  reminder_due_1d:    { bg: '#ccfbf1', fg: '#115e59' },
+  reminder_due_today: { bg: '#99f6e4', fg: '#134e4a' },
+  reminder_late_1d:   { bg: '#ffe4e6', fg: '#9f1239' },
+  reminder_late_3d:   { bg: '#ffe4e6', fg: '#9f1239' },
+  reminder_late_7d:   { bg: '#fecdd3', fg: '#881337' },
+  reminder_late_14d:  { bg: '#fecdd3', fg: '#881337' },
+  reminder_late_30d:  { bg: '#fda4af', fg: '#881337' },
 };
 
 // ───────── Funding Status page ─────────
@@ -12835,19 +12874,111 @@ async function loadCommunications() {
   const statusEl = document.getElementById('comm-status');
   if (listEl) listEl.innerHTML = '<div class="tbl-loading">Loading emails…</div>';
   if (statusEl) statusEl.textContent = '';
+  loadRemindersStatus();
   try {
-    // Pull the most recent 200 logs (sorted by sent_at server-side).
-    // Firebase REST orderBy requires an index, but a simple .json
-    // fetch returns the whole node; we sort + slice client-side.
-    const data = await fbGet('emailLog.json');
-    const entries = data && typeof data === 'object'
-      ? Object.entries(data).map(([id, v]) => Object.assign({}, v, { _id: id }))
-      : [];
-    entries.sort((a, b) => (b.sent_at || 0) - (a.sent_at || 0));
-    _commCache = { entries: entries.slice(0, 500), fetchedAt: Date.now() };
+    // Light list: newest 200 WITHOUT rendered bodies (~0.4 KB/row vs
+    // ~25 KB). The full HTML loads per-email when a preview opens, so
+    // this page stays fast no matter how many emails we accumulate.
+    const r = await fetch('/api/comms-list?limit=200', { credentials: 'include' });
+    const d = await r.json();
+    if (!r.ok || !d || d.error) throw new Error((d && d.error) || ('HTTP ' + r.status));
+    _commCache = { entries: d.entries || [], fetchedAt: Date.now() };
     renderCommunications();
   } catch (e) {
     if (listEl) listEl.innerHTML = `<div class="tbl-empty" style="padding:40px 20px;color:var(--red)">Couldn't load emails: ${escapeHtml(e.message || String(e))}</div>`;
+  }
+}
+
+async function loadOlderComms(btn) {
+  if (!_commCache || !_commCache.entries.length) return;
+  const oldest = _commCache.entries[_commCache.entries.length - 1].sent_at || 0;
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+  try {
+    const r = await fetch('/api/comms-list?limit=200&before=' + oldest, { credentials: 'include' });
+    const d = await r.json();
+    const older = (d && d.entries) || [];
+    if (!older.length) {
+      if (btn) btn.textContent = 'No older emails';
+      return;
+    }
+    const seen = new Set(_commCache.entries.map(e => e._id));
+    _commCache.entries = _commCache.entries.concat(older.filter(e => !seen.has(e._id)));
+    renderCommunications();
+  } catch (e) {
+    toast("Couldn't load older emails", 'err');
+    if (btn) { btn.disabled = false; btn.textContent = 'Load older emails'; }
+  }
+}
+
+// ── Payment Reminders card (status + preview controls) ─────────────
+async function loadRemindersStatus() {
+  const el = document.getElementById('rem-status');
+  if (!el) return;
+  try {
+    const r = await fetch('/api/reminders-status', { credentials: 'include' });
+    const d = await r.json();
+    if (!r.ok || !d || !d.ok) throw new Error((d && d.error) || ('HTTP ' + r.status));
+    const mode = d.mode || 'off';
+    const modeTxt = mode === 'live'
+      ? '<strong style="color:var(--green-dark)">LIVE</strong> — reminders email customers automatically each morning'
+      : mode === 'dry_run'
+        ? '<strong style="color:#b45309">DRY-RUN</strong> — the daily sweep logs below, nothing is emailed'
+        : '<strong>OFF</strong> — nothing sends automatically';
+    let last = '';
+    if (d.last_run && d.last_run.finishedAt) {
+      const s = d.last_run.stats || {};
+      last = ` · Last sweep ${_commFmtTime(d.last_run.finishedAt)}: ${s.matched || 0} matched, ${s.sent || 0} sent, ${s.dry_run || 0} dry-run`;
+    }
+    el.innerHTML = `Mode: ${modeTxt} · Daily at ${d.send_hour_pt != null ? d.send_hour_pt : 10}:00 AM PT${last}`;
+  } catch (e) {
+    el.textContent = 'Status unavailable: ' + (e.message || e);
+  }
+}
+
+async function sendReminderSamples(btn) {
+  const to = prompt('Send one sample of every reminder email to:', 'info@cashinflash.com');
+  if (!to || !to.includes('@')) return;
+  const resEl = document.getElementById('rem-result');
+  if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+  if (resEl) { resEl.style.color = 'var(--muted)'; resEl.textContent = 'Sending all 8 samples…'; }
+  try {
+    const r = await fetch('/api/reminders-samples', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to_email: to.trim() }) });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d && d.ok) {
+      if (resEl) { resEl.style.color = 'var(--green-dark)'; resEl.textContent = 'All ' + d.sent + ' sample emails sent to ' + to.trim() + ' ✓ — check your inbox.'; }
+      toast('Reminder samples sent', 'ok');
+    } else {
+      const sent = d && d.sent ? d.sent + ' of ' + d.total + ' sent — ' : '';
+      if (resEl) { resEl.style.color = 'var(--red)'; resEl.textContent = 'Sample send failed: ' + sent + ((d && (d.detail || d.error)) || ('HTTP ' + r.status)); }
+      toast('Sample send failed', 'err');
+    }
+  } catch (e) {
+    if (resEl) { resEl.style.color = 'var(--red)'; resEl.textContent = 'Network error: ' + (e.message || e); }
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  }
+}
+
+async function runReminderDryRun(btn) {
+  if (!confirm("Run a reminder DRY-RUN sweep now?\n\nThis checks today's real Vergent due dates and logs what WOULD be emailed. No emails are sent.")) return;
+  const resEl = document.getElementById('rem-result');
+  if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+  if (resEl) { resEl.style.color = 'var(--muted)'; resEl.textContent = 'Dry-run sweep started…'; }
+  try {
+    const r = await fetch('/api/run-reminders-sweep', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'dry_run' }) });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d && d.ok) {
+      if (resEl) { resEl.style.color = 'var(--green-dark)'; resEl.textContent = 'Sweep running — DRY-RUN rows appear in the list below as loans are checked (auto-refreshing in ~20s).'; }
+      toast('Dry-run sweep started', 'ok');
+      setTimeout(() => { if (document.getElementById('comm-list')) loadCommunications(); }, 20000);
+    } else {
+      if (resEl) { resEl.style.color = 'var(--red)'; resEl.textContent = 'Sweep failed: ' + ((d && (d.detail || d.error)) || ('HTTP ' + r.status)); }
+      toast('Sweep failed', 'err');
+    }
+  } catch (e) {
+    if (resEl) { resEl.style.color = 'var(--red)'; resEl.textContent = 'Network error: ' + (e.message || e); }
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
   }
 }
 
@@ -12891,7 +13022,11 @@ function renderCommunications() {
 
   const q = (document.getElementById('comm-search')?.value || '').toLowerCase().trim();
   const filtered = all.filter(e => {
-    if (_commKindFilter !== 'all' && e.kind !== _commKindFilter) return false;
+    if (_commKindFilter !== 'all') {
+      if (_commKindFilter === 'reminders') {
+        if (!String(e.kind || '').startsWith('reminder_')) return false;
+      } else if (e.kind !== _commKindFilter) return false;
+    }
     if (q) {
       const hay = `${e.to_email || ''} ${e.to_name || ''} ${e.subject || ''} ${e.loan_id || ''} ${e.customer_id || ''}`.toLowerCase();
       if (!hay.includes(q)) return false;
@@ -12942,7 +13077,8 @@ function renderCommunications() {
       </thead>
       <tbody>${filtered.map(rowHtml).join('')}</tbody>
     </table>
-  </div>`;
+  </div>
+  <div style="text-align:center;padding:14px 0 4px"><button class="chip" style="background:white" onclick="loadOlderComms(this)">Load older emails</button></div>`;
 }
 
 function openCommPreview(id) {
@@ -12965,8 +13101,23 @@ function openCommPreview(id) {
     metaEl.textContent = parts.join(' · ');
   }
   if (ifr) {
-    const html = e.rendered_html || '<div style="padding:40px;font-family:sans-serif;color:#888;text-align:center">No rendered HTML stored for this email.</div>';
-    ifr.srcdoc = html;
+    const noHtml = '<div style="padding:40px;font-family:sans-serif;color:#888;text-align:center">No rendered HTML stored for this email.</div>';
+    if (e.rendered_html) {
+      ifr.srcdoc = e.rendered_html;
+    } else if (e.has_html === false) {
+      ifr.srcdoc = noHtml;
+    } else {
+      // Light list omits bodies — pull this one email's HTML on demand
+      // and cache it on the entry so re-opening is instant.
+      ifr.srcdoc = '<div style="padding:40px;font-family:sans-serif;color:#888;text-align:center">Loading preview…</div>';
+      fetch('/fb/emailLog/' + encodeURIComponent(id) + '/rendered_html.json', { credentials: 'same-origin' })
+        .then(r => r.json())
+        .then(html => {
+          e.rendered_html = (typeof html === 'string' && html) ? html : '';
+          ifr.srcdoc = e.rendered_html || noHtml;
+        })
+        .catch(() => { ifr.srcdoc = noHtml; });
+    }
   }
   document.getElementById('comm-preview-modal').style.display = 'flex';
 }
