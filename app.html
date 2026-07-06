@@ -2107,6 +2107,8 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
               <div id="dv-google-review-wrap" style="display:none">
                 <button class="qa-btn" id="dv-google-review-btn" type="button" onclick="sendGoogleReviewEmail(this)" title="Email this customer a request to leave us a Google review"><span style="font-size:13px;line-height:1">⭐</span>Google Review</button>
                 <div id="dv-google-review-result" style="font-size:11.5px;color:var(--muted);margin-top:3px;min-height:14px"></div>
+                <button class="qa-btn" id="dv-trustpilot-review-btn" type="button" onclick="sendTrustpilotReviewEmail(this)" title="Email this customer a request to leave us a Trustpilot review" style="margin-top:6px"><span style="font-size:13px;line-height:1">⭐</span>TrustPilot Review</button>
+                <div id="dv-trustpilot-review-result" style="font-size:11.5px;color:var(--muted);margin-top:3px;min-height:14px"></div>
               </div>
               <!-- Shown by renderProfilePanel when the customer already
                    has a Held / Pending / Active / Outstanding loan in
@@ -6232,6 +6234,40 @@ async function sendGoogleReviewEmail(btn){
     if(r.ok && d && d.ok){
       if(resEl){resEl.style.color='var(--green-dark)';resEl.textContent='Review request sent to '+(d.to||email)+' ✓';}
       toast('Google review request sent','ok');
+    } else {
+      if(resEl){resEl.style.color='var(--red)';resEl.textContent='Failed: '+((d&&(d.detail||d.error))||('HTTP '+r.status));}
+      toast('Review request failed','err');
+    }
+  }catch(e){
+    if(resEl){resEl.style.color='var(--red)';resEl.textContent='Network error: '+((e&&e.message)||e);}
+  }finally{
+    if(btn){btn.disabled=false;btn.style.opacity='';}
+  }
+}
+async function sendTrustpilotReviewEmail(btn){
+  const fbId = window._profileFbId || document.body.dataset.firebaseId || '';
+  if(!fbId){ toast('Open an applicant first','err'); return; }
+  const a = (typeof apps!=='undefined'&&Array.isArray(apps))?apps.find(x=>x.firebaseId===fbId):null;
+  const email = (a && (a.email || (a.applicationData||{}).email)) || '';
+  const resEl = document.getElementById('dv-trustpilot-review-result');
+  if(!confirm('Send a Trustpilot review request to '+(email||'this customer')+'?')) return;
+  if(btn){btn.disabled=true;btn.style.opacity='.6';}
+  if(resEl){resEl.style.color='var(--muted)';resEl.textContent='Sending…';}
+  try{
+    let r=await fetch('/api/send-trustpilot-review',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({firebase_id:fbId})});
+    let d=await r.json().catch(()=>({}));
+    if(r.ok && d && d.already_sent){
+      const when=d.sentAt?new Date(d.sentAt).toLocaleString():'earlier';
+      if(!confirm('A Trustpilot review request was already sent '+when+(d.sentTo?(' to '+d.sentTo):'')+'.\n\nSend it again?')){
+        if(resEl){resEl.style.color='var(--muted)';resEl.textContent='Already sent '+when+'.';}
+        return;
+      }
+      r=await fetch('/api/send-trustpilot-review',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({firebase_id:fbId,force:true})});
+      d=await r.json().catch(()=>({}));
+    }
+    if(r.ok && d && d.ok){
+      if(resEl){resEl.style.color='var(--green-dark)';resEl.textContent='Review request sent to '+(d.to||email)+' ✓';}
+      toast('Trustpilot review request sent','ok');
     } else {
       if(resEl){resEl.style.color='var(--red)';resEl.textContent='Failed: '+((d&&(d.detail||d.error))||('HTTP '+r.status));}
       toast('Review request failed','err');
