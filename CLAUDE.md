@@ -217,10 +217,11 @@ NATIVE in app.html (renderComplianceCard + static markup in
 #dv-panel-profile, right under the profile status hero): a "Compliance"
 section on the PROFILE tab. Hydrates `/fb/reports/{id}/microbilt.json`
 once per applicant (same pattern as the plaidBalance card), cached in
-`_mbComplianceCache`. The injected `_MICROBILT_PANEL_HTML` in server.py
-is NOT injected anymore — injection targeting runtime DOM anchors broke
-twice after the 2026-07 overhaul (deleted anchors), so this feature went
-native; the constant remains for reference only. The ORIGINAL injected
+`_mbComplianceCache`. An injected version
+(`_MICROBILT_PANEL_HTML`) was tried and DELETED 2026-07-06 — injection
+targeting runtime DOM anchors broke twice after the 2026-07 overhaul
+(deleted anchors), so this feature went native. Don't reintroduce
+runtime-anchor injection for new features. The ORIGINAL injected
 Vergent panel (`_PHASE2_PANEL_HTML`) is equally vestigial (the native
 profile hero + rail card replaced it); don't anchor anything new to
 either. Pills: green
