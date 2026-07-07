@@ -6451,7 +6451,7 @@ function renderComplianceCard(fbId) {
   let needsRerun = false;
   const day = ms => { try { return new Date(ms).toLocaleDateString(); } catch (e) { return ''; } };
   if (!mla && !ssn) {
-    pills.push(['off', 'MLA + SSN: no check on record', '']);
+    pills.push(['off', 'MLA + Identity: no check on record', '']);
     needsRerun = true;
   } else {
     if (mla) {
@@ -6463,14 +6463,20 @@ function renderComplianceCard(fbId) {
                  (mla.checkedAt ? ' · checked ' + day(mla.checkedAt) : ''));
     }
     if (ssn) {
+      // Identity = Enhanced People Search (SSN-on-file match, deceased /
+      // Death Master, high-risk address, name match). 'fail' is a strong
+      // fraud signal — red pill, but NEVER an auto-decline: disposition
+      // stays with the operator.
       if (ssn.decision === 'pass')
-        pills.push(['ok', 'SSN: Verified ✓' + (ssn.cached ? ' (' + day(ssn.checkedAt) + ')' : ''), ssn.description]);
-      else if (ssn.decision === 'skipped') pills.push(['off', 'SSN: not checked', ssn.skipReason]);
+        pills.push(['ok', 'Identity: Verified ✓' + (ssn.cached ? ' (' + day(ssn.checkedAt) + ')' : ''), ssn.description]);
+      else if (ssn.decision === 'fail')
+        pills.push(['bad', 'Identity: FRAUD RISK', ssn.description]);
+      else if (ssn.decision === 'skipped') pills.push(['off', 'Identity: not checked', ssn.skipReason]);
       else {
-        pills.push(['warn', 'SSN: ' + (/match/i.test(ssn.description || '') ? 'Partial match' : 'Needs review'), ssn.description]);
+        pills.push(['warn', 'Identity: needs review', ssn.description]);
         needsRerun = true;
       }
-      lines.push('SSN: ' + escapeHtml(ssn.description || ssn.skipReason || ssn.decision) +
+      lines.push('Identity: ' + escapeHtml(ssn.description || ssn.skipReason || ssn.decision) +
                  (ssn.checkedAt ? ' · checked ' + day(ssn.checkedAt) : ''));
     }
   }
