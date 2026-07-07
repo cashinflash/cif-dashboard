@@ -1958,6 +1958,16 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
               <div id="profile-balance-result" style="display:none;font-size:13px;margin-top:10px;padding:11px 13px;border-radius:10px;background:#f4f7f9;border:1px solid var(--border);line-height:1.55;word-break:break-word"></div>
             </div>
 
+            <!-- MicroBilt compliance (MLA covered-borrower + SSN-name match).
+                 Populated by renderComplianceCard from /reports/{id}/microbilt
+                 (written by cif-apply's intake checks). Re-run proxies to
+                 /api/microbilt-recheck. Click a pill = toggle the detail line. -->
+            <div class="sec-h" style="margin-top:18px">Compliance</div>
+            <div id="profile-compliance" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:4px">
+              <span style="font-size:12px;color:var(--muted)">Loading checks…</span>
+            </div>
+            <div id="profile-compliance-detail" style="display:none;font-size:12px;color:var(--muted);line-height:1.6;margin:6px 0 4px"></div>
+
             <!-- Contact + Identity cards -->
             <div class="sec-h">Customer Information</div>
             <div class="profile-cards">
@@ -6409,11 +6419,90 @@ function sendPortalInvite(fbId, cid, force) {
       }
     }).catch(function () { if (btn) btn.disabled = false; if (res) { res.textContent = 'Network error.'; res.style.color = 'var(--red)'; } });
 }
+// ── MicroBilt compliance card (Profile tab) ─────────────────────────────
+// MLA covered-borrower + SSN-name verdicts, written by cif-apply's intake
+// checks to /reports/{id}/microbilt. Hydrated once per applicant (same
+// pattern as the plaidBalance card); "Re-run checks" posts to the
+// /api/microbilt-recheck proxy and refreshes from the response.
+const _mbComplianceCache = {};
+function renderComplianceCard(fbId) {
+  const wrap = document.getElementById('profile-compliance');
+  const det = document.getElementById('profile-compliance-detail');
+  if (!wrap) return;
+  const node = _mbComplianceCache[fbId];
+  if (node === undefined) {
+    _mbComplianceCache[fbId] = null;         // fetch in flight
+    wrap.innerHTML = '<span style="font-size:12px;color:var(--muted)">Loading checks…</span>';
+    if (det) det.style.display = 'none';
+    fetch('/fb/reports/' + encodeURIComponent(fbId) + '/microbilt.json', { credentials: 'same-origin' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        _mbComplianceCache[fbId] = d || {};
+        if (window._profileFbId === fbId) renderComplianceCard(fbId);
+      })
+      .catch(() => { _mbComplianceCache[fbId] = {}; });
+    return;
+  }
+  if (node === null) return;                 // fetch in flight; will re-render
+  const mla = node.mla || null, ssn = node.ssn || null;
+  const C = { ok: ['#e8f5ee', '#1a6b3c', '#9fd8b5'], bad: ['#fde7e7', '#5a0d0d', '#f0a8a8'],
+              warn: ['#fff5e6', '#5a3300', '#ffd9a3'], off: ['#f3f4f6', '#6b7280', '#d1d5db'] };
+  const pills = [], lines = [];
+  let needsRerun = false;
+  const day = ms => { try { return new Date(ms).toLocaleDateString(); } catch (e) { return ''; } };
+  if (!mla && !ssn) {
+    pills.push(['off', 'MLA + SSN: no check on record', '']);
+    needsRerun = true;
+  } else {
+    if (mla) {
+      if (mla.decision === 'proceed') pills.push(['ok', 'MLA: Not covered ✓', mla.text]);
+      else if (mla.decision === 'decline') pills.push(['bad', 'MLA: COVERED BORROWER', mla.text]);
+      else if (mla.decision === 'skipped') pills.push(['off', 'MLA: not checked', mla.skipReason]);
+      else { pills.push(['warn', 'MLA: check failed', mla.text]); needsRerun = true; }
+      lines.push('MLA: ' + escapeHtml(mla.text || mla.skipReason || mla.decision) +
+                 (mla.checkedAt ? ' · checked ' + day(mla.checkedAt) : ''));
+    }
+    if (ssn) {
+      if (ssn.decision === 'pass')
+        pills.push(['ok', 'SSN: Verified ✓' + (ssn.cached ? ' (' + day(ssn.checkedAt) + ')' : ''), ssn.description]);
+      else if (ssn.decision === 'skipped') pills.push(['off', 'SSN: not checked', ssn.skipReason]);
+      else {
+        pills.push(['warn', 'SSN: ' + (/match/i.test(ssn.description || '') ? 'Partial match' : 'Needs review'), ssn.description]);
+        needsRerun = true;
+      }
+      lines.push('SSN: ' + escapeHtml(ssn.description || ssn.skipReason || ssn.decision) +
+                 (ssn.checkedAt ? ' · checked ' + day(ssn.checkedAt) : ''));
+    }
+  }
+  wrap.innerHTML = pills.map(p => {
+    const c = C[p[0]];
+    return `<span class="mb-pill" title="${escapeHtml(p[2] || '')}" style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.02em;border:1px solid ${c[2]};background:${c[0]};color:${c[1]};cursor:pointer;white-space:nowrap">${p[1]}</span>`;
+  }).join('') + (needsRerun
+    ? '<button id="mb-rerun-btn" style="background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Re-run checks</button>'
+    : '');
+  if (det) { det.innerHTML = lines.join('<br>'); det.style.display = 'none'; }
+  wrap.querySelectorAll('.mb-pill').forEach(p => {
+    p.onclick = () => { if (det) det.style.display = det.style.display === 'block' ? 'none' : 'block'; };
+  });
+  const btn = document.getElementById('mb-rerun-btn');
+  if (btn) btn.onclick = () => {
+    btn.disabled = true; btn.textContent = 'Running…';
+    fetch('/api/microbilt-recheck', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin', body: JSON.stringify({ firebase_id: fbId }),
+    })
+      .then(r => r.json())
+      .then(d => { _mbComplianceCache[fbId] = (d && d.microbilt) || {}; renderComplianceCard(fbId); })
+      .catch(() => { btn.disabled = false; btn.textContent = 'Re-run checks'; });
+  };
+}
+
 function renderProfilePanel(fbId) {
   const a = apps.find(x => x.firebaseId === fbId);
   if (!a) return;
   const ad = a.applicationData || {};
   const m = _vergentMatchCache[fbId];
+  renderComplianceCard(fbId);
 
   // Status hero — shape mirrors the right-rail Vergent card states.
   const statusEl = document.getElementById('profile-status');

@@ -1265,7 +1265,12 @@ def inject_phase2_panel(html_bytes: bytes) -> bytes:
     sentinel is found (defensive — modern HTML always has one)."""
     if not html_bytes:
         return html_bytes
-    blob = _PHASE2_PANEL_HTML + _MICROBILT_PANEL_HTML
+    # _MICROBILT_PANEL_HTML is deliberately NOT injected (2026-07-06):
+    # the compliance card is native in app.html now (renderComplianceCard,
+    # Profile tab) — the injected version targeted DOM anchors the 2026-07
+    # detail overhaul deleted and never rendered. Constant kept for
+    # reference only.
+    blob = _PHASE2_PANEL_HTML
     closing = b'</body>'
     idx = html_bytes.rfind(closing)
     if idx < 0:

@@ -213,16 +213,17 @@ prefer that anchor over the legacy push button.
 
 ## MicroBilt compliance pills (MLA + SSN, 2026-07-06)
 
-Second injected blob `_MICROBILT_PANEL_HTML` in server.py (same pattern as
-the Vergent panel; `inject_phase2_panel` appends both). Polls
-`/fb/reports/{id}/microbilt.json` (written by cif-apply's intake checks) and
-renders a "Compliance" section in the detail view's RIGHT RAIL
-(`.dv-rail-section` inserted after `#dv-rail-vergent`; fbId comes from
-`document.body.dataset.firebaseId`, stamped by setRoute). NOTE: the 2026-07
-detail overhaul deleted the old anchors (`.msticky`, `vergentpush-*`) — the
-ORIGINAL injected Vergent panel (`_PHASE2_PANEL_HTML`) is vestigial now (the
-native `#dv-rail-vergent` card in app.html replaced it); don't anchor
-anything new to it. Pills: green
+NATIVE in app.html (renderComplianceCard + static markup in
+#dv-panel-profile, right under the profile status hero): a "Compliance"
+section on the PROFILE tab. Hydrates `/fb/reports/{id}/microbilt.json`
+once per applicant (same pattern as the plaidBalance card), cached in
+`_mbComplianceCache`. The injected `_MICROBILT_PANEL_HTML` in server.py
+is NOT injected anymore — injection targeting runtime DOM anchors broke
+twice after the 2026-07 overhaul (deleted anchors), so this feature went
+native; the constant remains for reference only. The ORIGINAL injected
+Vergent panel (`_PHASE2_PANEL_HTML`) is equally vestigial (the native
+profile hero + rail card replaced it); don't anchor anything new to
+either. Pills: green
 pills for not-covered/verified, red for MLA COVERED BORROWER, orange for
 review-class results (click any pill = toggle the verbatim detail line),
 gray for docs-form skips. "Re-run checks" button POSTs
