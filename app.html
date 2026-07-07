@@ -3926,6 +3926,7 @@ function renderActionCenter() {
   const _AUTO_BUCKET = { out_of_state: 'out-of-state', no_income: 'no income',
                          below_income_floor: 'below income floor',
                          mla_covered: 'MLA covered borrower',
+                         severe_distress: 'severe distress (multi-gate)',
                          dead_balance: 'low balance / no survival' };
 
   const left =
@@ -4313,6 +4314,7 @@ function renderDetail(fbId) {
   const _AUTO_BUCKET = { out_of_state: 'out-of-state', no_income: 'no income',
                          below_income_floor: 'below income floor',
                          mla_covered: 'MLA covered borrower',
+                         severe_distress: 'severe distress (multi-gate)',
                          dead_balance: 'low balance / no survival' };
   const _byLabel = _isAuto
     ? (' automatically by system' + (a.autoDeclineBucket
