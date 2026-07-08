@@ -41,6 +41,9 @@ _INDEX_TOP_FIELDS = (
     # MicroBilt MLA/SSN checks (2026-07-06): queue-row subtitle flag.
     # '' = clean/unchecked; keep lock-step with cif-apply run_server.py.
     'microbiltSummary',
+    # Reapply-block worst flag (2026-07-08): '' / weak_identity_match /
+    # instrument_reuse / funded_instrument_reuse — queue red-flag chip.
+    'reapplyFlag',
 )
 _INDEX_APPDATA_FIELDS = ('email', 'phone', 'firstName', 'lastName')
 
@@ -1928,6 +1931,26 @@ class Handler(BaseHTTPRequestHandler):
                     headers={'Content-Type': 'application/json'}, method='PATCH')
                 urllib.request.urlopen(hreq, timeout=10).read()
                 _mirror_report_write_to_index(f'reports/{fb_id}.json', 'PATCH', ha_patch)
+                # Reapply-block registry (2026-07-08): a manual decline arms
+                # the 30-day cooldown; a funding registers the loan's
+                # instruments for the two-loans-two-identities flag.
+                # Fire-and-forget on a thread — best-effort, the operator's
+                # click never waits on it and a registry outage never
+                # blocks the status change.
+                def _reapply_register(_fb_id=fb_id, _action=action):
+                    try:
+                        rreq = urllib.request.Request(
+                            'https://cif-apply.onrender.com/api/reapply-register',
+                            data=json.dumps({'firebase_id': _fb_id,
+                                             'action': _action}).encode(),
+                            headers={'Content-Type': 'application/json'},
+                            method='POST')
+                        urllib.request.urlopen(rreq, timeout=15).read()
+                    except Exception as _re:
+                        print(f'[REAPPLY] register {_action} {_fb_id} '
+                              f'failed: {_re}', flush=True)
+                import threading as _th
+                _th.Thread(target=_reapply_register, daemon=True).start()
                 self.send_json(200, {'ok': True, 'operator': operator,
                                      'override': bool(body.get('isOverride'))})
             except Exception as e:

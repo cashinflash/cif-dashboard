@@ -3927,6 +3927,7 @@ function renderActionCenter() {
                          below_income_floor: 'below income floor',
                          mla_covered: 'MLA covered borrower',
                          severe_distress: 'severe distress (multi-gate)',
+                         reapply_blocked: 'recent application on file',
                          dead_balance: 'low balance / no survival' };
 
   const left =
@@ -4152,13 +4153,18 @@ function renderQueue() {
     // microbiltSummary ('' when clean) appends MLA/SSN flags so identity
     // issues are visible before opening the modal — silence = clean.
     const mbFlag = a.microbiltSummary || '';
+    // reapplyFlag ('' when clean): reapply-block Layer-2 signal. The
+    // funded_instrument case also gets a red FLAG chip in the status cell.
+    const raFlag = a.reapplyFlag === 'funded_instrument_reuse' ? 'bank/card matches a FUNDED loan (possible duplicate identity)'
+                 : a.reapplyFlag === 'instrument_reuse' ? 'bank/card matches a recent decline'
+                 : a.reapplyFlag === 'weak_identity_match' ? 'shared phone/email with a recent decline' : '';
     const subReason = (a.v4ReasonLine || a.reason || '') +
-      (mbFlag ? ' · ' + mbFlag : '');
+      (mbFlag ? ' · ' + mbFlag : '') + (raFlag ? ' · ' + raFlag : '');
     rows.push(`<tr data-fb="${escapeHtml(a.firebaseId)}">
       <td><div class="applicant"><input type="checkbox" class="queue-sel-cb" data-fb="${escapeHtml(a.firebaseId)}" title="Select for bulk action"><div class="av">${escapeHtml(initials(a.name))}</div><div class="applicant-text"><div class="applicant-name">${escapeHtml(a.name || 'Unnamed')} ${sourceBadge(a)}</div><div class="applicant-id">#${escapeHtml(idShort)}</div></div></div></td>
       <td><div class="app-info"><div class="app-type">${escapeHtml(appType)}</div><div class="app-meta">${escapeHtml(appMeta)}</div>${subReason ? `<div class="app-meta" style="max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(subReason)}">${escapeHtml(subReason)}</div>` : ''}</div></td>
       <td>${engineBadge(a)}</td>
-      <td><span class="status ${sCls}">${escapeHtml(a.status || 'Pending')}</span>${a.humanActionBy === 'auto-system' ? ' <span title="Declined automatically by the system" style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:.04em;background:#eef2f7;color:#5a6b7b;border:1px solid #d3dde6;border-radius:4px;padding:1px 5px;vertical-align:middle">AUTO</span>' : ''}</td>
+      <td><span class="status ${sCls}">${escapeHtml(a.status || 'Pending')}</span>${a.humanActionBy === 'auto-system' ? ' <span title="Declined automatically by the system" style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:.04em;background:#eef2f7;color:#5a6b7b;border:1px solid #d3dde6;border-radius:4px;padding:1px 5px;vertical-align:middle">AUTO</span>' : ''}${a.reapplyFlag === 'funded_instrument_reuse' ? ' <span title="Same bank account or debit card as a FUNDED loan under a different identity — possible duplicate identity, review before any action" style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:.04em;background:#fde7e7;color:#5a0d0d;border:1px solid #e8b4b4;border-radius:4px;padding:1px 5px;vertical-align:middle">FLAG</span>' : ''}</td>
       <td><div class="tbl-time">${escapeHtml(a.date || '')}<br>${escapeHtml(a.time || '')}</div></td>
       <td><div class="tbl-time">${fmtTimeAgo(a.updatedAt || a.createdAt)}</div></td>
     </tr>`);
@@ -4315,6 +4321,7 @@ function renderDetail(fbId) {
                          below_income_floor: 'below income floor',
                          mla_covered: 'MLA covered borrower',
                          severe_distress: 'severe distress (multi-gate)',
+                         reapply_blocked: 'recent application on file',
                          dead_balance: 'low balance / no survival' };
   const _byLabel = _isAuto
     ? (' automatically by system' + (a.autoDeclineBucket
@@ -7595,7 +7602,10 @@ const DENIAL_REASONS = [
   "Incomplete or unreadable bank statement",
   // APPENDED (2026-07-06): _denialPrecheck references reasons BY INDEX
   // (0-12 above) — new reasons must only ever be appended, never inserted.
-  "Unable to offer this loan product to MLA covered borrowers"  // index 13
+  "Unable to offer this loan product to MLA covered borrowers", // index 13
+  // APPENDED (2026-07-08): 30-day reapplication cooldown. Must match
+  // cif-apply auto_decline._R_REAPPLY verbatim.
+  "A recent application is already on file"                     // index 14
 ];
 // Legacy/canonical fallback only — v4 declines pre-check from the
 // STRUCTURED gate data instead (see _denialPrecheck). Generic tokens
@@ -7631,6 +7641,11 @@ function _denialPrecheck(a) {
   // reason even when the auto-decline bucket isn't armed.
   const _mla = (a.microbilt && a.microbilt.mla) || null;
   if (_mla && _mla.covered === true) auto.add(13);
+  // Reapply cooldown (2026-07-08): pre-tick reason 14 when the record was
+  // auto-disposed as reapply_blocked, or when its bank/card matches a
+  // recent decline under a different identity (evasion signal).
+  if (a.autoDeclineBucket === 'reapply_blocked' ||
+      a.reapplyFlag === 'instrument_reuse') auto.add(14);
   let gates = null;
   try { gates = a.v4GatesJson ? JSON.parse(a.v4GatesJson) : null; } catch (e) {}
   if ((a.v4Decision || '').toUpperCase() === 'DECLINE' && Array.isArray(gates)) {
