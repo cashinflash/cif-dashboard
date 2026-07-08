@@ -237,6 +237,24 @@ only ever APPEND to that list, never insert.** The precheck pre-ticks 13
 when `record.microbilt.mla.covered === true`. Backend details:
 cif-apply/CLAUDE.md "MicroBilt intake checks".
 
+## Reapply-block visibility (30-day cooldown, 2026-07-08)
+
+Backend: cif-apply/CLAUDE.md "30-day reapplication block". Dashboard
+half: `/api/override` fire-and-forgets `POST cif-apply
+/api/reapply-register {firebase_id, action}` on every funded/declined
+action (a daemon thread inside the handler — manual declines arm the
+cooldown, fundings register instruments). `reapplyFlag` is in
+`_INDEX_TOP_FIELDS` (lock-step with cif-apply): queue rows append a
+human label to the subtitle and render a red **FLAG** chip next to the
+status when `funded_instrument_reuse` (same bank/card as a FUNDED loan
+under a different identity — possible duplicate identity; the record
+holds as `funded_instrument_fraud_review`, never auto-actioned).
+`reapply_blocked` has labels in BOTH `_AUTO_BUCKET` maps.
+DENIAL_REASONS gained "A recent application is already on file" at
+index 14 (append-only rule still stands); the precheck ticks it on
+`autoDeclineBucket === 'reapply_blocked'` or
+`reapplyFlag === 'instrument_reuse'`.
+
 ## v4 dashboard changes (spec §8 — docs/v4_spec.md in cif-apply)
 
 Landed on `claude/epic-davinci-cdufn9` alongside the cif-apply engine_v4
