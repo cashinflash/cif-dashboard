@@ -2638,6 +2638,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     </div>
     <div class="conn-tabs" style="display:flex;gap:5px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;width:max-content;max-width:100%;flex-wrap:wrap;box-shadow:var(--shadow-xs)">
       <button class="tf-btn active" data-rpt-tab="loansdue" onclick="setReportTab('loansdue')">Loans Due</button>
+      <button class="tf-btn" data-rpt-tab="schedule" onclick="setReportTab('schedule')" title="All scheduled card payments (preauthorized debits) from Vergent">Schedule</button>
       <button class="tf-btn" data-rpt-tab="appointments" onclick="setReportTab('appointments')">Appointments</button>
     </div>
     <div class="stats" id="rpt-stats" style="grid-template-columns:repeat(4,1fr)"></div>
@@ -11666,6 +11667,34 @@ function setReportTab(tab) {
   const apptDiv = document.getElementById('rpt-appointments');
   const searchBar = document.getElementById('rpt-search');
   const densityWrap = document.getElementById('rpt-density-wrap');
+  const quickFilters = document.getElementById('rpt-quick-filters');
+  const checkBal = document.getElementById('rpt-checkbal-btn');
+  const checkBalProg = document.getElementById('rpt-checkbal-progress');
+  const loadedAt = document.getElementById('rpt-loaded-at');
+  // Restore the loans-due-only toolbar bits on every tab switch; the
+  // Schedule branch re-hides them (scope chips + the batch balance
+  // button act on loans-due rows and would mislead on Schedule).
+  if (quickFilters) quickFilters.style.display = 'flex';
+  if (checkBal) checkBal.style.display = 'inline-flex';
+  if (checkBalProg) checkBalProg.style.display = '';
+  if (loadedAt) loadedAt.style.display = '';
+  if (tab === 'schedule') {
+    if (aging) aging.style.display = 'none';
+    if (activeAging) activeAging.style.display = 'none';
+    if (stats) stats.style.display = 'none';
+    if (buckets) buckets.style.display = 'none';
+    if (tableDiv) tableDiv.style.display = 'block';
+    if (apptDiv) apptDiv.style.display = 'none';
+    if (searchBar) searchBar.style.display = '';
+    if (densityWrap) densityWrap.style.display = 'none';
+    if (quickFilters) quickFilters.style.display = 'none';
+    if (checkBal) checkBal.style.display = 'none';
+    if (checkBalProg) checkBalProg.style.display = 'none';
+    if (loadedAt) loadedAt.style.display = 'none';
+    _stopUpcomingAuto();
+    loadScheduleView();
+    return;
+  }
   if (tab === 'appointments') {
     if (aging) aging.style.display = 'none';
     if (activeAging) activeAging.style.display = 'none';
@@ -11700,6 +11729,7 @@ function setReportTab(tab) {
 
 function filterReport(q) {
   if (_rptTab === 'appointments') return;          // search is hidden on calendar
+  if (_rptTab === 'schedule') { renderScheduleView(); return; }
   renderLoansDueUnified();
 }
 
@@ -15156,6 +15186,164 @@ function _renderPaymentAttemptsTable_render(el, list, cidFallbackNotice) {
     + '</tbody></table></div>';
 }
 
+// ─── Schedule tab — ALL scheduled card payments (Vergent preauthorized
+//     debits). Data: POST /api/vergent-contact-queue with category
+//     'preauthorizeddebits'. This queue has never been exercised on
+//     this tenant, so the view is defensive: field names are probed
+//     across common variants, an unknown row shape falls back to a raw
+//     table (so real field names surface for mapping), and a Vergent
+//     failure renders the endpoint's full per-model diagnostics.
+//     Rows are normalized onto the Loans-Due row shape so tapping one
+//     opens the EXACT same customer modal (Check balance / Schedule
+//     Payment / Open in Vergent / Open in Admin). ───
+let _schedRows = [];
+
+const _SCHED_DATE_FIELDS = ['ScheduledDate','scheduledDate','ScheduledPaymentDate','scheduledPaymentDate','PaymentDate','paymentDate','DebitDate','debitDate','ProcessDate','processDate','NextPayDate','nextPayDate','DueDate','dueDate'];
+const _SCHED_AMT_FIELDS = ['ScheduledAmount','scheduledAmount','PaymentAmount','paymentAmount','Amount','amount','AmountDue','amountDue','Balance','balance'];
+
+function _schedNormalize(r) {
+  let first = _cqField(r, ['FirstName','firstName']);
+  let last  = _cqField(r, ['LastName','lastName']);
+  if (!first && !last) {
+    const parts = String(_cqField(r, ['CustomerName','customerName','FullName','fullName','Name','name']) || '').trim().split(/\s+/);
+    first = parts.shift() || '';
+    last = parts.join(' ');
+  }
+  const rawDate = _cqField(r, _SCHED_DATE_FIELDS);
+  const amtRaw = _cqField(r, _SCHED_AMT_FIELDS);
+  const amt = (amtRaw !== '' && !isNaN(Number(amtRaw))) ? Number(amtRaw) : null;
+  return Object.assign({}, r, {
+    CustomerId: String(_cqField(r, ['CustomerId','customerId','CustomerID']) || ''),
+    FirstName: first, LastName: last,
+    LoanId: String(_cqField(r, ['LoanId','loanId','LoanNumber','loanNumber']) || ''),
+    HdrId: String(_cqField(r, ['HdrId','hdrId','LoanHeaderId','loanHeaderId']) || ''),
+    PrimaryPhoneNumber: String(_cqField(r, ['PrimaryPhoneNumber','PrimaryPhoenNumber','Phone','PhoneNumber','phone','phoneNumber','CellPhone','cellPhone']) || ''),
+    Balance: (r.Balance != null && r.Balance !== '' ? r.Balance : (amt != null ? amt : '')),
+    DueDate: r.DueDate || rawDate || '',
+    _schedMs: _localMidnight(rawDate),
+    _schedRaw: rawDate ? String(rawDate).slice(0, 10) : '',
+    _schedAmt: amt,
+  });
+}
+
+async function loadScheduleView() {
+  const table = document.getElementById('rpt-table');
+  const status = document.getElementById('rpt-status');
+  if (table) table.innerHTML = '<div class="tbl-loading">Loading scheduled card payments…</div>';
+  if (status) status.textContent = '';
+  try {
+    const r = await fetch('/api/vergent-contact-queue', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: 'preauthorizeddebits', numberOfRecords: 1000 }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (_rptTab !== 'schedule') return;
+    if (!r.ok || !d || d.ok === false) {
+      const diag = {
+        detail: (d && (d.detail || d.error)) || ('HTTP ' + r.status),
+        attempts: (d && d.attempts) || undefined,
+        loanModelsDiscovered: (d && d.loanModelsDiscovered) || undefined,
+      };
+      table.innerHTML = '<div class="tbl-empty"><div style="margin-bottom:10px;color:var(--red);font-weight:700">Couldn\'t load the schedule from Vergent</div><pre style="text-align:left;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;font-size:11px;overflow:auto;max-height:400px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(JSON.stringify(diag, null, 2)) + '</pre><div style="font-size:11.5px;color:var(--muted);margin-top:8px">Screenshot this and send it to your dev — it shows exactly what Vergent answered.</div></div>';
+      return;
+    }
+    _schedRows = (d.rows || []).map(_schedNormalize);
+    renderScheduleView();
+  } catch (e) {
+    if (table) table.innerHTML = '<div class="tbl-empty">Network error: ' + escapeHtml(e.message || String(e)) + '</div>';
+  }
+}
+
+function _schedMoney(n) {
+  return '$' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function renderScheduleView() {
+  const table = document.getElementById('rpt-table');
+  const status = document.getElementById('rpt-status');
+  if (!table || _rptTab !== 'schedule') return;
+  const q = (document.getElementById('rpt-search')?.value || '').toLowerCase().trim();
+  let list = _schedRows || [];
+  if (q) list = list.filter(r => JSON.stringify(r).toLowerCase().includes(q));
+  if (status) status.textContent = list.length + ' scheduled payment' + (list.length === 1 ? '' : 's');
+  if (!list.length) {
+    table.innerHTML = '<div class="tbl-empty">No scheduled card payments found in Vergent right now.</div>';
+    return;
+  }
+
+  // Unknown row shape: show the raw fields so nothing is hidden and
+  // the real Vergent column names surface for mapping.
+  const probe = list[0];
+  if (!probe.CustomerId && !probe.LoanId && probe._schedAmt == null) {
+    const keys = Object.keys(probe).filter(k => !k.startsWith('_')).slice(0, 8);
+    const head = keys.map(k => '<th>' + escapeHtml(k) + '</th>').join('');
+    const body = list.slice(0, 300).map(r => '<tr>' + keys.map(k => '<td>' + escapeHtml(String(r[k] != null ? r[k] : '')) + '</td>').join('') + '</tr>').join('');
+    table.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Raw view — Vergent returned fields we haven\'t mapped yet. Screenshot the column names for your dev.</div><div class="tbl-card-scroll"><table class="tbl cq-plain"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+    return;
+  }
+
+  const today = _todayMidnight();
+  const day = 24 * 60 * 60 * 1000;
+  const groups = [
+    { key: 'earlier',  label: 'Earlier (check these)', test: ms => !isNaN(ms) && ms < today },
+    { key: 'today',    label: 'Today',                 test: ms => ms === today },
+    { key: 'tomorrow', label: 'Tomorrow',              test: ms => ms === today + day },
+    { key: 'week',     label: 'This Week',             test: ms => ms > today + day && ms <= today + 7 * day },
+    { key: 'later',    label: 'Later',                 test: ms => ms > today + 7 * day },
+    { key: 'nodate',   label: 'No Date on Record',     test: ms => isNaN(ms) },
+  ];
+  const byGroup = {};
+  groups.forEach(g => byGroup[g.key] = []);
+  list.forEach(r => {
+    const g = groups.find(g => g.test(r._schedMs));
+    if (g) byGroup[g.key].push(r);
+  });
+  Object.values(byGroup).forEach(arr => arr.sort((a, b) => (a._schedMs || 0) - (b._schedMs || 0)));
+
+  const sum = arr => arr.reduce((s, r) => s + (r._schedAmt || 0), 0);
+  const weekArr = byGroup.today.concat(byGroup.tomorrow, byGroup.week);
+  const statCard = (label, arr) => '<div style="background:white;border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-xs)">' +
+    '<div style="font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">' + escapeHtml(label) + '</div>' +
+    '<div style="font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--text);font-variant-numeric:tabular-nums">' + _schedMoney(sum(arr)) + '</div>' +
+    '<div style="font-size:11.5px;color:var(--muted);font-weight:500;margin-top:4px">' + arr.length + ' payment' + (arr.length === 1 ? '' : 's') + '</div></div>';
+  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px">' +
+    statCard('Scheduled Today', byGroup.today) + statCard('Next 7 Days', weekArr) + statCard('Total Scheduled', list) + '</div>';
+
+  window._lnsRowCache = window._lnsRowCache || {};
+  const rowHtml = r => {
+    const name = ((r.FirstName || '') + ' ' + (r.LastName || '')).trim() || 'Unknown';
+    const rowKey = 'sched|' + (r.CustomerId || '') + '|' + (r.HdrId || r.LoanId || '') + '|' + (r._schedRaw || '');
+    window._lnsRowCache[rowKey] = r;
+    let when = '';
+    if (!isNaN(r._schedMs)) {
+      const dd = Math.round((r._schedMs - today) / day);
+      when = dd === 0 ? '<span style="color:#b45309;font-weight:700">Today</span>'
+           : dd === 1 ? 'Tomorrow'
+           : dd > 1 ? 'in ' + dd + 'd'
+           : '<span style="color:var(--red);font-weight:700">' + (-dd) + 'd ago</span>';
+    }
+    const phoneFmt = r.PrimaryPhoneNumber ? _fmtPhoneUS(r.PrimaryPhoneNumber) : '—';
+    return '<tr style="cursor:pointer" title="Tap to view customer details" onclick="openLoansDueDetailModal(window._lnsRowCache[\'' + rowKey + '\'])">' +
+      '<td><div class="applicant-name"><span style="color:var(--text);font-weight:700">' + escapeHtml(name) + '</span></div>' + (r.CustomerId ? '<div class="applicant-id">Cust #' + escapeHtml(r.CustomerId) + '</div>' : '') + '</td>' +
+      '<td>' + escapeHtml(phoneFmt) + '</td>' +
+      '<td>' + escapeHtml(r.LoanId || r.HdrId || '—') + '</td>' +
+      '<td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:700">' + (r._schedAmt != null ? escapeHtml(_schedMoney(r._schedAmt)) : '—') + '</td>' +
+      '<td><span class="tbl-time">' + escapeHtml(r._schedRaw || '—') + '</span>' + (when ? '<div style="font-size:11px">' + when + '</div>' : '') + '</td>' +
+    '</tr>';
+  };
+  groups.forEach(g => {
+    const arr = byGroup[g.key];
+    if (!arr.length) return;
+    html += '<div style="display:flex;align-items:baseline;gap:10px;margin:18px 2px 8px">' +
+      '<div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">' + escapeHtml(g.label) + '</div>' +
+      '<div style="font-size:11.5px;color:var(--muted)">' + arr.length + ' · ' + _schedMoney(sum(arr)) + '</div></div>' +
+      '<div class="tbl-card-scroll"><table class="tbl cq-tbl"><thead><tr><th>Customer</th><th>Phone</th><th>Loan</th><th style="text-align:right">Amount</th><th>Scheduled</th></tr></thead><tbody>' +
+      arr.map(rowHtml).join('') + '</tbody></table></div>';
+  });
+  table.innerHTML = html;
+}
+
 function openLoansDueDetailModal(row) {
   if (!row) return;
   _lnsOvRow = row;
@@ -15826,6 +16014,7 @@ function _openApptModalForDay(dayKey) {
 document.addEventListener('click', e => {
   if (e.target && e.target.closest && e.target.closest('#rpt-refresh-btn')) {
     if (_rptTab === 'appointments') loadAppointmentsView();
+    else if (_rptTab === 'schedule') loadScheduleView();
     else loadPastDueReport();
   }
 });
