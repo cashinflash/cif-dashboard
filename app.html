@@ -15186,69 +15186,56 @@ function _renderPaymentAttemptsTable_render(el, list, cidFallbackNotice) {
     + '</tbody></table></div>';
 }
 
-// ─── Schedule tab — ALL scheduled card payments (Vergent preauthorized
-//     debits). Data: POST /api/vergent-contact-queue with category
-//     'preauthorizeddebits'. This queue has never been exercised on
-//     this tenant, so the view is defensive: field names are probed
-//     across common variants, an unknown row shape falls back to a raw
-//     table (so real field names surface for mapping), and a Vergent
-//     failure renders the endpoint's full per-model diagnostics.
-//     Rows are normalized onto the Loans-Due row shape so tapping one
-//     opens the EXACT same customer modal (Check balance / Schedule
-//     Payment / Open in Vergent / Open in Admin). ───
+// ─── Schedule tab — ALL scheduled payments on the active book.
+//     Vergent's preauthorizeddebits contact queue NPEs on this tenant
+//     (GetCachedLoans NullReference — collections cache not built for
+//     the company), so the data comes from /api/vergent-schedule-report
+//     on cif-apply instead: the loans-due superset fanned out over
+//     GetScheduledPayments per loan (the SAME api behind the card
+//     icons on Loans Due), parallel + cached server-side. One report
+//     row per scheduled payment. Rows carry the Loans-Due field shape
+//     so tapping one opens the EXACT same customer modal (Check
+//     balance / Schedule Payment / Open in Vergent / Open in Admin).
 let _schedRows = [];
-
-const _SCHED_DATE_FIELDS = ['ScheduledDate','scheduledDate','ScheduledPaymentDate','scheduledPaymentDate','PaymentDate','paymentDate','DebitDate','debitDate','ProcessDate','processDate','NextPayDate','nextPayDate','DueDate','dueDate'];
-const _SCHED_AMT_FIELDS = ['ScheduledAmount','scheduledAmount','PaymentAmount','paymentAmount','Amount','amount','AmountDue','amountDue','Balance','balance'];
+let _schedMeta = null;
 
 function _schedNormalize(r) {
-  let first = _cqField(r, ['FirstName','firstName']);
-  let last  = _cqField(r, ['LastName','lastName']);
-  if (!first && !last) {
-    const parts = String(_cqField(r, ['CustomerName','customerName','FullName','fullName','Name','name']) || '').trim().split(/\s+/);
-    first = parts.shift() || '';
-    last = parts.join(' ');
-  }
-  const rawDate = _cqField(r, _SCHED_DATE_FIELDS);
-  const amtRaw = _cqField(r, _SCHED_AMT_FIELDS);
-  const amt = (amtRaw !== '' && !isNaN(Number(amtRaw))) ? Number(amtRaw) : null;
+  const rawDate = r.schedDate || '';
+  const amtRaw = r.schedAmount;
+  const amt = (amtRaw != null && amtRaw !== '' && !isNaN(Number(amtRaw))) ? Number(amtRaw) : null;
   return Object.assign({}, r, {
-    CustomerId: String(_cqField(r, ['CustomerId','customerId','CustomerID']) || ''),
-    FirstName: first, LastName: last,
-    LoanId: String(_cqField(r, ['LoanId','loanId','LoanNumber','loanNumber']) || ''),
-    HdrId: String(_cqField(r, ['HdrId','hdrId','LoanHeaderId','loanHeaderId']) || ''),
-    PrimaryPhoneNumber: String(_cqField(r, ['PrimaryPhoneNumber','PrimaryPhoenNumber','Phone','PhoneNumber','phone','phoneNumber','CellPhone','cellPhone']) || ''),
-    Balance: (r.Balance != null && r.Balance !== '' ? r.Balance : (amt != null ? amt : '')),
-    DueDate: r.DueDate || rawDate || '',
+    CustomerId: String(r.CustomerId || ''),
+    LoanId: String(r.LoanId || ''),
+    HdrId: String(r.HdrId || ''),
+    PrimaryPhoneNumber: String(r.PrimaryPhoneNumber || ''),
     _schedMs: _localMidnight(rawDate),
     _schedRaw: rawDate ? String(rawDate).slice(0, 10) : '',
     _schedAmt: amt,
+    _schedMethod: String(r.schedMethod || ''),
+    _schedIsCard: !!r.schedIsCard,
+    _schedSource: String(r.schedSource || ''),
   });
 }
 
 async function loadScheduleView() {
   const table = document.getElementById('rpt-table');
   const status = document.getElementById('rpt-status');
-  if (table) table.innerHTML = '<div class="tbl-loading">Loading scheduled card payments…</div>';
+  if (table) table.innerHTML = '<div class="tbl-loading">Scanning your active book for scheduled payments… a cold first load can take up to a minute.</div>';
   if (status) status.textContent = '';
   try {
-    const r = await fetch('/api/vergent-contact-queue', {
+    const r = await fetch('/api/vergent-schedule-report', {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category: 'preauthorizeddebits', numberOfRecords: 1000 }),
+      body: JSON.stringify({ daysAhead: 60 }),
     });
     const d = await r.json().catch(() => ({}));
     if (_rptTab !== 'schedule') return;
     if (!r.ok || !d || d.ok === false) {
-      const diag = {
-        detail: (d && (d.detail || d.error)) || ('HTTP ' + r.status),
-        attempts: (d && d.attempts) || undefined,
-        loanModelsDiscovered: (d && d.loanModelsDiscovered) || undefined,
-      };
-      table.innerHTML = '<div class="tbl-empty"><div style="margin-bottom:10px;color:var(--red);font-weight:700">Couldn\'t load the schedule from Vergent</div><pre style="text-align:left;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;font-size:11px;overflow:auto;max-height:400px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(JSON.stringify(diag, null, 2)) + '</pre><div style="font-size:11.5px;color:var(--muted);margin-top:8px">Screenshot this and send it to your dev — it shows exactly what Vergent answered.</div></div>';
+      table.innerHTML = '<div class="tbl-empty"><div style="margin-bottom:10px;color:var(--red);font-weight:700">Couldn\'t load the schedule from Vergent</div><pre style="text-align:left;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;font-size:11px;overflow:auto;max-height:400px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(String((d && (d.detail || d.error)) || ('HTTP ' + r.status))) + '</pre><div style="font-size:11.5px;color:var(--muted);margin-top:8px">Screenshot this and send it to your dev.</div></div>';
       return;
     }
     _schedRows = (d.rows || []).map(_schedNormalize);
+    _schedMeta = { partial: !!d.partial, loansScanned: d.loansScanned || 0, loansTotal: d.loansTotal || 0 };
     renderScheduleView();
   } catch (e) {
     if (table) table.innerHTML = '<div class="tbl-empty">Network error: ' + escapeHtml(e.message || String(e)) + '</div>';
@@ -15266,20 +15253,13 @@ function renderScheduleView() {
   const q = (document.getElementById('rpt-search')?.value || '').toLowerCase().trim();
   let list = _schedRows || [];
   if (q) list = list.filter(r => JSON.stringify(r).toLowerCase().includes(q));
-  if (status) status.textContent = list.length + ' scheduled payment' + (list.length === 1 ? '' : 's');
+  const scanned = _schedMeta ? (_schedMeta.loansScanned + ' of ' + _schedMeta.loansTotal + ' active loans scanned') : '';
+  if (status) status.textContent = list.length + ' scheduled payment' + (list.length === 1 ? '' : 's') + (scanned ? ' · ' + scanned : '');
+  const partialBanner = (_schedMeta && _schedMeta.partial)
+    ? '<div style="display:flex;align-items:center;gap:8px;background:#fff5e6;color:#5a3300;border:1px solid #f2d46c;border-radius:10px;padding:10px 14px;font-size:12.5px;font-weight:600;margin-bottom:12px">⏳ First scan is still warming up (' + escapeHtml(scanned) + '). Tap Refresh in a few seconds for the rest.</div>'
+    : '';
   if (!list.length) {
-    table.innerHTML = '<div class="tbl-empty">No scheduled card payments found in Vergent right now.</div>';
-    return;
-  }
-
-  // Unknown row shape: show the raw fields so nothing is hidden and
-  // the real Vergent column names surface for mapping.
-  const probe = list[0];
-  if (!probe.CustomerId && !probe.LoanId && probe._schedAmt == null) {
-    const keys = Object.keys(probe).filter(k => !k.startsWith('_')).slice(0, 8);
-    const head = keys.map(k => '<th>' + escapeHtml(k) + '</th>').join('');
-    const body = list.slice(0, 300).map(r => '<tr>' + keys.map(k => '<td>' + escapeHtml(String(r[k] != null ? r[k] : '')) + '</td>').join('') + '</tr>').join('');
-    table.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Raw view — Vergent returned fields we haven\'t mapped yet. Screenshot the column names for your dev.</div><div class="tbl-card-scroll"><table class="tbl cq-plain"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+    table.innerHTML = partialBanner + '<div class="tbl-empty">No scheduled payments on file across your active loans right now.' + (scanned ? '<div style="font-size:11.5px;color:var(--muted);margin-top:6px">' + escapeHtml(scanned) + '</div>' : '') + '</div>';
     return;
   }
 
@@ -15307,7 +15287,8 @@ function renderScheduleView() {
     '<div style="font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">' + escapeHtml(label) + '</div>' +
     '<div style="font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--text);font-variant-numeric:tabular-nums">' + _schedMoney(sum(arr)) + '</div>' +
     '<div style="font-size:11.5px;color:var(--muted);font-weight:500;margin-top:4px">' + arr.length + ' payment' + (arr.length === 1 ? '' : 's') + '</div></div>';
-  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px">' +
+  let html = partialBanner +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px">' +
     statCard('Scheduled Today', byGroup.today) + statCard('Next 7 Days', weekArr) + statCard('Total Scheduled', list) + '</div>';
 
   window._lnsRowCache = window._lnsRowCache || {};
@@ -15324,8 +15305,11 @@ function renderScheduleView() {
            : '<span style="color:var(--red);font-weight:700">' + (-dd) + 'd ago</span>';
     }
     const phoneFmt = r.PrimaryPhoneNumber ? _fmtPhoneUS(r.PrimaryPhoneNumber) : '—';
+    const methodChip = r._schedIsCard
+      ? '<span title="' + escapeHtml((r._schedSource === 'automatic' ? 'Automatic' : 'Manual') + ' card payment' + (r._schedMethod ? ' · ' + r._schedMethod : '')) + '" style="display:inline-block;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;white-space:nowrap">💳 Card</span>'
+      : '<span title="' + escapeHtml((r._schedSource === 'automatic' ? 'Automatic' : 'Manual') + (r._schedMethod ? ' · ' + r._schedMethod : '')) + '" style="display:inline-block;background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;white-space:nowrap">' + escapeHtml(r._schedMethod || 'Other') + '</span>';
     return '<tr style="cursor:pointer" title="Tap to view customer details" onclick="openLoansDueDetailModal(window._lnsRowCache[\'' + rowKey + '\'])">' +
-      '<td><div class="applicant-name"><span style="color:var(--text);font-weight:700">' + escapeHtml(name) + '</span></div>' + (r.CustomerId ? '<div class="applicant-id">Cust #' + escapeHtml(r.CustomerId) + '</div>' : '') + '</td>' +
+      '<td><div class="applicant-name"><span style="color:var(--text);font-weight:700">' + escapeHtml(name) + '</span>' + methodChip + '</div>' + (r.CustomerId ? '<div class="applicant-id">Cust #' + escapeHtml(r.CustomerId) + '</div>' : '') + '</td>' +
       '<td>' + escapeHtml(phoneFmt) + '</td>' +
       '<td>' + escapeHtml(r.LoanId || r.HdrId || '—') + '</td>' +
       '<td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:700">' + (r._schedAmt != null ? escapeHtml(_schedMoney(r._schedAmt)) : '—') + '</td>' +
