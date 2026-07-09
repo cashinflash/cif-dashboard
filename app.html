@@ -15239,7 +15239,7 @@ async function loadScheduleView() {
       return;
     }
     _schedRows = (d.rows || []).map(_schedNormalize);
-    _schedMeta = { partial: !!d.partial, loansScanned: d.loansScanned || 0, loansTotal: d.loansTotal || 0, source: d.source || '' };
+    _schedMeta = { partial: !!d.partial, loansScanned: d.loansScanned || 0, loansTotal: d.loansTotal || 0, source: d.source || '', reportAttempts: d.reportAttempts || null, reportError: d.reportError || '' };
     renderScheduleView();
   } catch (e) {
     if (table) table.innerHTML = '<div class="tbl-empty">Network error: ' + escapeHtml(e.message || String(e)) + '</div>';
@@ -15370,9 +15370,15 @@ function renderScheduleView() {
     '<div style="font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">' + escapeHtml(label) + '</div>' +
     '<div style="font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--text);font-variant-numeric:tabular-nums">' + _schedMoney(sum(arr)) + '</div>' +
     '<div style="font-size:11.5px;color:var(--muted);font-weight:500;margin-top:4px">' + arr.length + ' payment' + (arr.length === 1 ? '' : 's') + '</div></div>';
-  const srcNote = (_schedMeta && _schedMeta.source === 'fanout_manual')
-    ? '<div style="font-size:11.5px;color:var(--muted);margin:-6px 0 12px">Showing operator-scheduled payments from loan records (Vergent\'s Card Payment Process Report was unreachable just now).</div>'
-    : '';
+  let srcNote = '';
+  if (_schedMeta && _schedMeta.source === 'fanout_manual') {
+    const diag = { reportError: _schedMeta.reportError || undefined, attempts: _schedMeta.reportAttempts || undefined };
+    srcNote = '<div style="font-size:11.5px;color:var(--muted);margin:-6px 0 12px">Showing operator-scheduled payments from loan records (Vergent\'s Card Payment Process Report couldn\'t be located).' +
+      ((_schedMeta.reportAttempts && _schedMeta.reportAttempts.length) || _schedMeta.reportError
+        ? ' <details style="display:inline-block;vertical-align:top"><summary style="cursor:pointer;color:var(--green-dark);font-weight:700">Technical details (screenshot this for your dev)</summary><pre style="text-align:left;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:10.5px;overflow:auto;max-height:320px;white-space:pre-wrap;word-break:break-word;margin-top:6px">' + escapeHtml(JSON.stringify(diag, null, 2)) + '</pre></details>'
+        : '') +
+      '</div>';
+  }
   const selNote = (_schedSelDay != null)
     ? '<div style="display:flex;align-items:center;gap:8px;background:#ecfdf5;color:var(--green-dark);border:1px solid #a7e8c2;border-radius:10px;padding:8px 12px;font-size:12.5px;font-weight:700;margin-bottom:12px">Showing ' + escapeHtml(new Date(_schedSelDay).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })) + ' only · ' + dayList.length + ' payment' + (dayList.length === 1 ? '' : 's') + ' · ' + _schedMoney(sum(dayList)) + '<button class="chip" style="background:white;margin-left:auto" onclick="schedPickDay(null)">Clear</button></div>'
     : '';
