@@ -15198,6 +15198,8 @@ function _renderPaymentAttemptsTable_render(el, list, cidFallbackNotice) {
 //     balance / Schedule Payment / Open in Vergent / Open in Admin).
 let _schedRows = [];
 let _schedMeta = null;
+let _schedCalMonth = null;   // {y, m} shown on the calendar; null = current month
+let _schedSelDay = null;     // local-midnight ms of the tapped day, or null = all
 
 function _schedNormalize(r) {
   const rawDate = r.schedDate || '';
@@ -15235,7 +15237,7 @@ async function loadScheduleView() {
       return;
     }
     _schedRows = (d.rows || []).map(_schedNormalize);
-    _schedMeta = { partial: !!d.partial, loansScanned: d.loansScanned || 0, loansTotal: d.loansTotal || 0 };
+    _schedMeta = { partial: !!d.partial, loansScanned: d.loansScanned || 0, loansTotal: d.loansTotal || 0, source: d.source || '' };
     renderScheduleView();
   } catch (e) {
     if (table) table.innerHTML = '<div class="tbl-empty">Network error: ' + escapeHtml(e.message || String(e)) + '</div>';
@@ -15246,6 +15248,80 @@ function _schedMoney(n) {
   return '$' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function _schedMoneyShort(n) {
+  n = Number(n || 0);
+  if (n >= 10000) return '$' + (n / 1000).toFixed(1) + 'k';
+  return '$' + Math.round(n).toLocaleString();
+}
+
+function schedCalNav(dir) {
+  const now = new Date();
+  if (dir === 0) {
+    _schedCalMonth = null;
+  } else {
+    const base = _schedCalMonth || { y: now.getFullYear(), m: now.getMonth() };
+    const d = new Date(base.y, base.m + dir, 1);
+    _schedCalMonth = { y: d.getFullYear(), m: d.getMonth() };
+  }
+  renderScheduleView();
+}
+
+function schedPickDay(ms) {
+  _schedSelDay = (ms == null || _schedSelDay === ms) ? null : ms;
+  renderScheduleView();
+}
+
+// Month calendar: every day shows its scheduled total + count, shaded
+// deeper green as the day's dollars grow. Tapping a day filters the
+// list below to just that day; tapping again (or "Show all days")
+// clears the filter.
+function _schedCalHtml(list, today) {
+  const now = new Date();
+  const base = _schedCalMonth || { y: now.getFullYear(), m: now.getMonth() };
+  const first = new Date(base.y, base.m, 1);
+  const startDow = first.getDay();
+  const daysInMonth = new Date(base.y, base.m + 1, 0).getDate();
+  const byDay = {};
+  list.forEach(r => {
+    if (isNaN(r._schedMs)) return;
+    const b = byDay[r._schedMs] = byDay[r._schedMs] || { n: 0, amt: 0 };
+    b.n++; b.amt += (r._schedAmt || 0);
+  });
+  const maxAmt = Math.max(1, ...Object.values(byDay).map(d => d.amt));
+  const monthName = first.toLocaleString(undefined, { month: 'long', year: 'numeric' });
+  let cells = '';
+  for (let i = 0; i < startDow; i++) cells += '<div></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ms = new Date(base.y, base.m, d).getTime();
+    const info = byDay[ms];
+    const isToday = ms === today;
+    const isSel = _schedSelDay === ms;
+    const heat = info ? Math.min(1, info.amt / maxAmt) : 0;
+    const bg = isSel ? 'var(--green)' : info ? 'rgba(26,171,109,' + (0.10 + heat * 0.32).toFixed(2) + ')' : 'white';
+    cells += '<div ' + (info ? 'onclick="schedPickDay(' + ms + ')" role="button" ' : '') +
+      'style="cursor:' + (info ? 'pointer' : 'default') + ';background:' + bg + ';border:' + (isToday ? '2px solid var(--green)' : '1px solid var(--border)') + ';border-radius:10px;padding:6px 3px 5px;min-height:54px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px;overflow:hidden">' +
+      '<div style="font-size:11px;font-weight:' + (isToday ? '800' : '600') + ';color:' + (isSel ? 'white' : isToday ? 'var(--green-dark)' : 'var(--muted)') + '">' + d + '</div>' +
+      (info
+        ? '<div style="font-size:10.5px;font-weight:800;color:' + (isSel ? 'white' : 'var(--text)') + ';font-variant-numeric:tabular-nums;white-space:nowrap">' + _schedMoneyShort(info.amt) + '</div>' +
+          '<div style="font-size:9.5px;color:' + (isSel ? 'rgba(255,255,255,.85)' : 'var(--muted)') + ';white-space:nowrap">' + info.n + ' pmt' + (info.n === 1 ? '' : 's') + '</div>'
+        : '') +
+      '</div>';
+  }
+  const dow = ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d =>
+    '<div style="font-size:9.5px;font-weight:800;color:var(--muted);text-align:center;letter-spacing:.04em;padding-bottom:2px">' + d + '</div>').join('');
+  return '<div style="background:white;border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-xs);margin-bottom:16px">' +
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
+      '<div style="font-size:13.5px;font-weight:800;color:var(--text)">' + escapeHtml(monthName) + '</div>' +
+      '<div style="flex:1"></div>' +
+      (_schedSelDay != null ? '<button class="chip" style="background:white" onclick="schedPickDay(null)">Show all days</button>' : '') +
+      '<button class="chip" style="background:white;min-width:34px" onclick="schedCalNav(-1)" title="Previous month">‹</button>' +
+      '<button class="chip" style="background:white" onclick="schedCalNav(0)">Today</button>' +
+      '<button class="chip" style="background:white;min-width:34px" onclick="schedCalNav(1)" title="Next month">›</button>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">' + dow + cells + '</div>' +
+  '</div>';
+}
+
 function renderScheduleView() {
   const table = document.getElementById('rpt-table');
   const status = document.getElementById('rpt-status');
@@ -15253,7 +15329,7 @@ function renderScheduleView() {
   const q = (document.getElementById('rpt-search')?.value || '').toLowerCase().trim();
   let list = _schedRows || [];
   if (q) list = list.filter(r => JSON.stringify(r).toLowerCase().includes(q));
-  const scanned = _schedMeta ? (_schedMeta.loansScanned + ' of ' + _schedMeta.loansTotal + ' active loans scanned') : '';
+  const scanned = (_schedMeta && _schedMeta.loansTotal > 0) ? (_schedMeta.loansScanned + ' of ' + _schedMeta.loansTotal + ' active loans scanned') : '';
   if (status) status.textContent = list.length + ' scheduled payment' + (list.length === 1 ? '' : 's') + (scanned ? ' · ' + scanned : '');
   const partialBanner = (_schedMeta && _schedMeta.partial)
     ? '<div style="display:flex;align-items:center;gap:8px;background:#fff5e6;color:#5a3300;border:1px solid #f2d46c;border-radius:10px;padding:10px 14px;font-size:12.5px;font-weight:600;margin-bottom:12px">⏳ First scan is still warming up (' + escapeHtml(scanned) + '). Tap Refresh in a few seconds for the rest.</div>'
@@ -15265,6 +15341,10 @@ function renderScheduleView() {
 
   const today = _todayMidnight();
   const day = 24 * 60 * 60 * 1000;
+  // Day filter from the calendar applies to the group tables below;
+  // the calendar + stat cards always show the whole (searched) set so
+  // the overview never vanishes while a day is selected.
+  const dayList = (_schedSelDay != null) ? list.filter(r => r._schedMs === _schedSelDay) : list;
   const groups = [
     { key: 'earlier',  label: 'Earlier (check these)', test: ms => !isNaN(ms) && ms < today },
     { key: 'today',    label: 'Today',                 test: ms => ms === today },
@@ -15275,21 +15355,30 @@ function renderScheduleView() {
   ];
   const byGroup = {};
   groups.forEach(g => byGroup[g.key] = []);
-  list.forEach(r => {
+  dayList.forEach(r => {
     const g = groups.find(g => g.test(r._schedMs));
     if (g) byGroup[g.key].push(r);
   });
   Object.values(byGroup).forEach(arr => arr.sort((a, b) => (a._schedMs || 0) - (b._schedMs || 0)));
 
   const sum = arr => arr.reduce((s, r) => s + (r._schedAmt || 0), 0);
-  const weekArr = byGroup.today.concat(byGroup.tomorrow, byGroup.week);
+  const statToday = list.filter(r => r._schedMs === today);
+  const statWeek = list.filter(r => !isNaN(r._schedMs) && r._schedMs >= today && r._schedMs <= today + 7 * day);
   const statCard = (label, arr) => '<div style="background:white;border:1px solid var(--border);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-xs)">' +
     '<div style="font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">' + escapeHtml(label) + '</div>' +
     '<div style="font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--text);font-variant-numeric:tabular-nums">' + _schedMoney(sum(arr)) + '</div>' +
     '<div style="font-size:11.5px;color:var(--muted);font-weight:500;margin-top:4px">' + arr.length + ' payment' + (arr.length === 1 ? '' : 's') + '</div></div>';
+  const srcNote = (_schedMeta && _schedMeta.source === 'fanout_manual')
+    ? '<div style="font-size:11.5px;color:var(--muted);margin:-6px 0 12px">Showing operator-scheduled payments from loan records (Vergent\'s Card Payment Process Report was unreachable just now).</div>'
+    : '';
+  const selNote = (_schedSelDay != null)
+    ? '<div style="display:flex;align-items:center;gap:8px;background:#ecfdf5;color:var(--green-dark);border:1px solid #a7e8c2;border-radius:10px;padding:8px 12px;font-size:12.5px;font-weight:700;margin-bottom:12px">Showing ' + escapeHtml(new Date(_schedSelDay).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })) + ' only · ' + dayList.length + ' payment' + (dayList.length === 1 ? '' : 's') + ' · ' + _schedMoney(sum(dayList)) + '<button class="chip" style="background:white;margin-left:auto" onclick="schedPickDay(null)">Clear</button></div>'
+    : '';
   let html = partialBanner +
+    _schedCalHtml(list, today) +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px">' +
-    statCard('Scheduled Today', byGroup.today) + statCard('Next 7 Days', weekArr) + statCard('Total Scheduled', list) + '</div>';
+    statCard('Scheduled Today', statToday) + statCard('Next 7 Days', statWeek) + statCard('Total Scheduled', list) + '</div>' +
+    srcNote + selNote;
 
   window._lnsRowCache = window._lnsRowCache || {};
   const rowHtml = r => {
