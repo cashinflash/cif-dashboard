@@ -11579,6 +11579,29 @@ function _rptFmtDate(s) {
   if (isNaN(d.getTime())) return String(s);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 }
+function _fmtVergentDate(s, opts) {
+  // Format the DATE PART of a Vergent date string without timezone
+  // drift. new Date('2026-07-12') parses as UTC midnight, which
+  // renders as the PREVIOUS day in California — the operator-reported
+  // off-by-one on scheduled-payment dates in the servicing modals.
+  // Build a local-midnight Date from the literal digits instead, so
+  // the day (and weekday) always match what Vergent shows.
+  if (!s) return '—';
+  const str = String(s);
+  let dt = null;
+  let m = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) dt = new Date(+m[1], +m[2] - 1, +m[3]);
+  if (!dt) {
+    m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (m) dt = new Date(+m[3], +m[1] - 1, +m[2]);
+  }
+  if (!dt || isNaN(dt.getTime())) {
+    const f = new Date(str);
+    if (isNaN(f.getTime())) return str;
+    dt = f;
+  }
+  return dt.toLocaleDateString(undefined, opts || { month: 'short', day: 'numeric', year: 'numeric' });
+}
 function _rptFmtRelative(t) {
   if (!t) return '';
   const sec = Math.floor((Date.now() - t) / 1000);
@@ -11700,6 +11723,11 @@ function setReportTab(tab) {
     if (checkBalProg) checkBalProg.style.display = 'none';
     if (loadedAt) loadedAt.style.display = 'none';
     _stopUpcomingAuto();
+    // Opening the tab always starts on TODAY's payments (the full list
+    // is huge) — tapping today's calendar cell again, any other day,
+    // or "Show all days" widens it.
+    _schedSelDay = _todayMidnight();
+    _schedCalMonth = null;
     // Instant paint from the rows we already have, then refresh
     // quietly — no loading flash when flipping back to this tab.
     if (_schedRows && _schedRows.length) {
@@ -12614,9 +12642,7 @@ async function _loadPayOvCustomerNextPayDate(row) {
     auto.sort((a, b) => (new Date(a.date || 0).getTime() || 0) - (new Date(b.date || 0).getTime() || 0));
     const now = Date.now();
     const next = auto.find(s => (new Date(s.date || 0).getTime() || 0) >= now - 86400000) || auto[0];
-    const dt = new Date(next.date);
-    const dateStr = isNaN(dt) ? String(next.date || '—')
-      : dt.toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric', year:'numeric'});
+    const dateStr = _fmtVergentDate(next.date, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
     const amtStr = next.amount ? '  ·  $' + Number(next.amount).toFixed(2) : '';
     el.innerHTML = '<b style="font-variant-numeric:tabular-nums">' + escapeHtml(dateStr) + '</b>'
       + '<span style="color:var(--muted);font-size:12px">' + escapeHtml(amtStr) + '</span>';
@@ -12656,11 +12682,7 @@ async function _loadPayOvNextPayDate(row) {
       nextEl.innerHTML = '<span style="color:var(--muted)">No scheduled payments.</span>';
       return;
     }
-    const fmtDate = (s) => {
-      if (!s) return '—';
-      try { const dt = new Date(s); if (!isNaN(dt)) return dt.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'2-digit'}); } catch (e) {}
-      return s;
-    };
+    const fmtDate = (s) => _fmtVergentDate(s, { month: 'short', day: 'numeric', year: '2-digit' });
     const methodPill = (s) => {
       const isCard = s.is_card || /card|credit|debit|cc/i.test(s.method || '');
       return isCard
@@ -12709,11 +12731,7 @@ async function _loadPayOvLoanHistory(row) {
       el.innerHTML = '<span style="color:var(--muted)">No prior loans.</span>';
       return;
     }
-    const fmtDate = (s) => {
-      if (!s) return '—';
-      try { const dt = new Date(s); if (!isNaN(dt)) return dt.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'2-digit'}); } catch (e) {}
-      return s;
-    };
+    const fmtDate = (s) => _fmtVergentDate(s, { month: 'short', day: 'numeric', year: '2-digit' });
     // Days-late readout — same logic as the hover-popup _loanHistRender
     // (line ~11598). Vergent stores late status both as a numeric
     // days_late + a label string ("1 Day Late" / "Not Late"); we use
@@ -14258,7 +14276,7 @@ function _loanHistRender(cid, name) {
   if (!c || c.loading) return head + '<div style="color:var(--muted);padding:6px 0">Loading loan history…</div>';
   if (c.error)         return head + `<div style="color:var(--red);padding:6px 0">Couldn't load history. <span style="color:var(--muted);font-size:11px">(${escapeHtml(c.error)})</span></div>`;
   if (!c.loans.length) return head + '<div style="color:var(--muted);padding:6px 0">No prior loans on file.</div>';
-  const fmtDate = iso => { try { const d = new Date(iso); return isNaN(d) ? (iso || '—') : d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); } catch (e) { return iso || '—'; } };
+  const fmtDate = iso => _fmtVergentDate(iso, { month: 'short', day: 'numeric', year: 'numeric' });
   const fmtMoney = n => { const v = Number(n) || 0; return '$' + v.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0}); };
   const statusColor = s => {
     const t = (s || '').toLowerCase();
@@ -15328,8 +15346,8 @@ function _schedCalHtml(list, today) {
     const isSel = _schedSelDay === ms;
     const heat = info ? Math.min(1, info.amt / maxAmt) : 0;
     const bg = isSel ? 'var(--green)' : info ? 'rgba(26,171,109,' + (0.10 + heat * 0.32).toFixed(2) + ')' : 'white';
-    cells += '<div ' + (info ? 'onclick="schedPickDay(' + ms + ')" role="button" ' : '') +
-      'style="cursor:' + (info ? 'pointer' : 'default') + ';background:' + bg + ';border:' + (isToday ? '2px solid var(--green)' : '1px solid var(--border)') + ';border-radius:10px;padding:6px 3px 5px;min-height:54px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px;overflow:hidden">' +
+    cells += '<div ' + ((info || isToday) ? 'onclick="schedPickDay(' + ms + ')" role="button" ' : '') +
+      'style="cursor:' + ((info || isToday) ? 'pointer' : 'default') + ';background:' + bg + ';border:' + (isToday ? '2px solid var(--green)' : '1px solid var(--border)') + ';border-radius:10px;padding:6px 3px 5px;min-height:54px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px;overflow:hidden">' +
       '<div style="font-size:11px;font-weight:' + (isToday ? '800' : '600') + ';color:' + (isSel ? 'white' : isToday ? 'var(--green-dark)' : 'var(--muted)') + '">' + d + '</div>' +
       (info
         ? '<div style="font-size:10.5px;font-weight:800;color:' + (isSel ? 'white' : 'var(--text)') + ';font-variant-numeric:tabular-nums;white-space:nowrap">' + _schedMoneyShort(info.amt) + '</div>' +
@@ -15442,6 +15460,9 @@ function renderScheduleView() {
       '<td><span class="tbl-time">' + escapeHtml(r._schedRaw ? _rptFmtDate(r._schedRaw) : '—') + (r._schedTime ? ' · ' + escapeHtml(r._schedTime) : '') + '</span>' + (when ? '<div style="font-size:11px">' + when + '</div>' : '') + '</td>' +
     '</tr>';
   };
+  if (_schedSelDay != null && !dayList.length) {
+    html += '<div class="tbl-empty">No payments scheduled for this day. Tap another day on the calendar, or "Show all days".</div>';
+  }
   groups.forEach(g => {
     const arr = byGroup[g.key];
     if (!arr.length) return;
@@ -15562,11 +15583,7 @@ async function _loadLnsOvScheduled(row) {
       el.innerHTML = '<span style="color:var(--muted)">No scheduled payments.</span>';
       return;
     }
-    const fmtDate = (s) => {
-      if (!s) return '—';
-      try { const dt = new Date(s); if (!isNaN(dt)) return dt.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'2-digit'}); } catch (e) {}
-      return s;
-    };
+    const fmtDate = (s) => _fmtVergentDate(s, { month: 'short', day: 'numeric', year: '2-digit' });
     const methodPill = (s) => {
       const isCard = s.is_card || /card|credit|debit|cc/i.test(s.method || '');
       return isCard
@@ -15607,11 +15624,7 @@ async function _loadLnsOvLoanHistory(row) {
     const d = await r.json().catch(() => ({}));
     const loans = (d && d.loans) || [];
     if (!loans.length) { el.innerHTML = '<span style="color:var(--muted)">No prior loans.</span>'; return; }
-    const fmtDate = (s) => {
-      if (!s) return '—';
-      try { const dt = new Date(s); if (!isNaN(dt)) return dt.toLocaleDateString(undefined, {month:'short',day:'numeric',year:'2-digit'}); } catch (e) {}
-      return s;
-    };
+    const fmtDate = (s) => _fmtVergentDate(s, { month: 'short', day: 'numeric', year: '2-digit' });
     const lateCell = (ln) => {
       const dlRaw  = (ln.days_late_label && String(ln.days_late_label).trim()) || '';
       const dlRawL = dlRaw.toLowerCase();
