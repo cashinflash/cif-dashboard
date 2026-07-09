@@ -15212,8 +15212,10 @@ function _schedNormalize(r) {
     PrimaryPhoneNumber: String(r.PrimaryPhoneNumber || ''),
     _schedMs: _localMidnight(rawDate),
     _schedRaw: rawDate ? String(rawDate).slice(0, 10) : '',
+    _schedTime: String(r.schedTime || ''),
     _schedAmt: amt,
     _schedMethod: String(r.schedMethod || ''),
+    _schedLast4: String(r.cardLast4 || ''),
     _schedIsCard: !!r.schedIsCard,
     _schedSource: String(r.schedSource || ''),
   });
@@ -15394,15 +15396,16 @@ function renderScheduleView() {
            : '<span style="color:var(--red);font-weight:700">' + (-dd) + 'd ago</span>';
     }
     const phoneFmt = r.PrimaryPhoneNumber ? _fmtPhoneUS(r.PrimaryPhoneNumber) : '—';
-    const methodChip = r._schedIsCard
-      ? '<span title="' + escapeHtml((r._schedSource === 'automatic' ? 'Automatic' : 'Manual') + ' card payment' + (r._schedMethod ? ' · ' + r._schedMethod : '')) + '" style="display:inline-block;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;white-space:nowrap">💳 Card</span>'
-      : '<span title="' + escapeHtml((r._schedSource === 'automatic' ? 'Automatic' : 'Manual') + (r._schedMethod ? ' · ' + r._schedMethod : '')) + '" style="display:inline-block;background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;white-space:nowrap">' + escapeHtml(r._schedMethod || 'Other') + '</span>';
+    const chipLabel = r._schedIsCard
+      ? '💳 ' + (r._schedLast4 ? '•• ' + r._schedLast4 : 'Card')
+      : (r._schedMethod || 'Other');
+    const methodChip = '<span title="' + escapeHtml((r._schedSource === 'automatic' ? 'Automatic' : r._schedSource === 'vergent_report' ? 'Scheduled' : 'Manual') + (r._schedMethod ? ' · ' + r._schedMethod : '')) + '" style="display:inline-block;background:' + (r._schedIsCard ? '#e8f3f8' : '#f3f4f6') + ';color:' + (r._schedIsCard ? '#1a4d6b' : '#6b7280') + ';border:1px solid ' + (r._schedIsCard ? '#6cb1e2' : '#d1d5db') + ';border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px;white-space:nowrap">' + escapeHtml(chipLabel) + '</span>';
     return '<tr style="cursor:pointer" title="Tap to view customer details" onclick="openLoansDueDetailModal(window._lnsRowCache[\'' + rowKey + '\'])">' +
       '<td><div class="applicant-name"><span style="color:var(--text);font-weight:700">' + escapeHtml(name) + '</span>' + methodChip + '</div>' + (r.CustomerId ? '<div class="applicant-id">Cust #' + escapeHtml(r.CustomerId) + '</div>' : '') + '</td>' +
       '<td>' + escapeHtml(phoneFmt) + '</td>' +
       '<td>' + escapeHtml(r.LoanId || r.HdrId || '—') + '</td>' +
       '<td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:700">' + (r._schedAmt != null ? escapeHtml(_schedMoney(r._schedAmt)) : '—') + '</td>' +
-      '<td><span class="tbl-time">' + escapeHtml(r._schedRaw || '—') + '</span>' + (when ? '<div style="font-size:11px">' + when + '</div>' : '') + '</td>' +
+      '<td><span class="tbl-time">' + escapeHtml(r._schedRaw ? _rptFmtDate(r._schedRaw) : '—') + (r._schedTime ? ' · ' + escapeHtml(r._schedTime) : '') + '</span>' + (when ? '<div style="font-size:11px">' + when + '</div>' : '') + '</td>' +
     '</tr>';
   };
   groups.forEach(g => {
