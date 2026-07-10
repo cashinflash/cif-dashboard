@@ -1422,8 +1422,18 @@ class Handler(BaseHTTPRequestHandler):
             if not _fb_path_is_safe(fb_path):
                 self.send_json(403, {'error': 'forbidden_fb_path'}); return
             try:
-                with urllib.request.urlopen(_fb_url(fb_path), timeout=10) as r:
+                # Ask Firebase for gzip on the upstream leg (perf
+                # 2026-07-09): the index poll's Firebase→Render hop was
+                # uncompressed — ~10x the bytes and the metered RTDB
+                # egress. Decompress here; the response middleware
+                # re-gzips for the browser as before.
+                _greq = urllib.request.Request(
+                    _fb_url(fb_path), headers={'Accept-Encoding': 'gzip'})
+                with urllib.request.urlopen(_greq, timeout=10) as r:
                     body = r.read()
+                    if (r.headers.get('Content-Encoding') or '').lower() == 'gzip':
+                        import gzip as _gz
+                        body = _gz.decompress(body)
                 self.send_response(200)
                 for k, v in CORS.items():
                     self.send_header(k, v)
@@ -1891,11 +1901,21 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(400, {'error': 'invalid_json'}); return
             fb_id = (body.get('firebase_id') or '').strip()
             action = (body.get('humanAction') or '').strip().lower()
-            if not fb_id or action not in ('funded', 'declined'):
-                self.send_json(400, {'error': 'firebase_id and humanAction (funded|declined) required'})
+            status = (body.get('status') or '').strip()
+            # Consolidated endpoint (perf 2026-07-09): setStatus now sends
+            # the status change HERE too, so one click = ONE awaited
+            # Firebase round trip (a multi-path PATCH that updates the
+            # record and its reportsIndex row together) instead of the
+            # old 4-write chain across two requests. Accepts status-only
+            # calls (no humanAction) for non-funded/declined statuses.
+            if action and action not in ('funded', 'declined'):
+                self.send_json(400, {'error': 'humanAction must be funded|declined'})
+                return
+            if not fb_id or (not action and not status):
+                self.send_json(400, {'error': 'firebase_id and humanAction or status required'})
                 return
             # Format-validate fb_id before interpolating into Firebase
-            # paths below (`overrides/{fb_id}.json`, `reports/{fb_id}.json`).
+            # paths below (`overrides/{fb_id}.json`, `reports/{fb_id}...`).
             # Without this guard, fb_id="a/b" would write to a nested
             # node instead of the intended top-level record.
             if not _FB_ID_RE.match(fb_id):
@@ -1904,40 +1924,66 @@ class Handler(BaseHTTPRequestHandler):
             operator = sessions.get(token, {}).get('user', 'unknown')
             now_ms = int(time.time() * 1000)
             try:
-                if body.get('isOverride'):
-                    override_rec = json.dumps({
-                        'ts': now_ms,
-                        'operator': operator,
-                        'engineVerdict': body.get('engineVerdict') or '',
-                        'engineTier': body.get('engineTier') or 0,
-                        'humanAction': action,
-                        'amount': body.get('amount') or 0,
-                        'reason': (body.get('reason') or '').strip(),
-                    }).encode()
-                    oreq = urllib.request.Request(
-                        _fb_url(f'overrides/{fb_id}.json'), data=override_rec,
-                        headers={'Content-Type': 'application/json'}, method='PUT')
-                    urllib.request.urlopen(oreq, timeout=10).read()
-                    _audit('engine_override', user=operator, fb_id=fb_id,
-                           action=action, engine=body.get('engineVerdict') or '')
-                ha_patch = json.dumps({
-                    'humanAction': action,
-                    'humanActionAt': now_ms,
-                    'humanActionBy': operator,
-                    'updatedAt': now_ms,
-                }).encode()
-                hreq = urllib.request.Request(
-                    _fb_url(f'reports/{fb_id}.json'), data=ha_patch,
+                fields = {'updatedAt': now_ms}
+                if status:
+                    fields['status'] = status
+                    try:
+                        fields['statusUpdatedAt'] = int(body.get('statusUpdatedAt') or now_ms)
+                    except (TypeError, ValueError):
+                        fields['statusUpdatedAt'] = now_ms
+                if action:
+                    fields['humanAction'] = action
+                    fields['humanActionAt'] = now_ms
+                    fields['humanActionBy'] = operator
+                # ONE multi-path PATCH at the DB root updates the record
+                # AND mirrors the indexed fields onto reportsIndex — the
+                # only Firebase round trip the operator waits on.
+                multi = {}
+                for k, v in fields.items():
+                    multi[f'reports/{fb_id}/{k}'] = v
+                    if k in _INDEX_TOP_FIELDS:
+                        multi[f'reportsIndex/{fb_id}/{k}'] = v
+                mreq = urllib.request.Request(
+                    _fb_url('.json'), data=json.dumps(multi).encode(),
                     headers={'Content-Type': 'application/json'}, method='PATCH')
-                urllib.request.urlopen(hreq, timeout=10).read()
-                _mirror_report_write_to_index(f'reports/{fb_id}.json', 'PATCH', ha_patch)
-                # Reapply-block registry (2026-07-08): a manual decline arms
-                # the 30-day cooldown; a funding registers the loan's
-                # instruments for the two-loans-two-identities flag.
-                # Fire-and-forget on a thread — best-effort, the operator's
-                # click never waits on it and a registry outage never
-                # blocks the status change.
-                def _reapply_register(_fb_id=fb_id, _action=action):
+                urllib.request.urlopen(mreq, timeout=10).read()
+
+                # Everything else is best-effort bookkeeping the click
+                # should never wait on: the overrides audit record (engine
+                # crossings), the audit log line, and the reapply-block
+                # registry on cif-apply. One daemon thread, same
+                # fire-and-forget pattern reapply-register already used.
+                is_override = bool(body.get('isOverride'))
+                def _bg(_fb_id=fb_id, _action=action, _now=now_ms,
+                        _operator=operator, _body=body, _is_override=is_override):
+                    try:
+                        if _is_override and _action:
+                            override_rec = json.dumps({
+                                'ts': _now,
+                                'operator': _operator,
+                                'engineVerdict': _body.get('engineVerdict') or '',
+                                'engineTier': _body.get('engineTier') or 0,
+                                'humanAction': _action,
+                                'amount': _body.get('amount') or 0,
+                                'reason': (_body.get('reason') or '').strip(),
+                            }).encode()
+                            oreq = urllib.request.Request(
+                                _fb_url(f'overrides/{_fb_id}.json'),
+                                data=override_rec,
+                                headers={'Content-Type': 'application/json'},
+                                method='PUT')
+                            urllib.request.urlopen(oreq, timeout=10).read()
+                            _audit('engine_override', user=_operator,
+                                   fb_id=_fb_id, action=_action,
+                                   engine=_body.get('engineVerdict') or '')
+                    except Exception as _oe:
+                        print(f'[OVERRIDE] audit write {_fb_id} failed: {_oe}',
+                              flush=True)
+                    if not _action:
+                        return
+                    # Reapply-block registry (2026-07-08): a manual decline
+                    # arms the 30-day cooldown; a funding registers the
+                    # loan's instruments for the duplicate-identity flag.
                     try:
                         rreq = urllib.request.Request(
                             'https://cif-apply.onrender.com/api/reapply-register',
@@ -1950,9 +1996,9 @@ class Handler(BaseHTTPRequestHandler):
                         print(f'[REAPPLY] register {_action} {_fb_id} '
                               f'failed: {_re}', flush=True)
                 import threading as _th
-                _th.Thread(target=_reapply_register, daemon=True).start()
+                _th.Thread(target=_bg, daemon=True).start()
                 self.send_json(200, {'ok': True, 'operator': operator,
-                                     'override': bool(body.get('isOverride'))})
+                                     'override': is_override})
             except Exception as e:
                 self.send_json(500, {'error': str(e)})
             return
@@ -1986,20 +2032,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': 'firebase_proxy_failed'})
             return
 
-        if path == '/api/send-denial':
-            try:
-                import urllib.request as ur
-                payload = raw
-                req = ur.Request('https://cif-apply.onrender.com/api/send-denial',
-                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
-                with ur.urlopen(req, timeout=30) as r:
-                    result = r.read()
-                self.send_json(200, json.loads(result))
-            except Exception as e:
-                self.send_json(500, {'error': str(e)})
-            return
-
-        if path in ('/api/send-returned-payment', '/api/send-thank-you-payment', '/api/send-approval', '/api/send-card-failed', '/api/send-card-request', '/api/send-google-review', '/api/send-trustpilot-review', '/api/run-reminders-sweep', '/api/reminders-samples'):
+        # /api/send-denial rides the shared tuple below (2026-07-09):
+        # its old dedicated branch swallowed upstream error bodies — a
+        # 503 "retry or pass force_resend" from cif-apply reached the
+        # operator as a bare "HTTP Error 503". The tuple branch forwards
+        # upstream status + body verbatim.
+        if path in ('/api/send-denial', '/api/send-returned-payment', '/api/send-thank-you-payment', '/api/send-approval', '/api/send-card-failed', '/api/send-card-request', '/api/send-google-review', '/api/send-trustpilot-review', '/api/run-reminders-sweep', '/api/reminders-samples'):
             try:
                 import urllib.request as ur
                 req = ur.Request('https://cif-apply.onrender.com' + path,
