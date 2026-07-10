@@ -1184,6 +1184,11 @@ _FB_ALLOWED_PREFIXES = (
     'vergentCidIndex.json',
     'vergentLoanIndex/',
     'vergentLoanIndex.json',
+    # Server-computed dashboard roll-ups (cif-apply writes these every
+    # 10 min). Tiny; read by the dashboard for all-time KPIs so the
+    # client never has to download the full history.
+    'statsAggregates/',
+    'statsAggregates.json',
 )
 
 
@@ -1212,6 +1217,183 @@ def _fb_path_is_safe(suffix: str) -> bool:
 # as `[A-Za-z0-9_-]{10,32}`-shaped tokens. Anything else is an attacker
 # trying to slip a `/` or `..` into a path-interpolation.
 _FB_ID_RE = re.compile(r'^[A-Za-z0-9_-]{6,64}$')
+
+
+# ─── Applications window + delta (perf phase 3, 2026-07-10) ──────────
+# The queue used to download the ENTIRE /reportsIndex on every poll —
+# fine at 2k rows, real money and real seconds by 100k. These helpers
+# back /api/reports-window and /api/reports-delta:
+#   window — newest `limit` rows by createdAt PLUS every unsettled row
+#     (pending/processing/error: the operator's actual work set, so an
+#     old stuck Pending can never silently fall off the bottom), or a
+#     server-side search over the whole index when q= is given.
+#   delta  — only rows changed since the client's watermark
+#     (updatedAt OR createdAt > since); steady-state polls carry ~0-3
+#     rows instead of the whole index.
+# Both try indexed Firebase queries first (constant-time once
+# {"reportsIndex": {".indexOn": ["createdAt","updatedAt","status"]}}
+# lands in the DB rules) and transparently fall back to ONE
+# server-side full fetch + filter (the /api/comms-list pattern) — the
+# browser payload is tiny either way.
+
+def _fb_json(suffix, timeout):
+    """GET a Firebase REST path (gzip upstream) → parsed JSON."""
+    req = urllib.request.Request(_fb_url(suffix),
+                                 headers={'Accept-Encoding': 'gzip'})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        body = r.read()
+        if (r.headers.get('Content-Encoding') or '').lower() == 'gzip':
+            import gzip
+            body = gzip.decompress(body)
+    return json.loads(body or b'null')
+
+
+def _reports_bucket(row):
+    """Server-side mirror of app.html bucketStatus() — keep lock-step."""
+    s = str(row.get('status') or '').strip().lower()
+    if s == 'approved':
+        return 'approved'
+    if s == 'declined':
+        return 'declined'
+    if s in ('pending', 'review', 'pending review'):
+        return 'pending'
+    if s == 'error':
+        return 'error'
+    if 'processing' in s or 'retry' in s or 'plaid' in s:
+        return 'processing'
+    return ('processing' if row.get('processingComplete') is False
+            else 'pending')
+
+
+def _reports_row_matches(key, row, ql, qd):
+    """Search hay mirrors the client's _appHay (name/email/phone/ids)
+    plus first/last name, filename and Vergent cid; digit queries also
+    match the phone with formatting stripped."""
+    hay = ' '.join(str(row.get(f) or '') for f in (
+        'name', 'firstName', 'lastName', 'email', 'phone',
+        'submissionId', 'filename', 'vergentCid')).lower()
+    if ql in hay or ql in key.lower():
+        return True
+    if qd and len(qd) >= 4:
+        if qd in re.sub(r'\D', '', str(row.get('phone') or '')):
+            return True
+    return False
+
+
+def _reports_window_payload(limit, before=0, q=''):
+    """Compute the /api/reports-window response.
+    Returns (rows, indexed, complete, total, window_oldest). `complete`
+    means the returned rows reach the beginning of the dataset (nothing
+    older remains to page in); `total` is only known on the fallback
+    path. `window_oldest` is the oldest createdAt of the CONTIGUOUS
+    window/page rows — the client's next `before=` cursor. It must
+    exclude the unsettled stragglers stapled on below, or one ancient
+    stuck Pending would teleport the paging cursor decades back and
+    silently skip everything in between."""
+    rows, indexed, total, complete = {}, True, None, False
+    window_oldest = None
+    if not q:
+        try:
+            fbq = f'reportsIndex.json?orderBy=%22createdAt%22&limitToLast={limit}'
+            if before:
+                fbq += f'&endAt={before - 1}'
+            data = _fb_json(fbq, 25)
+            if isinstance(data, dict):
+                rows.update({k: v for k, v in data.items()
+                             if isinstance(v, dict)})
+            created = [v.get('createdAt') for v in rows.values()
+                       if isinstance(v.get('createdAt'), (int, float))]
+            window_oldest = min(created) if created else None
+            complete = len(rows) < limit
+            if not before:
+                # Unsettled rows beyond the window. equalTo is exact-
+                # case ('Pending'/'Processing'/'Error' is what cif-apply
+                # writes); odd legacy casings/variants still surface via
+                # the fallback path or the recency window itself.
+                # Fail-soft: a 400 here (no ".indexOn": "status" rule
+                # yet) must not sink the whole window.
+                for st in ('Pending', 'Processing', 'Error'):
+                    try:
+                        d2 = _fb_json('reportsIndex.json?orderBy=%22status%22'
+                                      f'&equalTo=%22{st}%22', 15)
+                        if isinstance(d2, dict):
+                            rows.update({k: v for k, v in d2.items()
+                                         if isinstance(v, dict)})
+                    except Exception:
+                        break
+        except Exception:
+            indexed = False
+    if q or not indexed:
+        data = _fb_json('reportsIndex.json', 60)
+        if not isinstance(data, dict):
+            data = {}
+        items = [(k, v) for k, v in data.items() if isinstance(v, dict)]
+        total = len(items)
+        items.sort(key=lambda kv: kv[1].get('createdAt') or 0, reverse=True)
+        if q:
+            ql, qd = q.lower(), re.sub(r'\D', '', q)
+            out = {}
+            for k, v in items:
+                if _reports_row_matches(k, v, ql, qd):
+                    out[k] = v
+                    if len(out) >= 200:
+                        break
+            return out, False, False, total, None
+        rows, indexed = {}, False
+        window_oldest = None
+        kept_older = 0
+        for k, v in items:
+            ca = v.get('createdAt') or 0
+            if before and ca >= before:
+                continue
+            if before:
+                kept_older += 1
+            if len(rows) < limit:
+                rows[k] = v
+                if ca and (window_oldest is None or ca < window_oldest):
+                    window_oldest = ca
+            elif not before and _reports_bucket(v) in ('pending',
+                                                       'processing',
+                                                       'error'):
+                rows[k] = v
+        complete = (len(rows) >= kept_older) if before else (len(rows) >= total)
+    return rows, indexed, complete, total, window_oldest
+
+
+def _reports_delta_payload(since):
+    """Compute the /api/reports-delta response.
+    Returns (rows, indexed, truncated). Truncated deltas (>2000 changed
+    rows — e.g. a laptop that slept for days across a backfill) tell
+    the client to do a full window reload instead of merging."""
+    cap = 2000
+    rows, indexed, truncated = {}, True, False
+    try:
+        for field in ('updatedAt', 'createdAt'):
+            fbq = (f'reportsIndex.json?orderBy=%22{field}%22'
+                   f'&startAt={since + 1}&limitToLast={cap + 1}')
+            data = _fb_json(fbq, 25)
+            if isinstance(data, dict):
+                got = {k: v for k, v in data.items() if isinstance(v, dict)}
+                if len(got) > cap:
+                    truncated = True
+                rows.update(got)
+    except Exception:
+        rows, indexed = {}, False
+    if not indexed:
+        data = _fb_json('reportsIndex.json', 60)
+        if not isinstance(data, dict):
+            data = {}
+        changed = [(k, v) for k, v in data.items() if isinstance(v, dict)
+                   and max(v.get('updatedAt') or 0,
+                           v.get('createdAt') or 0) > since]
+        if len(changed) > cap:
+            truncated = True
+            changed.sort(key=lambda kv: max(kv[1].get('updatedAt') or 0,
+                                            kv[1].get('createdAt') or 0),
+                         reverse=True)
+            changed = changed[:cap]
+        rows = dict(changed)
+    return rows, indexed, truncated
 
 
 def _set_session_cookie(handler, token: str, max_age: int) -> None:
@@ -1426,6 +1608,18 @@ class Handler(BaseHTTPRequestHandler):
             if not valid_session(token):
                 self.send_json(401, {'error': 'Unauthorized'}); return
             fb_path = path[4:]
+            # Forward the query string (perf phase 3): Firebase REST
+            # query params (orderBy/limitToLast/startAt/endAt) let the
+            # client window big nodes — e.g. the Instant-Funding alert
+            # poll reads only the newest 50 entries via
+            # ?orderBy="$key"&limitToLast=50 instead of the whole node.
+            # do_GET strips queries from `path`, so rebuild from
+            # self.path. Safe: _fb_path_is_safe checks the COMBINED
+            # string (prefix match is anchored at the start; the
+            # control-char guard covers the query too), and _fb_url
+            # appends our auth with '&' when a '?' is already present.
+            if '?' in self.path:
+                fb_path += '?' + self.path.split('?', 1)[1]
             # Path-traversal guard — operators can only read the
             # dashboard-relevant prefixes. Without this, an authenticated
             # operator could read e.g. /fb/users.json (the user table
@@ -1518,6 +1712,56 @@ class Handler(BaseHTTPRequestHandler):
             entries = entries[:limit]
             self.send_json(200, {'ok': True, 'entries': entries,
                                  'indexed': indexed, 'count': len(entries)})
+            return
+
+        # ─── Applications: windowed list + change-only delta ──────
+        # (perf phase 3 — helpers/pattern documented at
+        # _reports_window_payload above.)
+        if path == '/api/reports-window':
+            if not valid_session(token):
+                self.send_json(401, {'error': 'Unauthorized'}); return
+            from urllib.parse import parse_qs, urlparse
+            qs = parse_qs(urlparse(self.path).query)
+            try:
+                limit = max(50, min(int(qs.get('limit', ['1000'])[0]), 2000))
+            except (TypeError, ValueError):
+                limit = 1000
+            try:
+                before = max(0, int(qs.get('before', ['0'])[0]))
+            except (TypeError, ValueError):
+                before = 0
+            q = (qs.get('q', [''])[0] or '').strip()[:80]
+            try:
+                rows, indexed, complete, total, window_oldest = \
+                    _reports_window_payload(limit, before, q)
+            except Exception:
+                self.send_json(500, {'error': 'firebase_fetch_failed'})
+                return
+            self.send_json(200, {'ok': True, 'rows': rows,
+                                 'indexed': indexed, 'complete': complete,
+                                 'total': total, 'count': len(rows),
+                                 'windowOldest': window_oldest})
+            return
+
+        if path == '/api/reports-delta':
+            if not valid_session(token):
+                self.send_json(401, {'error': 'Unauthorized'}); return
+            from urllib.parse import parse_qs, urlparse
+            qs = parse_qs(urlparse(self.path).query)
+            try:
+                since = int(qs.get('since', ['0'])[0])
+            except (TypeError, ValueError):
+                since = 0
+            if since <= 0:
+                self.send_json(400, {'error': 'missing_since'}); return
+            try:
+                rows, indexed, truncated = _reports_delta_payload(since)
+            except Exception:
+                self.send_json(500, {'error': 'firebase_fetch_failed'})
+                return
+            self.send_json(200, {'ok': True, 'rows': rows,
+                                 'indexed': indexed, 'truncated': truncated,
+                                 'count': len(rows)})
             return
 
         # ─── Payment reminders: status card (proxy to cif-apply) ──
