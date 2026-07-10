@@ -435,6 +435,70 @@ cif-apply/CLAUDE.md "Payment reminders" for the backend. Reminder kinds
 and a grouped "Reminders" filter chip (startsWith match in
 renderCommunications).
 
+## Performance program (2026-07-09/10, phases 1-3)
+
+Harry's ask: "Fast, reliable, professional. True fintech fortune 500."
+Three phases, all shipped. Phase 1: optimistic setStatus +
+updateQueueRowInPlace (row swap, not full rebuild), route-guarded
+rerender(), fixed fast-poll predicate, async-ack emails
+(`{ok,queued,to}` after dedup claim), consolidated one-PATCH
+/api/override, gzip on the /fb/ proxy's upstream leg. Phase 2:
+Open-in-Admin made deterministic (synchronous vergentCid/Loan index
+writes at every link point, tri-state lookup contract
+200/404-no_application/503-retryable, cid-first client flow). Phase 3
+(the scale work) is below — read this before touching loadReports.
+
+### Windowed queue + delta polling (phase 3 — how data loads now)
+
+**The client NEVER downloads the full /reportsIndex (or /reports)
+anymore.** Don't reintroduce a full fetch — that was the whole point.
+
+- Boot + every ~10 min: `GET /api/reports-window?limit=1000` → newest
+  1000 rows **plus every unsettled row** (pending/processing/error —
+  so reviewQueue()/KPI-pending stay exact even when an old stuck
+  Pending falls outside the window). Response carries `complete`,
+  `total`, and `windowOldest` — the paging cursor, computed from the
+  CONTIGUOUS createdAt window only (an ancient unsettled straggler
+  must not drag the cursor back; caught by test, don't "simplify").
+- Every other poll (60s visible / 20s in-flight fast-poll):
+  `GET /api/reports-delta?since=<watermark>` → only changed rows
+  (updatedAt OR createdAt > since). `_mergeReportRows` replace-or-
+  inserts by firebaseId. Watermark `_reportsSyncAt` = max
+  created/updatedAt seen, polled with a 5s overlap (idempotent).
+  `truncated: true` (>2000 changed) → client falls back to a full
+  window reload. Deletes are invisible to delta — deleteApplication
+  splices `apps` locally and the 10-min resync reconciles cross-tab.
+- "Load older applications" button (queue tail, only when
+  `!_reportsComplete`) pages back with `before=<cursor>`.
+- Global search: local filter as before, PLUS a 400ms-debounced
+  `GET /api/reports-window?q=...` server sweep of the full index that
+  merges matches into `apps` (`_serverSearchReports`) — operators can
+  find ANY applicant ever. openCustomerInAdmin's email fallback does
+  the same sweep before saying "No application found".
+- Both endpoints live in server.py as pure helpers
+  (`_reports_window_payload` / `_reports_delta_payload`) + thin
+  handlers, right after /api/comms-list. They try indexed Firebase
+  queries first and fall back to ONE server-side full fetch + filter.
+  **Optional speed-up when the index grows:** add
+  `{"reportsIndex": {".indexOn": ["createdAt","updatedAt","status"]}}`
+  to the Firebase rules and the endpoints go constant-time (they log
+  nothing when falling back — check `indexed` in the JSON).
+- All-time dashboard stats come from `/fb/statsAggregates.json`
+  (cif-apply computes total/byStatus/byDay-120d every 10 min, buckets
+  mirror bucketStatus(), days in PT). renderDashboard uses
+  `_statsCounts` whenever a KPI range reaches past the loaded window
+  (`_statsRangeNeeded`); ranges inside the window count loaded rows
+  exactly as before. Queue chips stay window-computed on purpose —
+  they must equal the rows a click shows.
+- The /fb/ GET proxy now FORWARDS query strings (safety-checked as a
+  combined string), so `fbGet('node.json?orderBy=...')` works — the IF
+  alert poll uses `?orderBy="$key"&limitToLast=50` ($key needs no
+  .indexOn). loadPlaidCustomers/filterPlaidCustomers were deleted
+  (dead since the App Links tab removal; last full-/reports readers).
+- Hermetic tests exist in the session scratchpad pattern: stub server
+  + Playwright (window boot, straggler-in-window, delta merge, load
+  older, server search, stats KPI, "no full-index fetch" assertion).
+
 ## Coordinating with cif-apply
 
 Many bugs span both repos (Bug 1 in particular). Read

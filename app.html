@@ -3457,42 +3457,117 @@ function readRouteFromHash() {
 }
 
 // ───────── Data ─────────
-async function loadReports() {
+// Windowed queue + change-only polling (perf phase 3, 2026-07-10).
+// The client no longer downloads the whole /reportsIndex every poll:
+//   boot / every ~10 min → /api/reports-window (newest 1000 rows +
+//     every unsettled row, so old stuck Pendings never vanish)
+//   every other poll     → /api/reports-delta?since=<watermark>
+//     (only rows that changed — steady-state payload is ~0-3 rows)
+// "Load older" pages history in with ?before=; the global search
+// also queries the server so operators can find ANY applicant ever,
+// not just the loaded window. All-time dashboard stats come from
+// /statsAggregates (server-computed on cif-apply every 10 min).
+const REPORTS_WINDOW_LIMIT = 1000;
+let _reportsSyncAt = 0;        // change watermark (max created/updatedAt seen)
+let _reportsWindowOldest = 0;  // oldest createdAt paged in so far
+let _reportsComplete = false;  // true = every row ever is loaded
+let _reportsTotal = null;      // server-known total (fallback path only)
+let _reportsLastFullSync = 0;  // last full-window fetch (10-min resync)
+let _loadOlderBusy = false;
+
+// Merge server rows into `apps` (replace-or-insert by firebaseId),
+// keep newest-first order, re-overlay hydrated full records (heavy
+// fields from the cache, volatile light fields from the FRESH row —
+// spreading the fresh row LAST is the "declined but still shows
+// Pending" fix), and advance the delta watermark.
+function _mergeReportRows(rows) {
+  if (!rows || typeof rows !== 'object') return 0;
+  const byId = new Map(apps.map(a => [a.firebaseId, a]));
+  let changed = 0;
+  for (const [k, v] of Object.entries(rows)) {
+    if (!v || typeof v !== 'object') continue;
+    const merged = _fullRecordCache[k]
+      ? { ..._fullRecordCache[k], ...v, firebaseId: k }
+      : { ...v, firebaseId: k };
+    byId.set(k, merged);
+    changed++;
+    const t = Math.max(v.updatedAt || 0, v.createdAt || 0);
+    if (t > _reportsSyncAt) _reportsSyncAt = t;
+  }
+  if (changed) {
+    apps = Array.from(byId.values())
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  }
+  return changed;
+}
+
+async function loadReports(opts) {
+  opts = opts || {};
   try {
-    // Poll the compact /reportsIndex (tiny: name/status/score/dates per
-    // applicant). Fall back to the full /reports tree only if the index
-    // is empty/unavailable, so the dashboard never breaks during rollout
-    // or if the index writer ever lags.
-    let data = await fbGet('reportsIndex.json');
-    const haveIndex = data && typeof data === 'object' && !data.error
-      && Object.keys(data).length > 0;
-    if (!haveIndex) {
-      data = await fbGet('reports.json');
-    }
-    if (data && typeof data === 'object' && !data.error) {
-      apps = Object.entries(data)
-        .map(([k, v]) => ({ ...v, firebaseId: k }))
-        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      // Re-overlay any full records hydrated this session so the open
-      // applicant keeps its heavy fields across the light poll.
-      const cachedIds = Object.keys(_fullRecordCache);
-      if (cachedIds.length) {
-        // Heavy fields (applicationData, transactions, …) come from the
-        // hydrated full record; volatile light fields (status, score,
-        // dates) must come from the FRESH index entry `a`. Spreading `a`
-        // LAST is the fix for the "I declined it but the dashboard still
-        // shows Pending until I refresh" bug: previously the stale
-        // hydrated snapshot clobbered the operator's just-saved status on
-        // the very next poll.
-        apps = apps.map(a => _fullRecordCache[a.firebaseId]
-          ? { ..._fullRecordCache[a.firebaseId], ...a, firebaseId: a.firebaseId }
-          : a);
+    const needFull = opts.full || !_reportsSyncAt ||
+      (Date.now() - _reportsLastFullSync) > 10 * 60 * 1000;
+    if (needFull) {
+      const r = await fetch(`/api/reports-window?limit=${REPORTS_WINDOW_LIMIT}`,
+        { credentials: 'include' });
+      if (r.status === 401) { window.location.replace('/'); return; }
+      const d = await r.json();
+      if (d && d.ok && d.rows && typeof d.rows === 'object') {
+        const winRows = Object.entries(d.rows)
+          .map(([k, v]) => ({ ...v, firebaseId: k }));
+        // Paging cursor = oldest row of the CONTIGUOUS window (the
+        // server excludes the unsettled stragglers it staples on — an
+        // ancient stuck Pending must not teleport the cursor back and
+        // skip everything in between). Fallback: min createdAt seen.
+        let oldest = (typeof d.windowOldest === 'number' && d.windowOldest > 0)
+          ? d.windowOldest : Infinity;
+        if (oldest === Infinity) {
+          winRows.forEach(v => {
+            if (v.createdAt) oldest = Math.min(oldest, v.createdAt);
+          });
+        }
+        oldest = (oldest === Infinity) ? 0 : oldest;
+        // Resync replaces the window but KEEPS rows the operator
+        // already paged in below it (Load older) — a 10-min refresh
+        // must never shrink the list under them.
+        const keepOlder = d.complete ? [] : apps.filter(a =>
+          (a.createdAt || 0) < oldest && !d.rows[a.firebaseId]);
+        apps = winRows.concat(keepOlder)
+          .map(a => _fullRecordCache[a.firebaseId]
+            ? { ..._fullRecordCache[a.firebaseId], ...a, firebaseId: a.firebaseId }
+            : a)
+          .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        _reportsSyncAt = apps.reduce((m, a) =>
+          Math.max(m, a.updatedAt || 0, a.createdAt || 0), 0);
+        _reportsWindowOldest = Math.min(oldest || Infinity,
+          _reportsWindowOldest || Infinity);
+        if (!isFinite(_reportsWindowOldest)) _reportsWindowOldest = 0;
+        _reportsComplete = !!d.complete;
+        _reportsTotal = (typeof d.total === 'number') ? d.total
+          : (d.complete ? apps.length : _reportsTotal);
+        _reportsLastFullSync = Date.now();
+        _ensureStatsAgg();
+      } else if (!_reportsSyncAt) {
+        apps = [];
       }
+      document.getElementById('sync-chip').classList.remove('off');
+      rerender();
     } else {
-      apps = [];
+      const since = Math.max(0, _reportsSyncAt - 5000); // 5s overlap; merge is idempotent
+      const r = await fetch(`/api/reports-delta?since=${since}`,
+        { credentials: 'include' });
+      if (r.status === 401) { window.location.replace('/'); return; }
+      const d = await r.json();
+      document.getElementById('sync-chip').classList.remove('off');
+      if (d && d.ok) {
+        if (d.truncated) {
+          // Too many changes to merge (slept laptop / backfill) —
+          // reload the window wholesale instead.
+          _reportsLastFullSync = 0;
+          return loadReports({ full: true });
+        }
+        if (d.count && _mergeReportRows(d.rows)) rerender();
+      }
     }
-    document.getElementById('sync-chip').classList.remove('off');
-    rerender();
   } catch (e) {
     document.getElementById('sync-chip').classList.add('off');
     console.warn('loadReports failed:', e);
@@ -3501,8 +3576,129 @@ async function loadReports() {
   // score written yet, or status literally "Processing"), schedule a
   // faster follow-up poll so the operator sees the transition to
   // Pending without having to mash Refresh. Once everything's settled
-  // we fall back to the standard 8s interval set at boot.
+  // we fall back to the standard 60s interval set at boot.
   _maybeScheduleFastReportsPoll();
+}
+
+// "Load older applications" — pages the next window in below the
+// oldest loaded row. Wired to the button renderQueue appends when
+// _reportsComplete is false.
+async function loadOlderReports(btn) {
+  if (_loadOlderBusy || _reportsComplete) return;
+  _loadOlderBusy = true;
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+  try {
+    const r = await fetch(`/api/reports-window?limit=${REPORTS_WINDOW_LIMIT}` +
+      `&before=${_reportsWindowOldest || 0}`, { credentials: 'include' });
+    if (r.status === 401) { window.location.replace('/'); return; }
+    const d = await r.json();
+    if (d && d.ok && d.rows) {
+      _mergeReportRows(d.rows);
+      // Advance the cursor to this page's contiguous oldest (server-
+      // computed; falls back to the min row createdAt).
+      let pageOldest = (typeof d.windowOldest === 'number' && d.windowOldest > 0)
+        ? d.windowOldest : 0;
+      if (!pageOldest) {
+        Object.values(d.rows).forEach(v => {
+          if (v && v.createdAt && (!pageOldest || v.createdAt < pageOldest)) {
+            pageOldest = v.createdAt;
+          }
+        });
+      }
+      if (pageOldest && (!_reportsWindowOldest || pageOldest < _reportsWindowOldest)) {
+        _reportsWindowOldest = pageOldest;
+      }
+      if (d.complete) _reportsComplete = true;
+      if (typeof d.total === 'number') _reportsTotal = d.total;
+      rerender();
+    } else {
+      toast('Could not load older applications', 'error');
+    }
+  } catch (e) {
+    toast('Could not load older applications', 'error');
+  }
+  _loadOlderBusy = false;
+}
+
+// Server-side search over the FULL index — merges matches into `apps`
+// so the queue filter + global search dropdown can find applicants
+// older than the loaded window. Debounced from the search input; only
+// fires when the window is incomplete.
+let _lastServerSearchQ = '';
+async function _serverSearchReports(q) {
+  q = (q || '').trim();
+  if (_reportsComplete || q.length < 2 || q === _lastServerSearchQ) return;
+  try {
+    const r = await fetch(`/api/reports-window?q=${encodeURIComponent(q)}`,
+      { credentials: 'include' });
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d && d.ok) {
+      // Remember only sweeps that actually completed, so a network
+      // blip doesn't permanently skip this query.
+      _lastServerSearchQ = q;
+      if (d.rows && _mergeReportRows(d.rows)) {
+        // Only repaint if this is still what the operator is looking at.
+        if (currentSearch.trim() === q) {
+          renderQueue();
+          renderSearchDropdown(currentSearch);
+        }
+      }
+    }
+  } catch (e) { /* best-effort — local results still shown */ }
+}
+
+// All-time dashboard stats (cif-apply writes /statsAggregates every
+// 10 min: total, byStatus, byDay[120d] — bucketed to mirror
+// bucketStatus()). Only needed while the loaded window is incomplete.
+let _statsAgg = null;
+let _statsAggAt = 0;
+async function _ensureStatsAgg() {
+  if (_reportsComplete) return;
+  if (Date.now() - _statsAggAt < 5 * 60 * 1000) return;
+  _statsAggAt = Date.now();
+  try {
+    const d = await fbGet('statsAggregates.json');
+    if (d && !d.error && typeof d.total === 'number') {
+      const first = !_statsAgg;
+      _statsAgg = d;
+      if (first) rerender();
+    }
+  } catch (e) { /* dashboard falls back to window-computed numbers */ }
+}
+
+// Bucket counts for [from,to) computed from /statsAggregates byDay
+// (or byStatus for all-time). Same shape as _bucketCounts().
+function _statsCounts(from, to, isAll) {
+  const empty = { total: 0, pending: 0, approved: 0, declined: 0,
+                  processing: 0, error: 0 };
+  if (!_statsAgg) return empty;
+  if (isAll) {
+    const bs = _statsAgg.byStatus || {};
+    return { total: _statsAgg.total || 0, pending: bs.pending || 0,
+             approved: bs.approved || 0, declined: bs.declined || 0,
+             processing: bs.processing || 0, error: bs.error || 0 };
+  }
+  const byDay = _statsAgg.byDay || {};
+  const c = { ...empty };
+  const d0 = new Date(from); d0.setHours(0, 0, 0, 0);
+  // Walk local calendar days (not fixed 24h steps — DST-safe).
+  for (const d = new Date(d0); d.getTime() < to; d.setDate(d.getDate() + 1)) {
+    const day = byDay[_localDateStr(d)];
+    if (!day) continue;
+    c.total += day.total || 0; c.pending += day.pending || 0;
+    c.approved += day.approved || 0; c.declined += day.declined || 0;
+    c.processing += day.processing || 0; c.error += day.error || 0;
+  }
+  return c;
+}
+
+// True when a range's counts should come from /statsAggregates instead
+// of the loaded window (window incomplete AND the range starts before
+// the oldest loaded row — or is all-time).
+function _statsRangeNeeded(from, isAll) {
+  return !!_statsAgg && !_reportsComplete &&
+    (isAll || (from > 0 && from < _reportsWindowOldest));
 }
 
 let _fastPollTimer = null;
@@ -3844,12 +4040,20 @@ function renderDashboard() {
   // Fire-and-forget the Servicing overview fetch on every dashboard
   // render. Doesn't block the rest of the dashboard from drawing.
   renderAnalyticsOverview();
+  _ensureStatsAgg(); // no-op when window complete / fetched <5 min ago
   // ── KPI cards: filter by selected time range ──
+  // Ranges reaching past the loaded window (All time, sometimes This
+  // month) count from /statsAggregates; ranges the window fully covers
+  // count from the loaded rows exactly as before.
+  const [rFrom, rTo] = _rangeBounds(_kpiRange);
+  const isAll = _kpiRange === 'all';
   const inRange = appsInRange(_kpiRange);
-  const c = _bucketCounts(inRange);
+  const c = _statsRangeNeeded(rFrom, isAll)
+    ? _statsCounts(rFrom, rTo, isAll) : _bucketCounts(inRange);
   const [prevFrom, prevTo] = _previousRangeBounds(_kpiRange);
   const prev = (prevFrom < prevTo) ? apps.filter(a => a.createdAt >= prevFrom && a.createdAt < prevTo) : [];
-  const cPrev = _bucketCounts(prev);
+  const cPrev = _statsRangeNeeded(prevFrom, false) && prevFrom < prevTo
+    ? _statsCounts(prevFrom, prevTo, false) : _bucketCounts(prev);
 
   document.getElementById('kpi-total').textContent = c.total;
   // Total / Approved / Declined are FLOW metrics (what happened in the
@@ -3883,14 +4087,17 @@ function renderDashboard() {
   document.getElementById('kpi-approved-trend').innerHTML = decided ? `<svg class="icn"><use href="#i-up"/></svg>${apprRate}%<span class="stat-trend-sub">approval rate</span>` : `<span class="stat-trend-sub">${rangeLabel(_kpiRange)}</span>`;
   document.getElementById('kpi-declined-trend').innerHTML = decided ? `<svg class="icn"><use href="#i-down"/></svg>${declRate}%<span class="stat-trend-sub">decline rate</span>` : `<span class="stat-trend-sub">${rangeLabel(_kpiRange)}</span>`;
 
-  document.getElementById('greet-sub').innerHTML = `<b>${counts().pending}</b> pending · <b>${counts().approved}</b> approved · <b>${counts().declined}</b> declined`;
+  // Greeting line is all-time state: server aggregates when the window
+  // is incomplete (raw counts), the loaded rows otherwise (deduped).
+  const allC = _statsRangeNeeded(0, true) ? _statsCounts(0, 0, true) : counts();
+  document.getElementById('greet-sub').innerHTML = `<b>${allC.pending}</b> pending · <b>${allC.approved}</b> approved · <b>${allC.declined}</b> declined`;
 
   // ── Pipeline donut: same range-filtered raw list as the KPI cards,
   // so the donut total always equals the "Total Applications" card for
   // the selected time range. (Previously counted deduped unique
   // customers across all time — operator saw 1068 vs 1215 and read it
   // as a bug. Raw submissions vs unique customers; now both raw.)
-  const dc = _bucketCounts(inRange);
+  const dc = c;
   const total = dc.total || 1;
   const pPct = (dc.pending / total) * 100;
   const aPct = (dc.approved / total) * 100;
@@ -4192,7 +4399,9 @@ function renderQueue() {
   }
   const tbody = document.getElementById('queue-tbody');
   if (list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="tbl-empty">No applications match.</td></tr>`;
+    const wider = (!_reportsComplete && currentSearch.trim().length >= 2)
+      ? ' Searching older records…' : '';
+    tbody.innerHTML = `<tr><td colspan="6" class="tbl-empty">No applications match.${wider}</td></tr>`;
     return;
   }
   // Group rows by day. Insert a "Today" / "Yesterday" / "Mon, May 7"
@@ -4207,6 +4416,19 @@ function renderQueue() {
       lastGroup = group;
     }
     rows.push(_queueRowHtml(a));
+  }
+  // Windowed queue (perf phase 3): the list holds the newest rows +
+  // everything unsettled, not all of history. Offer to page older
+  // records in. Hidden mid-search — the server search already sweeps
+  // the full index for matches.
+  if (!_reportsComplete && !currentSearch.trim()) {
+    const totNote = _reportsTotal
+      ? `showing ${apps.length.toLocaleString()} of ${_reportsTotal.toLocaleString()}`
+      : `showing newest ${apps.length.toLocaleString()}`;
+    rows.push(`<tr class="queue-group"><td colspan="6" style="text-align:center;padding:12px">
+      <button onclick="loadOlderReports(this)" style="background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Load older applications</button>
+      <span style="margin-left:10px;font-size:11px;color:var(--muted)">${totNote}</span>
+    </td></tr>`);
   }
   // BULK SELECT (one-time feature): preserve checked rows across a
   // re-render (filter change, forced refresh) so the operator's
@@ -8796,7 +9018,11 @@ async function pollNewBankLinks() {
 
 async function pollNewIFSubmissions() {
   try {
-    const data = await fbGet('ifSubmissions.json');
+    // Newest 50 only (perf phase 3): push keys sort chronologically and
+    // "$key" needs no .indexOn rule, so this stays constant-cost as the
+    // node grows. The alert logic only cares about entries newer than
+    // the operator's high-watermark anyway.
+    const data = await fbGet('ifSubmissions.json?orderBy=%22%24key%22&limitToLast=50');
     if (!data || typeof data !== 'object' || data.error) return;
     const rows = [];
     for (const [key, val] of Object.entries(data)) {
@@ -9204,9 +9430,16 @@ const _searchRerender = _debounce(function(){
   renderQueue();
   renderSearchDropdown(currentSearch);
 }, 140);
+// Server-side sweep of the FULL index (windowed queue, perf phase 3) —
+// longer debounce than the local filter so we only hit the server once
+// the operator pauses typing. Merges matches into `apps` and repaints.
+const _serverSearchDeb = _debounce(function(){
+  _serverSearchReports(currentSearch);
+}, 400);
 document.getElementById('search-input').addEventListener('input', (e) => {
   currentSearch = e.target.value || '';
   _searchRerender();
+  _serverSearchDeb();
 });
 // Debounced wrappers for the per-page search boxes (wired via oninput=).
 var _rptSearchDeb  = _debounce(function(v){ filterReport(v); }, 140);
@@ -9328,60 +9561,11 @@ function plaidCustomerKey(phone, email) {
   return (p + '|' + e) || null;
 }
 
-async function loadPlaidCustomers() {
-  const list = document.getElementById('plaid-list');
-  if (!list) return;
-  list.innerHTML = '<div class="tbl-loading">Loading…</div>';
-  try {
-    const data = await fbGet('reports.json');
-    if (!data) { allPlaidCustomers = []; renderPlaidCustomers([]); return; }
-    const groups = {};
-    Object.entries(data).forEach(([id, r]) => {
-      if (!r) return;
-      const bankMethod = (r.applicationData?.bankMethod || r.bankMethod || r.filename || '').toLowerCase();
-      const hasPlaidToken = !!(r.plaidAssetToken || r.plaidAccessToken);
-      const isPlaid = bankMethod.includes('plaid') || hasPlaidToken;
-      if (!isPlaid) return;
-      const phone = r.applicationData?.phone || '';
-      const email = r.applicationData?.email || '';
-      const fallbackName = r.name || `${r.applicationData?.firstName||''} ${r.applicationData?.lastName||''}`.trim();
-      const key = plaidCustomerKey(phone, email) || fallbackName || id;
-      const app = {
-        firebaseId: id, date: r.date || '', time: r.time || '',
-        createdAt: r.createdAt || 0,
-        accessToken: r.plaidAccessToken || r.applicationData?.plaidAccessToken || '',
-        assetToken: r.plaidAssetToken || '',
-        status: r.status || '', amount: r.amount || '',
-        decision: r.claudeDecision || '',
-      };
-      if (!groups[key]) groups[key] = { key, name: fallbackName, phone, email, applications: [] };
-      groups[key].applications.push(app);
-      if (!groups[key].name && fallbackName) groups[key].name = fallbackName;
-    });
-    allPlaidCustomers = Object.values(groups).map(g => {
-      g.applications.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
-      const latest = g.applications[0] || {};
-      g.latestStatus = latest.status || '';
-      g.latestDate = latest.date || '';
-      g.latestCreatedAt = latest.createdAt || 0;
-      g.totalApps = g.applications.length;
-      return g;
-    }).sort((a,b) => b.latestCreatedAt - a.latestCreatedAt);
-    renderPlaidCustomers(allPlaidCustomers);
-  } catch (e) {
-    list.innerHTML = `<div class="tbl-empty">Error loading: ${escapeHtml(e.message||String(e))}</div>`;
-  }
-}
-
-function filterPlaidCustomers(q) {
-  if (!q) { renderPlaidCustomers(allPlaidCustomers); return; }
-  const lq = q.toLowerCase();
-  renderPlaidCustomers(allPlaidCustomers.filter(c =>
-    (c.name||'').toLowerCase().includes(lq) ||
-    (c.phone||'').includes(lq) ||
-    (c.email||'').toLowerCase().includes(lq)
-  ));
-}
+// loadPlaidCustomers / filterPlaidCustomers deleted (perf phase 3,
+// 2026-07-10): the App Links tab that called them was removed in the
+// 2026-07 overhaul, but the orphaned loader still existed — and it was
+// the LAST caller of fbGet('reports.json'), the full-tree download.
+// Nothing in the dashboard reads the whole /reports node anymore.
 
 function _connStatusPill(s) {
   const lo = (s || '').toLowerCase();
@@ -10323,12 +10507,23 @@ async function openCustomerInAdmin(email, btn, cid) {
     if (btn) { btn.disabled = false; btn.textContent = orig; }
     // fall through to the email match
   }
-  const matches = (emLc && typeof apps !== 'undefined' && Array.isArray(apps))
-    ? apps.filter(function(a) {
-        const ae = ((a.email || (a.applicationData && a.applicationData.email) || '') + '').trim().toLowerCase();
-        return ae && ae === emLc;
-      })
-    : [];
+  const _emailMatches = function() {
+    return (emLc && typeof apps !== 'undefined' && Array.isArray(apps))
+      ? apps.filter(function(a) {
+          const ae = ((a.email || (a.applicationData && a.applicationData.email) || '') + '').trim().toLowerCase();
+          return ae && ae === emLc;
+        })
+      : [];
+  };
+  let matches = _emailMatches();
+  if (!matches.length && emLc && !_reportsComplete) {
+    // Windowed queue: the customer may simply be older than the loaded
+    // window — sweep the full index server-side before giving up.
+    if (btn) { btn.disabled = true; btn.textContent = 'Searching…'; }
+    try { await _serverSearchReports(emLc); } catch (e) {}
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+    matches = _emailMatches();
+  }
   if (!matches.length) {
     if (btn) {
       btn.textContent = 'No application found';
