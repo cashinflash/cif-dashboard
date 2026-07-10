@@ -1720,6 +1720,55 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   .offer-input-group{min-height:46px;border-radius:12px;flex-shrink:0}
   .offer-input{width:56px;font-size:16px;font-weight:800;text-align:center;caret-color:transparent}
 }
+/* ── Mobile round 2 (2026-07-10, operator feedback) ── */
+#dv-vg-badge{display:none;font-family:inherit}
+.tab-lbl-short{display:none}
+#dv-copy-report-btn .lbl-short{display:none}
+@keyframes vgPulse{0%,100%{opacity:.55}50%{opacity:1}}
+@media (max-width:600px){
+  /* Hero: no meta line at all (email included) — the snapshot card
+     carries the useful facts now. */
+  #dv-meta{display:none}
+  .dv-hero{position:relative}
+  .dv-hero-left{padding-right:44px}
+  /* Vergent status badge, top-right of the hero */
+  #dv-vg-badge{display:flex;position:absolute;top:14px;right:14px;width:38px;height:38px;border-radius:999px;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,.55);background:rgba(255,255,255,.16);color:white;font-weight:800;font-size:16px;cursor:pointer;z-index:5}
+  #dv-vg-badge.vg-found{background:#1aab6d;border-color:#eafff3;box-shadow:0 0 0 3px rgba(255,255,255,.28)}
+  #dv-vg-badge.vg-miss{background:#6b7280;border-color:rgba(255,255,255,.5)}
+  #dv-vg-badge.vg-warn{background:#d97706;border-color:#ffe9c7}
+  #dv-vg-badge.vg-wait{background:rgba(255,255,255,.18);animation:vgPulse 1.4s ease-in-out infinite}
+  /* Big New/Existing Customer banner replaced by the badge */
+  #profile-status{display:none}
+  /* Snapshot card polish: deeper radius, roomier rows, soft shadow */
+  .dv-snap-m{border-radius:14px;padding:5px 15px;box-shadow:0 8px 22px rgba(8,45,25,.22)}
+  .dv-snap-m .check-row{padding:10.5px 0}
+  /* Active tab pill: white icon on the green fill (was green-on-green) */
+  .dv-tab.active .icn{color:#fff;opacity:1}
+  /* Tabs: two fixed rows (4 + 3) instead of a horizontal slider */
+  .dv-tabs{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;overflow-x:visible}
+  .dv-tab{justify-content:center;padding:9px 2px;font-size:11.5px;gap:6px;min-height:40px}
+  .dv-tab:nth-child(-n+4){grid-column:span 3}
+  .dv-tab:nth-child(n+5){grid-column:span 4}
+  .tab-lbl-full{display:none}
+  .tab-lbl-short{display:inline}
+  /* Copy full report -> Copy */
+  #dv-copy-report-btn .lbl-full{display:none}
+  #dv-copy-report-btn .lbl-short{display:inline}
+  /* Duplicates of the hero snapshot: rail card + report facts strip */
+  #dv-rail-snap{display:none}
+  #dv-snap{display:none}
+  /* Create: the primary action — solid green gradient, white text */
+  #dv-create-menu-btn{background:linear-gradient(135deg,#1aab6d,#0c6b3f);color:#fff;border:1px solid #0c6b3f;font-weight:800;min-height:50px;font-size:13.5px;border-radius:12px;box-shadow:0 4px 14px rgba(12,107,63,.28)}
+  #dv-create-menu-btn .icn{color:#fff}
+  #dv-create-menu .cm-item-hero{border:1.5px solid #15803d;border-radius:10px;margin:6px 8px 8px;background:#f0fdf4;color:#14532d}
+  #dv-create-menu .cm-item-hero .icn{color:#15803d}
+}
+/* Very narrow phones (SE/mini): "Application" needs a touch less type
+   to fit its quarter-width tab cell without clipping. */
+@media (max-width:374px){
+  .dv-tab{font-size:10px;gap:3px;padding:9px 1px;letter-spacing:-.01em}
+  .dv-tab .icn{width:11px;height:11px}
+}
 </style>
 <!-- Offer amount wheel (phones): $100 / $125 / $150 / $200 / $255 +
      custom entry. Registered in _MOB_OVERLAYS so back-gesture closes it. -->
@@ -2008,6 +2057,11 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     </div>
     <div class="detail-card">
       <div class="dv-hero" id="dv-hero">
+        <!-- Vergent status badge (phones): replaces the big New/Existing
+             Customer banner. Gray = not in Vergent (tap = re-check),
+             green = existing customer (tap = open in Vergent), amber =
+             ambiguous/error. Synced by _syncVgHeroBadgeFrom. -->
+        <button id="dv-vg-badge" type="button" onclick="vgBadgeTap()" aria-label="Vergent status"><span>V</span></button>
         <div class="dv-hero-left">
           <div class="dv-hero-av" id="dv-av">—</div>
           <div class="dv-hero-text">
@@ -2031,7 +2085,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
           <button class="dv-tab active" data-tab="profile"><svg class="icn"><use href="#i-overview"/></svg>Profile</button>
           <button class="dv-tab" data-tab="report"><svg class="icn"><use href="#i-doc"/></svg>Report</button>
           <button class="dv-tab" data-tab="application"><svg class="icn"><use href="#i-list"/></svg>Application</button>
-          <button class="dv-tab" data-tab="debitcard"><svg class="icn"><use href="#i-zap"/></svg>Debit Card</button>
+          <button class="dv-tab" data-tab="debitcard"><svg class="icn"><use href="#i-zap"/></svg><span class="tab-lbl-full">Debit Card</span><span class="tab-lbl-short">Card</span></button>
           <button class="dv-tab" data-tab="documents"><svg class="icn"><use href="#i-folder"/></svg>Documents</button>
           <button class="dv-tab" data-tab="history"><svg class="icn"><use href="#i-history"/></svg>History</button>
           <button class="dv-tab" data-tab="notes"><svg class="icn"><use href="#i-message"/></svg>Notes &amp; Alerts</button>
@@ -2060,7 +2114,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
                  Populated by renderComplianceCard from /reports/{id}/microbilt
                  (written by cif-apply's intake checks). Re-run proxies to
                  /api/microbilt-recheck. Click a pill = toggle the detail line. -->
-            <div class="sec-h" style="margin-top:18px">Compliance</div>
+            <div class="sec-h" style="margin-top:18px" id="dv-compliance-h">Compliance</div>
             <div id="profile-compliance" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:4px">
               <span style="font-size:12px;color:var(--muted)">Loading checks…</span>
             </div>
@@ -2104,7 +2158,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 
             <div class="sec-h">Engine Analysis
               <button type="button" id="dv-copy-report-btn" onclick="copyEngineReport(this)"
-                      style="margin-left:auto;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;text-transform:none;letter-spacing:0">Copy full report</button>
+                      style="margin-left:auto;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;text-transform:none;letter-spacing:0"><span class="lbl-full">Copy full report</span><span class="lbl-short">Copy</span></button>
             </div>
             <!-- Slim facts strip (verified income + bank) — replaced the old
                  7-card snapshot whose other 5 cards were dead v2 fields. -->
@@ -2282,7 +2336,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
             <div class="dv-rail-title">Vergent <span class="vg-status" id="vg-status">Pending</span></div>
             <div class="vg-card" id="vg-card"><div class="vg-pending">Checking Vergent…</div></div>
           </div>
-          <div class="dv-rail-section dv-rail-card">
+          <div class="dv-rail-section dv-rail-card" id="dv-rail-snap">
             <div class="dv-rail-title">Applicant Snapshot</div>
             <div id="dv-snapshot"></div>
           </div>
@@ -4930,11 +4984,13 @@ function renderDetail(fbId) {
     }
   } catch (e) { /* non-fatal */ }
 
-  // Applicant Snapshot (right rail — replaced the old Documents list,
-  // operator request 2026-07-10): the four facts operators reach for
-  // when working a file — bank + account last-4, debit card last-4,
-  // and the pay schedule (frequency + projected next payday) derived
-  // from the engine's verified payroll deposit dates.
+  // Applicant Snapshot (right rail on desktop + hero card on phones;
+  // replaced the old Documents list, operator request 2026-07-10):
+  // the five facts operators reach for when working a file — bank +
+  // account last-4, debit card last-4, verified income, and the pay
+  // schedule (frequency + projected next payday) derived from the
+  // engine's verified payroll deposit dates. ONE template feeds both
+  // containers so desktop and phone never disagree.
   const snapEl = document.getElementById('dv-snapshot');
   if (snapEl) {
     const bankLast4 = ad.accountNumber ? String(ad.accountNumber).replace(/\D/g, '').slice(-4) : '';
@@ -4945,14 +5001,21 @@ function renderDetail(fbId) {
     const dcLast4 = String(dcObj.cardNumber || '').replace(/\D/g, '').slice(-4)
       || String(dcObj.last4 || '').replace(/\D/g, '').slice(-4);
     const pay = _nextPaydayInfo(a);
+    const _snapIncome = Number(a.monthlyIncome || 0) ||
+      Number((a.engineV4 || {}).qualifying_income_monthly || 0);
     const rows = [
-      { name: 'Bank', html: bankVal, dimText: 'Not on file' },
-      { name: 'Debit card', html: dcLast4 ? '···· ' + dcLast4 : '', dimText: 'Not submitted' },
-      { name: 'Pay frequency', html: pay.cadLabel ? escapeHtml(pay.cadLabel) : '', dimText: 'Unknown' },
-      { name: 'Next payday', html: pay.nextLabel ? escapeHtml(pay.nextLabel) : '', dimText: pay.cadLabel ? 'Unknown' : 'No engine data' },
+      { icon: 'i-bank', name: 'Bank', html: bankVal, dimText: 'Not on file' },
+      { icon: 'i-card', name: 'Debit card', html: dcLast4 ? '···· ' + dcLast4 : '', dimText: 'Not submitted' },
+      { icon: 'i-chart', name: 'Verified income',
+        html: _snapIncome > 0 ? '<span style="color:var(--green-dark)">$' + Math.round(_snapIncome).toLocaleString() + '/mo</span>' : '',
+        dimText: 'None verified' },
+      { icon: 'i-history', name: 'Pay frequency', html: pay.cadLabel ? escapeHtml(pay.cadLabel) : '', dimText: 'Unknown' },
+      { icon: 'i-clock', name: 'Next payday',
+        html: pay.nextLabel ? '<span style="background:#e8f5ee;color:#1a6b3c;border:1px solid #bfe3cd;border-radius:6px;padding:2px 8px">' + escapeHtml(pay.nextLabel) + '</span>' : '',
+        dimText: pay.cadLabel ? 'Unknown' : 'No engine data' },
     ];
     const snapHtml = rows.map(r =>
-      `<div class="check-row"><span class="check-name">${escapeHtml(r.name)}</span>` +
+      `<div class="check-row"><span class="check-name" style="display:flex;align-items:center;gap:8px"><svg class="icn" style="width:13px;height:13px;color:var(--muted);stroke-width:2;flex-shrink:0"><use href="#${r.icon}"/></svg>${escapeHtml(r.name)}</span>` +
       (r.html
         ? `<span class="check-tag" style="color:var(--text);font-weight:700">${r.html}</span>`
         : `<span class="check-tag dim">${escapeHtml(r.dimText)}</span>`) +
@@ -6257,13 +6320,17 @@ function copyEngineReport(btn) {
 
 function _copyReportFeedback(btn, msg, ok) {
   if (!btn) return;
-  if (!btn.dataset.label) btn.dataset.label = btn.textContent;
+  // Cache/restore innerHTML, NOT textContent: the label is now two
+  // spans (.lbl-full/.lbl-short — CSS picks one per viewport), and a
+  // textContent round-trip would flatten them into the concatenated
+  // string "Copy full reportCopy" forever after the first click.
+  if (!btn.dataset.label) btn.dataset.label = btn.innerHTML;
   btn.textContent = msg;
   btn.style.background = ok ? '#e8f5ee' : '#fde7e7';
   btn.style.color      = ok ? '#1a6b3c' : '#5a0d0d';
   btn.style.borderColor = ok ? '#8fd3ab' : '#e8a3a3';
   setTimeout(() => {
-    btn.textContent = btn.dataset.label;
+    btn.innerHTML = btn.dataset.label;
     btn.style.background = '#e8f3f8';
     btn.style.color = '#1a4d6b';
     btn.style.borderColor = '#6cb1e2';
@@ -7063,6 +7130,7 @@ function renderProfilePanel(fbId) {
   // not-found/new applicants.
   const custRail = document.getElementById('dv-rail-customer');
   if (custRail) custRail.style.display = matchedHere ? '' : 'none';
+  _syncVgHeroBadgeFrom(m);
   // Create Customer button (rail Quick Actions): shown ONLY for the
   // not_found / new state, where the operator's next action is to
   // create the Vergent record. Hidden on found (already exists),
@@ -16740,7 +16808,8 @@ if (document.readyState === 'loading') {
 //    wiring and renderProfilePanel's visibility toggles stay correct.
 function _placeQaSection() {
   const qa = document.getElementById('dv-rail-qa');
-  const anchor = document.getElementById('dv-custinfo-h');
+  const anchor = document.getElementById('dv-compliance-h')
+    || document.getElementById('dv-custinfo-h');
   const home = document.getElementById('dv-rail-home-qa');
   if (!qa || !anchor || !home) return;
   if (window.matchMedia('(max-width:600px)').matches) {
@@ -16753,6 +16822,37 @@ function _placeQaSection() {
 }
 window.addEventListener('resize', _debounce(_placeQaSection, 150));
 
+// Hero Vergent badge (phones): mirrors the vergentMatch status the
+// profile banner shows on desktop. Green = existing customer (tap =
+// open in Vergent), gray = not found (tap = re-check), amber =
+// ambiguous/error (tap = re-check), pulsing = still checking.
+function _syncVgHeroBadgeFrom(m) {
+  const b = document.getElementById('dv-vg-badge');
+  if (!b) return;
+  const st = m ? String(m.status || '').toLowerCase() : '';
+  b.classList.remove('vg-found', 'vg-miss', 'vg-warn', 'vg-wait');
+  if (st === 'found') b.classList.add('vg-found');
+  else if (st === 'not_found' || st === 'new') b.classList.add('vg-miss');
+  else if (st === 'ambiguous' || st === 'error') b.classList.add('vg-warn');
+  else b.classList.add('vg-wait');
+  b.title = st === 'found'
+    ? 'Existing Vergent customer #' + (m.customerId || '') + ' — tap to open in Vergent'
+    : st ? 'Not matched in Vergent — tap to re-check' : 'Checking Vergent…';
+}
+function vgBadgeTap() {
+  const fbId = document.body.dataset.firebaseId;
+  const m = (fbId && typeof _vergentMatchCache !== 'undefined')
+    ? _vergentMatchCache[fbId] : null;
+  const link = document.getElementById('profile-vergent-link');
+  if (m && String(m.status || '').toLowerCase() === 'found'
+      && link && link.href && !link.href.endsWith('#')) {
+    window.open(link.href, '_blank', 'noopener');
+    return;
+  }
+  const re = document.getElementById('profile-vergent-recheck');
+  if (re) { toast('Re-checking Vergent…'); re.click(); }
+}
+
 // 2) One Create button with a dropdown (phones). Options are built at
 //    tap time from the real buttons' current visibility and simply
 //    click them — gating stays single-sourced in renderProfilePanel.
@@ -16761,15 +16861,17 @@ function toggleCreateMenu() {
   if (!menu) return;
   if (menu.style.display === 'block') { menu.style.display = 'none'; return; }
   const targets = [
-    ['dv-create-customer-btn', 'Customer', 'i-user'],
-    ['dv-create-loan-btn', 'Loan', 'i-zap'],
-    ['dv-create-cust-loan-btn', 'Customer & Loan', 'i-bolt'],
+    ['dv-create-customer-btn', 'Customer', 'i-user', ''],
+    ['dv-create-loan-btn', 'Loan', 'i-zap', ''],
+    // The combo is the power move — green outline so it stands out,
+    // mirroring the emphasized combo button on desktop.
+    ['dv-create-cust-loan-btn', 'Customer & Loan', 'i-bolt', ' cm-item-hero'],
   ];
   const items = [];
-  for (const [id, label, icon] of targets) {
+  for (const [id, label, icon, extra] of targets) {
     const btn = document.getElementById(id);
     if (btn && btn.style.display !== 'none') {
-      items.push(`<button class="cm-item" type="button" data-target="${id}"><svg class="icn"><use href="#${icon}"/></svg>${label}</button>`);
+      items.push(`<button class="cm-item${extra}" type="button" data-target="${id}"><svg class="icn"><use href="#${icon}"/></svg>${label}</button>`);
     }
   }
   menu.innerHTML = items.length ? items.join('')
