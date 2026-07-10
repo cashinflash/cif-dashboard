@@ -528,6 +528,24 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 .check-tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700}
 .check-tag .icn{width:13px;height:13px;stroke-width:2.5}
 .check-tag.ok{color:var(--green)}.check-tag.warn{color:var(--amber-700)}.check-tag.no{color:var(--red)}.check-tag.dim{color:var(--muted)}
+/* Rail cards (2026-07-10 visual pass): each rail section sits in its
+   own white card on the gray rail, so the column reads as designed
+   panels instead of loose buttons floating on the background. */
+.dv-rail-card{background:white;border:1px solid var(--border);border-radius:12px;padding:14px;box-shadow:var(--shadow-xs)}
+.dv-rail-card .dv-rail-title{margin-bottom:12px}
+.dv-rail-danger.dv-rail-card{border-color:var(--red-100)}
+#dv-docs .check-row:last-child{border-bottom:none}
+#dv-docs .check-row:first-child{padding-top:2px}
+/* Status/result lines under rail buttons: collapse entirely when
+   empty so idle sections don't reserve dead space. */
+.qa-result{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.4}
+.qa-result:empty{display:none}
+.qa-mini-label{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+/* Portal account status row — colored state dot + label, masked email
+   right-aligned. Replaces the old free-floating gray text line. */
+.dv-pstat{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;color:var(--text2);margin-bottom:8px;min-height:16px}
+.dv-pstat-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dv-pstat-email{margin-left:auto;font-weight:500;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
 
 .action-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 22px;background:var(--surface);border-top:1px solid var(--border);position:sticky;bottom:0;z-index:10}
 .action-spacer{flex:1}
@@ -764,7 +782,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 .dv-card-alert-hint{font-size:10.5px;color:#7a2222;margin-top:6px;line-height:1.4;opacity:.85}
 .dv-card-alert-dismiss{margin-top:8px;background:white;color:#5a0d0d;border:1px solid #f5c2c2;border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer}
 .dv-card-alert-dismiss:hover{background:#fef2f2;border-color:#b91c1c}
-.dv-rail-danger-btn{width:100%;padding:9px 14px;border-radius:8px;background:var(--red-50);color:var(--red);border:1px solid var(--red-200);font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:all .12s}
+.dv-rail-danger-btn{width:100%;padding:9px 14px;border-radius:8px;background:white;color:var(--red);border:1px solid var(--red-200);font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:all .12s}
 .dv-rail-danger-btn:hover{background:var(--red);color:white;border-color:var(--red)}
 .dv-rail-danger-btn .icn{width:13px;height:13px;stroke-width:2.5}
 .dv-rail-danger-hint{font-size:11px;color:var(--muted);line-height:1.4;margin-top:8px;padding:0 2px}
@@ -780,7 +798,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
    the engine, refresh from Plaid, send the denial email. Stacked
    full-width so they're easy to hit on narrower windows. */
 .qa-grid{display:flex;flex-direction:column;gap:6px}
-.qa-btn{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:white;color:var(--text2);font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;text-align:left;transition:all .12s}
+.qa-btn{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:white;color:var(--text2);font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;text-align:left;transition:all .12s;white-space:nowrap}
 .qa-btn:hover{background:var(--surface2);border-color:var(--border2);color:var(--text)}
 .qa-btn .icn{width:14px;height:14px;color:var(--muted);stroke-width:2.25;flex-shrink:0}
 .qa-btn:hover .icn{color:var(--green-dark)}
@@ -1569,6 +1587,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
     <symbol id="i-zap" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
     <symbol id="i-card" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="10" x2="22" y2="10"/></symbol>
     <symbol id="i-warning" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
     <symbol id="i-arrow-left" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></symbol>
     <symbol id="i-arrow-right" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
@@ -2061,7 +2080,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
                primary outcome decisions. -->
           <div class="dv-rail-section" id="dv-rail-card-alert" style="display:none">
             <div class="dv-card-alert">
-              <div class="dv-card-alert-icon">⚠️</div>
+              <div class="dv-card-alert-icon"><svg class="icn" style="width:16px;height:16px;color:#b91c1c;stroke-width:2.25"><use href="#i-warning"/></svg></div>
               <div class="dv-card-alert-body">
                 <div class="dv-card-alert-title">Debit card not saved to Vergent</div>
                 <div class="dv-card-alert-detail" id="dv-card-alert-detail"></div>
@@ -2074,7 +2093,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
               </div>
             </div>
           </div>
-          <div class="dv-rail-section">
+          <div class="dv-rail-section dv-rail-card">
             <div class="dv-rail-title">Quick Actions</div>
             <div class="qa-grid">
               <!-- Create Customer (operator request: top of Quick
@@ -2095,38 +2114,13 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
                 </div>
               </div>
               <button class="qa-btn qa-btn-emerald" id="dv-create-loan-btn" onclick="openCreateLoanModal()" title="Create a loan agreement in Vergent for this applicant and trigger the e-sign email"><svg class="icn"><use href="#i-zap"/></svg>Create Loan</button>
-              <!-- Portal Invite (operator request): shown ONLY when the
-                   customer already EXISTS in Vergent ('found'). Emails them
-                   their one-click magic link to set up their online account,
-                   sent to their Vergent on-file address (cif-apply resolves it
-                   from the customer id, so the link can't reach the wrong
-                   person). The chip shows whether they're already registered.
-                   renderProfilePanel toggles visibility + fills the chip. -->
-              <div id="dv-portal-invite-wrap" style="display:none">
-                <button class="qa-btn" id="dv-portal-invite-btn" type="button" title="Email this customer their one-click link to set up their online account"><svg class="icn"><use href="#i-message"/></svg>Portal Invite</button>
-                <div id="dv-portal-status-chip" style="font-size:11px;font-weight:600;color:var(--muted);margin-top:5px;min-height:14px"></div>
-                <div id="dv-portal-invite-result" style="font-size:11.5px;color:var(--muted);margin-top:3px;min-height:14px"></div>
-              </div>
-              <!-- Google Review (operator request): emails the customer a
-                   branded ask to review us on Google (g.page review link).
-                   Shown ONLY when the customer EXISTS in Vergent (match
-                   status 'found') — renderProfilePanel toggles visibility,
-                   same gating as Portal Invite. Double-send guarded
-                   server-side: a repeat click warns with the original send
-                   date and requires confirmation. -->
-              <div id="dv-google-review-wrap" style="display:none">
-                <button class="qa-btn" id="dv-google-review-btn" type="button" onclick="sendGoogleReviewEmail(this)" title="Email this customer a request to leave us a Google review"><span style="font-size:13px;line-height:1">⭐</span>Google Review</button>
-                <div id="dv-google-review-result" style="font-size:11.5px;color:var(--muted);margin-top:3px;min-height:14px"></div>
-                <button class="qa-btn" id="dv-trustpilot-review-btn" type="button" onclick="sendTrustpilotReviewEmail(this)" title="Email this customer a request to leave us a Trustpilot review" style="margin-top:6px"><span style="font-size:13px;line-height:1">⭐</span>TrustPilot Review</button>
-                <div id="dv-trustpilot-review-result" style="font-size:11.5px;color:var(--muted);margin-top:3px;min-height:14px"></div>
-              </div>
               <!-- Shown by renderProfilePanel when the customer already
                    has a Held / Pending / Active / Outstanding loan in
                    Vergent. Hides the Create Loan + combo buttons so the
                    operator can't create a second loan; auto-clears when
                    the existing loan is voided/funded in Vergent (cache
                    refetches on tab visibilitychange). -->
-              <div id="dv-active-loan-notice" style="display:none;color:#5a3300;background:#fff5e6;border:1px solid #f3b770;border-radius:8px;padding:9px 11px;line-height:1.35"><div style="font-size:13px;font-weight:800;display:flex;align-items:center;gap:5px">⚠️ Active Loan</div><div id="dv-active-loan-detail" style="font-size:11.5px;font-weight:400;margin-top:3px;color:#7a5a16">—</div></div>
+              <div id="dv-active-loan-notice" style="display:none;color:#5a3300;background:#fff5e6;border:1px solid #f3b770;border-radius:8px;padding:9px 11px;line-height:1.35"><div style="font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:7px"><svg class="icn" style="width:14px;height:14px;color:#b45309;flex-shrink:0"><use href="#i-warning"/></svg>Active Loan</div><div id="dv-active-loan-detail" style="font-size:11.5px;font-weight:400;margin-top:3px;color:#7a5a16">—</div></div>
               <!-- Combo flow (operator request): Create Customer ->
                    Push DL+Statement -> Verify card -> Create Loan ->
                    Send E-Sign. Distinct dark-green gradient + left
@@ -2155,6 +2149,40 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
               <button class="qa-btn" id="dv-refresh-plaid-btn" style="display:none" aria-hidden="true" tabindex="-1"></button>
             </div>
           </div>
+          <!-- Customer engagement — portal access + review requests.
+               Split out of Quick Actions (2026-07-10 visual pass) so
+               operational tools and customer outreach read as separate
+               groups. Whole section only shows for customers who EXIST
+               in Vergent ('found') — renderProfilePanel toggles it with
+               the same gating the two inner wraps already used. -->
+          <div class="dv-rail-section dv-rail-card" id="dv-rail-customer" style="display:none">
+            <div class="dv-rail-title">Customer</div>
+            <div class="qa-grid">
+              <!-- Portal Invite: emails the customer their one-click
+                   magic link, sent to their Vergent on-file address
+                   (cif-apply resolves it from the customer id, so the
+                   link can't reach the wrong person). The status row
+                   shows whether they're already registered. -->
+              <div id="dv-portal-invite-wrap" style="display:none">
+                <div id="dv-portal-status-chip" class="dv-pstat"></div>
+                <button class="qa-btn" id="dv-portal-invite-btn" type="button" title="Email this customer their one-click link to set up their online account"><svg class="icn"><use href="#i-message"/></svg>Portal Invite</button>
+                <div id="dv-portal-invite-result" class="qa-result"></div>
+              </div>
+              <!-- Review requests: branded ask to review us on Google /
+                   Trustpilot. Double-send guarded server-side: a repeat
+                   click warns with the original send date and requires
+                   confirmation. -->
+              <div id="dv-google-review-wrap" style="display:none">
+                <div class="qa-mini-label" style="margin-bottom:6px">Request a review</div>
+                <div style="display:flex;gap:6px">
+                  <button class="qa-btn" id="dv-google-review-btn" type="button" onclick="sendGoogleReviewEmail(this)" title="Email this customer a request to leave us a Google review" style="flex:1;justify-content:center;text-align:center"><svg class="icn"><use href="#i-star"/></svg>Google</button>
+                  <button class="qa-btn" id="dv-trustpilot-review-btn" type="button" onclick="sendTrustpilotReviewEmail(this)" title="Email this customer a request to leave us a Trustpilot review" style="flex:1;justify-content:center;text-align:center"><svg class="icn"><use href="#i-star"/></svg>Trustpilot</button>
+                </div>
+                <div id="dv-google-review-result" class="qa-result"></div>
+                <div id="dv-trustpilot-review-result" class="qa-result"></div>
+              </div>
+            </div>
+          </div>
           <!-- Vergent rail — hidden for found customers via renderVergentPanel
                since operators use the Notes / Documents tabs to push for
                returning customers. New / ambiguous / error / pending all
@@ -2163,11 +2191,11 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
             <div class="dv-rail-title">Vergent <span class="vg-status" id="vg-status">Pending</span></div>
             <div class="vg-card" id="vg-card"><div class="vg-pending">Checking Vergent…</div></div>
           </div>
-          <div class="dv-rail-section">
+          <div class="dv-rail-section dv-rail-card">
             <div class="dv-rail-title">Documents</div>
             <div id="dv-docs"></div>
           </div>
-          <div class="dv-rail-section dv-rail-danger">
+          <div class="dv-rail-section dv-rail-danger dv-rail-card">
             <div class="dv-rail-title" style="color:var(--red)">Danger Zone</div>
             <button class="dv-rail-danger-btn" id="dv-delete-btn" title="Permanently delete this application from Firebase"><svg class="icn"><use href="#i-x"/></svg>Delete Application</button>
             <div class="dv-rail-danger-hint">This permanently removes the application record from Firebase. Can't be undone.</div>
@@ -6605,6 +6633,15 @@ async function sendTrustpilotReviewEmail(btn){
 // and only touch the DOM when the answer actually changed.
 var _portalStatusCache = {};      // cid -> {d, at}
 var _portalStatusInflight = {};   // cid -> true while a check is running
+// Structured status row (2026-07-10 visual pass): colored state dot +
+// label, masked email right-aligned — replaces the old free-floating
+// gray text line that read as an afterthought.
+function _portalStatusRowHtml(dotColor, label, masked) {
+  return '<span class="dv-pstat-dot" style="background:' + dotColor + '"></span>'
+    + '<span>' + label + '</span>'
+    + (masked ? '<span class="dv-pstat-email" title="' + escapeHtml(masked) + '">'
+        + escapeHtml(masked) + '</span>' : '');
+}
 function _renderPortalStatus(cid, d) {
   const wrap = document.getElementById('dv-portal-invite-wrap');
   if (!wrap || wrap.getAttribute('data-cid') !== String(cid)) return;  // operator switched applicants
@@ -6613,15 +6650,13 @@ function _renderPortalStatus(cid, d) {
   d = d || {};
   let html;
   if (d.registered) {
-    html = '<span style="color:var(--green-dark)">✓ Portal user</span>'
-      + (d.masked ? ' · ' + escapeHtml(d.masked) : '');
+    html = _portalStatusRowHtml('#16a34a', 'Portal user', d.masked);
   } else if (d.noEmail) {
-    html = '<span style="color:var(--amber-700)">No email on file in Vergent</span>';
+    html = _portalStatusRowHtml('#d97706', 'No email on file in Vergent', '');
   } else if (d.error) {
     html = '';
   } else {
-    html = '<span style="color:var(--muted)">Not registered yet</span>'
-      + (d.masked ? ' · ' + escapeHtml(d.masked) : '');
+    html = _portalStatusRowHtml('#94a3b8', 'Not registered', d.masked);
   }
   if (chip.innerHTML !== html) chip.innerHTML = html;   // write only on change
   // Already a portal user → no invite to send: hide the button (+ its
@@ -6640,7 +6675,7 @@ function refreshPortalStatus(fbId, cid, force) {
   if (cached) {
     _renderPortalStatus(key, cached.d);   // instant — no "Checking…" flash
   } else {
-    chip.textContent = 'Checking account status…'; chip.style.color = 'var(--muted)';
+    chip.innerHTML = _portalStatusRowHtml('#cbd5e1', 'Checking account status…', '');
   }
   if (cached && !force && (Date.now() - cached.at) < 60000) return;  // fresh enough
   if (_portalStatusInflight[key]) return;                            // single-flight
@@ -6849,6 +6884,11 @@ function renderProfilePanel(fbId) {
   // same 'found' gating as Portal Invite (operator request).
   const grWrap = document.getElementById('dv-google-review-wrap');
   if (grWrap) grWrap.style.display = matchedHere ? 'block' : 'none';
+  // The whole Customer rail card (portal + reviews) follows the same
+  // gating — without this the empty card shell would linger for
+  // not-found/new applicants.
+  const custRail = document.getElementById('dv-rail-customer');
+  if (custRail) custRail.style.display = matchedHere ? '' : 'none';
   // Create Customer button (rail Quick Actions): shown ONLY for the
   // not_found / new state, where the operator's next action is to
   // create the Vergent record. Hidden on found (already exists),
