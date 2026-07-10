@@ -140,6 +140,15 @@ button,input,select{font-family:inherit}
 .stat-hero{background:linear-gradient(135deg,#f0fdf6 0%,#e7f7ee 100%);border-color:#bde5cc;box-shadow:0 1px 0 rgba(16,163,74,.06),0 4px 12px rgba(16,163,74,.06)}
 .stat-hero .stat-value{font-size:36px;color:var(--green-dark);font-weight:800;letter-spacing:-.03em}
 .stat-hero-sub{font-size:11.5px;color:var(--green-dark);font-weight:600;margin-top:6px;opacity:.85}
+.stat-hero{cursor:pointer}
+/* Servicing KPI tiles (2026-07-10): icon chip + $ sub-line + active ring */
+.svc-kpi{cursor:pointer}
+.svc-kpi-top{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+.svc-kpi-top .stat-label{margin-bottom:0}
+.svc-kpi-icn{width:28px;height:28px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.svc-kpi-icn .icn{width:14px;height:14px;stroke-width:2.25}
+.svc-kpi-sub{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:7px;font-variant-numeric:tabular-nums}
+.svc-kpi.on{border-color:var(--green);box-shadow:0 0 0 1px var(--green)}
 @media(max-width:600px){.stat-hero .stat-value{font-size:28px}}
 
 /* CARD */
@@ -1137,13 +1146,32 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   #rpt-buckets .rpt-bucket-head{margin-bottom:5px;gap:6px}
   #rpt-buckets .rpt-bucket-title{font-size:10px;letter-spacing:.05em}
   #rpt-buckets .rpt-bucket-head .chip{padding:4px 9px;font-size:11px;min-height:30px}
-  #rpt-buckets .rpt-bucket-cards{display:flex !important;grid-template-columns:none;overflow-x:auto;-webkit-overflow-scrolling:touch;gap:6px;padding-bottom:4px;scroll-snap-type:x proximity;scrollbar-width:none}
-  #rpt-buckets .rpt-bucket-cards::-webkit-scrollbar{display:none}
-  #rpt-buckets .bktile{flex:0 0 auto;padding:7px 14px 7px 14px;border-radius:999px;flex-direction:row;align-items:baseline;gap:7px;scroll-snap-align:start;min-width:0;box-shadow:none}
-  #rpt-buckets .bktile-band{width:3px;border-radius:3px}
-  #rpt-buckets .bktile-label{font-size:10.5px;padding-left:4px;letter-spacing:.04em}
-  #rpt-buckets .bktile-count{font-size:14px;padding-left:0;line-height:1}
-  #rpt-buckets .bktile-amt{display:none}
+  /* 2026-07-10 mobile redo: the horizontal pill strip clipped labels
+     and hid the dollars. Two-up tiles show count + $ per bucket with
+     zero sideways scrolling. */
+  #rpt-buckets .rpt-bucket-cards{display:grid !important;grid-template-columns:1fr 1fr;gap:8px;overflow:visible;padding-bottom:0}
+  #rpt-buckets .bktile{padding:10px 12px 9px;border-radius:12px;box-shadow:var(--shadow-xs)}
+  #rpt-buckets .bktile-label{font-size:10px;letter-spacing:.04em}
+  #rpt-buckets .bktile-count{font-size:19px;padding-left:7px}
+  #rpt-buckets .bktile-amt{display:block;font-size:11px}
+  /* Harry 2026-07-10: the four KPI cards go away entirely on phones —
+     the bucket tiles below carry the same story with less scrolling. */
+  #rpt-stats{display:none !important}
+  /* Toolbar noise off: row density is meaningless on card layout and
+     the loaded-at stamp is desk furniture. */
+  #rpt-loaded-at,#rpt-density-wrap{display:none !important}
+  /* Scope chips become one segmented control instead of wrapping pills. */
+  /* !important: the container + input carry inline flex styles */
+  #rpt-quick-filters{display:grid !important;grid-template-columns:repeat(4,1fr);gap:0 !important;border:1px solid var(--border);border-radius:11px;overflow:hidden;background:white;box-shadow:var(--shadow-xs)}
+  #rpt-quick-filters .chip{border:0;border-radius:0;margin:0;justify-content:center;text-align:center;font-size:11px;font-weight:700;padding:10px 2px;min-height:40px;background:white;white-space:nowrap}
+  #rpt-quick-filters .chip + .chip{border-left:1px solid var(--border)}
+  #rpt-quick-filters .chip.active{background:var(--green);color:#fff}
+  /* Search gets its own full-width row; the balance sweep becomes a
+     proper thumb-size button. */
+  #rpt-search{flex:1 1 100% !important;min-width:0 !important}
+  #rpt-checkbal-btn{flex:1;justify-content:center;min-height:44px;border-radius:10px}
+  /* No dangling em-dash when a loan card has no phone on file. */
+  .lns-noph{display:none}
 }
 
 /* Custom-range modal (Loans Due tab) */
@@ -2824,9 +2852,9 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
          past-due only, upcoming only) plus a 31+ days shortcut. -->
     <div id="rpt-quick-filters" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
       <button class="chip rpt-qf active" data-rpt-scope="all" onclick="setServicingScope('all')">All</button>
-      <button class="chip rpt-qf" data-rpt-scope="pastdue" onclick="setServicingScope('pastdue')">Past Due Only</button>
-      <button class="chip rpt-qf" data-rpt-scope="upcoming" onclick="setServicingScope('upcoming')">Upcoming Only</button>
-      <button class="chip rpt-qf" data-rpt-scope="severe31" onclick="setServicingScope('severe31')">31+ Days Late</button>
+      <button class="chip rpt-qf" data-rpt-scope="pastdue" onclick="setServicingScope('pastdue')">Past due</button>
+      <button class="chip rpt-qf" data-rpt-scope="upcoming" onclick="setServicingScope('upcoming')">Upcoming</button>
+      <button class="chip rpt-qf" data-rpt-scope="severe31" onclick="setServicingScope('severe31')">31+ days</button>
     </div>
     <!-- Always shows ACTIVE past-due loans only (non-zero balance /
          amount-due, status not Bought-Back/Paid-Off/etc.). The aging
@@ -15418,25 +15446,44 @@ function renderLoansDueUnified() {
   // KPI cards — count the whole active book (past-due + upcoming).
   if (stats) {
     const totalDue   = allRows.reduce((s, r) => s + (Number(r.AmountDue) || 0), 0);
-    const pastDueCt  = allRows.filter(r => _pastDueComputedDaysLate(r) >= 1).length;
+    const pastRows   = allRows.filter(r => _pastDueComputedDaysLate(r) >= 1);
+    const pastDueCt  = pastRows.length;
+    const pastDueAmt = pastRows.reduce((s, r) => s + (Number(r.AmountDue) || 0), 0);
     const upcomingCt = allRows.length - pastDueCt;
-    const sev31      = allRows.filter(r => _pastDueComputedDaysLate(r) >= 31).length;
-    const card = (label, val, cls) => `<div class="stat${cls?' '+cls:''}">
-      <div class="stat-label">${escapeHtml(label)}</div>
-      <div class="stat-value${cls==='dec'?' red':cls==='pen'?' amber':''}">${val}</div>
-    </div>`;
-    // "To collect" is the headline number — set it apart with an
-    // emerald accent + larger value so the eye lands on it first.
-    const hero = (label, val, sub) => `<div class="stat stat-hero">
+    const upcomingAmt = Math.max(0, totalDue - pastDueAmt);
+    const sevRows    = allRows.filter(r => _pastDueComputedDaysLate(r) >= 31);
+    const sev31     = sevRows.length;
+    const sev31Amt  = sevRows.reduce((s, r) => s + (Number(r.AmountDue) || 0), 0);
+    // KPI tiles (2026-07-10 polish): icon chip + dollar context under
+    // each count, and every tile filters the table on click — same
+    // scopes as the quick-filter chips, so the row reads as controls,
+    // not just decoration. Active scope gets the green ring.
+    const kpi = (label, val, sub, icon, chipBg, chipFg, valCls, on, click) => `
+      <div class="stat svc-kpi${on ? ' on' : ''}" role="button" tabindex="0" onclick="${click}" title="Filter the list below">
+        <div class="svc-kpi-top">
+          <span class="svc-kpi-icn" style="background:${chipBg};color:${chipFg}"><svg class="icn"><use href="#${icon}"/></svg></span>
+          <div class="stat-label">${escapeHtml(label)}</div>
+        </div>
+        <div class="stat-value${valCls ? ' ' + valCls : ''}">${val}</div>
+        <div class="svc-kpi-sub">${escapeHtml(sub)}</div>
+      </div>`;
+    // "To collect" is the headline number — emerald hero, tap = show all.
+    const hero = (label, val, sub) => `<div class="stat stat-hero" role="button" tabindex="0" onclick="setServicingScope('all')" title="Show all active loans">
       <div class="stat-label">${escapeHtml(label)}</div>
       <div class="stat-value">${val}</div>
       <div class="stat-hero-sub">${escapeHtml(sub)}</div>
     </div>`;
     stats.innerHTML =
         hero('To collect', _rptFmtMoney(totalDue), `${allRows.length.toLocaleString()} active loan${allRows.length === 1 ? '' : 's'}`)
-      + card('Past due', pastDueCt, pastDueCt > 0 ? 'dec' : '')
-      + card('Upcoming · 30d', upcomingCt)
-      + card('31+ days late', sev31, sev31 > 0 ? 'dec' : '');
+      + kpi('Past due', pastDueCt, _rptFmtMoney(pastDueAmt) + ' outstanding',
+            'i-warning', '#fff5e6', '#b45309', pastDueCt > 0 ? 'red' : '',
+            _servicingScope === 'pastdue', "setServicingScope('pastdue')")
+      + kpi('Upcoming · 30d', upcomingCt, _rptFmtMoney(upcomingAmt) + ' scheduled',
+            'i-clock', '#e8f3f8', '#1a4d6b', '',
+            _servicingScope === 'upcoming', "setServicingScope('upcoming')")
+      + kpi('31+ days late', sev31, _rptFmtMoney(sev31Amt) + ' at risk',
+            'i-alert-bell', '#fde7e7', '#b91c1c', sev31 > 0 ? 'red' : '',
+            _bucketFilter === 'pd-31', "setServicingScope('severe31')");
   }
 
   // Bucket cards (Upcoming + Past Due sections) — replaces the old
@@ -15551,7 +15598,7 @@ function _loansDueRowHtml(r) {
   const phoneFmt = _fmtPhoneUS(phoneRaw);
   const phoneHtml = phoneRaw
     ? `<a href="tel:${escapeHtml(phoneRaw)}" style="color:var(--green-dark);text-decoration:none;font-variant-numeric:tabular-nums" onclick="event.stopPropagation()">${escapeHtml(phoneFmt)}</a>`
-    : '—';
+    : '<span class="lns-noph">—</span>';
   const vergentLink = `https://shared.lms.vergentlms.com/customer/general?action=view&id=${encodeURIComponent(r.CustomerId || '')}`;
   const cid = String(r.CustomerId || '');
   const hdrId = String(r.HdrId || r.LoanId || '');
