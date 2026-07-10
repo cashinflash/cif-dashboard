@@ -6589,6 +6589,51 @@ function findAppByIdentity(row){
   }
   return null;
 }
+// Windowed-queue companion to findAppByIdentity (2026-07-10): the
+// local match only sees the loaded window, but Servicing works OLD
+// funded customers whose applications often predate the Vergent-id
+// linking entirely — the cid lookup then honestly answers
+// "no application" even though a name search finds them instantly
+// (the operator-reported regression). Sweep the FULL index server-side
+// by phone and by name (the same engine behind the top search bar),
+// merge matches into `apps`, and re-run the guarded identity match.
+// When it resolves AND the record carries no Vergent id yet, write the
+// cid link onto the record (fire-and-forget): the /fb/ write mirror
+// fans it into reportsIndex + vergentCidIndex, so every future click
+// for this customer takes the O(1) path instead of this sweep.
+// Match safety rides on findAppByIdentity's unique-only guards.
+async function _identityFbIdWithServerSweep(row, cid) {
+  let fbId = findAppByIdentity(row);
+  if (!fbId && row && typeof _reportsComplete !== 'undefined' && !_reportsComplete) {
+    const phone = String(row.PrimaryPhoneNumber || row.PrimaryPhoenNumber
+      || row.Phone || row.CellPhone || row.phone || row.HomePhone || '')
+      .replace(/\D/g, '').slice(-10);
+    const name = (((row.FirstName || row.firstName || '') + ' '
+      + (row.LastName || row.lastName || '')).trim())
+      || String(row.customer || '').trim();
+    const sweeps = [];
+    if (phone.length === 10) sweeps.push(phone);
+    if (name.length >= 4) sweeps.push(name);
+    for (const q of sweeps) {
+      try { await _serverSearchReports(q); } catch (e) {}
+      fbId = findAppByIdentity(row);
+      if (fbId) break;
+    }
+  }
+  if (fbId && cid && /^\d+$/.test(String(cid))) {
+    const a = (typeof apps !== 'undefined') ? apps.find(x => x.firebaseId === fbId) : null;
+    const existing = a && (a.vergentCid
+      || (a.vergentMatch || {}).customerId || a.vergentCustomerId);
+    if (a && !existing) {
+      a.vergentCid = String(cid);
+      try { fbPatchReport(fbId, { vergentCid: String(cid) }).catch(function () {}); } catch (e) {}
+      if (typeof _lnsOvFbIdByCid !== 'undefined') _lnsOvFbIdByCid[String(cid)] = fbId;
+      if (typeof _payOvFbIdByCid !== 'undefined') _payOvFbIdByCid[String(cid)] = fbId;
+    }
+  }
+  return fbId;
+}
+
 // Shared "last balance reading persists" helper for the servicing modals
 // (Loans Due + Payments). Mirrors the profile page: show the most recent
 // reading and keep it displayed until a new Check balance replaces it.
@@ -6644,7 +6689,7 @@ async function checkLoansDueBalance(btn){
     // vergentCidIndex) can't pick a same-name stranger. Identity match is
     // only the fallback for older loans the index doesn't know.
     const fbId=(cid ? await _lnsOvAwaitFbId(cid, 25000, String(row.HdrId||row.LoanId||'')) : null)
-      || findAppByIdentity(row);
+      || await _identityFbIdWithServerSweep(row, cid);
     if(!fbId){
       // Distinguish "lookup still running / hiccuped" from a definitive miss.
       const st = cid ? _lnsOvFbIdByCid[cid] : undefined;
@@ -6766,7 +6811,7 @@ async function checkAllVisibleBalances(btn){
       if(fbId===undefined){   // batch resolver unavailable — per-customer path
         fbId=(cid?await _lnsOvAwaitFbId(cid,20000,String(r.HdrId||r.LoanId||'')):null);
       }
-      if(!fbId) fbId=findAppByIdentity(r);
+      if(!fbId) fbId=await _identityFbIdWithServerSweep(r, cid);
       if(!fbId){ noLink++; }
       else{
         const d=await(await fetch('/api/plaid-balance',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({firebase_id:fbId})})).json();
@@ -13526,7 +13571,7 @@ async function checkPaymentBalance(btn){
   if(el){el.style.display='block';el.style.background='#f4f7f9';el.style.borderColor='var(--border)';el.style.color='var(--muted)';el.textContent='Resolving customer…';}
   try{
     const fbId=(cid ? await _payOvAwaitFbId(cid, 25000, String(row.loan_id||'')) : null)
-      || findAppByIdentity(row);
+      || await _identityFbIdWithServerSweep(row, cid);
     if(!fbId){
       const st = cid ? _payOvFbIdByCid[cid] : undefined;
       renderBalanceResult({ok:false,message: st==='__loading__'
@@ -13561,7 +13606,7 @@ async function payOvOpenAdmin() {
   if (btn) { btn.disabled = true; btn.style.opacity = '.7'; btn.innerHTML = 'Opening…'; }
   try {
     let fbId = cid ? await _payOvAwaitFbId(cid, 25000, loanId) : null;
-    if (!fbId) fbId = findAppByIdentity(_payOvRow);
+    if (!fbId) fbId = await _identityFbIdWithServerSweep(_payOvRow, cid);
     if (fbId) {
       window.open(location.pathname + location.search + '#fb=' + encodeURIComponent(fbId), '_blank');
     } else if (cid && _payOvFbIdByCid[cid] === '__loading__') {
@@ -13569,7 +13614,7 @@ async function payOvOpenAdmin() {
     } else if (cid && _payOvFbIdByCid[cid] === '__retryable__') {
       toast('Lookup service hiccuped — retrying automatically, click again in a few seconds.', 'err');
     } else {
-      toast('No application on file — Vergent-only customer (act in Vergent directly).', 'err');
+      toast('No application found by Vergent ID, loan, phone, or name across the full history — likely a Vergent-only record (act in Vergent directly).', 'err');
     }
   } catch (e) {
     toast('Lookup failed: ' + ((e && e.message) || e), 'err');
@@ -15815,7 +15860,7 @@ async function lnsOvOpenAdmin() {
   if (btn) { btn.disabled = true; btn.style.opacity = '.7'; btn.innerHTML = 'Opening…'; }
   try {
     let fbId = cid ? await _lnsOvAwaitFbId(cid, 25000, loanId) : null;
-    if (!fbId) fbId = findAppByIdentity(_lnsOvRow);
+    if (!fbId) fbId = await _identityFbIdWithServerSweep(_lnsOvRow, cid);
     if (fbId) {
       // Open the application in a NEW tab; leave the Loans Due modal open.
       window.open(location.pathname + location.search + '#fb=' + encodeURIComponent(fbId), '_blank');
@@ -15824,7 +15869,7 @@ async function lnsOvOpenAdmin() {
     } else if (cid && _lnsOvFbIdByCid[cid] === '__retryable__') {
       toast('Lookup service hiccuped — retrying automatically, click again in a few seconds.', 'err');
     } else {
-      toast('No application on file — Vergent-only customer (act in Vergent directly).', 'err');
+      toast('No application found by Vergent ID, loan, phone, or name across the full history — likely a Vergent-only record (act in Vergent directly).', 'err');
     }
   } catch (e) {
     toast('Lookup failed: ' + ((e && e.message) || e), 'err');

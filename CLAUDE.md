@@ -479,6 +479,17 @@ anymore.** Don't reintroduce a full fetch — that was the whole point.
   splices `apps` locally and the 10-min resync reconciles cross-tab.
 - "Load older applications" button (queue tail, only when
   `!_reportsComplete`) pages back with `before=<cursor>`.
+- **Servicing modals' identity fallback sweeps the full index**
+  (`_identityFbIdWithServerSweep`): the cid lookup is authoritative,
+  but customers whose applications PREDATE the Vergent-id linking get
+  an honest no_application from it — pre-windowing, the local
+  findAppByIdentity over all 8k rows caught them; post-windowing it
+  went blind for exactly the old funded customers Servicing works
+  (operator-reported "not finding the customer", 2026-07-10). The
+  sweep re-uses _serverSearchReports (phone, then name), re-runs the
+  guarded identity match, and on success writes the cid link onto the
+  record (fire-and-forget) so the /fb/ mirror fans it into
+  reportsIndex + vergentCidIndex — every later click is O(1).
 - Global search: local filter as before, PLUS a 400ms-debounced
   `GET /api/reports-window?q=...` server sweep of the full index that
   merges matches into `apps` (`_serverSearchReports`) — operators can
