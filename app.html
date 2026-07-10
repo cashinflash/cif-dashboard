@@ -3511,9 +3511,15 @@ function _maybeScheduleFastReportsPoll() {
   const inFlight = apps.some(a => {
     const s = String(a.status || '').toLowerCase();
     if (s === 'processing') return true;
-    // Pending without a score yet = engine hasn't written its result.
-    // We treat that as still in-flight so we keep polling.
-    if ((s === 'pending' || s === '') && a.score == null) return true;
+    // In-flight = a RECENT record the engine hasn't decided yet. The
+    // old test used the deleted v1 `score` field (always undefined
+    // since it left the index projection), which made every Pending
+    // row look in-flight forever and silently pinned the poll at 20s
+    // — 3x the intended cadence, 3x the Firebase egress, 3x the DOM
+    // rebuilds. Bound to 30 minutes so old stuck rows can't pin it.
+    if ((s === 'pending' || s === '') &&
+        (Date.now() - (a.createdAt || 0)) < 30 * 60 * 1000 &&
+        !a.processingComplete && !a.claudeDecision && !a.v4Decision) return true;
     return false;
   });
   if (inFlight) {
@@ -3559,11 +3565,17 @@ async function hydrateFullRecord(fbId) {
 }
 
 function rerender() {
-  renderDashboard();
-  renderQueue();
+  // Route-guarded (perf 2026-07-09): rebuilding the full queue AND all
+  // dashboard stats on every poll regardless of the visible view was
+  // ~0.5-1.5s of main-thread work per tick at 8k records. Render only
+  // what's on screen — setRoute already re-renders each view on
+  // navigation, so nothing goes stale.
+  const activeId = document.querySelector('.view.active')?.id || '';
+  if (activeId === 'view-dashboard') renderDashboard();
+  if (activeId === 'view-queue') renderQueue();
   // Re-render detail if currently viewing one
   const fbId = document.body.dataset.firebaseId;
-  if (fbId && document.getElementById('view-detail').classList.contains('active')) {
+  if (fbId && activeId === 'view-detail') {
     renderDetail(fbId);
   }
 }
@@ -4104,6 +4116,48 @@ function filteredApps() {
   return out;
 }
 
+// One queue row's markup — shared by the full renderQueue rebuild and
+// the in-place single-row updater (perf 2026-07-09: a status click no
+// longer rebuilds all 8k+ rows, it swaps just the affected <tr>).
+function _queueRowHtml(a) {
+  const sCls = statusClass(a.status);
+  const idShort = (a.submissionId || a.firebaseId || '').slice(-6).toUpperCase();
+  const appType = (a.applicationData || a.hasApp) ? 'Application' : (a.filename ? 'Document' : 'Manual');
+  const appMeta = a.amount ? a.amount.replace(/^N\/A$/, '—') : '';
+  // §8.5: one-sentence engine reason as the row subtitle so the queue
+  // is scannable without opening modals. v4ReasonLine when the v4
+  // shadow has run; falls back to the canonical engine reason.
+  // microbiltSummary ('' when clean) appends MLA/SSN flags so identity
+  // issues are visible before opening the modal — silence = clean.
+  const mbFlag = a.microbiltSummary || '';
+  // reapplyFlag ('' when clean): reapply-block Layer-2 signal. The
+  // funded_instrument case also gets a red FLAG chip in the status cell.
+  const raFlag = a.reapplyFlag === 'funded_instrument_reuse' ? 'bank/card matches a FUNDED loan (possible duplicate identity)'
+               : a.reapplyFlag === 'instrument_reuse' ? 'bank/card matches a recent decline'
+               : a.reapplyFlag === 'weak_identity_match' ? 'shared phone/email with a recent decline' : '';
+  const subReason = (a.v4ReasonLine || a.reason || '') +
+    (mbFlag ? ' · ' + mbFlag : '') + (raFlag ? ' · ' + raFlag : '');
+  return `<tr data-fb="${escapeHtml(a.firebaseId)}">
+      <td><div class="applicant"><input type="checkbox" class="queue-sel-cb" data-fb="${escapeHtml(a.firebaseId)}" title="Select for bulk action"><div class="av">${escapeHtml(initials(a.name))}</div><div class="applicant-text"><div class="applicant-name">${escapeHtml(a.name || 'Unnamed')} ${sourceBadge(a)}</div><div class="applicant-id">#${escapeHtml(idShort)}</div></div></div></td>
+      <td><div class="app-info"><div class="app-type">${escapeHtml(appType)}</div><div class="app-meta">${escapeHtml(appMeta)}</div>${subReason ? `<div class="app-meta" style="max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(subReason)}">${escapeHtml(subReason)}</div>` : ''}</div></td>
+      <td>${engineBadge(a)}</td>
+      <td><span class="status ${sCls}">${escapeHtml(a.status || 'Pending')}</span>${a.humanActionBy === 'auto-system' ? ' <span title="Declined automatically by the system" style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:.04em;background:#eef2f7;color:#5a6b7b;border:1px solid #d3dde6;border-radius:4px;padding:1px 5px;vertical-align:middle">AUTO</span>' : ''}${a.reapplyFlag === 'funded_instrument_reuse' ? ' <span title="Same bank account or debit card as a FUNDED loan under a different identity — possible duplicate identity, review before any action" style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:.04em;background:#fde7e7;color:#5a0d0d;border:1px solid #e8b4b4;border-radius:4px;padding:1px 5px;vertical-align:middle">FLAG</span>' : ''}</td>
+      <td><div class="tbl-time">${escapeHtml(a.date || '')}<br>${escapeHtml(a.time || '')}</div></td>
+      <td><div class="tbl-time">${fmtTimeAgo(a.updatedAt || a.createdAt)}</div></td>
+    </tr>`;
+}
+
+// Replace just one queue row after an optimistic local change. No-op
+// when the queue isn't rendered or the row is filtered out of view.
+function updateQueueRowInPlace(fbId) {
+  const tbody = document.getElementById('queue-tbody');
+  if (!tbody) return;
+  const tr = tbody.querySelector(`tr[data-fb="${CSS.escape(fbId)}"]`);
+  const a = apps.find(x => x.firebaseId === fbId);
+  if (!tr || !a) return;
+  tr.outerHTML = _queueRowHtml(a);
+}
+
 function renderQueue() {
   const c = counts();
   document.getElementById('ct-all').textContent = c.total;
@@ -4152,31 +4206,7 @@ function renderQueue() {
       rows.push(`<tr class="queue-group"><td colspan="6">${escapeHtml(group)}</td></tr>`);
       lastGroup = group;
     }
-    const sCls = statusClass(a.status);
-    const idShort = (a.submissionId || a.firebaseId || '').slice(-6).toUpperCase();
-    const appType = (a.applicationData || a.hasApp) ? 'Application' : (a.filename ? 'Document' : 'Manual');
-    const appMeta = a.amount ? a.amount.replace(/^N\/A$/, '—') : '';
-    // §8.5: one-sentence engine reason as the row subtitle so the queue
-    // is scannable without opening modals. v4ReasonLine when the v4
-    // shadow has run; falls back to the canonical engine reason.
-    // microbiltSummary ('' when clean) appends MLA/SSN flags so identity
-    // issues are visible before opening the modal — silence = clean.
-    const mbFlag = a.microbiltSummary || '';
-    // reapplyFlag ('' when clean): reapply-block Layer-2 signal. The
-    // funded_instrument case also gets a red FLAG chip in the status cell.
-    const raFlag = a.reapplyFlag === 'funded_instrument_reuse' ? 'bank/card matches a FUNDED loan (possible duplicate identity)'
-                 : a.reapplyFlag === 'instrument_reuse' ? 'bank/card matches a recent decline'
-                 : a.reapplyFlag === 'weak_identity_match' ? 'shared phone/email with a recent decline' : '';
-    const subReason = (a.v4ReasonLine || a.reason || '') +
-      (mbFlag ? ' · ' + mbFlag : '') + (raFlag ? ' · ' + raFlag : '');
-    rows.push(`<tr data-fb="${escapeHtml(a.firebaseId)}">
-      <td><div class="applicant"><input type="checkbox" class="queue-sel-cb" data-fb="${escapeHtml(a.firebaseId)}" title="Select for bulk action"><div class="av">${escapeHtml(initials(a.name))}</div><div class="applicant-text"><div class="applicant-name">${escapeHtml(a.name || 'Unnamed')} ${sourceBadge(a)}</div><div class="applicant-id">#${escapeHtml(idShort)}</div></div></div></td>
-      <td><div class="app-info"><div class="app-type">${escapeHtml(appType)}</div><div class="app-meta">${escapeHtml(appMeta)}</div>${subReason ? `<div class="app-meta" style="max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(subReason)}">${escapeHtml(subReason)}</div>` : ''}</div></td>
-      <td>${engineBadge(a)}</td>
-      <td><span class="status ${sCls}">${escapeHtml(a.status || 'Pending')}</span>${a.humanActionBy === 'auto-system' ? ' <span title="Declined automatically by the system" style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:.04em;background:#eef2f7;color:#5a6b7b;border:1px solid #d3dde6;border-radius:4px;padding:1px 5px;vertical-align:middle">AUTO</span>' : ''}${a.reapplyFlag === 'funded_instrument_reuse' ? ' <span title="Same bank account or debit card as a FUNDED loan under a different identity — possible duplicate identity, review before any action" style="display:inline-block;font-size:9px;font-weight:800;letter-spacing:.04em;background:#fde7e7;color:#5a0d0d;border:1px solid #e8b4b4;border-radius:4px;padding:1px 5px;vertical-align:middle">FLAG</span>' : ''}</td>
-      <td><div class="tbl-time">${escapeHtml(a.date || '')}<br>${escapeHtml(a.time || '')}</div></td>
-      <td><div class="tbl-time">${fmtTimeAgo(a.updatedAt || a.createdAt)}</div></td>
-    </tr>`);
+    rows.push(_queueRowHtml(a));
   }
   // BULK SELECT (one-time feature): preserve checked rows across a
   // re-render (filter change, forced refresh) so the operator's
@@ -7852,14 +7882,17 @@ async function sendDenialEmail() {
     });
     const d = await r.json().catch(() => ({}));
     if (r.ok && d.ok) {
-      toast(`Denial email sent to ${_denialEmail} ✓`, 'ok');
+      toast(d.duplicate
+        ? 'Already sent today' + (d.prior_sent_at ? ' at ' + new Date(d.prior_sent_at).toLocaleTimeString() : '') + ' — not re-sent'
+        : `Denial email to ${_denialEmail} on its way ✓`, 'ok');
       // Marking Declined needs to happen BEFORE closeDenialModal clears
-      // _denialFbId. setStatus updates Firebase + the local apps cache
-      // and re-renders the detail so the operator sees the new status
-      // pill immediately.
+      // _denialFbId. skipConfirm: clicking "Send Denial Email" WAS the
+      // confirmation — the old extra confirm() fired AFTER the email
+      // had already gone out, and cancelling it left the customer
+      // emailed but the record still Pending.
       const fbId = _denialFbId;
       closeDenialModal();
-      if (fbId) setStatus(fbId, 'Declined');
+      if (fbId) setStatus(fbId, 'Declined', { skipConfirm: true });
     } else {
       toast('Send failed: ' + (d.error || ('HTTP ' + r.status)), 'err');
     }
@@ -8002,51 +8035,73 @@ async function confirmOverride() {
 // /overrides/{fbId} (override crossings only) + humanAction/
 // humanActionAt on the report. Best-effort: a log failure never blocks
 // the status change the operator just made.
-function _recordHumanAction(fbId, status, opts) {
-  const a = apps.find(x => x.firebaseId === fbId);
-  const action = status === 'Approved' ? 'funded' : status === 'Declined' ? 'declined' : null;
-  if (!action) return;
-  const engineTier = (opts && opts.engineTier) != null ? opts.engineTier : (parseAmount(a && a.amount) || 0);
-  fetch('/api/override', {
-    method: 'POST', credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      firebase_id: fbId,
-      humanAction: action,
-      engineVerdict: (a && a.claudeDecision) || '',
-      engineTier,
-      amount: (opts && opts.overrideAmount) || parseAmount(a && a.amount) || 0,
-      reason: (opts && opts.overrideReason) || '',
-      isOverride: !!(opts && opts.fromOverride),
-    })
-  }).then(r => r.json()).then(d => {
-    const now = Date.now();
-    const patch = { humanAction: action, humanActionAt: now, humanActionBy: (d && d.operator) || '' };
-    if (a) Object.assign(a, patch);
-    if (_fullRecordCache[fbId]) Object.assign(_fullRecordCache[fbId], patch);
-    rerender();
-  }).catch(() => {});
-}
-
 async function setStatus(fbId, status, opts = {}) {
   const a = apps.find(x => x.firebaseId === fbId);
   if (!a) return;
   // Override gating removed (operator request 2026-06-15): approve or
   // decline ANY file in one click — no reason, no modal, ever. The
   // silent humanAction stamp (who acted) is kept so auto-vs-manual
-  // labels keep working; it's a background write that never blocks you.
+  // labels keep working.
   if (!opts.skipConfirm && !confirm(`${status} ${a.name || 'this applicant'}?`)) return;
-  toast('Updating…');
+  // OPTIMISTIC (perf 2026-07-09): the old path serialized 4 Firebase
+  // writes across two requests and rebuilt the full queue twice per
+  // click (~1-2.5s). Now: paint first, then ONE consolidated
+  // /api/override call (single multi-path Firebase write server-side);
+  // on failure, revert the row and say so.
   const _now = Date.now();
-  await fbPatchReport(fbId, { status, statusUpdatedAt: _now });
-  Object.assign(a, { status, statusUpdatedAt: _now });
+  const action = status === 'Approved' ? 'funded' : status === 'Declined' ? 'declined' : '';
+  const prev = {
+    status: a.status, statusUpdatedAt: a.statusUpdatedAt,
+    humanAction: a.humanAction, humanActionAt: a.humanActionAt,
+    humanActionBy: a.humanActionBy,
+  };
+  const patch = { status, statusUpdatedAt: _now };
+  if (action) { patch.humanAction = action; patch.humanActionAt = _now; }
+  Object.assign(a, patch);
   // Keep the hydrated cache in sync so the next light poll's overlay
   // (and the open detail view) reflect the new status, not the stale
   // snapshot captured when the applicant was first opened.
-  if (_fullRecordCache[fbId]) Object.assign(_fullRecordCache[fbId], { status, statusUpdatedAt: _now });
-  _recordHumanAction(fbId, status, opts);
+  if (_fullRecordCache[fbId]) Object.assign(_fullRecordCache[fbId], patch);
+  updateQueueRowInPlace(fbId);
+  if (document.body.dataset.firebaseId === fbId &&
+      document.getElementById('view-detail')?.classList.contains('active')) {
+    renderDetail(fbId);
+  }
   toast(`Marked ${status}`, 'ok');
-  rerender();
+  try {
+    const engineTier = (opts && opts.engineTier) != null ? opts.engineTier : (parseAmount(a.amount) || 0);
+    const r = await fetch('/api/override', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        firebase_id: fbId,
+        status,
+        statusUpdatedAt: _now,
+        humanAction: action,
+        engineVerdict: a.claudeDecision || '',
+        engineTier,
+        amount: (opts && opts.overrideAmount) || parseAmount(a.amount) || 0,
+        reason: (opts && opts.overrideReason) || '',
+        isOverride: !!(opts && opts.fromOverride),
+      }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error((d && d.error) || ('HTTP ' + r.status));
+    if (action) {
+      a.humanActionBy = (d && d.operator) || '';
+      if (_fullRecordCache[fbId]) _fullRecordCache[fbId].humanActionBy = a.humanActionBy;
+      updateQueueRowInPlace(fbId);
+    }
+  } catch (e) {
+    Object.assign(a, prev);
+    if (_fullRecordCache[fbId]) Object.assign(_fullRecordCache[fbId], prev);
+    updateQueueRowInPlace(fbId);
+    if (document.body.dataset.firebaseId === fbId &&
+        document.getElementById('view-detail')?.classList.contains('active')) {
+      renderDetail(fbId);
+    }
+    toast(`Couldn't save ${status} — change reverted. ${e.message || e}`, 'err');
+  }
 }
 
 async function saveOffer(fbId) {
@@ -8303,17 +8358,22 @@ async function reExtractPdf(fbId) {
     let done = false;
     for (let i = 0; i < 36; i++) {
       await new Promise(res => setTimeout(res, 5000));
-      let rec;
-      try { rec = await fbGet(`reports/${fbId}.json`); } catch (e) { continue; }
-      const status = rec && rec.reExtractStatus;
+      // Poll ONLY the status leaf — the full record carries hundreds of
+      // KB of rendered report/engine data we'd re-download every 5s.
+      let status;
+      try { status = await fbGet(`reports/${fbId}/reExtractStatus.json`); } catch (e) { continue; }
       if (status === 'done') {
         done = true;
-        toast('Re-extract complete — ' + (rec.reExtractTransactionCount || 0) + ' transactions', 'ok');
+        let count = 0;
+        try { count = (await fbGet(`reports/${fbId}/reExtractTransactionCount.json`)) || 0; } catch (e) {}
+        toast('Re-extract complete — ' + count + ' transactions', 'ok');
         break;
       }
       if (status === 'error') {
         done = true;
-        toast('Re-extract failed: ' + (rec.reExtractError || 'unknown error'), 'err');
+        let msg = null;
+        try { msg = await fbGet(`reports/${fbId}/reExtractError.json`); } catch (e) {}
+        toast('Re-extract failed: ' + (msg || 'unknown error'), 'err');
         break;
       }
     }
@@ -8417,15 +8477,22 @@ async function _pollPlaidRefresh(fbId, pdfRefreshable) {
       _showDocsRefreshing(false);
       return;
     }
-    let rec;
-    try { rec = await fbGet(`reports/${fbId}.json`); } catch (e) { continue; }
-    if (!rec) continue;
-    const st = rec.plaidRefreshStatus;
-    const stage = rec.plaidRefreshStage || '';
-    const pdfState = rec.plaidRefreshPdf;
+    // Poll ONLY the three job leaves — the full record re-downloaded
+    // every 5s carried the entire engine output + rendered HTML.
+    let st, stage, pdfState;
+    try {
+      [st, stage, pdfState] = await Promise.all([
+        fbGet(`reports/${fbId}/plaidRefreshStatus.json`),
+        fbGet(`reports/${fbId}/plaidRefreshStage.json`),
+        fbGet(`reports/${fbId}/plaidRefreshPdf.json`),
+      ]);
+    } catch (e) { continue; }
+    stage = stage || '';
 
     if (st === 'error') {
-      toast('Refresh failed: ' + (rec.plaidRefreshError || 'unknown error'), 'err');
+      let errMsg = null;
+      try { errMsg = await fbGet(`reports/${fbId}/plaidRefreshError.json`); } catch (e) {}
+      toast('Refresh failed: ' + (errMsg || 'unknown error'), 'err');
       dvEndRerunLoading();
       _showDocsRefreshing(false);
       await hydrateFullRecord(fbId);
@@ -8445,7 +8512,7 @@ async function _pollPlaidRefresh(fbId, pdfRefreshable) {
         toast('Report updated from fresh Plaid data', 'ok');
         // Nothing more to wait for if the PDF is already settled.
         if (st === 'done' || pdfState === 'done' || pdfState === 'skipped' || pdfState === 'error') {
-          _finishPlaidPdf(rec);
+          _finishPlaidPdf(await _plaidPdfLight(fbId, pdfState));
           return;
         }
         // Otherwise the PDF is still downloading — show the corner chip.
@@ -8459,7 +8526,7 @@ async function _pollPlaidRefresh(fbId, pdfRefreshable) {
       if (st === 'done' || pdfState === 'done' || pdfState === 'error' || pdfState === 'skipped') {
         await hydrateFullRecord(fbId);
         rerender();   // fingerprint change → Documents grid repaints with the new PDF
-        _finishPlaidPdf(rec);
+        _finishPlaidPdf(await _plaidPdfLight(fbId, pdfState));
         return;
       }
     }
@@ -8471,6 +8538,16 @@ async function _pollPlaidRefresh(fbId, pdfRefreshable) {
   } else {
     _showDocsRefreshing(false, 'The fresh PDF is taking longer than usual — it’ll appear in Documents when ready', true);
   }
+}
+
+// Light stand-in for the record when only the PDF outcome is needed —
+// fetches the note leaf only when the skipped branch will display it.
+async function _plaidPdfLight(fbId, pdfState) {
+  const light = { plaidRefreshPdf: pdfState, plaidRefreshNote: null };
+  if (pdfState === 'skipped') {
+    try { light.plaidRefreshNote = await fbGet(`reports/${fbId}/plaidRefreshNote.json`); } catch (e) {}
+  }
+  return light;
 }
 
 function _finishPlaidPdf(rec) {
@@ -9535,14 +9612,22 @@ async function rerunAppLinkPlaid(fbId, btn) {
   const maxAttempts = 48;
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise(r => setTimeout(r, 5000));
-    let rec;
-    try { rec = await fbGet(`reports/${fbId}.json`); }
-    catch (e) { continue; }
-    if (!rec) continue;
-    const urlChanged = rec.bankStatementUrl && rec.bankStatementUrl !== baselineUrl;
-    const tokenChanged = rec.plaidAssetToken && rec.plaidAssetToken !== baselineToken;
+    // Poll ONLY the two leaves being watched — not the full record.
+    let url, tok;
+    try {
+      [url, tok] = await Promise.all([
+        fbGet(`reports/${fbId}/bankStatementUrl.json`),
+        fbGet(`reports/${fbId}/plaidAssetToken.json`),
+      ]);
+    } catch (e) { continue; }
+    const urlChanged = url && url !== baselineUrl;
+    const tokenChanged = tok && tok !== baselineToken;
     if (urlChanged || tokenChanged) {
-      const decision = (rec.claudeDecision || rec.status || 'updated').toString();
+      let decision = 'updated';
+      try {
+        decision = String((await fbGet(`reports/${fbId}/claudeDecision.json`))
+          || (await fbGet(`reports/${fbId}/status.json`)) || 'updated');
+      } catch (e) {}
       if (statusToast) statusToast.remove();
       toast('Report ready — ' + decision, 'ok');
       if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = 'Re-run report'; }
