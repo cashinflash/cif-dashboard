@@ -1695,7 +1695,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 .amt-title{font-size:14px;font-weight:800;color:var(--text)}
 .amt-x{background:var(--surface2);border:1px solid var(--border);border-radius:999px;width:30px;height:30px;font-size:14px;color:var(--muted);cursor:pointer;font-family:inherit}
 .amt-wheel-wrap{position:relative;margin:6px 0 4px}
-.amt-wheel{height:220px;overflow-y:auto;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.amt-wheel{height:220px;overflow-y:auto;overflow-x:hidden;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;touch-action:pan-y;overscroll-behavior:contain}
 .amt-wheel::-webkit-scrollbar{display:none}
 .amt-pad{height:88px}
 .amt-item{height:44px;display:flex;align-items:center;justify-content:center;scroll-snap-align:center;font-size:21px;font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums;transition:color .12s, transform .12s;cursor:pointer}
@@ -1917,9 +1917,9 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
               <div class="perf-row3"><span class="perf-trend flat" id="perf-income-sub">monthly</span><span class="spark" id="spark-income"></span></div>
             </div>
             <div class="perf-cell">
-              <div class="perf-label">Avg. Score</div>
-              <div class="perf-value" id="perf-score">—</div>
-              <div class="perf-row3"><span class="perf-trend flat" id="perf-score-sub">/100</span><span class="spark" id="spark-score"></span></div>
+              <div class="perf-label">Auto-Decided</div>
+              <div class="perf-value" id="perf-auto">—</div>
+              <div class="perf-row3"><span class="perf-trend flat" id="perf-auto-sub">by the engine</span></div>
             </div>
             <div class="perf-cell">
               <div class="perf-label">Income Verified</div>
@@ -4300,6 +4300,8 @@ function renderDashboard() {
 // grouped by what the engine wants from you); RIGHT = what the system
 // auto-declined today (for a quick QA scan). All derived from existing
 // fields — pure display, no engine exposure.
+let _autoDeclOpen = false;
+function toggleAutoDecl() { _autoDeclOpen = !_autoDeclOpen; renderActionCenter(); }
 function renderActionCenter() {
   const feed = document.getElementById('activity-feed');
   if (!feed) return;
@@ -4345,10 +4347,18 @@ function renderActionCenter() {
          section('Engine declined — confirm/override', 'var(--red)', g.confirm, '⚖️', 'no',
            a => a.v4ReasonLine || a.reason || 'Declined by engine')));
 
+  // Phones collapse the auto-declined list behind a View toggle
+  // (operator request 2026-07-10) — it's QA reading material, not
+  // work, and it ate a screenful of space on mobile.
+  const _phone = window.matchMedia('(max-width:600px)').matches;
+  const showAuto = !_phone || _autoDeclOpen;
   const right =
-    `<div style="font-size:12px;font-weight:700;color:var(--text);padding:10px 22px 2px">
-       Auto-declined today · ${autoToday.length}</div>` +
-    (autoToday.length === 0
+    `<div style="font-size:12px;font-weight:700;color:var(--text);padding:10px 22px 2px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+       <span>Auto-declined today · ${autoToday.length}</span>
+       ${_phone ? `<button onclick="toggleAutoDecl()" style="background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:4px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">${_autoDeclOpen ? 'Hide' : 'View'}</button>` : ''}
+     </div>` +
+    (!showAuto ? '' :
+     autoToday.length === 0
       ? '<div class="tbl-empty" style="padding:18px 22px">None yet today.</div>'
       : autoToday.slice(0, 10).map(a =>
           row(a, 'A', 'no', (_AUTO_BUCKET[a.autoDeclineBucket] || a.autoDeclineBucket || 'auto-declined')))
@@ -4373,16 +4383,22 @@ function renderPerformance() {
   const decRate = decidedMonth.length ? Math.round((apprMonth / decidedMonth.length) * 100) : 0;
 
   // Avg Loan Amount — averaged across approved apps this month.
+  // parseAmount, NOT Number(): a.amount is a display string ("$300"),
+  // so Number() returned NaN for every row and this card sat at "—"
+  // forever (operator caught it 2026-07-10).
   const approvedApps = decidedMonth.filter(a => bucketStatus(a) === 'approved');
-  const loanVals = approvedApps.map(a => Number(a.amount || 0)).filter(n => n > 0);
+  const loanVals = approvedApps.map(a => parseAmount(a.amount) || 0).filter(n => n > 0);
   const avgLoan = loanVals.length ? Math.round(loanVals.reduce((s, v) => s + v, 0) / loanVals.length) : null;
   // Avg Verified Income — monthly income from all decided apps with
-  // a non-zero verified figure.
+  // a non-zero verified figure (monthlyIncome rides reportsIndex as of
+  // 2026-07-10; older rows backfill via cif-apply's 45-min index walk).
   const incomeVals = decidedMonth.map(a => Number(a.monthlyIncome || 0)).filter(n => n > 0);
   const avgIncome = incomeVals.length ? Math.round(incomeVals.reduce((s, v) => s + v, 0) / incomeVals.length) : null;
-  // Avg Score
-  const scoreVals = decidedMonth.map(a => Number(a.score)).filter(n => !isNaN(n) && n > 0);
-  const avgSc = scoreVals.length ? Math.round(scoreVals.reduce((s, v) => s + v, 0) / scoreVals.length) : null;
+  // Auto-decided — share of this month's decisions the engine handled
+  // alone. Replaces the dead v1 Avg Score card (cif-apply stopped
+  // writing `score` long ago, so that card was permanently "—").
+  const autoCount = decidedMonth.filter(a => a.humanActionBy === 'auto-system').length;
+  const autoPct = decidedMonth.length ? Math.round((autoCount / decidedMonth.length) * 100) : 0;
   // Income Verified — % of decided apps with verified monthly income.
   const verified = decidedMonth.filter(a => Number(a.monthlyIncome) > 0).length;
   const stability = decidedMonth.length ? Math.round((verified / decidedMonth.length) * 100) : 0;
@@ -4392,7 +4408,12 @@ function renderPerformance() {
   document.getElementById('perf-loan').innerHTML = avgLoan == null ? '—' : `$${avgLoan.toLocaleString()}`;
   document.getElementById('perf-loan-sub').textContent = approvedApps.length ? `${approvedApps.length} approved` : 'approved this month';
   document.getElementById('perf-income').innerHTML = avgIncome == null ? '—' : `$${avgIncome.toLocaleString()}`;
-  document.getElementById('perf-score').innerHTML = avgSc == null ? '—' : `${avgSc}<span class="unit">/100</span>`;
+  const incomeSub = document.getElementById('perf-income-sub');
+  if (incomeSub) incomeSub.textContent = incomeVals.length ? `${incomeVals.length} with income` : 'monthly';
+  const autoEl = document.getElementById('perf-auto');
+  if (autoEl) autoEl.innerHTML = decidedMonth.length ? `${autoPct}<span class="unit">%</span>` : '—';
+  const autoSub = document.getElementById('perf-auto-sub');
+  if (autoSub) autoSub.textContent = autoCount ? `${autoCount} by the engine` : 'by the engine';
   document.getElementById('perf-stability').innerHTML = decidedMonth.length ? `${stability}<span class="unit">%</span>` : '—';
   document.getElementById('perf-stability-sub').textContent = decidedMonth.length ? `${verified}/${decidedMonth.length} verified` : 'of decided';
   const stabBadge = document.getElementById('perf-stability-badge');
@@ -4404,14 +4425,17 @@ function renderPerformance() {
     if (!dec.length) return null;
     return dec.filter(a => bucketStatus(a) === 'approved').length / dec.length;
   }), 'var(--green)');
-  drawSpark('spark-fcf', _weeklyTrend(apps, w => {
-    const dec = w.filter(a => isDecided(a));
-    const v = dec.map(a => Number(a.fcf || 0)).filter(n => !isNaN(n));
+  // spark-loan / spark-income had markup slots but were never drawn;
+  // the old code drew to spark-fcf (no such element) and spark-score
+  // (dead v1 field).
+  drawSpark('spark-loan', _weeklyTrend(apps, w => {
+    const v = w.filter(a => bucketStatus(a) === 'approved')
+      .map(a => parseAmount(a.amount) || 0).filter(n => n > 0);
     return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
   }), 'var(--green)');
-  drawSpark('spark-score', _weeklyTrend(apps, w => {
-    const dec = w.filter(a => isDecided(a));
-    const v = dec.map(a => Number(a.score)).filter(n => !isNaN(n) && n > 0);
+  drawSpark('spark-income', _weeklyTrend(apps, w => {
+    const v = w.filter(a => isDecided(a))
+      .map(a => Number(a.monthlyIncome || 0)).filter(n => n > 0);
     return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
   }), 'var(--green)');
 }
@@ -8408,7 +8432,10 @@ async function sendDenialEmail() {
       // emailed but the record still Pending.
       const fbId = _denialFbId;
       closeDenialModal();
-      if (fbId) setStatus(fbId, 'Declined', { skipConfirm: true });
+      if (fbId) {
+        await setStatus(fbId, 'Declined', { skipConfirm: true });
+        _afterDeclineReturn();
+      }
     } else {
       toast('Send failed: ' + (d.error || ('HTTP ' + r.status)), 'err');
     }
@@ -8435,6 +8462,19 @@ async function declineNoEmail() {
   // too (declining an engine-APPROVE needs a logged reason). The modal
   // click was the explicit action, so no extra confirm().
   await setStatus(fbId, 'Declined', { skipConfirm: true });
+  _afterDeclineReturn();
+}
+
+// After a decline from the detail view, land the operator back on the
+// dashboard (operator request 2026-07-10) — the working loop is
+// dashboard → open application → decide → next, so staying parked on
+// the applicant you just declined wasted a tap. Skips when the §8.2
+// override modal is open (crossing declines still need their typed
+// reason first) and when the decline didn't come from the detail view.
+function _afterDeclineReturn() {
+  const detailActive = document.getElementById('view-detail')?.classList.contains('active');
+  const ovrOpen = document.getElementById('ovr-ov')?.classList.contains('open');
+  if (detailActive && !ovrOpen) setRoute('dashboard');
 }
 
 async function deleteApplication(fbId) {
