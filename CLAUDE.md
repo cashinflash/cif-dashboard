@@ -460,6 +460,15 @@ anymore.** Don't reintroduce a full fetch — that was the whole point.
   `total`, and `windowOldest` — the paging cursor, computed from the
   CONTIGUOUS createdAt window only (an ancient unsettled straggler
   must not drag the cursor back; caught by test, don't "simplify").
+  **Straggler identity mask** (`_reports_customer_key`, lock-step with
+  customerKey()): a straggler only ships if it's the customer's NEWEST
+  application — the client dedups to latest-per-customer, so shipping
+  an old Pending without its newer settled (outside-window) sibling
+  "resurrects" it in the review queue. First deploy did exactly that
+  (operator saw 60+ dead pendings reappear); don't remove the mask.
+  When out-of-window stragglers exist, the indexed path defers to the
+  full-fetch fallback (the mask needs the whole index — fine at
+  current scale; the delta poll stays indexed either way).
 - Every other poll (60s visible / 20s in-flight fast-poll):
   `GET /api/reports-delta?since=<watermark>` → only changed rows
   (updatedAt OR createdAt > since). `_mergeReportRows` replace-or-
