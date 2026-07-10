@@ -534,8 +534,9 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 .dv-rail-card{background:white;border:1px solid var(--border);border-radius:12px;padding:14px;box-shadow:var(--shadow-xs)}
 .dv-rail-card .dv-rail-title{margin-bottom:12px}
 .dv-rail-danger.dv-rail-card{border-color:var(--red-100)}
-#dv-docs .check-row:last-child{border-bottom:none}
-#dv-docs .check-row:first-child{padding-top:2px}
+#dv-snapshot .check-row:last-child{border-bottom:none}
+#dv-snapshot .check-row:first-child{padding-top:2px}
+#dv-snapshot .check-tag{font-variant-numeric:tabular-nums}
 /* Status/result lines under rail buttons: collapse entirely when
    empty so idle sections don't reserve dead space. */
 .qa-result{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.4}
@@ -2175,8 +2176,8 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
               <div id="dv-google-review-wrap" style="display:none">
                 <div class="qa-mini-label" style="margin-bottom:6px">Request a review</div>
                 <div style="display:flex;gap:6px">
-                  <button class="qa-btn" id="dv-google-review-btn" type="button" onclick="sendGoogleReviewEmail(this)" title="Email this customer a request to leave us a Google review" style="flex:1;justify-content:center;text-align:center"><svg class="icn"><use href="#i-star"/></svg>Google</button>
-                  <button class="qa-btn" id="dv-trustpilot-review-btn" type="button" onclick="sendTrustpilotReviewEmail(this)" title="Email this customer a request to leave us a Trustpilot review" style="flex:1;justify-content:center;text-align:center"><svg class="icn"><use href="#i-star"/></svg>Trustpilot</button>
+                  <button class="qa-btn" id="dv-google-review-btn" type="button" onclick="sendGoogleReviewEmail(this)" title="Email this customer a request to leave us a Google review" style="flex:1;justify-content:center;text-align:center"><svg viewBox="0 0 48 48" style="width:13px;height:13px;flex-shrink:0"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Google</button>
+                  <button class="qa-btn" id="dv-trustpilot-review-btn" type="button" onclick="sendTrustpilotReviewEmail(this)" title="Email this customer a request to leave us a Trustpilot review" style="flex:1;justify-content:center;text-align:center"><svg viewBox="0 0 24 24" style="width:13px;height:13px;flex-shrink:0"><path fill="#00B67A" d="M12 .9l2.9 8.1H24l-6.7 5 2.6 8.4-7.9-5.2-7.9 5.2L6.7 14 0 9h9.1z"/><path fill="#005128" d="M12 17.2l5.4-1.2 2.5 6.4z"/></svg>Trustpilot</button>
                 </div>
                 <div id="dv-google-review-result" class="qa-result"></div>
                 <div id="dv-trustpilot-review-result" class="qa-result"></div>
@@ -2192,8 +2193,8 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
             <div class="vg-card" id="vg-card"><div class="vg-pending">Checking Vergent…</div></div>
           </div>
           <div class="dv-rail-section dv-rail-card">
-            <div class="dv-rail-title">Documents</div>
-            <div id="dv-docs"></div>
+            <div class="dv-rail-title">Applicant Snapshot</div>
+            <div id="dv-snapshot"></div>
           </div>
           <div class="dv-rail-section dv-rail-danger dv-rail-card">
             <div class="dv-rail-title" style="color:var(--red)">Danger Zone</div>
@@ -4482,6 +4483,74 @@ function toggleV4Report() {
   if (_reportViewFbId) renderDetail(_reportViewFbId);
 }
 
+// Project the applicant's next payday from the v4 engine's verified
+// payroll deposits (engineV4.pay_dates + inferred_cadence). The engine
+// stores next_expected_pay_date at RUN time, which goes stale when the
+// operator opens the file days later — so we roll the schedule forward
+// past today instead: weekly/biweekly step from the last observed
+// deposit; semi-monthly/monthly walk to the applicant's usual
+// day(s)-of-month (31st clamps to month-end). Paydays that project
+// onto a weekend shift to the Friday before, matching how payroll ACH
+// actually posts. Falls back to the stored next_expected_pay_date if
+// it's still in the future. Display-only — never a decision input.
+function _nextPaydayInfo(a) {
+  const v4 = a.engineV4 || {};
+  const cad = String(v4.inferred_cadence || '').toLowerCase();
+  const cadLabel = { weekly: 'Weekly', biweekly: 'Biweekly',
+                     semimonthly: 'Semi-monthly', monthly: 'Monthly' }[cad] || '';
+  const parse = s => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || ''));
+    return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+  };
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const dates = (Array.isArray(v4.pay_dates) ? v4.pay_dates : [])
+    .map(parse).filter(Boolean).sort((x, y) => x - y);
+  let next = null;
+  if (dates.length) {
+    const last = dates[dates.length - 1];
+    if (cad === 'weekly' || cad === 'biweekly') {
+      const step = cad === 'weekly' ? 7 : 14;
+      next = new Date(last);
+      while (next <= today) next.setDate(next.getDate() + step);
+    } else if (cad === 'monthly' || cad === 'semimonthly') {
+      const dom = {};
+      dates.forEach(d => { const k = d.getDate(); dom[k] = (dom[k] || 0) + 1; });
+      const anchors = Object.keys(dom).map(Number)
+        .sort((x, y) => dom[y] - dom[x] || x - y)
+        .slice(0, cad === 'semimonthly' ? 2 : 1);
+      if (anchors.length) {
+        next = new Date(today);
+        for (let i = 0; i < 62; i++) {
+          next.setDate(next.getDate() + 1);
+          const eom = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+          if (anchors.some(k => next.getDate() === Math.min(k, eom))) break;
+        }
+      }
+    }
+    if (next) {
+      const rolled = new Date(next);
+      if (rolled.getDay() === 6) rolled.setDate(rolled.getDate() - 1);
+      else if (rolled.getDay() === 0) rolled.setDate(rolled.getDate() - 2);
+      if (rolled > today) next = rolled;   // keep the shift only if still ahead
+    }
+  }
+  if (!next) {
+    const stored = parse(v4.next_expected_pay_date);
+    if (stored && stored > today) next = stored;
+  }
+  let nextLabel = '';
+  if (next) {
+    nextLabel = next.toLocaleDateString('en-US',
+      { weekday: 'short', month: 'short', day: 'numeric' });
+    const days = Math.round((next - today) / 86400000);
+    if (days >= 0 && days <= 14) {
+      nextLabel += days === 0 ? ' · today'
+        : days === 1 ? ' · tomorrow' : ' · in ' + days + 'd';
+    }
+  }
+  return { cadLabel: cadLabel, nextLabel: nextLabel };
+}
+
 var _detailHydrateState = {};
 function renderDetail(fbId) {
   const a = apps.find(x => x.firebaseId === fbId);
@@ -4767,27 +4836,34 @@ function renderDetail(fbId) {
     }
   } catch (e) { /* non-fatal */ }
 
-  // Documents (right rail — short list). Accurately distinguishes how
-  // the applicant supplied their bank info: Plaid-connected (bankMethod
-  // mentions plaid, OR we have an asset/access token) vs. uploaded
-  // statement (we have a bankStatementUrl but no Plaid token). _isPlaid
-  // / _hasStmt above already do exactly this; reuse them as the source
-  // of truth so the rail and the rest of the page never disagree.
-  const docs = document.getElementById('dv-docs');
-  const railDocs = [];
-  if (_isPlaid) {
-    railDocs.push({ name: 'Bank — Plaid connected', meta: 'Linked' });
-  } else if (_hasStmt) {
-    railDocs.push({ name: 'Bank Statement (uploaded)', meta: 'Linked' });
-  } else if (a.filename) {
-    // Last-resort fallback: a raw filename without a typed bankMethod.
-    // Show what we have so the operator can spot it.
-    railDocs.push({ name: a.filename, meta: 'Bank Statement' });
+  // Applicant Snapshot (right rail — replaced the old Documents list,
+  // operator request 2026-07-10): the four facts operators reach for
+  // when working a file — bank + account last-4, debit card last-4,
+  // and the pay schedule (frequency + projected next payday) derived
+  // from the engine's verified payroll deposit dates.
+  const snapEl = document.getElementById('dv-snapshot');
+  if (snapEl) {
+    const bankLast4 = ad.accountNumber ? String(ad.accountNumber).replace(/\D/g, '').slice(-4) : '';
+    const bankVal = ad.bankName
+      ? escapeHtml(ad.bankName) + (bankLast4 ? ' <span style="color:var(--muted)">····' + bankLast4 + '</span>' : '')
+      : (bankLast4 ? '····' + bankLast4 : '');
+    const dcObj = ad.debitCard || {};
+    const dcLast4 = String(dcObj.cardNumber || '').replace(/\D/g, '').slice(-4)
+      || String(dcObj.last4 || '').replace(/\D/g, '').slice(-4);
+    const pay = _nextPaydayInfo(a);
+    const rows = [
+      { name: 'Bank', html: bankVal, dimText: 'Not on file' },
+      { name: 'Debit card', html: dcLast4 ? '···· ' + dcLast4 : '', dimText: 'Not submitted' },
+      { name: 'Pay frequency', html: pay.cadLabel ? escapeHtml(pay.cadLabel) : '', dimText: 'Unknown' },
+      { name: 'Next payday', html: pay.nextLabel ? escapeHtml(pay.nextLabel) : '', dimText: pay.cadLabel ? 'Unknown' : 'No engine data' },
+    ];
+    snapEl.innerHTML = rows.map(r =>
+      `<div class="check-row"><span class="check-name">${escapeHtml(r.name)}</span>` +
+      (r.html
+        ? `<span class="check-tag" style="color:var(--text);font-weight:700">${r.html}</span>`
+        : `<span class="check-tag dim">${escapeHtml(r.dimText)}</span>`) +
+      `</div>`).join('');
   }
-  if (ad.driverLicenseUrl || ad.dlUrl) railDocs.push({ name: 'Driver License', meta: 'Linked' });
-  if (a.applicationData) railDocs.push({ name: 'Application', meta: 'On file' });
-  if (railDocs.length === 0) docs.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0">No documents on file.</div>';
-  else docs.innerHTML = railDocs.map(d => `<div class="check-row"><span class="check-name">${escapeHtml(d.name)}</span><span class="check-tag ok">${escapeHtml(d.meta)}</span></div>`).join('');
 
   // Engine report (Analysis tab). renderDetail fires on every
   // loadReports poll (every 3-8s). Re-setting innerHTML each time
