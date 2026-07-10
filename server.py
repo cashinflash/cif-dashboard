@@ -44,6 +44,10 @@ _INDEX_TOP_FIELDS = (
     # Reapply-block worst flag (2026-07-08): '' / weak_identity_match /
     # instrument_reuse / funded_instrument_reuse — queue red-flag chip.
     'reapplyFlag',
+    # Verified monthly income (2026-07-10): Performance cards +
+    # Applicant Snapshot read it straight off the index. Lock-step
+    # with cif-apply run_server.py.
+    'monthlyIncome',
 )
 _INDEX_APPDATA_FIELDS = ('email', 'phone', 'firstName', 'lastName')
 
