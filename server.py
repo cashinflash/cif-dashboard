@@ -1265,6 +1265,18 @@ def _reports_bucket(row):
             else 'pending')
 
 
+def _reports_customer_key(fb_id, row):
+    """Server-side mirror of app.html customerKey() — keep lock-step.
+    email → phone(last 10 digits) → firebaseId."""
+    email = str(row.get('email') or '').strip().lower()
+    if email and '@' in email:
+        return 'em:' + email
+    phone = re.sub(r'\D', '', str(row.get('phone') or ''))
+    if len(phone) >= 10:
+        return 'ph:' + phone[-10:]
+    return 'fb:' + fb_id
+
+
 def _reports_row_matches(key, row, ql, qd):
     """Search hay mirrors the client's _appHay (name/email/phone/ids)
     plus first/last name, filename and Vergent cid; digit queries also
@@ -1312,15 +1324,22 @@ def _reports_window_payload(limit, before=0, q=''):
                 # the fallback path or the recency window itself.
                 # Fail-soft: a 400 here (no ".indexOn": "status" rule
                 # yet) must not sink the whole window.
+                extra = {}
                 for st in ('Pending', 'Processing', 'Error'):
                     try:
                         d2 = _fb_json('reportsIndex.json?orderBy=%22status%22'
                                       f'&equalTo=%22{st}%22', 15)
                         if isinstance(d2, dict):
-                            rows.update({k: v for k, v in d2.items()
-                                         if isinstance(v, dict)})
+                            extra.update({k: v for k, v in d2.items()
+                                          if isinstance(v, dict)})
                     except Exception:
                         break
+                if any(k not in rows for k in extra):
+                    # Stragglers older than the window need the identity
+                    # mask (below) — "is this the customer's NEWEST
+                    # application?" — which only the whole index can
+                    # answer. Take the fallback path for this request.
+                    rows, indexed = {}, False
         except Exception:
             indexed = False
     if q or not indexed:
@@ -1342,6 +1361,20 @@ def _reports_window_payload(limit, before=0, q=''):
         rows, indexed = {}, False
         window_oldest = None
         kept_older = 0
+        # Identity mask for the unsettled stragglers: only surface a
+        # straggler that is the customer's NEWEST application. The
+        # client dedups to the latest row per customer (customerKey) —
+        # pre-windowing, an old stuck Pending was hidden by the same
+        # customer's newer application. Delivering the straggler
+        # without its newer (settled, outside-window) siblings would
+        # "resurrect" long-dead pendings in the review queue — this is
+        # exactly what happened on first deploy (operator saw 60+ old
+        # apps reappear). Items are newest-first, so first key wins.
+        newest_by_key = {}
+        for k, v in items:
+            ck = _reports_customer_key(k, v)
+            if ck not in newest_by_key:
+                newest_by_key[ck] = k
         for k, v in items:
             ca = v.get('createdAt') or 0
             if before and ca >= before:
@@ -1352,9 +1385,9 @@ def _reports_window_payload(limit, before=0, q=''):
                 rows[k] = v
                 if ca and (window_oldest is None or ca < window_oldest):
                     window_oldest = ca
-            elif not before and _reports_bucket(v) in ('pending',
-                                                       'processing',
-                                                       'error'):
+            elif (not before
+                  and _reports_bucket(v) in ('pending', 'processing', 'error')
+                  and newest_by_key.get(_reports_customer_key(k, v)) == k):
                 rows[k] = v
         complete = (len(rows) >= kept_older) if before else (len(rows) >= total)
     return rows, indexed, complete, total, window_oldest
