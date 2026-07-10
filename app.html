@@ -6044,7 +6044,17 @@ function findAppByIdentity(row){
     || row.Phone || row.CellPhone || row.phone || row.HomePhone);
   if(ph && ph.length===10){
     const byPhone=apps.filter(function(a){ return appPhone(a)===ph; });
-    if(byPhone.length) return byPhone[0].firebaseId;  // newest-first; phone is unique enough
+    if(byPhone.length===1) return byPhone[0].firebaseId;
+    if(byPhone.length>1){
+      // Shared phones are real (spouses, re-applications under a
+      // different identity — the exact cohort the fraud flags track).
+      // Only accept a multi-match when the LAST NAME also agrees;
+      // opening the wrong customer's file is worse than a miss.
+      const ln0=_normName(row.LastName||row.lastName);
+      const agree=byPhone.filter(function(a){ return ln0 && appLast(a)===ln0; });
+      if(agree.length===1) return agree[0].firebaseId;
+      return null;   // ambiguous — don't guess
+    }
   }
   // Name matches must be UNIQUE. Two customers can share a name — guessing
   // "the newest one" opened the wrong customer's report. When ambiguous we
@@ -6121,11 +6131,13 @@ async function checkLoansDueBalance(btn){
     const fbId=(cid ? await _lnsOvAwaitFbId(cid, 25000, String(row.HdrId||row.LoanId||'')) : null)
       || findAppByIdentity(row);
     if(!fbId){
-      // Distinguish "lookup still running" (retryable) from a definitive miss.
-      const stillLooking = cid && _lnsOvFbIdByCid[cid]==='__loading__';
-      renderBalanceResult({ok:false,message: stillLooking
+      // Distinguish "lookup still running / hiccuped" from a definitive miss.
+      const st = cid ? _lnsOvFbIdByCid[cid] : undefined;
+      renderBalanceResult({ok:false,message: st==='__loading__'
         ? 'Still locating this customer’s application — give it a few seconds and click again.'
-        : 'No matching application found in the dashboard for this customer — live balance unavailable.'}, 'lns-ov-balance-result');
+        : st==='__retryable__'
+          ? 'Lookup service hiccuped — retrying automatically; click again in a few seconds.'
+          : 'No application on file for this customer — live balance unavailable.'}, 'lns-ov-balance-result');
       return;
     }
     if(el) el.textContent='Checking live balance… (some banks take up to a minute)';
@@ -10260,17 +10272,20 @@ function renderCustomerSearchResults(source, rows) {
       });
       actions.appendChild(vbtn);
     }
-    // "Open in Admin" — jump to this customer's application detail in this
-    // dashboard (matched by email against the loaded applications index).
-    if (row.email) {
+    // "Open in Admin" — cid-first (authoritative, same chain as the
+    // servicing modals), email match as fallback. Renders whenever we
+    // have EITHER key (2026-07-10 — email-only rendering left cid-only
+    // rows with no button at all).
+    if (row.email || row.customerId) {
       const abtn = document.createElement('button');
       abtn.type = 'button';
       abtn.className = 'btn btn-ghost';
       abtn.textContent = 'Open in Admin';
       abtn.style.cssText = btnStyle;
-      const aEmail = String(row.email);
+      const aEmail = String(row.email || '');
+      const aCid = String(row.customerId || '');
       abtn.addEventListener('click', function() {
-        openCustomerInAdmin(aEmail, abtn);
+        openCustomerInAdmin(aEmail, abtn, aCid);
       });
       actions.appendChild(abtn);
     }
@@ -10282,11 +10297,33 @@ function renderCustomerSearchResults(source, rows) {
 // "Open in Admin" — find this customer's application in the loaded index
 // (matched by applicant email) and open its detail. Applications are never
 // deleted, so there is always one on file; if several match, open the newest.
-function openCustomerInAdmin(email, btn) {
+async function openCustomerInAdmin(email, btn, cid) {
   const emLc = (email || '').trim().toLowerCase();
-  if (!emLc) return;
+  const cidStr = String(cid || '').trim();
+  if (!emLc && !cidStr) return;
   const orig = btn ? btn.textContent : '';
-  const matches = (typeof apps !== 'undefined' && Array.isArray(apps))
+  // CID-FIRST (2026-07-10): the Vergent customer id is authoritative —
+  // it can't miss on a typo'd/changed email and can't open a same-name
+  // stranger. Email equality is the fallback.
+  if (cidStr) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Opening…'; }
+    try {
+      const r = await fetch('/api/lookup-fbid-by-vergent-cid', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cid: cidStr }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.firebase_id) {
+        if (btn) { btn.disabled = false; btn.textContent = orig; }
+        _navHash('#fb=' + encodeURIComponent(d.firebase_id));
+        return;
+      }
+    } catch (e) {}
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+    // fall through to the email match
+  }
+  const matches = (emLc && typeof apps !== 'undefined' && Array.isArray(apps))
     ? apps.filter(function(a) {
         const ae = ((a.email || (a.applicationData && a.applicationData.email) || '') + '').trim().toLowerCase();
         return ae && ae === emLc;
@@ -10550,7 +10587,12 @@ function openIFCardModal(rowKey) {
       linkedApp = apps.find(a => ((a.applicationData || {}).ifSubmissionId) === subId) || null;
     }
     if (!linkedApp && cid) {
+      // Index rows carry vergentCid (not the nested vergentMatch, which
+      // only exists on session-hydrated full records) — matching on
+      // vergentMatch alone silently failed for most rows, so the Open
+      // in Admin button never appeared on this surface (2026-07-10).
       linkedApp = apps.find(a => {
+        if (String(a.vergentCid || '') === String(cid)) return true;
         const vm = a.vergentMatch || {};
         return (vm.status || '').toLowerCase() === 'found' && String(vm.customerId) === String(cid);
       }) || null;
@@ -12889,9 +12931,13 @@ async function _payOvKickoffFbIdLookup(cid, loanId) {
       body: JSON.stringify({ cid: String(cid), loan_id: String(loanId || '') }),
     });
     const d = await r.json().catch(() => ({}));
-    _payOvFbIdByCid[cid] = (r.ok && d.firebase_id) ? d.firebase_id : null;
+    // TRI-STATE (2026-07-10): null only for a definitive
+    // no-application answer; infrastructure failures are retryable.
+    if (r.ok && d.firebase_id) _payOvFbIdByCid[cid] = d.firebase_id;
+    else if (d && d.no_application) _payOvFbIdByCid[cid] = null;
+    else _payOvFbIdByCid[cid] = '__retryable__';
   } catch (e) {
-    _payOvFbIdByCid[cid] = null;
+    _payOvFbIdByCid[cid] = '__retryable__';
   }
   if (_payOvRow && String(_payOvRow.customer_id || '') === String(cid)) {
     _payOvRefreshAdminButton(cid);
@@ -12920,18 +12966,28 @@ async function _payOvAwaitFbId(cid, timeoutMs, loanId) {
   const loc = _localFbIdFor(cid, loanId);
   if (loc) { _payOvFbIdByCid[cid] = loc; return loc; }
   const cached = _payOvFbIdByCid[cid];
-  if (cached && cached !== '__loading__') return cached;
-  if (cached !== '__loading__') _payOvKickoffFbIdLookup(cid, loanId);
+  if (cached && cached !== '__loading__' && cached !== '__retryable__') return cached;
+  if (cached !== '__loading__') {
+    if (cached === '__retryable__') _payOvFbIdByCid[cid] = undefined;
+    _payOvKickoffFbIdLookup(cid, loanId);
+  }
   const start = (typeof performance !== 'undefined' && performance.now)
     ? performance.now() : new Date().getTime();
-  const limit = Number(timeoutMs) || 25000;
-  let retried = false;
+  // Await the real answer (90s safety cap) — see _lnsOvAwaitFbId.
+  const limit = Math.max(Number(timeoutMs) || 0, 90000);
+  let retried = 0;
   while (true) {
     const v = _payOvFbIdByCid[cid];
-    if (v && v !== '__loading__') return v;
+    if (v && v !== '__loading__' && v !== '__retryable__') return v;
     if (v === null) {
-      if (retried) return null;
-      retried = true;
+      if (retried >= 1) return null;
+      retried++;
+      _payOvKickoffFbIdLookup(cid, loanId);
+    }
+    if (v === '__retryable__') {
+      if (retried >= 3) return null;
+      retried++;
+      _payOvFbIdByCid[cid] = undefined;
       _payOvKickoffFbIdLookup(cid, loanId);
     }
     const now = (typeof performance !== 'undefined' && performance.now)
@@ -12955,10 +13011,12 @@ async function checkPaymentBalance(btn){
     const fbId=(cid ? await _payOvAwaitFbId(cid, 25000, String(row.loan_id||'')) : null)
       || findAppByIdentity(row);
     if(!fbId){
-      const stillLooking = cid && _payOvFbIdByCid[cid]==='__loading__';
-      renderBalanceResult({ok:false,message: stillLooking
+      const st = cid ? _payOvFbIdByCid[cid] : undefined;
+      renderBalanceResult({ok:false,message: st==='__loading__'
         ? 'Still locating this customer’s application — give it a few seconds and click again.'
-        : 'No matching application found in the dashboard for this customer — live balance unavailable.'}, 'pay-ov-balance-result');
+        : st==='__retryable__'
+          ? 'Lookup service hiccuped — retrying automatically; click again in a few seconds.'
+          : 'No application on file for this customer — live balance unavailable.'}, 'pay-ov-balance-result');
       return;
     }
     if(el) el.textContent='Checking live balance… (some banks take up to a minute)';
@@ -12991,8 +13049,10 @@ async function payOvOpenAdmin() {
       window.open(location.pathname + location.search + '#fb=' + encodeURIComponent(fbId), '_blank');
     } else if (cid && _payOvFbIdByCid[cid] === '__loading__') {
       toast('Still locating this customer — give it a few seconds and click again.', 'err');
+    } else if (cid && _payOvFbIdByCid[cid] === '__retryable__') {
+      toast('Lookup service hiccuped — retrying automatically, click again in a few seconds.', 'err');
     } else {
-      toast('No application found in our system for this customer.', 'err');
+      toast('No application on file — Vergent-only customer (act in Vergent directly).', 'err');
     }
   } catch (e) {
     toast('Lookup failed: ' + ((e && e.message) || e), 'err');
@@ -15102,9 +15162,16 @@ async function _lnsOvKickoffFbIdLookup(cid, loanId) {
       body: JSON.stringify({ cid: String(cid), loan_id: String(loanId || '') }),
     });
     const d = await r.json().catch(() => ({}));
-    _lnsOvFbIdByCid[cid] = (r.ok && d.firebase_id) ? d.firebase_id : null;
+    // TRI-STATE (2026-07-10): null is cached ONLY for a definitive
+    // "no application exists" answer from a COMPLETED backend scan. An
+    // infrastructure failure is '__retryable__' — never allowed to
+    // masquerade as "customer has no application" (that conflation was
+    // the operator's reported ~10% false 'No application found').
+    if (r.ok && d.firebase_id) _lnsOvFbIdByCid[cid] = d.firebase_id;
+    else if (d && d.no_application) _lnsOvFbIdByCid[cid] = null;
+    else _lnsOvFbIdByCid[cid] = '__retryable__';
   } catch (e) {
-    _lnsOvFbIdByCid[cid] = null;
+    _lnsOvFbIdByCid[cid] = '__retryable__';
   }
   // If the operator is still viewing this customer's modal, refresh
   // button state so disabled/visible flags reflect the lookup result.
@@ -15139,21 +15206,36 @@ async function _lnsOvAwaitFbId(cid, timeoutMs, loanId) {
   const loc = _localFbIdFor(cid, loanId);
   if (loc) { _lnsOvFbIdByCid[cid] = loc; return loc; }
   const cached = _lnsOvFbIdByCid[cid];
-  if (cached && cached !== '__loading__') return cached;
-  if (cached !== '__loading__') _lnsOvKickoffFbIdLookup(cid, loanId);
+  if (cached && cached !== '__loading__' && cached !== '__retryable__') return cached;
+  if (cached !== '__loading__') {
+    if (cached === '__retryable__') _lnsOvFbIdByCid[cid] = undefined;
+    _lnsOvKickoffFbIdLookup(cid, loanId);
+  }
   const start = (typeof performance !== 'undefined' && performance.now)
     ? performance.now() : new Date().getTime();
-  const limit = Number(timeoutMs) || 30000;
-  let retried = false;
+  // Await the REAL answer. The old 25-30s bail returned null while the
+  // backend was still (correctly) searching — the answer then landed
+  // in the cache after the operator gave up, which is exactly the
+  // reported "works on the second click" pattern. 90s is a safety cap
+  // only; the index-based backend answers in well under a second.
+  const limit = Math.max(Number(timeoutMs) || 0, 90000);
+  let retried = 0;
   while (true) {
     const v = _lnsOvFbIdByCid[cid];
-    if (v && v !== '__loading__') return v;
+    if (v && v !== '__loading__' && v !== '__retryable__') return v;
     if (v === null) {
-      // One transparent retry: a transient blip (backend deploy restart,
-      // 502, dropped connection) must NOT read as a definitive "no
-      // application for this customer".
-      if (retried) return null;
-      retried = true;
+      // One transparent retry on a DEFINITIVE miss: a record linked
+      // seconds ago may land between checks.
+      if (retried >= 1) return null;
+      retried++;
+      _lnsOvKickoffFbIdLookup(cid, loanId);
+    }
+    if (v === '__retryable__') {
+      // Infrastructure blip — retry automatically (bounded), never
+      // convert to a definitive "no application".
+      if (retried >= 3) return null;
+      retried++;
+      _lnsOvFbIdByCid[cid] = undefined;
       _lnsOvKickoffFbIdLookup(cid, loanId);
     }
     const now = (typeof performance !== 'undefined' && performance.now)
@@ -15222,8 +15304,10 @@ async function lnsOvOpenAdmin() {
       window.open(location.pathname + location.search + '#fb=' + encodeURIComponent(fbId), '_blank');
     } else if (cid && _lnsOvFbIdByCid[cid] === '__loading__') {
       toast('Still locating this customer — give it a few seconds and click again.', 'err');
+    } else if (cid && _lnsOvFbIdByCid[cid] === '__retryable__') {
+      toast('Lookup service hiccuped — retrying automatically, click again in a few seconds.', 'err');
     } else {
-      toast('No application found in our system for this customer.', 'err');
+      toast('No application on file — Vergent-only customer (act in Vergent directly).', 'err');
     }
   } catch (e) {
     toast('Lookup failed: ' + ((e && e.message) || e), 'err');

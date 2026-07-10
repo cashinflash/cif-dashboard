@@ -113,6 +113,17 @@ def _mirror_report_write_to_index(fb_path, method, raw):
                 headers={'Content-Type': 'application/json'},
                 method='PATCH')
             urllib.request.urlopen(ireq, timeout=10).read()
+            # O(1) cid index written at the moment the operator links a
+            # customer (2026-07-10) — the badge's "Use this ID" used to
+            # leave the backend lookup index stale until the next
+            # deploy-time backfill.
+            if proj.get('vergentCid'):
+                creq = urllib.request.Request(
+                    _fb_url('vergentCidIndex.json'),
+                    data=json.dumps({proj['vergentCid']: rid}).encode(),
+                    headers={'Content-Type': 'application/json'},
+                    method='PATCH')
+                urllib.request.urlopen(creq, timeout=10).read()
     except Exception as e:
         print(f'[REPORTS-INDEX-MIRROR] {fb_path} failed: {e}', flush=True)
 ANTHROPIC_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
