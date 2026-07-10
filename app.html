@@ -1673,6 +1673,80 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   <a class="bt-tab" data-route="if" href="#if"><svg class="icn"><use href="#i-card"/></svg><span>Cards</span></a>
   <button class="bt-tab" id="bt-more" type="button" onclick="mobMoreOpen()"><svg class="icn"><use href="#i-dashboard"/></svg><span>More</span></button>
 </nav>
+<!-- ── Mobile detail cockpit (2026-07-10, operator request) ──
+     Phones only: hero swaps stat cards for the Applicant Snapshot,
+     the app#/date meta hides, Quick Actions moves above Customer
+     Information with a single Create dropdown, and the offer amount
+     opens a scroll-wheel sheet instead of the keyboard. -->
+<style id="mob-detail-css">
+.dv-snap-m{display:none}
+.dv-create-m{display:none;position:relative}
+#dv-create-menu{display:none;position:absolute;left:0;right:0;top:calc(100% + 6px);background:white;border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 32px rgba(15,40,25,.18);z-index:90;overflow:hidden}
+#dv-create-menu .cm-item{display:flex;align-items:center;gap:9px;width:100%;padding:13px 16px;border:none;background:white;font-size:13.5px;font-weight:700;color:var(--text);font-family:inherit;cursor:pointer;text-align:left;border-bottom:1px solid var(--border-soft)}
+#dv-create-menu .cm-item:last-child{border-bottom:none}
+#dv-create-menu .cm-item:active{background:var(--surface2)}
+#dv-create-menu .cm-item .icn{width:14px;height:14px;color:#15803d;stroke-width:2.25}
+#dv-create-menu .cm-empty{padding:13px 16px;font-size:12.5px;color:var(--muted)}
+.amt-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:520;display:none;align-items:flex-end}
+.amt-ov.open{display:flex}
+.amt-sheet{background:white;width:100%;border-radius:18px 18px 0 0;padding:16px 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -12px 40px rgba(0,0,0,.25);animation:amtUp .18s ease-out}
+@keyframes amtUp{from{transform:translateY(40px);opacity:.6}to{transform:translateY(0);opacity:1}}
+.amt-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.amt-title{font-size:14px;font-weight:800;color:var(--text)}
+.amt-x{background:var(--surface2);border:1px solid var(--border);border-radius:999px;width:30px;height:30px;font-size:14px;color:var(--muted);cursor:pointer;font-family:inherit}
+.amt-wheel-wrap{position:relative;margin:6px 0 4px}
+.amt-wheel{height:220px;overflow-y:auto;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.amt-wheel::-webkit-scrollbar{display:none}
+.amt-pad{height:88px}
+.amt-item{height:44px;display:flex;align-items:center;justify-content:center;scroll-snap-align:center;font-size:21px;font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums;transition:color .12s, transform .12s;cursor:pointer}
+.amt-item.sel{color:var(--text);transform:scale(1.16)}
+.amt-hl{position:absolute;left:8%;right:8%;top:88px;height:44px;border-top:1.5px solid var(--green);border-bottom:1.5px solid var(--green);border-radius:10px;background:rgba(26,171,109,.06);pointer-events:none}
+.amt-actions{display:flex;gap:8px;margin-top:10px}
+.amt-custom{flex:1;border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:14px;font-weight:700;font-family:inherit;min-width:0;text-align:center}
+.amt-done{flex:1.3;background:var(--green);color:white;border:1px solid var(--green);border-radius:12px;padding:12px 14px;font-size:13.5px;font-weight:800;font-family:inherit;cursor:pointer}
+@media (max-width:600px){
+  .dv-meta-app{display:none}
+  #dv-stats{display:none}
+  .dv-snap-m{display:block;background:white;border-radius:12px;padding:2px 14px;width:100%;box-shadow:var(--shadow-xs)}
+  .dv-snap-m .check-row{border-bottom:1px solid var(--border-soft)}
+  .dv-snap-m .check-row:last-child{border-bottom:none}
+  .dv-create-m{display:block}
+  #dv-create-customer-btn,#dv-create-loan-btn,#dv-create-cust-loan-btn{display:none !important}
+  #dv-rail-qa{margin:0 0 16px}
+  /* Action bar: full-width thumb targets + centered amount chip */
+  .dv-bar-actions{flex-wrap:nowrap;gap:8px}
+  .dv-bar-actions .btn.btn-danger{flex:1;justify-content:center;min-height:46px;border-radius:12px;font-size:12.5px}
+  .dv-bar-actions .btn-approve{flex:1.15;justify-content:center;min-height:46px;border-radius:12px;font-size:13px}
+  .offer-input-group{min-height:46px;border-radius:12px;flex-shrink:0}
+  .offer-input{width:56px;font-size:16px;font-weight:800;text-align:center;caret-color:transparent}
+}
+</style>
+<!-- Offer amount wheel (phones): $100 / $125 / $150 / $200 / $255 +
+     custom entry. Registered in _MOB_OVERLAYS so back-gesture closes it. -->
+<div class="amt-ov" id="dv-amt-sheet" onclick="if(event.target===this)closeAmtSheet()">
+  <div class="amt-sheet">
+    <div class="amt-head">
+      <div class="amt-title">Offer amount</div>
+      <button class="amt-x" type="button" onclick="closeAmtSheet()">✕</button>
+    </div>
+    <div class="amt-wheel-wrap">
+      <div class="amt-wheel" id="amt-wheel">
+        <div class="amt-pad"></div>
+        <div class="amt-item" data-v="100">$100</div>
+        <div class="amt-item" data-v="125">$125</div>
+        <div class="amt-item" data-v="150">$150</div>
+        <div class="amt-item" data-v="200">$200</div>
+        <div class="amt-item" data-v="255">$255</div>
+        <div class="amt-pad"></div>
+      </div>
+      <div class="amt-hl"></div>
+    </div>
+    <div class="amt-actions">
+      <input class="amt-custom" id="amt-custom" type="text" inputmode="numeric" placeholder="Custom $">
+      <button class="amt-done" type="button" onclick="applyAmtSheet()">Set amount</button>
+    </div>
+  </div>
+</div>
 <div class="more-sheet-ov" id="more-sheet" onclick="if(event.target===this)mobMoreClose()">
   <div class="more-sheet">
     <div class="more-grab"></div>
@@ -1946,6 +2020,10 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
           <div class="dv-hero-stat" id="dv-hero-avg-late"><div class="dv-hero-stat-lbl">Avg Days Late</div><div class="dv-hero-stat-val" id="dv-avg-days-late">—</div><div class="dv-hero-stat-tag" id="dv-avg-days-late-tag">across history</div></div>
           <div class="dv-hero-stat"><div class="dv-hero-stat-lbl">Engine / Action</div><div class="dv-hero-stat-val" id="dv-status">—</div><div class="dv-hero-stat-tag" id="dv-status-tag">—</div></div>
         </div>
+        <!-- Phones swap the three stat cards for the Applicant Snapshot
+             (operator request 2026-07-10) — renderDetail writes the same
+             rows here as into the rail card; CSS shows exactly one. -->
+        <div class="dv-snap-m" id="dv-snapshot-m"></div>
       </div>
 
       <div class="dv-body">
@@ -1989,7 +2067,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
             <div id="profile-compliance-detail" style="display:none;font-size:12px;color:var(--muted);line-height:1.6;margin:6px 0 4px"></div>
 
             <!-- Contact + Identity cards -->
-            <div class="sec-h">Customer Information</div>
+            <div class="sec-h" id="dv-custinfo-h">Customer Information</div>
             <div class="profile-cards">
               <div class="profile-card">
                 <div class="profile-card-title">Contact</div>
@@ -2094,9 +2172,20 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
               </div>
             </div>
           </div>
-          <div class="dv-rail-section dv-rail-card">
+          <div id="dv-rail-home-qa">
+          <div class="dv-rail-section dv-rail-card" id="dv-rail-qa">
             <div class="dv-rail-title">Quick Actions</div>
             <div class="qa-grid">
+              <!-- Phones collapse the three Create buttons into one
+                   dropdown (operator request 2026-07-10). Options are
+                   built at tap time from the real buttons' visibility,
+                   and each option just clicks its (CSS-hidden) button —
+                   the Vergent-status/active-loan gating stays single-
+                   sourced in renderProfilePanel. -->
+              <div class="dv-create-m" id="dv-create-menu-wrap">
+                <button class="qa-btn qa-btn-emerald" id="dv-create-menu-btn" type="button" onclick="toggleCreateMenu()" style="width:100%;justify-content:center"><svg class="icn"><use href="#i-plus"/></svg>Create<svg class="icn" style="width:11px;height:11px;margin-left:2px"><use href="#i-caret"/></svg></button>
+                <div id="dv-create-menu"></div>
+              </div>
               <!-- Create Customer (operator request: top of Quick
                    Actions, identical visual to Create Loan). Hidden by
                    default; renderProfilePanel toggles visibility based
@@ -2149,6 +2238,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
                    the new UI surface. -->
               <button class="qa-btn" id="dv-refresh-plaid-btn" style="display:none" aria-hidden="true" tabindex="-1"></button>
             </div>
+          </div>
           </div>
           <!-- Customer engagement — portal access + review requests.
                Split out of Quick Actions (2026-07-10 visual pass) so
@@ -4596,7 +4686,11 @@ function renderDetail(fbId) {
   pillEl.className = 'dv-hero-pill ' + heroPillCls;
   const srcBadgeEl = document.getElementById('dv-source-badge');
   if (srcBadgeEl) srcBadgeEl.innerHTML = sourceBadge(a);
-  document.getElementById('dv-meta').textContent = `Application #${(a.submissionId||a.firebaseId||'').slice(-8).toUpperCase()} · ${a.date||''} ${a.time||''}${a.email?' · '+a.email:''}`;
+  // Split the meta line so phones can hide the app#/date half (the
+  // email stays — it's the actionable part on a small screen).
+  document.getElementById('dv-meta').innerHTML =
+    `<span class="dv-meta-app">Application #${escapeHtml((a.submissionId||a.firebaseId||'').slice(-8).toUpperCase())} · ${escapeHtml(a.date||'')} ${escapeHtml(a.time||'')}</span>` +
+    (a.email ? `<span class="dv-meta-app"> · </span><span>${escapeHtml(a.email)}</span>` : '');
 
   // Loans + Avg Days Late — sourced from the Vergent loans cache.
   // Cache populates async via loadVergentLoans; if it isn't ready yet
@@ -4857,13 +4951,17 @@ function renderDetail(fbId) {
       { name: 'Pay frequency', html: pay.cadLabel ? escapeHtml(pay.cadLabel) : '', dimText: 'Unknown' },
       { name: 'Next payday', html: pay.nextLabel ? escapeHtml(pay.nextLabel) : '', dimText: pay.cadLabel ? 'Unknown' : 'No engine data' },
     ];
-    snapEl.innerHTML = rows.map(r =>
+    const snapHtml = rows.map(r =>
       `<div class="check-row"><span class="check-name">${escapeHtml(r.name)}</span>` +
       (r.html
         ? `<span class="check-tag" style="color:var(--text);font-weight:700">${r.html}</span>`
         : `<span class="check-tag dim">${escapeHtml(r.dimText)}</span>`) +
       `</div>`).join('');
+    snapEl.innerHTML = snapHtml;
+    const snapM = document.getElementById('dv-snapshot-m');
+    if (snapM) snapM.innerHTML = snapHtml;
   }
+  _placeQaSection();
 
   // Engine report (Analysis tab). renderDetail fires on every
   // loadReports poll (every 3-8s). Re-setting innerHTML each time
@@ -16635,7 +16733,135 @@ if (document.readyState === 'loading') {
    Escape key, and the More sheet. Ordered inner-most first so
    stacked modals unwind naturally (e.g. schedule-payment closes
    before the payment detail under it). */
+// ── Mobile detail cockpit (2026-07-10) ──────────────────────────
+// 1) Quick Actions live above Customer Information on phones. The
+//    SAME element moves between its rail slot (#dv-rail-home-qa) and
+//    the profile panel — never cloned, so every button keeps its
+//    wiring and renderProfilePanel's visibility toggles stay correct.
+function _placeQaSection() {
+  const qa = document.getElementById('dv-rail-qa');
+  const anchor = document.getElementById('dv-custinfo-h');
+  const home = document.getElementById('dv-rail-home-qa');
+  if (!qa || !anchor || !home) return;
+  if (window.matchMedia('(max-width:600px)').matches) {
+    if (qa.nextElementSibling !== anchor || qa.parentElement !== anchor.parentElement) {
+      anchor.parentElement.insertBefore(qa, anchor);
+    }
+  } else if (qa.parentElement !== home) {
+    home.appendChild(qa);
+  }
+}
+window.addEventListener('resize', _debounce(_placeQaSection, 150));
+
+// 2) One Create button with a dropdown (phones). Options are built at
+//    tap time from the real buttons' current visibility and simply
+//    click them — gating stays single-sourced in renderProfilePanel.
+function toggleCreateMenu() {
+  const menu = document.getElementById('dv-create-menu');
+  if (!menu) return;
+  if (menu.style.display === 'block') { menu.style.display = 'none'; return; }
+  const targets = [
+    ['dv-create-customer-btn', 'Customer', 'i-user'],
+    ['dv-create-loan-btn', 'Loan', 'i-zap'],
+    ['dv-create-cust-loan-btn', 'Customer & Loan', 'i-bolt'],
+  ];
+  const items = [];
+  for (const [id, label, icon] of targets) {
+    const btn = document.getElementById(id);
+    if (btn && btn.style.display !== 'none') {
+      items.push(`<button class="cm-item" type="button" data-target="${id}"><svg class="icn"><use href="#${icon}"/></svg>${label}</button>`);
+    }
+  }
+  menu.innerHTML = items.length ? items.join('')
+    : '<div class="cm-empty">No create actions available — this customer has an active loan.</div>';
+  menu.style.display = 'block';
+}
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('dv-create-menu');
+  if (!menu || menu.style.display !== 'block') return;
+  const item = e.target.closest('#dv-create-menu .cm-item');
+  if (item) {
+    menu.style.display = 'none';
+    const real = document.getElementById(item.getAttribute('data-target'));
+    if (real) real.click();
+    return;
+  }
+  if (!e.target.closest('#dv-create-menu-wrap')) menu.style.display = 'none';
+});
+
+// 3) Offer amount wheel (phones): tapping the offer field opens a
+//    scroll-snap wheel of the loan tiers instead of the keyboard.
+const _AMT_PRESETS = [100, 125, 150, 200, 255];
+const _AMT_ITEM_H = 44;
+let _amtSel = 150;
+function _amtHighlight() {
+  const wheel = document.getElementById('amt-wheel');
+  const idx = Math.max(0, Math.min(_AMT_PRESETS.length - 1,
+    Math.round(wheel.scrollTop / _AMT_ITEM_H)));
+  const v = _AMT_PRESETS[idx];
+  if (v !== _amtSel) {
+    _amtSel = v;
+    // Scrolling the wheel is a preset choice — clear the custom field
+    // so it can't silently win over what the operator just picked.
+    const custom = document.getElementById('amt-custom');
+    if (custom && custom.value) custom.value = '';
+    if (navigator.vibrate) { try { navigator.vibrate(8); } catch (e) {} }
+  }
+  wheel.querySelectorAll('.amt-item').forEach(el =>
+    el.classList.toggle('sel', +el.getAttribute('data-v') === v));
+}
+const _amtOnScroll = _debounce(_amtHighlight, 60);
+function openAmtSheet() {
+  const ov = document.getElementById('dv-amt-sheet');
+  const wheel = document.getElementById('amt-wheel');
+  if (!ov || !wheel) return;
+  const cur = parseAmount(document.getElementById('dv-offer-input').value || '') || 150;
+  let idx = _AMT_PRESETS.indexOf(cur);
+  // Custom stays empty on open (the current amount is already visible
+  // in the offer field) — a non-empty custom always beats the wheel,
+  // so pre-filling it would make wheel picks silently no-op.
+  const custom = document.getElementById('amt-custom');
+  if (custom) custom.value = '';
+  if (idx === -1) {
+    idx = _AMT_PRESETS.reduce((bi, v, i) =>
+      Math.abs(v - cur) < Math.abs(_AMT_PRESETS[bi] - cur) ? i : bi, 0);
+  }
+  ov.classList.add('open');
+  wheel.scrollTop = idx * _AMT_ITEM_H;
+  _amtHighlight();
+  if (!wheel._amtWired) {
+    wheel._amtWired = true;
+    wheel.addEventListener('scroll', _amtOnScroll);
+    wheel.addEventListener('click', (e) => {
+      const it = e.target.closest('.amt-item');
+      if (it) wheel.scrollTo({ top: _AMT_PRESETS.indexOf(+it.getAttribute('data-v')) * _AMT_ITEM_H, behavior: 'smooth' });
+    });
+  }
+}
+function closeAmtSheet() {
+  const ov = document.getElementById('dv-amt-sheet');
+  if (ov) ov.classList.remove('open');
+}
+function applyAmtSheet() {
+  const custom = (document.getElementById('amt-custom').value || '').replace(/[^\d]/g, '');
+  const v = custom ? parseInt(custom, 10) : _amtSel;
+  const inp = document.getElementById('dv-offer-input');
+  if (inp && v) {
+    inp.value = v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    const id = _activeFbId();
+    if (id && typeof saveOffer === 'function') saveOffer(id);
+  }
+  closeAmtSheet();
+}
+// Intercept before focus so the phone keyboard never opens.
+document.getElementById('dv-offer-input').addEventListener('pointerdown', (e) => {
+  if (!window.matchMedia('(max-width:600px)').matches) return;
+  e.preventDefault();
+  openAmtSheet();
+});
+
 const _MOB_OVERLAYS = [
+  ['dv-amt-sheet', 'closeAmtSheet'],
   ['more-sheet', 'mobMoreClose'],
   ['schp-ov', 'closeSchedulePaymentModal'],
   ['rng-modal', 'closeRangeModal'],
