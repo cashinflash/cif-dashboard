@@ -227,8 +227,13 @@ profile hero + rail card replaced it); don't anchor anything new to
 either. Pills: green
 pills for not-covered/verified, red for MLA COVERED BORROWER, orange for
 review-class results (click any pill = toggle the verbatim detail line),
-gray for docs-form skips. "Re-run checks" button POSTs
-`/api/microbilt-recheck` (proxy in server.py → cif-apply, 60s timeout).
+gray for docs-form skips. Split re-run buttons (2026-07-11):
+"Re-run MLA" / "Re-run identity" POST `/api/microbilt-recheck` with
+`only` so each click bills exactly one product (a shared in-flight
+guard also blocks double-tap double-billing); failed-CALL states render
+as a dashed slate "check didn't run ⟳" pill (node.error, with a
+text-based fallback for legacy records), distinct from the orange
+genuine "needs review".
 `microbiltSummary` is in `_INDEX_TOP_FIELDS` (lock-step with cif-apply) and
 appends to the queue-row subtitle — '' when clean, so silence = clean.
 DENIAL_REASONS gained "Unable to offer this loan product to MLA covered
