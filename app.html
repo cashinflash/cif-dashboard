@@ -7151,17 +7151,17 @@ function renderComplianceCard(fbId) {
 
   const inflight = window._mbRerunInFlight;
   const running = inflight && inflight.fbId === fbId ? inflight.only : null; // ''=both
-  const ghost = 'class="btn btn-ghost" style="padding:5px 11px;font-size:12px"';
   const runIcn = '<svg class="icn" style="width:13px;height:13px"><use href="#i-refresh"/></svg>';
   const spinner = '<span style="display:inline-block;width:11px;height:11px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite"></span>';
   const btn = (only, label) => {
-    const isRunning = running !== null && (running === only || running === '');
     const me = running === only;
-    return '<button ' + ghost + (running !== null ? ' disabled' : '')
+    const style = 'padding:5px 11px;font-size:12px'
+      + (running !== null ? ';opacity:.6;pointer-events:none' : '');
+    return '<button class="btn btn-ghost" style="' + style + '"'
+      + (running !== null ? ' disabled' : '')
       + ' data-mb-rerun="' + only + '"'
       + (only ? ' title="Re-runs ONLY the ' + (only === 'mla' ? 'MLA' : 'identity') + ' product (one billable check)"'
               : ' title="Runs both checks (two billable reports)"')
-      + (isRunning ? ' style="padding:5px 11px;font-size:12px;opacity:.6"' : '')
       + '>' + (me ? spinner + ' Running…' : runIcn + label) + '</button>';
   };
 
@@ -7298,7 +7298,10 @@ function _mbWireRerun(wrap, actions, fbId) {
       // second request until the first answers. The in-flight marker
       // carries {fbId, only} so re-renders keep painting the running
       // state instead of restoring enabled-looking buttons.
-      if (window._mbRerunInFlight) return;
+      if (window._mbRerunInFlight) {
+        toast('A compliance check is already running — try again in a moment', 'err');
+        return;
+      }
       const only = b.getAttribute('data-mb-rerun') || '';
       window._mbRerunInFlight = { fbId: fbId, only: only };
       renderComplianceCard(fbId);
@@ -7313,8 +7316,11 @@ function _mbWireRerun(wrap, actions, fbId) {
           window._mbRerunInFlight = null;
           if (ok && d && d.microbilt) {
             // Success refreshes the verdicts; the backend returns BOTH
-            // nodes (the untouched product preserved verbatim).
+            // nodes (the untouched product preserved verbatim). Sync the
+            // full-record snapshot too — the MLA funding gate reads it,
+            // and a stale copy there must never outvote this result.
             _mbComplianceCache[fbId] = d.microbilt;
+            if (_fullRecordCache[fbId]) _fullRecordCache[fbId].microbilt = d.microbilt;
             toast((only === 'mla' ? 'MLA check' : only === 'identity' ? 'Identity check' : 'Compliance checks') + ' updated', 'ok');
           } else {
             // FAILURE NEVER WIPES REAL VERDICTS: keep the cached node,
@@ -8865,13 +8871,21 @@ async function mlaFundingGate(fbId) {
       'file with the MLA reason ("Unable to offer this loan product to ' +
       'MLA covered borrowers").');
   };
-  let mla = ((_fullRecordCache[fbId] || {}).microbilt || {}).mla
-    || ((_mbComplianceCache[fbId] || {}).mla) || null;
+  // Freshest source first: the compliance card's re-run result lands in
+  // _mbComplianceCache; the full-record snapshot is a detail-open copy.
+  let mla = ((_mbComplianceCache[fbId] || {}).mla)
+    || (((_fullRecordCache[fbId] || {}).microbilt || {}).mla) || null;
   if (covered(mla)) { blockMsg(); return false; }
   if (clearOk(mla)) return true;
   // Known can't-run: no full SSN / DOB on the record (docs-form uploads).
   if (mla && mla.decision === 'skipped' && /missing_fields/.test(mla.skipReason || '')) {
     return confirm('The MLA check cannot run on this record (no full SSN / DOB on file).\n\nFund anyway without an MLA verdict?');
+  }
+  // Completed report, indeterminate verdict (review WITHOUT an error):
+  // re-running would just buy the same answer again — confirm instead.
+  if (mla && mla.decision === 'review' && !mla.error) {
+    return confirm('The MLA check completed but returned no definitive covered/not-covered answer ('
+      + String(mla.text || 'indeterminate').slice(0, 100) + ').\n\nFund anyway?');
   }
   // No usable verdict — run the MLA product now (one billable report),
   // sharing the compliance card's billing guard so a double-click or a
@@ -8880,11 +8894,11 @@ async function mlaFundingGate(fbId) {
     toast('A compliance check is already running — try again in a moment', 'err');
     return false;
   }
+  let t = null, verdict = null, failDetail = '';
   window._mbRerunInFlight = { fbId: fbId, only: 'mla' };
-  if (window._profileFbId === fbId) renderComplianceCard(fbId);
-  const t = toast('Running MLA check…', '', { spinner: true, sticky: true });
-  let verdict = null, failDetail = '';
   try {
+    if (window._profileFbId === fbId) renderComplianceCard(fbId);
+    t = toast('Running MLA check…', '', { spinner: true, sticky: true });
     const r = await fetch('/api/microbilt-recheck', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
@@ -8902,13 +8916,17 @@ async function mlaFundingGate(fbId) {
     failDetail = 'network error';
   } finally {
     window._mbRerunInFlight = null;
-    try { t.remove(); } catch (e) { /* toast already gone */ }
+    if (t) { try { t.remove(); } catch (e) { /* toast already gone */ } }
     if (window._profileFbId === fbId) renderComplianceCard(fbId);
   }
   if (covered(verdict)) { blockMsg(); return false; }
   if (clearOk(verdict)) { toast('MLA check clear — not a covered borrower', 'ok'); return true; }
   if (verdict && verdict.decision === 'skipped') {
     return confirm('The MLA check cannot run on this record (' + (verdict.skipReason || 'missing fields') + ').\n\nFund anyway without an MLA verdict?');
+  }
+  if (verdict && verdict.decision === 'review' && !verdict.error) {
+    return confirm('The MLA check completed but returned no definitive covered/not-covered answer ('
+      + String(verdict.text || 'indeterminate').slice(0, 100) + ').\n\nFund anyway?');
   }
   const why = failDetail || (verdict && (verdict.error || verdict.text)) || 'no verdict returned';
   return confirm('The MLA check didn’t complete (' + String(why).slice(0, 100) + ').\n\nFund anyway without an MLA verdict?');
