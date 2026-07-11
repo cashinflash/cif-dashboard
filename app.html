@@ -7140,62 +7140,92 @@ function renderComplianceCard(fbId) {
   }
   if (node === null) return;                 // fetch in flight; will re-render
   const mla = node.mla || null, ssn = node.ssn || null;
+  // Palette: ok green / bad red / warn orange (GENUINE findings only) /
+  // off gray (skips) / err slate + dashed border (the CALL failed — a
+  // plumbing state, deliberately distinct from a compliance flag).
   const C = { ok: ['#e8f5ee', '#1a6b3c', '#9fd8b5'], bad: ['#fde7e7', '#5a0d0d', '#f0a8a8'],
-              warn: ['#fff5e6', '#5a3300', '#ffd9a3'], off: ['#f3f4f6', '#6b7280', '#d1d5db'] };
+              warn: ['#fff5e6', '#5a3300', '#ffd9a3'], off: ['#f3f4f6', '#6b7280', '#d1d5db'],
+              err: ['#f4f7f9', '#475569', '#b8c4cf'] };
   const pills = [], lines = [];
-  let needsRerun = false;
-  const day = ms => { try { return new Date(ms).toLocaleDateString(); } catch (e) { return ''; } };
+  const when = ms => {
+    try {
+      return new Date(ms).toLocaleString(undefined,
+        { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    } catch (e) { return ''; }
+  };
+  // Legacy records predate the error field — recognize their failed-call
+  // reviews by the interpreter's reason text.
+  const mlaErr = !!(mla && (mla.error
+    || (mla.decision === 'review' && /call failed/i.test(mla.text || ''))));
+  const ssnErr = !!(ssn && (ssn.error
+    || (ssn.decision === 'review' && /call failed/i.test(ssn.description || ''))));
   if (!mla && !ssn) {
     pills.push(['off', 'MLA + Identity: no check on record', '']);
-    needsRerun = true;
   } else {
     if (mla) {
-      if (mla.decision === 'proceed') pills.push(['ok', 'MLA: Not covered ✓', mla.text]);
+      if (mlaErr) pills.push(['err', 'MLA: check didn\u2019t run \u27f3', mla.text]);
+      else if (mla.decision === 'proceed') pills.push(['ok', 'MLA: Not covered ✓', mla.text]);
       else if (mla.decision === 'decline') pills.push(['bad', 'MLA: COVERED BORROWER', mla.text]);
       else if (mla.decision === 'skipped') pills.push(['off', 'MLA: not checked', mla.skipReason]);
-      else { pills.push(['warn', 'MLA: check failed', mla.text]); needsRerun = true; }
+      else pills.push(['warn', 'MLA: needs review', mla.text]);
       lines.push('MLA: ' + escapeHtml(mla.text || mla.skipReason || mla.decision) +
-                 (mla.checkedAt ? ' · checked ' + day(mla.checkedAt) : ''));
+                 (mla.checkedAt ? ' · checked ' + when(mla.checkedAt) : ''));
     }
     if (ssn) {
       // Identity = Enhanced People Search (SSN-on-file match, deceased /
       // Death Master, high-risk address, name match). 'fail' is a strong
       // fraud signal — red pill, but NEVER an auto-decline: disposition
       // stays with the operator.
-      if (ssn.decision === 'pass')
-        pills.push(['ok', 'Identity: Verified ✓' + (ssn.cached ? ' (' + day(ssn.checkedAt) + ')' : ''), ssn.description]);
+      if (ssnErr) pills.push(['err', 'Identity: check didn\u2019t run \u27f3', ssn.description]);
+      else if (ssn.decision === 'pass')
+        pills.push(['ok', 'Identity: Verified ✓' + (ssn.cached ? ' (' + when(ssn.checkedAt) + ')' : ''), ssn.description]);
       else if (ssn.decision === 'fail')
         pills.push(['bad', 'Identity: FRAUD RISK', ssn.description]);
       else if (ssn.decision === 'skipped') pills.push(['off', 'Identity: not checked', ssn.skipReason]);
-      else {
-        pills.push(['warn', 'Identity: needs review', ssn.description]);
-        needsRerun = true;
-      }
+      else pills.push(['warn', 'Identity: needs review', ssn.description]);
       lines.push('Identity: ' + escapeHtml(ssn.description || ssn.skipReason || ssn.decision) +
-                 (ssn.checkedAt ? ' · checked ' + day(ssn.checkedAt) : ''));
+                 (ssn.checkedAt ? ' · checked ' + when(ssn.checkedAt) : ''));
     }
   }
+  // Split re-run buttons (2026-07-10): each MicroBilt product bills
+  // separately, so each gets its own button — clearing an identity
+  // hiccup must not re-buy the MLA report. No node at all -> one
+  // "Run checks" that runs both.
+  const rrStyle = 'background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit';
+  const buttons = (!mla && !ssn)
+    ? `<button class="mb-rr" data-only="" style="${rrStyle}">Run checks</button>`
+    : `<button class="mb-rr" data-only="mla" style="${rrStyle}" title="Re-runs ONLY the MLA product (one billable check)">Re-run MLA</button>`
+      + `<button class="mb-rr" data-only="identity" style="${rrStyle}" title="Re-runs ONLY the identity product (one billable check)">Re-run identity</button>`;
   wrap.innerHTML = pills.map(p => {
     const c = C[p[0]];
-    return `<span class="mb-pill" title="${escapeHtml(p[2] || '')}" style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.02em;border:1px solid ${c[2]};background:${c[0]};color:${c[1]};cursor:pointer;white-space:nowrap">${p[1]}</span>`;
-  }).join('') + (needsRerun
-    ? '<button id="mb-rerun-btn" style="background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Re-run checks</button>'
-    : '');
+    const dash = p[0] === 'err' ? 'dashed' : 'solid';
+    return `<span class="mb-pill" title="${escapeHtml(p[2] || '')}" style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.02em;border:1px ${dash} ${c[2]};background:${c[0]};color:${c[1]};cursor:pointer;white-space:nowrap">${p[1]}</span>`;
+  }).join('') + buttons;
   if (det) { det.innerHTML = lines.join('<br>'); det.style.display = 'none'; }
   wrap.querySelectorAll('.mb-pill').forEach(p => {
     p.onclick = () => { if (det) det.style.display = det.style.display === 'block' ? 'none' : 'block'; };
   });
-  const btn = document.getElementById('mb-rerun-btn');
-  if (btn) btn.onclick = () => {
-    btn.disabled = true; btn.textContent = 'Running…';
-    fetch('/api/microbilt-recheck', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin', body: JSON.stringify({ firebase_id: fbId }),
-    })
-      .then(r => r.json())
-      .then(d => { _mbComplianceCache[fbId] = (d && d.microbilt) || {}; renderComplianceCard(fbId); })
-      .catch(() => { btn.disabled = false; btn.textContent = 'Re-run checks'; });
-  };
+  wrap.querySelectorAll('.mb-rr').forEach(b => {
+    b.onclick = () => {
+      // Billing guard: each click = one billable MicroBilt report, so a
+      // double-tap (or a poll re-render mid-flight) must never fire a
+      // second request until the first answers.
+      if (window._mbRerunInFlight) return;
+      window._mbRerunInFlight = true;
+      const only = b.getAttribute('data-only') || '';
+      wrap.querySelectorAll('.mb-rr').forEach(x => { x.disabled = true; x.style.opacity = '.6'; });
+      b.textContent = 'Running…';
+      fetch('/api/microbilt-recheck', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(only ? { firebase_id: fbId, only: only }
+                                  : { firebase_id: fbId }),
+      })
+        .then(r => r.json())
+        .then(d => { window._mbRerunInFlight = false; _mbComplianceCache[fbId] = (d && d.microbilt) || {}; renderComplianceCard(fbId); })
+        .catch(() => { window._mbRerunInFlight = false; renderComplianceCard(fbId); });
+    };
+  });
 }
 
 function renderProfilePanel(fbId) {
