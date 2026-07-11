@@ -224,16 +224,37 @@ targeting runtime DOM anchors broke twice after the 2026-07 overhaul
 runtime-anchor injection for new features. The ORIGINAL injected
 Vergent panel (`_PHASE2_PANEL_HTML`) is equally vestigial (the native
 profile hero + rail card replaced it); don't anchor anything new to
-either. Pills: green
-pills for not-covered/verified, red for MLA COVERED BORROWER, orange for
-review-class results (click any pill = toggle the verbatim detail line),
-gray for docs-form skips. Split re-run buttons (2026-07-11):
-"Re-run MLA" / "Re-run identity" POST `/api/microbilt-recheck` with
-`only` so each click bills exactly one product (a shared in-flight
-guard also blocks double-tap double-billing); failed-CALL states render
-as a dashed slate "check didn't run ⟳" pill (node.error, with a
-text-based fallback for legacy records), distinct from the orange
-genuine "needs review".
+either.
+
+REDESIGNED 2026-07-11 into a `.profile-card` with one row per check
+(MLA / Identity), token-palette status chips (dot + label; green
+clear, red COVERED BORROWER / FRAUD RISK, amber genuine needs-review,
+gray not-checked, dashed slate "Didn't run" for failed CALLS — keep the
+dashed=plumbing-not-verdict distinction), per-row expandable detail
+boxes, humanized skipReason wording, and the split re-run actions as
+`.btn-ghost` buttons right-aligned in the `#dv-compliance-h` sec-h
+(that id is the mobile Quick-Actions insertion anchor — `_placeQaSection`
+inserts before it; NEVER rename/wrap it). Behavior contracts:
+- Re-run failures NEVER wipe the cached verdicts (r.ok checked; error →
+  toast, cache kept). A failed hydrate renders a distinct "couldn't
+  load + Retry" state, not "no check on record".
+- `window._mbRerunInFlight = {fbId, only}` is the shared billing guard —
+  re-renders keep painting the running state; the MLA funding gate uses
+  the same guard so nothing can double-bill.
+- Split buttons POST `/api/microbilt-recheck` with `only='mla'|'identity'`
+  (backend 400s unknown values; 503 prev_read_failed = safe abort,
+  just re-click; 409 = checks disabled).
+
+**MLA FUNDING GATE (2026-07-11)**: `mlaFundingGate(fbId)` runs before
+EVERY funding action — inside `setStatus` for status==='Approved'
+(covers the one-click Approve AND the override modal) and at the top of
+`sendApprovalEmail` (the offer email counts as an offer). No MLA verdict
+on record → it runs the MLA product right there (one billable report,
+spinner toast); covered borrower → HARD BLOCK (alert + toast, never
+confirmable); can't-run (docs-form no-SSN, MicroBilt outage) → explicit
+operator confirm. This is what makes cif-apply's manual mode
+(`MICROBILT_AT_INTAKE=false`) safe: intake checks can stop entirely and
+it stays impossible to fund without the federally-required MLA check.
 `microbiltSummary` is in `_INDEX_TOP_FIELDS` (lock-step with cif-apply) and
 appends to the queue-row subtitle — '' when clean, so silence = clean.
 DENIAL_REASONS gained "Unable to offer this loan product to MLA covered

@@ -2143,15 +2143,18 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
               <div id="profile-balance-result" style="display:none;font-size:13px;margin-top:10px;padding:11px 13px;border-radius:10px;background:#f4f7f9;border:1px solid var(--border);line-height:1.55;word-break:break-word"></div>
             </div>
 
-            <!-- MicroBilt compliance (MLA covered-borrower + SSN-name match).
-                 Populated by renderComplianceCard from /reports/{id}/microbilt
-                 (written by cif-apply's intake checks). Re-run proxies to
-                 /api/microbilt-recheck. Click a pill = toggle the detail line. -->
-            <div class="sec-h" style="margin-top:18px" id="dv-compliance-h">Compliance</div>
-            <div id="profile-compliance" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:4px">
-              <span style="font-size:12px;color:var(--muted)">Loading checks…</span>
+            <!-- MicroBilt compliance (MLA covered-borrower + identity/EPS).
+                 Populated by renderComplianceCard from /reports/{id}/microbilt;
+                 re-runs proxy to /api/microbilt-recheck (each product bills
+                 separately, hence the split header actions). NOTE:
+                 #dv-compliance-h is the mobile Quick-Actions insertion anchor
+                 (_placeQaSection) — keep the id on this top-level heading. -->
+            <div class="sec-h" style="margin-top:18px" id="dv-compliance-h">Compliance
+              <span id="profile-compliance-actions" style="margin-left:auto;display:inline-flex;gap:6px;text-transform:none;letter-spacing:0"></span>
             </div>
-            <div id="profile-compliance-detail" style="display:none;font-size:12px;color:var(--muted);line-height:1.6;margin:6px 0 4px"></div>
+            <div id="profile-compliance" style="margin-bottom:8px">
+              <div class="profile-loans-loading">Loading compliance checks…</div>
+            </div>
 
             <!-- Contact + Identity cards -->
             <div class="sec-h" id="dv-custinfo-h">Customer Information</div>
@@ -7122,31 +7125,76 @@ function sendPortalInvite(fbId, cid, force) {
 const _mbComplianceCache = {};
 function renderComplianceCard(fbId) {
   const wrap = document.getElementById('profile-compliance');
-  const det = document.getElementById('profile-compliance-detail');
+  const actions = document.getElementById('profile-compliance-actions');
   if (!wrap) return;
+  const LOADING = '<div class="profile-loans-loading">Loading compliance checks…</div>';
   const node = _mbComplianceCache[fbId];
   if (node === undefined) {
     _mbComplianceCache[fbId] = null;         // fetch in flight
-    wrap.innerHTML = '<span style="font-size:12px;color:var(--muted)">Loading checks…</span>';
-    if (det) det.style.display = 'none';
+    wrap.innerHTML = LOADING;
+    if (actions) actions.innerHTML = '';
     fetch('/fb/reports/' + encodeURIComponent(fbId) + '/microbilt.json', { credentials: 'same-origin' })
-      .then(r => r.ok ? r.json() : null)
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)))
       .then(d => {
         _mbComplianceCache[fbId] = d || {};
         if (window._profileFbId === fbId) renderComplianceCard(fbId);
       })
-      .catch(() => { _mbComplianceCache[fbId] = {}; });
+      .catch(() => {
+        // A failed LOAD is not "no check on record" — render a distinct
+        // couldn't-load state with a free retry (it's just a re-fetch).
+        _mbComplianceCache[fbId] = { __loadFailed: true };
+        if (window._profileFbId === fbId) renderComplianceCard(fbId);
+      });
     return;
   }
-  if (node === null) return;                 // fetch in flight; will re-render
+  if (node === null) { wrap.innerHTML = LOADING; if (actions) actions.innerHTML = ''; return; }
+
+  const inflight = window._mbRerunInFlight;
+  const running = inflight && inflight.fbId === fbId ? inflight.only : null; // ''=both
+  const ghost = 'class="btn btn-ghost" style="padding:5px 11px;font-size:12px"';
+  const runIcn = '<svg class="icn" style="width:13px;height:13px"><use href="#i-refresh"/></svg>';
+  const spinner = '<span style="display:inline-block;width:11px;height:11px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite"></span>';
+  const btn = (only, label) => {
+    const isRunning = running !== null && (running === only || running === '');
+    const me = running === only;
+    return '<button ' + ghost + (running !== null ? ' disabled' : '')
+      + ' data-mb-rerun="' + only + '"'
+      + (only ? ' title="Re-runs ONLY the ' + (only === 'mla' ? 'MLA' : 'identity') + ' product (one billable check)"'
+              : ' title="Runs both checks (two billable reports)"')
+      + (isRunning ? ' style="padding:5px 11px;font-size:12px;opacity:.6"' : '')
+      + '>' + (me ? spinner + ' Running…' : runIcn + label) + '</button>';
+  };
+
+  if (node.__loadFailed) {
+    wrap.innerHTML = '<div class="profile-loans-empty" style="border-style:dashed">'
+      + 'Couldn’t load compliance data. '
+      + '<a href="#" id="mb-load-retry" style="color:var(--green-700);font-weight:600">Retry</a></div>';
+    if (actions) actions.innerHTML = '';
+    const retry = document.getElementById('mb-load-retry');
+    if (retry) retry.onclick = (e) => { e.preventDefault(); delete _mbComplianceCache[fbId]; renderComplianceCard(fbId); };
+    return;
+  }
+
   const mla = node.mla || null, ssn = node.ssn || null;
-  // Palette: ok green / bad red / warn orange (GENUINE findings only) /
-  // off gray (skips) / err slate + dashed border (the CALL failed — a
-  // plumbing state, deliberately distinct from a compliance flag).
-  const C = { ok: ['#e8f5ee', '#1a6b3c', '#9fd8b5'], bad: ['#fde7e7', '#5a0d0d', '#f0a8a8'],
-              warn: ['#fff5e6', '#5a3300', '#ffd9a3'], off: ['#f3f4f6', '#6b7280', '#d1d5db'],
-              err: ['#f4f7f9', '#475569', '#b8c4cf'] };
-  const pills = [], lines = [];
+
+  if (!mla && !ssn) {
+    wrap.innerHTML = '<div class="profile-loans-empty">No compliance checks on this record yet.'
+      + '<div style="font-size:12px;color:var(--muted2);margin-top:3px">Run them when this file is a serious candidate — each check is a billable MicroBilt report.</div></div>';
+    if (actions) actions.innerHTML = btn('', 'Run checks');
+    _mbWireRerun(wrap, actions, fbId);
+    return;
+  }
+
+  // Status anatomy: dot + label chip in the app's token palette. err =
+  // slate + DASHED border — a plumbing state ("the call didn't run"),
+  // deliberately distinct from a compliance verdict. Keep that contract.
+  const CHIP = {
+    ok:   ['var(--green-50)', 'var(--green-800)', 'var(--green-200)', 'solid'],
+    bad:  ['var(--red-50)',   'var(--red-700)',   'var(--red-200)',   'solid'],
+    warn: ['var(--amber-50)', 'var(--amber-700)', 'var(--amber-200)', 'solid'],
+    off:  ['var(--surface2)', 'var(--muted)',     'var(--border2)',   'solid'],
+    err:  ['#f4f7f9',         '#475569',          '#b8c4cf',          'dashed'],
+  };
   const when = ms => {
     try {
       return new Date(ms).toLocaleString(undefined,
@@ -7159,71 +7207,129 @@ function renderComplianceCard(fbId) {
     || (mla.decision === 'review' && /call failed/i.test(mla.text || ''))));
   const ssnErr = !!(ssn && (ssn.error
     || (ssn.decision === 'review' && /call failed/i.test(ssn.description || ''))));
-  if (!mla && !ssn) {
-    pills.push(['off', 'MLA + Identity: no check on record', '']);
-  } else {
-    if (mla) {
-      if (mlaErr) pills.push(['err', 'MLA: check didn\u2019t run \u27f3', mla.text]);
-      else if (mla.decision === 'proceed') pills.push(['ok', 'MLA: Not covered ✓', mla.text]);
-      else if (mla.decision === 'decline') pills.push(['bad', 'MLA: COVERED BORROWER', mla.text]);
-      else if (mla.decision === 'skipped') pills.push(['off', 'MLA: not checked', mla.skipReason]);
-      else pills.push(['warn', 'MLA: needs review', mla.text]);
-      lines.push('MLA: ' + escapeHtml(mla.text || mla.skipReason || mla.decision) +
-                 (mla.checkedAt ? ' · checked ' + when(mla.checkedAt) : ''));
-    }
-    if (ssn) {
-      // Identity = Enhanced People Search (SSN-on-file match, deceased /
-      // Death Master, high-risk address, name match). 'fail' is a strong
-      // fraud signal — red pill, but NEVER an auto-decline: disposition
-      // stays with the operator.
-      if (ssnErr) pills.push(['err', 'Identity: check didn\u2019t run \u27f3', ssn.description]);
-      else if (ssn.decision === 'pass')
-        pills.push(['ok', 'Identity: Verified ✓' + (ssn.cached ? ' (' + when(ssn.checkedAt) + ')' : ''), ssn.description]);
-      else if (ssn.decision === 'fail')
-        pills.push(['bad', 'Identity: FRAUD RISK', ssn.description]);
-      else if (ssn.decision === 'skipped') pills.push(['off', 'Identity: not checked', ssn.skipReason]);
-      else pills.push(['warn', 'Identity: needs review', ssn.description]);
-      lines.push('Identity: ' + escapeHtml(ssn.description || ssn.skipReason || ssn.decision) +
-                 (ssn.checkedAt ? ' · checked ' + when(ssn.checkedAt) : ''));
-    }
+  // Human wording for machine skipReason codes.
+  const SKIP_TEXT = {
+    docs_form_missing_fields: 'No full SSN / DOB on this record (docs-form upload)',
+    missing_fields: 'Record is missing the fields this check needs',
+    product_not_enabled: 'Product not enabled with MicroBilt yet',
+    not_rerun: 'Carried over — only the other check was re-run',
+  };
+  const detailText = (raw, skip) => (skip && SKIP_TEXT[skip]) || raw || '';
+
+  const rowFor = (key, title, sub, state, chipLabel, detail, checkedAt) => {
+    const c = CHIP[state];
+    const chip = '<span style="display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:6px;'
+      + 'font-size:11px;font-weight:700;letter-spacing:.03em;white-space:nowrap;flex-shrink:0;'
+      + 'background:' + c[0] + ';color:' + c[1] + ';border:1px ' + c[3] + ' ' + c[2] + '">'
+      + '<span style="width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.85"></span>'
+      + escapeHtml(chipLabel) + '</span>';
+    return '<div class="mb-row" data-mb-row="' + key + '" role="button" tabindex="0" aria-expanded="false"'
+      + ' style="display:flex;align-items:center;gap:12px;padding:10px 2px;cursor:pointer">'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="font-size:13px;font-weight:600;color:var(--text)">' + escapeHtml(title)
+      +     ' <span style="font-weight:400;color:var(--muted2);font-size:12px">· ' + escapeHtml(sub) + '</span></div>'
+      +   '<div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">'
+      +     escapeHtml(detail || '—') + '</div>'
+      + '</div>'
+      + (checkedAt ? '<span style="font-size:11.5px;color:var(--muted2);white-space:nowrap;flex-shrink:0">' + escapeHtml(when(checkedAt)) + '</span>' : '')
+      + chip
+      + '<svg class="icn mb-chev" style="width:13px;height:13px;color:var(--muted2);flex-shrink:0;transition:transform .15s"><use href="#i-caret"/></svg>'
+      + '</div>'
+      + '<div class="mb-det" data-mb-det="' + key + '" style="display:none;font-size:12.5px;color:var(--text2);line-height:1.6;'
+      +   'padding:11px 13px;border-radius:10px;background:#f4f7f9;border:1px solid var(--border);margin:0 2px 10px;word-break:break-word">'
+      +   escapeHtml(detail || 'No detail recorded.')
+      +   (checkedAt ? '<div style="color:var(--muted2);margin-top:4px;font-size:11.5px">Checked ' + escapeHtml(when(checkedAt)) + '</div>' : '')
+      + '</div>';
+  };
+
+  const rows = [];
+  if (mla) {
+    let state = 'warn', label = 'Needs review';
+    if (mlaErr) { state = 'err'; label = 'Didn’t run'; }
+    else if (mla.decision === 'proceed') { state = 'ok'; label = 'Not covered'; }
+    else if (mla.decision === 'decline') { state = 'bad'; label = 'COVERED BORROWER'; }
+    else if (mla.decision === 'skipped') { state = 'off'; label = 'Not checked'; }
+    rows.push(rowFor('mla', 'MLA', 'Military Lending Act', state, label,
+      detailText(mla.text, mla.skipReason) || mla.decision, mla.checkedAt));
   }
-  // Split re-run buttons (2026-07-10): each MicroBilt product bills
-  // separately, so each gets its own button — clearing an identity
-  // hiccup must not re-buy the MLA report. No node at all -> one
-  // "Run checks" that runs both.
-  const rrStyle = 'background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit';
-  const buttons = (!mla && !ssn)
-    ? `<button class="mb-rr" data-only="" style="${rrStyle}">Run checks</button>`
-    : `<button class="mb-rr" data-only="mla" style="${rrStyle}" title="Re-runs ONLY the MLA product (one billable check)">Re-run MLA</button>`
-      + `<button class="mb-rr" data-only="identity" style="${rrStyle}" title="Re-runs ONLY the identity product (one billable check)">Re-run identity</button>`;
-  wrap.innerHTML = pills.map(p => {
-    const c = C[p[0]];
-    const dash = p[0] === 'err' ? 'dashed' : 'solid';
-    return `<span class="mb-pill" title="${escapeHtml(p[2] || '')}" style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.02em;border:1px ${dash} ${c[2]};background:${c[0]};color:${c[1]};cursor:pointer;white-space:nowrap">${p[1]}</span>`;
-  }).join('') + buttons;
-  if (det) { det.innerHTML = lines.join('<br>'); det.style.display = 'none'; }
-  wrap.querySelectorAll('.mb-pill').forEach(p => {
-    p.onclick = () => { if (det) det.style.display = det.style.display === 'block' ? 'none' : 'block'; };
+  if (ssn) {
+    // Identity = Enhanced People Search (SSN-on-file match, deceased /
+    // Death Master, high-risk address, name match). 'fail' is a strong
+    // fraud signal — red chip, but NEVER an auto-decline: disposition
+    // stays with the operator.
+    let state = 'warn', label = 'Needs review';
+    if (ssnErr) { state = 'err'; label = 'Didn’t run'; }
+    else if (ssn.decision === 'pass') { state = 'ok'; label = 'Verified'; }
+    else if (ssn.decision === 'fail') { state = 'bad'; label = 'FRAUD RISK'; }
+    else if (ssn.decision === 'skipped') { state = 'off'; label = 'Not checked'; }
+    rows.push(rowFor('ssn', 'Identity', 'Enhanced People Search', state, label,
+      detailText(ssn.description, ssn.skipReason) || ssn.decision, ssn.checkedAt));
+  }
+
+  wrap.innerHTML = '<div class="profile-card" style="padding:4px 14px">'
+    + rows.join('<div style="border-top:1px solid var(--border-soft)"></div>')
+    + '</div>';
+  if (actions) {
+    actions.innerHTML = btn('mla', 'Re-run MLA') + btn('identity', 'Re-run identity');
+  }
+
+  // Per-row detail toggle (click or Enter/Space) with chevron affordance.
+  wrap.querySelectorAll('.mb-row').forEach(row => {
+    const key = row.getAttribute('data-mb-row');
+    const det = wrap.querySelector('[data-mb-det="' + key + '"]');
+    const flip = () => {
+      const open = det.style.display === 'block';
+      det.style.display = open ? 'none' : 'block';
+      row.setAttribute('aria-expanded', String(!open));
+      const chev = row.querySelector('.mb-chev');
+      if (chev) chev.style.transform = open ? '' : 'rotate(180deg)';
+    };
+    row.onclick = flip;
+    row.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } };
   });
-  wrap.querySelectorAll('.mb-rr').forEach(b => {
+  _mbWireRerun(wrap, actions, fbId);
+}
+
+function _mbWireRerun(wrap, actions, fbId) {
+  (actions || wrap).querySelectorAll('[data-mb-rerun]').forEach(b => {
     b.onclick = () => {
       // Billing guard: each click = one billable MicroBilt report, so a
       // double-tap (or a poll re-render mid-flight) must never fire a
-      // second request until the first answers.
+      // second request until the first answers. The in-flight marker
+      // carries {fbId, only} so re-renders keep painting the running
+      // state instead of restoring enabled-looking buttons.
       if (window._mbRerunInFlight) return;
-      window._mbRerunInFlight = true;
-      const only = b.getAttribute('data-only') || '';
-      wrap.querySelectorAll('.mb-rr').forEach(x => { x.disabled = true; x.style.opacity = '.6'; });
-      b.textContent = 'Running…';
+      const only = b.getAttribute('data-mb-rerun') || '';
+      window._mbRerunInFlight = { fbId: fbId, only: only };
+      renderComplianceCard(fbId);
       fetch('/api/microbilt-recheck', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
         body: JSON.stringify(only ? { firebase_id: fbId, only: only }
                                   : { firebase_id: fbId }),
       })
-        .then(r => r.json())
-        .then(d => { window._mbRerunInFlight = false; _mbComplianceCache[fbId] = (d && d.microbilt) || {}; renderComplianceCard(fbId); })
-        .catch(() => { window._mbRerunInFlight = false; renderComplianceCard(fbId); });
+        .then(r => r.json().catch(() => ({})).then(d => ({ ok: r.ok, status: r.status, d: d })))
+        .then(({ ok, status, d }) => {
+          window._mbRerunInFlight = null;
+          if (ok && d && d.microbilt) {
+            // Success refreshes the verdicts; the backend returns BOTH
+            // nodes (the untouched product preserved verbatim).
+            _mbComplianceCache[fbId] = d.microbilt;
+            toast((only === 'mla' ? 'MLA check' : only === 'identity' ? 'Identity check' : 'Compliance checks') + ' updated', 'ok');
+          } else {
+            // FAILURE NEVER WIPES REAL VERDICTS: keep the cached node,
+            // tell the operator what happened. (503 prev_read_failed =
+            // safe abort on the backend — just re-click.)
+            const msg = (d && (d.error || d.detail)) || ('HTTP ' + status);
+            toast('Check didn’t run: ' + String(msg).slice(0, 120), 'err');
+          }
+          if (window._profileFbId === fbId) renderComplianceCard(fbId);
+        })
+        .catch(() => {
+          window._mbRerunInFlight = null;
+          toast('Check didn’t run: network error', 'err');
+          if (window._profileFbId === fbId) renderComplianceCard(fbId);
+        });
     };
   });
 }
@@ -8513,6 +8619,9 @@ async function sendApprovalEmail() {
   const amtRaw = (document.getElementById('appr-amount')?.value || '').trim();
   const amt = parseFloat(amtRaw);
   if (!isFinite(amt) || amt <= 0) { toast('Enter a valid approval amount', 'err'); return; }
+  // MLA gate: no approval offer goes out without a covered-borrower
+  // verdict — same rule as funding (the email IS the offer).
+  if (_apprFbId && !(await mlaFundingGate(_apprFbId))) return;
   const btn = document.getElementById('appr-send');
   btn.disabled = true;
   const orig = btn.innerHTML;
@@ -8734,6 +8843,77 @@ async function confirmOverride() {
 // /overrides/{fbId} (override crossings only) + humanAction/
 // humanActionAt on the report. Best-effort: a log failure never blocks
 // the status change the operator just made.
+// ── MLA FUNDING GATE (2026-07-11) ────────────────────────────────────
+// Federal law (32 CFR §232, the Military Lending Act) bars this product
+// for covered borrowers, so NOTHING may be funded or offered without an
+// MLA verdict on the record. With intake checks in manual mode
+// (MICROBILT_AT_INTAKE=false on cif-apply) this gate is what guarantees
+// the check still ALWAYS happens — automatically, at the moment of
+// action, one billable report, only on files the operator actually
+// funds. Resolution: verdict already on record → done; otherwise run
+// the MLA product now. Covered = HARD BLOCK (never confirmable);
+// can't-run = explicit operator confirm (a MicroBilt outage must not
+// freeze funding, but it never passes silently either).
+async function mlaFundingGate(fbId) {
+  const covered = m => !!m && m.decision === 'decline' && m.covered === true;
+  const clearOk = m => !!m && m.decision === 'proceed' && !m.error;
+  const blockMsg = () => {
+    toast('BLOCKED: MLA covered borrower — this loan cannot be funded', 'err', { duration: 6000 });
+    alert('This applicant is an MLA COVERED BORROWER.\n\n' +
+      'Federal law (32 CFR §232) caps the MAPR at 36% for covered ' +
+      'borrowers, so this product cannot be offered to them. Decline the ' +
+      'file with the MLA reason ("Unable to offer this loan product to ' +
+      'MLA covered borrowers").');
+  };
+  let mla = ((_fullRecordCache[fbId] || {}).microbilt || {}).mla
+    || ((_mbComplianceCache[fbId] || {}).mla) || null;
+  if (covered(mla)) { blockMsg(); return false; }
+  if (clearOk(mla)) return true;
+  // Known can't-run: no full SSN / DOB on the record (docs-form uploads).
+  if (mla && mla.decision === 'skipped' && /missing_fields/.test(mla.skipReason || '')) {
+    return confirm('The MLA check cannot run on this record (no full SSN / DOB on file).\n\nFund anyway without an MLA verdict?');
+  }
+  // No usable verdict — run the MLA product now (one billable report),
+  // sharing the compliance card's billing guard so a double-click or a
+  // simultaneous Re-run button can never buy a second report.
+  if (window._mbRerunInFlight) {
+    toast('A compliance check is already running — try again in a moment', 'err');
+    return false;
+  }
+  window._mbRerunInFlight = { fbId: fbId, only: 'mla' };
+  if (window._profileFbId === fbId) renderComplianceCard(fbId);
+  const t = toast('Running MLA check…', '', { spinner: true, sticky: true });
+  let verdict = null, failDetail = '';
+  try {
+    const r = await fetch('/api/microbilt-recheck', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ firebase_id: fbId, only: 'mla' }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d && d.microbilt) {
+      _mbComplianceCache[fbId] = d.microbilt;
+      if (_fullRecordCache[fbId]) _fullRecordCache[fbId].microbilt = d.microbilt;
+      verdict = d.microbilt.mla || null;
+    } else {
+      failDetail = (d && (d.error || d.detail)) || ('HTTP ' + r.status);
+    }
+  } catch (e) {
+    failDetail = 'network error';
+  } finally {
+    window._mbRerunInFlight = null;
+    try { t.remove(); } catch (e) { /* toast already gone */ }
+    if (window._profileFbId === fbId) renderComplianceCard(fbId);
+  }
+  if (covered(verdict)) { blockMsg(); return false; }
+  if (clearOk(verdict)) { toast('MLA check clear — not a covered borrower', 'ok'); return true; }
+  if (verdict && verdict.decision === 'skipped') {
+    return confirm('The MLA check cannot run on this record (' + (verdict.skipReason || 'missing fields') + ').\n\nFund anyway without an MLA verdict?');
+  }
+  const why = failDetail || (verdict && (verdict.error || verdict.text)) || 'no verdict returned';
+  return confirm('The MLA check didn’t complete (' + String(why).slice(0, 100) + ').\n\nFund anyway without an MLA verdict?');
+}
+
 async function setStatus(fbId, status, opts = {}) {
   const a = apps.find(x => x.firebaseId === fbId);
   if (!a) return;
@@ -8742,6 +8922,9 @@ async function setStatus(fbId, status, opts = {}) {
   // silent humanAction stamp (who acted) is kept so auto-vs-manual
   // labels keep working.
   if (!opts.skipConfirm && !confirm(`${status} ${a.name || 'this applicant'}?`)) return;
+  // MLA gate: every funding action passes through here — one-click
+  // approves AND override-modal approves (both land in this function).
+  if (status === 'Approved' && !(await mlaFundingGate(fbId))) return;
   // OPTIMISTIC (perf 2026-07-09): the old path serialized 4 Firebase
   // writes across two requests and rebuilt the full queue twice per
   // click (~1-2.5s). Now: paint first, then ONE consolidated
