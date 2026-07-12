@@ -545,6 +545,21 @@ anymore.** Don't reintroduce a full fetch — that was the whole point.
   + Playwright (window boot, straggler-in-window, delta merge, load
   older, server search, stats KPI, "no full-index fetch" assertion).
 
+## CCL combo speed (2026-07-12, phases 0-2 with cif-apply)
+
+The Create Customer & Loan combo (`startCreateCustomerLoan`) no longer
+sleeps 2.5s before create-loan and no longer calls
+`/api/vergent-list-cards` — it sends `prepaid_card_id: 0` and the
+cif-apply create-loan handler owns settling adaptively (GetCustomerData
+poll + cards-list retry + Pending-originate retry on a
+customer-not-found settle race; see cif-apply/CLAUDE.md "CCL combo
+speed"). Don't re-add the client sleep or the list-cards fetch to the
+combo. The STANDALONE Create Loan modal still uses
+/api/vergent-list-cards — the endpoint stays. Browser regression:
+scratchpad ccl_stub.py + test_ccl_combo.py (asserts no list-cards call
+and an immediate create-loan). Backend timing lines to read when Harry
+reports slowness: [VERGENT-PUSH-TIMING] / [VERGENT-CREATE-LOAN-TIMING].
+
 ## Coordinating with cif-apply
 
 Many bugs span both repos (Bug 1 in particular). Read

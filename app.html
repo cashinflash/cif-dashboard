@@ -5915,32 +5915,19 @@ async function startCreateCustomerLoan() {
     return;
   }
   // Step 3 + 4: create the loan + dispatch e-sign.
-  _cclSetStep('loan',  'running', 'Settling new Vergent customer…');
+  // CCL perf phase 2: the old client-side 2.5s "settling" sleep and the
+  // separate /api/vergent-list-cards fetch are gone. The backend's
+  // create-loan handler now owns both concerns adaptively: it polls
+  // GetCustomerData until the seconds-old customer is readable, retries
+  // the cards list while it's still empty, auto-picks the just-saved
+  // card (same get_customer_cards call the list-cards endpoint made —
+  // one less round trip), and re-tries the 'Pending' originate once on
+  // a customer-not-found settle race. So prepaid_card_id:0 here means
+  // "server picks the newest disbursement-eligible card," NOT the old
+  // "hope Vergent defaults right" that caused the 502s. Settled
+  // customers pay zero extra wait.
+  _cclSetStep('loan',  'running', 'Creating loan…');
   _cclSetStep('esign', 'running', 'Queued…');
-  // Settling delay — Vergent commits the new customer to its query
-  // index asynchronously. Without this wait, loan-create fires too
-  // fast and ~60% of the time fails with "customer not found." The
-  // standalone "Create Loan" button works because by the time the
-  // operator clicks it, the customer has had several seconds to
-  // settle. 2.5s mirrors that natural gap.
-  await new Promise(r => setTimeout(r, 2500));
-  _cclSetStep('loan', 'running', 'Creating loan…');
-  // The standalone Create Loan modal fetches the customer's cards list
-  // FIRST and passes the real card id when creating the loan -- the
-  // combo used to just pass 0 and hope Vergent picked the right card,
-  // which produced the HTTP 502 (no body) error the operator hit. Mirror
-  // the standalone behavior: fetch list, pick the just-saved card.
-  let resolvedCardId = 0;
-  try {
-    const cr = await fetch('/api/vergent-list-cards?fb=' + encodeURIComponent(fbId),
-                            { credentials: 'include' });
-    const cd = await cr.json().catch(() => ({}));
-    const cards = (cd && cd.cards) || [];
-    if (cards.length) {
-      const first = Number(cards[0].id);
-      if (Number.isFinite(first) && first > 0) resolvedCardId = first;
-    }
-  } catch (e) { /* fall back to 0 — Vergent picks default */ }
   try {
     const r = await fetch('/api/vergent-create-loan', {
       method: 'POST', credentials: 'include',
@@ -5949,7 +5936,7 @@ async function startCreateCustomerLoan() {
         firebase_id: fbId,
         loan_amount: amount,
         due_date: dueRaw + 'T00:00:00.000Z',
-        prepaid_card_id: resolvedCardId,
+        prepaid_card_id: 0,
         send_esign: true,
       }),
     });
