@@ -545,6 +545,36 @@ anymore.** Don't reintroduce a full fetch — that was the whole point.
   + Playwright (window boot, straggler-in-window, delta merge, load
   older, server search, stats KPI, "no full-index fetch" assertion).
 
+## Mobile decision screen (2026-07-13, operator-approved)
+
+Phones-only overhaul of the detail page. Contracts:
+- `.mdc` cards (`#mdc-history`/`#mdc-verdict`/`#mdc-id`) are the FIRST
+  children of `#dv-panel-profile`, rendered by
+  `renderMobileDecisionCards(fbId)` (hooked at the TOP of
+  renderProfileLoans so every loan/match re-render refreshes them).
+  Desktop hides them via base `.mdc{display:none}` — don't render-gate
+  in JS.
+- `_loanTableHtml(loans)` is the SHARED loan-table builder (Profile
+  section + strip expansion — no ids inside, safe to render twice).
+- ID card shows the applicant's REAL uploaded photo (`govIdUrl` +
+  ad fallbacks, same source as the Documents tab). Lightbox
+  `#idlb-ov` is registered FIRST in `_MOB_OVERLAYS` (inner-most).
+- On phones + `body[data-current-route="detail"]`: the search bar is
+  hidden AND `--topnav-h` is overridden back to 60px+safe-area — the
+  sticky `.dv-tabs`, `.main.full` padding, and scroll-margins all read
+  that var, so they move together. Never hardcode the 116px value.
+- `switchDetailTab` scrolls the active `.view` to top on phones (the
+  view IS the scroll container — `window.scrollTo` is a no-op) and
+  toggles `dv-nonprofile` on #view-detail (CSS hides `.dv-rail` on
+  non-Profile tabs; Danger Zone collapses behind its title).
+- `.dv-bar-actions` (Decline/$/Approve) is position:fixed above the
+  bottom tab bar on the detail route; `.main.full` gets extra bottom
+  padding to clear it.
+- `.mb-when` (compliance row timestamp) hides on phones — the expanded
+  detail box repeats the checked time.
+Verified by scratchpad mobrev_stub.py + shot_mdc.py (18 checks incl. a
+desktop regression sweep).
+
 ## CCL combo speed (2026-07-12, phases 0-2 with cif-apply)
 
 The Create Customer & Loan combo (`startCreateCustomerLoan`) no longer
