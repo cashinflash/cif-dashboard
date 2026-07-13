@@ -1802,7 +1802,93 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
   .dv-tab{font-size:10px;gap:3px;padding:9px 1px;letter-spacing:-.01em}
   .dv-tab .icn{width:11px;height:11px}
 }
+
+/* ── MOBILE DECISION SCREEN (2026-07-13, operator-approved) ─────────
+   Phones only. The operator's pre-check reading order — Vergent
+   history → engine verdict → ID photo — lives at the top of the
+   Profile tab, ABOVE Quick Actions + Compliance, so the whole
+   pre-approval ritual is one scroll on one tab. Desktop unchanged
+   (.mdc stays display:none outside the media query). */
+.mdc{display:none}
+.idlb-ov{display:none}
+@media (max-width:600px){
+  /* Reclaim the pinned search bar while inside an applicant: hide it
+     and shrink the shared header-height var so the sticky tab strip,
+     content padding, and section anchors all move up together. */
+  body[data-current-route="detail"] .search-wrap{display:none !important}
+  body[data-current-route="detail"]{--topnav-h:calc(60px + env(safe-area-inset-top,0px))}
+  /* Anchored scrolls (loan history links etc.) must clear the sticky
+     topnav + tab strip instead of hiding under them. */
+  #view-detail .sec-h,#view-detail .profile-card,#view-detail .doc-preview-card,#view-detail .mdc{scroll-margin-top:calc(var(--topnav-h) + 112px)}
+
+  .mdc.on{display:block;margin:0 0 10px}
+  .mdc-card{background:white;border:1px solid var(--border);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow-xs)}
+  /* History strip */
+  .mdc-hist-line{display:flex;align-items:center;gap:9px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .mdc-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .mdc-hist-txt{flex:1;min-width:0;font-size:12.5px;font-weight:700;color:var(--text);line-height:1.45}
+  .mdc-hist-sub{display:block;font-size:11.5px;font-weight:600;color:var(--muted)}
+  .mdc-chev{width:13px;height:13px;color:var(--muted2);flex-shrink:0;transition:transform .15s}
+  .mdc.open .mdc-chev{transform:rotate(180deg)}
+  .mdc-hist-body{display:none;margin-top:10px;border-top:1px solid var(--border-soft);padding-top:10px}
+  .mdc.open .mdc-hist-body{display:block}
+  /* Verdict mini-card */
+  .mdc-verdict-top{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .mdc-verdict-big{font-size:16px;font-weight:800;letter-spacing:-.01em}
+  .mdc-verdict-big.ap{color:var(--green-dark)}
+  .mdc-verdict-big.de{color:var(--red)}
+  .mdc-verdict-big.rv{color:#a15c00}
+  .mdc-reason{font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:9px}
+  .mdc-facts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .mdc-fact{background:var(--surface2);border:1px solid var(--border-soft);border-radius:9px;padding:7px 9px}
+  .mdc-fact-l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .mdc-fact-v{font-size:13.5px;font-weight:800;color:var(--text);margin-top:1px;font-variant-numeric:tabular-nums}
+  .mdc-report-btn{margin-left:auto;background:#e8f3f8;color:#1a4d6b;border:1px solid #6cb1e2;padding:6px 11px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+  /* ID thumbnail */
+  .mdc-id-row{display:flex;align-items:center;gap:12px}
+  .mdc-id-thumb{width:112px;height:70px;object-fit:cover;border-radius:9px;border:1px solid var(--border);background:var(--surface2);flex-shrink:0}
+  .mdc-id-txt{flex:1;min-width:0}
+  .mdc-id-t1{font-size:12.5px;font-weight:700;color:var(--text)}
+  .mdc-id-t2{font-size:11.5px;color:var(--muted);margin-top:1px}
+  /* Tab switches land at the top; the rail (portal invite / reviews /
+     danger zone) only rides the Profile tab on phones. */
+  #view-detail.dv-nonprofile .dv-rail{display:none !important}
+  /* Danger zone collapsed behind its title on phones. */
+  .dv-rail-danger .dv-rail-danger-btn,.dv-rail-danger .dv-rail-danger-hint{display:none}
+  .dv-rail-danger.open .dv-rail-danger-btn,.dv-rail-danger.open .dv-rail-danger-hint{display:block}
+  .dv-rail-danger .dv-rail-title{cursor:pointer;margin-bottom:0}
+  .dv-rail-danger.open .dv-rail-title{margin-bottom:10px}
+  .dv-rail-danger .dv-rail-title::after{content:'▸';font-size:12px;color:var(--red);transition:transform .15s}
+  .dv-rail-danger.open .dv-rail-title::after{transform:rotate(90deg)}
+  /* Compliance rows: the timestamp column forced 3-line label wraps on
+     phones; the expanded detail box repeats "Checked <time>" anyway. */
+  .mb-when{display:none}
+  /* Loan-history table: keep headers on one line, tighter cells. */
+  .loan-table th{white-space:nowrap;font-size:10px;padding:8px 8px}
+  .loan-table td{white-space:nowrap;font-size:12px;padding:9px 8px}
+  /* Sticky decision bar: Decline / $ / Approve pinned above the bottom
+     tab bar while inside an applicant — read at the bottom, act right
+     there. Content bottom padding clears it. */
+  body[data-current-route="detail"] .dv-bar-actions{position:fixed;left:8px;right:8px;bottom:calc(58px + env(safe-area-inset-bottom,0px));z-index:290;background:rgba(255,255,255,.96);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:16px;padding:8px;box-shadow:0 8px 28px rgba(15,40,25,.16)}
+  body[data-current-route="detail"] #view-detail .main.full{padding-bottom:calc(168px + env(safe-area-inset-bottom,0px)) !important}
+}
+/* ID lightbox (all sizes; opened from the mobile ID card) */
+.idlb-ov.open{display:flex;position:fixed;inset:0;z-index:560;background:rgba(10,16,12,.92);align-items:center;justify-content:center;overflow:auto;-webkit-overflow-scrolling:touch}
+.idlb-ov img{max-width:96vw;max-height:88vh;border-radius:10px;transition:transform .18s ease;transform-origin:center center}
+.idlb-ov.zoomed img{transform:scale(2.1)}
+.idlb-ov.zoomed{align-items:flex-start;justify-content:flex-start}
+.idlb-x{position:fixed;top:calc(14px + env(safe-area-inset-top,0px));right:14px;z-index:561;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.14);color:white;border:1px solid rgba(255,255,255,.35);font-size:17px;font-weight:700;cursor:pointer;font-family:inherit}
+.idlb-hint{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;color:rgba(255,255,255,.75);font-size:11.5px;font-weight:600;pointer-events:none}
 </style>
+<!-- ID photo lightbox: opened from the mobile ID decision card. Tap
+     backdrop or ✕ to close, tap the photo to toggle 2x zoom (then pan
+     by scrolling). Registered in _MOB_OVERLAYS for back-gesture close. -->
+<div class="idlb-ov" id="idlb-ov" onclick="if(event.target===this)closeIdLightbox()">
+  <img id="idlb-img" alt="ID document" onclick="document.getElementById('idlb-ov').classList.toggle('zoomed')">
+  <button class="idlb-x" type="button" onclick="closeIdLightbox()">✕</button>
+  <div class="idlb-hint">Tap photo to zoom · tap outside to close</div>
+</div>
+
 <!-- Offer amount wheel (phones): $100 / $125 / $150 / $200 / $255 +
      custom entry. Registered in _MOB_OVERLAYS so back-gesture closes it. -->
 <div class="amt-ov" id="dv-amt-sheet" onclick="if(event.target===this)closeAmtSheet()">
@@ -2128,6 +2214,14 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
 
           <!-- PROFILE PANEL — customer-level admin view -->
           <div class="dv-panel active" id="dv-panel-profile">
+            <!-- MOBILE DECISION CARDS (phones only; hidden on desktop
+                 via .mdc CSS). Rendered by renderMobileDecisionCards:
+                 Vergent history strip → engine verdict → ID photo, in
+                 the operator's pre-check reading order, above Quick
+                 Actions + Compliance. -->
+            <div class="mdc" id="mdc-history"></div>
+            <div class="mdc" id="mdc-verdict"></div>
+            <div class="mdc" id="mdc-id"></div>
             <!-- Customer status hero -->
             <div class="profile-status" id="profile-status">
               <div class="profile-status-icn"><svg class="icn"><use href="#i-overview"/></svg></div>
@@ -2377,7 +2471,7 @@ body.queue-select-mode #queue-tbody tr[data-fb]:hover td{background:var(--green-
             <div id="dv-snapshot"></div>
           </div>
           <div class="dv-rail-section dv-rail-danger dv-rail-card">
-            <div class="dv-rail-title" style="color:var(--red)">Danger Zone</div>
+            <div class="dv-rail-title" style="color:var(--red)" onclick="this.closest('.dv-rail-danger').classList.toggle('open')">Danger Zone</div>
             <button class="dv-rail-danger-btn" id="dv-delete-btn" title="Permanently delete this application from Firebase"><svg class="icn"><use href="#i-x"/></svg>Delete Application</button>
             <div class="dv-rail-danger-hint">This permanently removes the application record from Firebase. Can't be undone.</div>
           </div>
@@ -7218,7 +7312,7 @@ function renderComplianceCard(fbId) {
       +   '<div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">'
       +     escapeHtml(detail || '—') + '</div>'
       + '</div>'
-      + (checkedAt ? '<span style="font-size:11.5px;color:var(--muted2);white-space:nowrap;flex-shrink:0">' + escapeHtml(when(checkedAt)) + '</span>' : '')
+      + (checkedAt ? '<span class="mb-when" style="font-size:11.5px;color:var(--muted2);white-space:nowrap;flex-shrink:0">' + escapeHtml(when(checkedAt)) + '</span>' : '')
       + chip
       + '<svg class="icn mb-chev" style="width:13px;height:13px;color:var(--muted2);flex-shrink:0;transition:transform .15s"><use href="#i-caret"/></svg>'
       + '</div>'
@@ -7591,6 +7685,9 @@ function renderProfilePanel(fbId) {
 }
 
 function renderProfileLoans(fbId) {
+  // Keep the mobile decision cards in lock-step with every loan-area
+  // re-render (initial paint, vergentMatch resolution, loans loaded).
+  try { renderMobileDecisionCards(fbId); } catch (e) { /* non-fatal */ }
   const wrap = document.getElementById('profile-loans');
   const countEl = document.getElementById('profile-loan-count');
   const cache = _vergentLoansCache[fbId];
@@ -7618,7 +7715,14 @@ function renderProfileLoans(fbId) {
     return;
   }
   countEl.textContent = `${loans.length} loan${loans.length === 1 ? '' : 's'}`;
-  wrap.innerHTML = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table class="loan-table">
+  wrap.innerHTML = _loanTableHtml(loans);
+}
+
+// Shared loan-table builder — used by the Profile section AND the
+// mobile decision strip's expansion (same rows, two homes; no ids in
+// the markup so rendering it twice is safe).
+function _loanTableHtml(loans) {
+  return `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table class="loan-table">
     <thead><tr><th>Date</th><th>Loan #</th><th>Amount</th><th>Balance</th><th>Status</th><th>Days Late</th></tr></thead>
     <tbody>${loans.map(l => {
       const date = fmtLoanDate(l.date);
@@ -7656,6 +7760,137 @@ function fmtLoanDate(s) {
   } catch (e) {
     return String(s);
   }
+}
+
+// ── Mobile decision cards (phones only; .mdc CSS hides on desktop) ──
+// The operator's pre-check reading order at the top of the Profile
+// tab: Vergent history strip → engine verdict → ID photo. Pure
+// presentation over data that's already loaded for the page —
+// no new endpoints, no new fetches.
+function renderMobileDecisionCards(fbId) {
+  const hist = document.getElementById('mdc-history');
+  const verd = document.getElementById('mdc-verdict');
+  const idc  = document.getElementById('mdc-id');
+  if (!hist || !verd || !idc) return;
+  const a = apps.find(x => x.firebaseId === fbId);
+  if (!a) {
+    hist.classList.remove('on'); verd.classList.remove('on'); idc.classList.remove('on');
+    return;
+  }
+
+  // 1) Vergent history strip
+  const m = _vergentMatchCache[fbId];
+  const cache = _vergentLoansCache[fbId];
+  const st = m ? String(m.status || '').toLowerCase() : '';
+  let dot = 'var(--border2)', line = 'Checking Vergent…', sub = '', expandable = false;
+  if (st === 'found') {
+    const cid = m.customerId || '?';
+    if (!cache) {
+      dot = 'var(--green)'; line = 'Existing customer'; sub = 'Vergent #' + cid + ' · loading loan history…';
+    } else if (cache.error) {
+      dot = '#e0a437'; line = 'Existing customer'; sub = 'Vergent #' + cid + ' · history unavailable';
+    } else {
+      const loans = cache.loans || [];
+      if (!loans.length) {
+        dot = 'var(--green)'; line = 'Existing customer · no loans on file'; sub = 'Vergent #' + cid;
+      } else {
+        const owed = loans.reduce((s, l) => s + (Number(l.balance) || 0), 0);
+        const late = loans.some(l => Number(l.days_late || 0) > 0);
+        const newest = loans.map(l => l.date).filter(Boolean).sort().slice(-1)[0];
+        dot = owed > 0 ? 'var(--red)' : late ? '#e0a437' : 'var(--green)';
+        line = 'Existing customer · ' + loans.length + ' loan' + (loans.length === 1 ? '' : 's')
+             + (owed > 0 ? ' · $' + Math.round(owed).toLocaleString() + ' OWED' : ' · all paid off');
+        sub = (late ? 'Has late history' : 'Never late') + (newest ? ' · last ' + fmtLoanDate(newest) : '');
+        expandable = true;
+      }
+    }
+  } else if (st === 'not_found' || st === 'new') {
+    dot = '#8aa0ad'; line = 'New customer'; sub = 'No Vergent history';
+  } else if (st === 'ambiguous') {
+    dot = '#e0a437'; line = 'Vergent: multiple possible matches'; sub = 'Resolve in Quick Actions below';
+  } else if (st === 'error') {
+    dot = 'var(--red)'; line = 'Vergent check failed'; sub = 'Tap the V badge up top to re-check';
+  }
+  hist.innerHTML = '<div class="mdc-card">'
+    + '<div class="mdc-hist-line"' + (expandable
+        ? ' onclick="document.getElementById(\'mdc-history\').classList.toggle(\'open\')"' : '') + '>'
+    +   '<span class="mdc-dot" style="background:' + dot + '"></span>'
+    +   '<span class="mdc-hist-txt">' + escapeHtml(line)
+    +     '<span class="mdc-hist-sub">' + escapeHtml(sub) + '</span></span>'
+    +   (expandable ? '<svg class="icn mdc-chev"><use href="#i-caret"/></svg>' : '')
+    + '</div>'
+    + (expandable ? '<div class="mdc-hist-body">' + _loanTableHtml((cache && cache.loans) || []) + '</div>' : '')
+    + '</div>';
+  hist.classList.add('on');
+
+  // 2) Engine verdict mini-card (facts render only when the v4 fields
+  //    exist on the record — older applicants just get verdict+reason).
+  const dec = String(a.claudeDecision || '').toLowerCase();
+  if (dec) {
+    const amt = parseAmount(a.amount) != null ? parseAmount(a.amount) : parseAmount(a.claudeAmount);
+    const cls = dec.startsWith('app') ? 'ap' : dec.startsWith('dec') ? 'de' : 'rv';
+    const label = dec.startsWith('app') ? 'APPROVE' : dec.startsWith('dec') ? 'DECLINE' : 'REVIEW';
+    const reason = a.v4ReasonLine || a.reason || '';
+    const money = v => '$' + Math.round(Number(v)).toLocaleString();
+    const facts = [];
+    if (a.v4Adb30 != null) facts.push(['Avg balance 30d', money(a.v4Adb30)]);
+    if (a.v4Survival != null) facts.push(['Payday survival', money(a.v4Survival)]);
+    const inc = a.v4IncomeMonthly != null ? a.v4IncomeMonthly : a.monthlyIncome;
+    if (inc != null && Number(inc) > 0) facts.push(['Income / mo', money(inc)]);
+    if (a.v4Velocity != null) facts.push(['Velocity', Number(a.v4Velocity).toFixed(2)]);
+    verd.innerHTML = '<div class="mdc-card">'
+      + '<div class="mdc-verdict-top">'
+      +   '<span class="mdc-verdict-big ' + cls + '">' + label
+      +     (amt != null && !dec.startsWith('dec') ? ' · $' + amt.toLocaleString() : '') + '</span>'
+      +   '<button type="button" class="mdc-report-btn" onclick="switchDetailTab(\'report\')">Full report →</button>'
+      + '</div>'
+      + (reason ? '<div class="mdc-reason">' + escapeHtml(reason) + '</div>' : '')
+      + (facts.length ? '<div class="mdc-facts">' + facts.map(f =>
+            '<div class="mdc-fact"><div class="mdc-fact-l">' + f[0] + '</div>'
+          + '<div class="mdc-fact-v">' + escapeHtml(String(f[1])) + '</div></div>').join('') + '</div>' : '')
+      + '</div>';
+    verd.classList.add('on');
+  } else {
+    verd.classList.remove('on');
+  }
+
+  // 3) Government ID (image → tap for full-screen lightbox; PDF →
+  //    opens in a new tab; nothing on file → card hidden).
+  const ad = a.applicationData || {};
+  const idUrl = a.govIdUrl || ad.idDocumentUrl || ad.driverLicenseUrl || ad.dlUrl || '';
+  if (idUrl) {
+    const isPdf = String(idUrl).toLowerCase().split('?')[0].endsWith('.pdf');
+    const safeUrl = escapeHtml(idUrl);
+    idc.innerHTML = '<div class="mdc-card">'
+      + '<div class="mdc-id-row" style="cursor:pointer" onclick="'
+      +   (isPdf ? "window.open('" + safeUrl + "','_blank')"
+                 : "openIdLightbox('" + safeUrl + "')") + '">'
+      +   (isPdf
+            ? '<div class="mdc-id-thumb" style="display:flex;align-items:center;justify-content:center;font-size:22px">📄</div>'
+            : '<img class="mdc-id-thumb" loading="lazy" src="' + safeUrl + '" alt="ID" onerror="this.style.visibility=\'hidden\'">')
+      +   '<div class="mdc-id-txt">'
+      +     '<div class="mdc-id-t1">🪪 Government ID</div>'
+      +     '<div class="mdc-id-t2">' + (isPdf ? 'PDF on file — tap to open' : 'Tap to view full screen') + '</div>'
+      +   '</div>'
+      + '</div></div>';
+    idc.classList.add('on');
+  } else {
+    idc.classList.remove('on');
+  }
+}
+
+function openIdLightbox(url) {
+  const ov = document.getElementById('idlb-ov');
+  const img = document.getElementById('idlb-img');
+  if (!ov || !img) return;
+  img.src = url;
+  ov.classList.remove('zoomed');
+  ov.classList.add('open');
+}
+
+function closeIdLightbox() {
+  const ov = document.getElementById('idlb-ov');
+  if (ov) { ov.classList.remove('open'); ov.classList.remove('zoomed'); }
 }
 
 function loanStatusClass(status, daysLate, balance, isOutstanding) {
@@ -8385,10 +8620,20 @@ function _searchOpenKbd() {
 function switchDetailTab(name) {
   document.querySelectorAll('.dv-tab').forEach(t => t.classList.toggle('active', t.getAttribute('data-tab') === name));
   document.querySelectorAll('.dv-panel').forEach(p => p.classList.toggle('active', p.id === 'dv-panel-' + name));
+  // Phones hide the rail (portal invite / reviews / danger zone) on
+  // every tab except Profile — see .dv-nonprofile CSS.
+  const vd = document.getElementById('view-detail');
+  if (vd) vd.classList.toggle('dv-nonprofile', name !== 'profile');
   // Phone chip strip: keep the active chip visible.
   if (window.matchMedia('(max-width:600px)').matches) {
     const t = document.querySelector('.dv-tab.active');
     if (t && t.scrollIntoView) t.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+    // Every tab switch lands at the TOP of that tab — switching used
+    // to keep the previous tab's scroll offset, dumping the operator
+    // mid-panel (or hiding content under the sticky strip).
+    const v = document.querySelector('.view.active');
+    if (v) v.scrollTop = 0;
+    window.scrollTo(0, 0);
   }
 }
 
@@ -17369,6 +17614,7 @@ document.getElementById('dv-offer-input').addEventListener('pointerdown', (e) =>
 });
 
 const _MOB_OVERLAYS = [
+  ['idlb-ov', 'closeIdLightbox'],
   ['dv-amt-sheet', 'closeAmtSheet'],
   ['more-sheet', 'mobMoreClose'],
   ['schp-ov', 'closeSchedulePaymentModal'],
