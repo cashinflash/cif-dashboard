@@ -3155,6 +3155,30 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(500, {'error': str(e)})
             return
 
+        # Reconnect-bank email (2026-07-16): emails the customer a
+        # "reconnect your bank in the portal" nudge when their stored Plaid
+        # connection died (ITEM_LOGIN_REQUIRED family). Proxies to
+        # cif-apply, which dedups one send per record per day.
+        if path == '/api/send-reconnect-email':
+            try:
+                body = json.loads(raw)
+                payload = json.dumps(body).encode()
+                import urllib.request as ur
+                req = ur.Request('https://cif-apply.onrender.com/api/send-reconnect-email',
+                    data=payload, headers={'Content-Type': 'application/json'}, method='POST')
+                with ur.urlopen(req, timeout=30) as r:
+                    result = json.loads(r.read().decode())
+                self.send_json(200, result)
+            except urllib.error.HTTPError as e:
+                try: err_body = json.loads(e.read().decode())
+                except Exception: err_body = {'error': str(e)}
+                print(f'[RECONNECT-EMAIL UPSTREAM {e.code}] {err_body}', flush=True)
+                self.send_json(e.code, err_body)
+            except Exception as e:
+                print(f'[RECONNECT-EMAIL ERROR] {e}', flush=True)
+                self.send_json(500, {'error': str(e)})
+            return
+
         # Phase U.3: trigger a Plaid asset report. Path:
         # /api/portal-plaid/asset-report/{itemId}
         # Posts to cif-portal's admin endpoint via the service-user proxy

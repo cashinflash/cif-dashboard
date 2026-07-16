@@ -9559,6 +9559,32 @@ function _showDocsRefreshing(on, doneText, isError) {
   }
 }
 
+// Bank-reconnect UX (2026-07-16): a stored Plaid connection that died at
+// the bank (ITEM_LOGIN_REQUIRED family) can NEVER be revived server-side —
+// only the customer re-authenticating fixes it. Recognize those errors,
+// say so in plain English, and offer to email the customer a reconnect
+// link (proxied to cif-apply, deduped one send per record per day).
+const _PLAID_RELINK_RX = /(ITEM_LOGIN_REQUIRED|OAUTH_INVALID_TOKEN|ACCESS_NOT_GRANTED|ITEM_LOCKED|ITEM_NOT_FOUND|ITEM_PENDING_EXPIRATION|INVALID_ACCESS_TOKEN)/i;
+function _isPlaidRelinkErr(msg) { return _PLAID_RELINK_RX.test(String(msg || '')); }
+function _handlePlaidFailure(fbId, rawMsg) {
+  if (!_isPlaidRelinkErr(rawMsg)) { toast('Refresh failed: ' + rawMsg, 'err'); return; }
+  toast('Bank connection expired at the bank — the customer must reconnect. Re-running cannot fix this.', 'err');
+  setTimeout(function () {
+    if (!confirm("This customer's bank connection has expired at their bank (password change, revoked access, or the bank's own consent expiry).\n\nNo re-run can fix it — only the customer reconnecting can.\n\nEmail them a link to reconnect their bank in the portal?")) return;
+    fetch('/api/send-reconnect-email', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firebase_id: fbId })
+    })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (res.ok && res.d && res.d.ok) toast(res.d.deduped ? ('Already sent today to ' + res.d.to) : ('Reconnect email sent to ' + res.d.to));
+        else toast('Could not send: ' + ((res.d && (res.d.detail || res.d.error)) || 'unknown'), 'err');
+      })
+      .catch(function (e) { toast('Could not send: ' + ((e && e.message) || e), 'err'); });
+  }, 400);
+}
+
 async function refreshFromPlaid(fbId) {
   toast('Starting fresh Plaid pull…');
   dvShowRerunLoading('Pulling a fresh Plaid asset report & re-running…');
@@ -9572,9 +9598,10 @@ async function refreshFromPlaid(fbId) {
     const d = await r.json().catch(() => ({}));
     if (!r.ok) {
       // 400 no_plaid_connection, 404 not found, etc. Surface the
-      // backend's human-readable detail.
+      // backend's human-readable detail (relink errors get the
+      // plain-English treatment + reconnect-email offer).
       const msg = d.detail || d.error || ('HTTP ' + r.status);
-      toast('Refresh failed: ' + msg, 'err');
+      _handlePlaidFailure(fbId, msg);
       dvEndRerunLoading();
       _lastReportHtml = null;
       rerender();
@@ -9624,7 +9651,7 @@ async function _pollPlaidRefresh(fbId, pdfRefreshable) {
     if (st === 'error') {
       let errMsg = null;
       try { errMsg = await fbGet(`reports/${fbId}/plaidRefreshError.json`); } catch (e) {}
-      toast('Refresh failed: ' + (errMsg || 'unknown error'), 'err');
+      _handlePlaidFailure(fbId, errMsg || 'unknown error');
       dvEndRerunLoading();
       _showDocsRefreshing(false);
       await hydrateFullRecord(fbId);

@@ -263,6 +263,20 @@ only ever APPEND to that list, never insert.** The precheck pre-ticks 13
 when `record.microbilt.mla.covered === true`. Backend details:
 cif-apply/CLAUDE.md "MicroBilt intake checks".
 
+## Plaid relink UX (2026-07-16)
+
+A stored Plaid connection that died at the BANK (ITEM_LOGIN_REQUIRED
+family — see cif-apply/CLAUDE.md "Plaid reliability program") can never
+be revived by Re-Run/Refresh. app.html's `_handlePlaidFailure(fbId,
+msg)` (right above refreshFromPlaid) recognizes those codes
+(`_PLAID_RELINK_RX`), replaces the raw-exception toast with plain
+English, and offers a confirm() → `POST /api/send-reconnect-email`
+(server.py proxy → cif-apply; deduped 1/record/day upstream). It is
+wired into BOTH refresh failure paths (the !r.ok branch and the
+_pollPlaidRefresh status='error' branch). Any new Plaid-touching
+operator action should route its failure toast through
+_handlePlaidFailure instead of toasting the raw error.
+
 ## Reapply-block visibility (30-day cooldown, 2026-07-08)
 
 Backend: cif-apply/CLAUDE.md "30-day reapplication block". Dashboard
